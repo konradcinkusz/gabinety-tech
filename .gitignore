@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+.env
+secrets.env
+node_modules/
+.next/
+TestResults/
+*.log

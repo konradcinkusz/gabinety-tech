@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="../Gabinety.ServiceDefaults/Gabinety.ServiceDefaults.csproj" />
+    <ProjectReference Include="../Gabinety.Contracts/Gabinety.Contracts.csproj" />
+    <ProjectReference Include="../Gabinety.Ranking/Gabinety.Ranking.csproj" />
+  </ItemGroup>
+</Project>

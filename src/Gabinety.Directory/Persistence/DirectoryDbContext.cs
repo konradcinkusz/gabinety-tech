@@ -10,6 +10,9 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
     public DbSet<Features.Taxonomy.Category> Categories => Set<Features.Taxonomy.Category>();
     public DbSet<Features.Taxonomy.TaxonomyMeta> TaxonomyMeta => Set<Features.Taxonomy.TaxonomyMeta>();
 
+    public DbSet<Features.Verification.VerificationEvent> VerificationEvents => Set<Features.Verification.VerificationEvent>();
+    public DbSet<Features.Verification.Moderator> Moderators => Set<Features.Verification.Moderator>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DirectoryDbContext).Assembly);
 }

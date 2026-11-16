@@ -124,7 +124,10 @@ public sealed class ProfilesFeature : IServiceFeature
         var nipChanged = nip != p.Nip;
         if (nipChanged && p.Status == PractitionerStatus.Approved &&
             PractitionerStateMachine.TryTransition(p.Status, PractitionerTrigger.NipChanged, out var next))
+        {
             p.Status = next;
+            Verification.VerificationEvents.Record(db, p.Id, Verification.VerificationEventKind.NipChanged, uid, null, time);
+        }
         p.DisplayName = name; p.Headline = headline; p.Bio = bio; p.PortfolioUrl = portfolio; p.MeetingUrlDefault = meeting;
         p.Nip = nip; p.NipValid = nip is not null; // a stored NIP has passed the checksum
         p.ProfileCompleteness = ProfileCompleteness.Compute(headline.Length > 0, bio.Length >= 200,
@@ -156,6 +159,7 @@ public sealed class ProfilesFeature : IServiceFeature
                 code = ErrorCodes.SubmitIncomplete, unmetItems = new SubmitIncomplete(unmet).UnmetItems }, statusCode: 422, contentType: "application/problem+json");
 
         p.Status = next; p.StatusReason = null; p.UpdatedAt = time.GetUtcNow();
+        Verification.VerificationEvents.Record(db, p.Id, Verification.VerificationEventKind.Submitted, uid, null, time);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
     }

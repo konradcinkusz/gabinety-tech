@@ -125,6 +125,20 @@ namespace Gabinety.Directory.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("display_name");
 
+                    b.Property<string>("GithubChallengeCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("github_challenge_code");
+
+                    b.Property<DateTimeOffset?>("GithubChallengeExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("github_challenge_expires_at");
+
+                    b.Property<string>("GithubChallengeLogin")
+                        .HasMaxLength(39)
+                        .HasColumnType("character varying(39)")
+                        .HasColumnName("github_challenge_login");
+
                     b.Property<bool>("GithubLinked")
                         .HasColumnType("boolean")
                         .HasColumnName("github_linked");
@@ -299,6 +313,56 @@ namespace Gabinety.Directory.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Gabinety.Directory.Features.Verification.Moderator", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("moderators", (string)null);
+                });
+
+            modelBuilder.Entity("Gabinety.Directory.Features.Verification.VerificationEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActorUserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("PractitionerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("practitioner_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PractitionerId", "At");
+
+                    b.ToTable("verification_events", (string)null);
+                });
+
             modelBuilder.Entity("Gabinety.Directory.Features.Offerings.Offering", b =>
                 {
                     b.HasOne("Gabinety.Directory.Features.Profiles.Practitioner", null)
@@ -310,6 +374,15 @@ namespace Gabinety.Directory.Persistence.Migrations
                     b.HasOne("Gabinety.Directory.Features.Taxonomy.Category", null)
                         .WithMany()
                         .HasForeignKey("ProblemSlug")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Gabinety.Directory.Features.Verification.VerificationEvent", b =>
+                {
+                    b.HasOne("Gabinety.Directory.Features.Profiles.Practitioner", null)
+                        .WithMany()
+                        .HasForeignKey("PractitionerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

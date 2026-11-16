@@ -13,7 +13,7 @@ export async function proxy(request: NextRequest) {
     const { issuer, audience } = readConfig().identity;
     return remoteVerifier(base, { issuer, audience })(token);
   };
-  const d = await decide({ pathname, search, accessToken: request.cookies.get("gt_at")?.value }, verify);
+  const d = await decide({ pathname, search, accessToken: request.cookies.get("gt_at")?.value, refreshToken: request.cookies.get("gt_rt")?.value }, verify);
   if (d.action === "next") return NextResponse.next();
   return NextResponse.redirect(new URL(d.to, request.url));
 }

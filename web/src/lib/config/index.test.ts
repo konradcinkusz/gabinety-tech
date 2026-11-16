@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readConfig } from "./config";
+import { readConfig } from "./index";
 
 describe("readConfig", () => {
   it("splits candidate lists and trims", () => {
@@ -15,5 +15,13 @@ describe("readConfig", () => {
     expect(readConfig(env).backends.auth).toEqual(["http://one"]);
     env["Backend__Auth"] = "http://two";
     expect(readConfig(env).backends.auth).toEqual(["http://two"]);
+  });
+});
+
+describe("readConfig identity", () => {
+  it("reads optional issuer, audience and public url", () => {
+    const c = readConfig({ Identity__Issuer: "i", Identity__Audience: "a", Identity__PublicUrl: "https://id" });
+    expect(c.identity).toEqual({ issuer: "i", audience: "a", publicUrl: "https://id" });
+    expect(readConfig({}).identity).toEqual({ issuer: undefined, audience: undefined, publicUrl: undefined });
   });
 });

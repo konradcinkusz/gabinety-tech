@@ -17,7 +17,7 @@ namespace Gabinety.Integration.Tests.ThinSlice;
 /// altered signature character is rejected. The image is pinned by digest (docs/spikes/authservice.md section 4).
 /// </summary>
 [Trait("tier", "integration")]
-public class ThinSliceTests : IAsyncLifetime
+public class ThinSliceTests(Xunit.Abstractions.ITestOutputHelper output) : IAsyncLifetime
 {
     // ghcr.io/konradcinkusz/authservice:v0.3.4, multi-platform index digest read from the registry on 2026-11-16.
     private const string Image = "ghcr.io/konradcinkusz/authservice@sha256:d0309a94f6b6300d4b8091381786c160ae7717a022416debaaa6d8d19a244645";
@@ -83,6 +83,7 @@ public class ThinSliceTests : IAsyncLifetime
             acceptedTermsVersion = versions.GetProperty("terms").GetString(),
             acceptedPrivacyVersion = versions.GetProperty("privacy").GetString(),
         });
+        output.WriteLine($"OBSERVED register status: {(int)reg.StatusCode}");
         Assert.True(reg.IsSuccessStatusCode, $"register answered {(int)reg.StatusCode}: {await reg.Content.ReadAsStringAsync()}");
 
         var login = await http.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
@@ -91,7 +92,18 @@ public class ThinSliceTests : IAsyncLifetime
 
         var payload = token.Split('.')[1].Replace('-', '+').Replace('_', '/');
         payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
-        var sub = JsonDocument.Parse(Convert.FromBase64String(payload)).RootElement.GetProperty("sub").GetString()!;
+        var claims = JsonDocument.Parse(Convert.FromBase64String(payload)).RootElement;
+        var sub = claims.GetProperty("sub").GetString()!;
+        // Names and JSON kinds only, never values (the e-mail is synthetic but values are not needed).
+        output.WriteLine("OBSERVED claims: " + string.Join(", ", claims.EnumerateObject().Select(p => $"{p.Name}:{p.Value.ValueKind}")));
+        var h = token.Split('.')[0].Replace('-', '+').Replace('_', '/');
+        h = h.PadRight(h.Length + (4 - h.Length % 4) % 4, '=');
+        var header = JsonDocument.Parse(Convert.FromBase64String(h)).RootElement;
+        output.WriteLine("OBSERVED header: " + string.Join(", ", header.EnumerateObject().Select(p => p.Name == "kid" ? "kid:present" : $"{p.Name}:{p.Value}")));
+        var disco = await http.GetFromJsonAsync<JsonElement>("/.well-known/openid-configuration");
+        output.WriteLine($"OBSERVED discovery issuer={disco.GetProperty("issuer").GetString()} jwks_uri_path={new Uri(disco.GetProperty("jwks_uri").GetString()!).AbsolutePath}");
+        var jwks = await http.GetFromJsonAsync<JsonElement>("/.well-known/jwks.json");
+        output.WriteLine($"OBSERVED jwks keys={jwks.GetProperty("keys").GetArrayLength()}");
         return (token, sub);
     }
 

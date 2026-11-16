@@ -10,13 +10,16 @@ namespace Gabinety.Llm;
 /// hosted service) and never throws out of it (R4): a runtime that cannot start or is not signed in is reported through
 /// <see cref="Status"/>. No prompt, reply or reasoning text goes on a span, a log or a metric.
 /// </summary>
-public sealed class CopilotLlmGateway(IOptions<CopilotOptions> options, ILogger<CopilotLlmGateway> logger) : ILlmGateway
+public sealed class CopilotLlmGateway(
+    IOptions<CopilotOptions> options, ILogger<CopilotLlmGateway> logger, IOptions<LlmOptions>? llmOptions = null) : ILlmGateway
 {
     private static readonly ActivitySource ActivitySource = new("Gabinety.Llm");
 
     private readonly CopilotOptions _options = options.Value;
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private volatile LlmGatewayStatus _status = new(LlmGatewayState.Unavailable, "Copilot runtime not started");
+    private readonly IReadOnlyList<CustomModelOptions> _configuredCustomModels = llmOptions?.Value.CustomModels ?? [];
+    private IReadOnlyList<CustomModelOptions> _customModels = [];
     private CopilotClient? _client;
 
     public LlmGatewayStatus Status => _status;
@@ -57,6 +60,7 @@ public sealed class CopilotLlmGateway(IOptions<CopilotOptions> options, ILogger<
                 }
 
                 var models = await _client.ListModelsAsync(timeout.Token);
+                _customModels = ActiveCustomModels(_configuredCustomModels, models.Select(m => m.Id), logger);
                 _status = new LlmGatewayStatus(LlmGatewayState.Ready, $"Signed in as {auth.Login}; {models.Count} models.");
                 logger.LogInformation("Copilot runtime ready with {ModelCount} models", models.Count);
             }
@@ -87,21 +91,92 @@ public sealed class CopilotLlmGateway(IOptions<CopilotOptions> options, ILogger<
         }
     }
 
+#pragma warning disable GHCP001 // The SDK marks the token price unit experimental and CachePrice deprecated; both are read in this method and its helper only.
     public async Task<IReadOnlyList<LlmModelInfo>> ListModelsAsync(CancellationToken ct)
     {
         var client = RequireReady();
         var models = await client.ListModelsAsync(ct);
-        return models
+        var priceUnits = await ListPriceUnitsAsync(client, ct);
+
+        var listed = models
             .Select(m => new LlmModelInfo(m.Id, m.Name, !IsDisabled(m.Policy),
-                ReasoningEfforts: CopilotSessionSettings.ListedEfforts(m.SupportedReasoningEfforts),
-                DefaultReasoningEffort: m.DefaultReasoningEffort))
+                TokenPriceMapping.Map(
+                    m.Billing?.TokenPrices?.BatchSize,
+                    m.Billing?.TokenPrices?.InputPrice,
+                    m.Billing?.TokenPrices?.OutputPrice,
+                    m.Billing?.TokenPrices?.CacheReadPrice,
+                    m.Billing?.TokenPrices?.CachePrice,
+                    priceUnits.TryGetValue(m.Id, out var nanoAiu) ? nanoAiu : null),
+                CopilotSessionSettings.ListedEfforts(m.SupportedReasoningEfforts),
+                m.DefaultReasoningEffort))
             .ToList();
+
+        listed.AddRange(_customModels.Select(CustomModelPricing.ToModelInfo));
+        return listed;
+    }
+
+    /// <summary>
+    /// The unit each model's token prices are quoted in, by model id (<c>models.listTokenPriceUnits</c>): true for nano-AIU.
+    /// A failure leaves the models listed without prices (R11); it does not make the gateway unavailable.
+    /// </summary>
+    private async Task<Dictionary<string, bool>> ListPriceUnitsAsync(CopilotClient client, CancellationToken ct)
+    {
+        var nanoAiuByModel = new Dictionary<string, bool>(StringComparer.Ordinal);
+        try
+        {
+            var units = await client.Rpc.Models.ListTokenPriceUnitsAsync(ct);
+            foreach (var entry in units.Units)
+            {
+                if (entry.Unit == GitHub.Copilot.Rpc.TokenPriceUnit.AiCredits || entry.Unit == GitHub.Copilot.Rpc.TokenPriceUnit.NanoAiu)
+                {
+                    nanoAiuByModel[entry.ModelId] = entry.Unit == GitHub.Copilot.Rpc.TokenPriceUnit.NanoAiu;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Only the exception type: the message may echo what the runtime sent.
+            logger.LogWarning("Could not list token price units; models are listed without prices ({ExceptionType})", ex.GetType().Name);
+        }
+
+        return nanoAiuByModel;
+    }
+#pragma warning restore GHCP001
+
+    /// <summary>
+    /// The custom models that may be listed. A custom id that a Copilot model already uses is refused and an error naming
+    /// the id (nothing else of the entry) is logged: the Copilot id would otherwise be ambiguous.
+    /// </summary>
+    internal static IReadOnlyList<CustomModelOptions> ActiveCustomModels(
+        IEnumerable<CustomModelOptions> configured, IEnumerable<string> copilotIds, ILogger logger)
+    {
+        var taken = copilotIds.ToHashSet(StringComparer.Ordinal);
+        var active = new List<CustomModelOptions>();
+        foreach (var custom in configured)
+        {
+            if (taken.Contains(custom.Id))
+            {
+                logger.LogError("Custom model {ModelId} is not listed: a Copilot model has the same id. Rename it under Llm:CustomModels.", custom.Id);
+            }
+            else
+            {
+                active.Add(custom);
+            }
+        }
+
+        logger.LogInformation("{CustomModelCount} custom models listed", active.Count);
+        return active;
     }
 
     public async Task<ILlmConversation> StartConversationAsync(LlmConversationOptions options, CancellationToken ct)
     {
         var client = RequireReady();
-        var session = await client.CreateSessionAsync(CopilotSessionSettings.ForCopilotModel(options), ct);
+        var custom = _customModels.FirstOrDefault(c => string.Equals(c.Id, options.ModelId, StringComparison.Ordinal));
+        var config = custom is null
+            ? CopilotSessionSettings.ForCopilotModel(options)
+            : CopilotSessionSettings.ForCustomModel(options, custom);
+
+        var session = await client.CreateSessionAsync(config, ct);
         return new CopilotConversation(session, options, logger);
     }
 
@@ -163,8 +238,7 @@ public sealed class CopilotLlmGateway(IOptions<CopilotOptions> options, ILogger<
         private readonly IDisposable _usageSubscription;
         private readonly IDisposable _reasoningSubscription;
         private readonly List<string> _reasoningBlocks = [];
-        private int? _inputTokens;
-        private int? _outputTokens;
+        private UsageTally _usage = new();
 
         public CopilotConversation(CopilotSession session, LlmConversationOptions options, ILogger logger)
         {
@@ -208,27 +282,27 @@ public sealed class CopilotLlmGateway(IOptions<CopilotOptions> options, ILogger<
             var text = final?.Data.Content
                 ?? throw new InvalidOperationException($"Model {ModelId} finished without an assistant message.");
 
-            int? inputTokens, outputTokens;
+            ReplyUsage usage;
             string? reasoning;
             lock (_replyGate)
             {
-                inputTokens = _inputTokens;
-                outputTokens = _outputTokens;
+                usage = _usage.Snapshot();
                 reasoning = ReplyReasoning.Choose(final.Data.ReasoningText, _reasoningBlocks);
             }
 
-            if (inputTokens is { } input)
+            if (usage.InputTokens is { } input)
             {
                 activity?.SetTag("gen_ai.usage.input_tokens", input);
             }
 
-            if (outputTokens is { } output)
+            if (usage.OutputTokens is { } output)
             {
                 activity?.SetTag("gen_ai.usage.output_tokens", output);
             }
 
             _logger.LogDebug("Model {ModelId} replied in {LatencyMs} ms", ModelId, stopwatch.ElapsedMilliseconds);
-            return new LlmReply(text, stopwatch.Elapsed, inputTokens, outputTokens, reasoning);
+            return new LlmReply(text, stopwatch.Elapsed, usage.InputTokens, usage.OutputTokens,
+                reasoning, usage.ReasoningTokens, usage.CachedInputTokens, usage.AiCredits);
         }
 
         public async ValueTask DisposeAsync()
@@ -242,13 +316,15 @@ public sealed class CopilotLlmGateway(IOptions<CopilotOptions> options, ILogger<
         {
             lock (_replyGate)
             {
-                _inputTokens = Sum(_inputTokens, e.Data.InputTokens);
-                _outputTokens = Sum(_outputTokens, e.Data.OutputTokens);
+                _usage.Add(
+                    (long?)e.Data.InputTokens,
+                    (long?)e.Data.OutputTokens,
+                    (long?)e.Data.ReasoningTokens,
+                    (long?)e.Data.CacheReadTokens,
+                    e.Data.CopilotUsage?.TotalNanoAiu,
+                    e.Data.AiCreditsStatus == AiCreditsStatus.Unavailable);
             }
         }
-
-        private static int? Sum(int? total, double? add) =>
-            add is { } value ? (total ?? 0) + (int)value : total;
 
         private void AddReasoning(AssistantReasoningEvent e)
         {
@@ -262,8 +338,7 @@ public sealed class CopilotLlmGateway(IOptions<CopilotOptions> options, ILogger<
         {
             lock (_replyGate)
             {
-                _inputTokens = null;
-                _outputTokens = null;
+                _usage = new UsageTally();
                 _reasoningBlocks.Clear();
             }
         }

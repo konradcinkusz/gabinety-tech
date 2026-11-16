@@ -22,8 +22,10 @@ public static class LlmServiceCollectionExtensions
         switch (provider.ToLowerInvariant())
         {
             case "copilot":
-                // Placeholder: the real Copilot gateway replaces this registration in T-02.02.
-                builder.Services.AddSingleton<ILlmGateway, PlaceholderCopilotGateway>();
+                builder.Services.AddOptions<CopilotOptions>().BindConfiguration("Copilot");
+                builder.Services.AddSingleton<CopilotLlmGateway>();
+                builder.Services.AddSingleton<ILlmGateway>(sp => sp.GetRequiredService<CopilotLlmGateway>());
+                builder.Services.AddHostedService<CopilotClientHostedService>();
                 break;
 
             case "fake":
@@ -39,17 +41,5 @@ public static class LlmServiceCollectionExtensions
         }
 
         return builder;
-    }
-
-    /// <summary>Stands in for the Copilot gateway until T-02.02: reports Unavailable, lists nothing, starts nothing.</summary>
-    private sealed class PlaceholderCopilotGateway : ILlmGateway
-    {
-        public LlmGatewayStatus Status { get; } = new(LlmGatewayState.Unavailable, "Copilot gateway not implemented yet");
-
-        public Task<IReadOnlyList<LlmModelInfo>> ListModelsAsync(CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<LlmModelInfo>>([]);
-
-        public Task<ILlmConversation> StartConversationAsync(LlmConversationOptions options, CancellationToken ct) =>
-            throw new LlmUnavailableException(Status.Detail);
     }
 }

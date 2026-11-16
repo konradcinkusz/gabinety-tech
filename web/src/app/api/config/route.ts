@@ -1,6 +1,6 @@
-import { readConfig } from "@/lib/config";
+import { publicConfig } from "../../../lib/config";
 
 export const dynamic = "force-dynamic";
 export function GET() {
-  return Response.json(readConfig(), { headers: { "Cache-Control": "public, max-age=5" } });
+  return Response.json(publicConfig(), { headers: { "Cache-Control": "public, max-age=5" } });
 }

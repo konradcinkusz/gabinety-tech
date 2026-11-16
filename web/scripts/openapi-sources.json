@@ -1,0 +1,6 @@
+{
+  "directory": "http://localhost:5101/openapi/v1.json",
+  "booking": "http://localhost:5102/openapi/v1.json",
+  "reputation": "http://localhost:5103/openapi/v1.json",
+  "assistant": "http://localhost:5104/openapi/v1.json"
+}

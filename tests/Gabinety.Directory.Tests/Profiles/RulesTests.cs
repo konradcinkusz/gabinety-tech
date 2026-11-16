@@ -25,12 +25,16 @@ public class ContactDetectorTests
     [InlineData("tel +48 600-100-200")]
     [InlineData("600100200")]
     [InlineData("znajdz mnie @jan_dev")]
+    [InlineData("2015-2023 oraz dzwon 600 100 200")] // a year range does not hide a real number
+    [InlineData("w 2020 2021 dzwon 600-100-200")]
     public void Rejects(string text) => Assert.True(_d.ContainsContactDetails(text));
 
     [Theory]
     [InlineData("dotnet 8 i EF Core 9")]
     [InlineData(".NET 8.0.1 oraz C# 13")]
     [InlineData("10 lat doswiadczenia, PostgreSQL 17.2")]
+    [InlineData("Backend 2015-2023, potem 2019 - obecnie")]
+    [InlineData("projekty 2018–2021 oraz 2020 2021")]
     [InlineData("")]
     public void Accepts(string text) => Assert.False(_d.ContainsContactDetails(text));
 }

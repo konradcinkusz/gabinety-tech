@@ -6,8 +6,7 @@ namespace Gabinety.Directory.Features.Me;
 /// <summary>GET /api/v1/me behind JWT validation against authservice's JWKS (CONTRACTS 3.3). The practitioner and moderator facts arrive with T-03.x.</summary>
 public sealed class MeFeature : IServiceFeature
 {
-    public void Add(IHostApplicationBuilder builder) =>
-        builder.Services.AddJwtAuthentication(builder.Configuration);
+    public void Add(IHostApplicationBuilder builder) { } // JWT authentication is registered once, in Program.cs
 
     public void Map(IEndpointRouteBuilder endpoints) =>
         endpoints.MapGet("/api/v1/me", (ClaimsPrincipal user) =>

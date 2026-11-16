@@ -21,6 +21,40 @@ internal static class CopilotSessionSettings
         OnPermissionRequest = RejectAllPermissions,
     };
 
+    /// <summary>A custom model: the SDK's bring-your-own-key provider, with no Copilot model id (<c>SessionConfig.Model</c> stays null).</summary>
+    public static SessionConfig ForCustomModel(LlmConversationOptions options, CustomModelOptions custom)
+    {
+        var config = ForCopilotModel(options);
+        config.Model = null;
+        config.Provider = ProviderFor(custom);
+        return config;
+    }
+
+    private static ProviderConfig ProviderFor(CustomModelOptions custom)
+    {
+        var type = custom.ProviderType.ToLowerInvariant();
+        // The message names the entry and the type only: never the key or the URL (R13).
+        var modelProvider = type switch
+        {
+            "anthropic" => "anthropic",
+            "openai" => "openai",
+            "azure" => "azure_openai",
+            _ => throw new ArgumentException($"Custom model {custom.Id} has an unsupported ProviderType '{custom.ProviderType}'."),
+        };
+
+        return new ProviderConfig
+        {
+            Type = type,
+            // Telemetry only. Any OpenAI-compatible endpoint is type openai.
+            ModelProvider = modelProvider,
+            // The Messages API has no wire format of its own; WireApi is not sent for anthropic.
+            WireApi = type == "anthropic" ? null : custom.WireApi,
+            BaseUrl = custom.BaseUrl,
+            ApiKey = custom.ApiKey,
+            WireModel = custom.Model,
+        };
+    }
+
     /// <summary>The reasoning efforts a model lists, or null when it lists none.</summary>
     public static IReadOnlyList<string>? ListedEfforts(IEnumerable<string>? efforts) =>
         efforts?.ToList() is { Count: > 0 } list ? list : null;

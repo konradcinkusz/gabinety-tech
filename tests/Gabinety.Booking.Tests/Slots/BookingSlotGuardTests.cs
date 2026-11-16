@@ -20,6 +20,12 @@ public class BookingSlotGuardTests
     public void The_exclusion_violation_of_bookings_no_overlap_is_a_taken_slot() =>
         Assert.True(BookingSlotGuard.IsSlotTaken(new DbUpdateException("x", Pg("23P01", "bookings_no_overlap"))));
 
+    // Measured on PostgreSQL 17 in CI: two concurrent inserts of overlapping intervals can make the LOSER fail with 40P01 (deadlock detected)
+    // instead of 23P01, because each waits for the other's index entry. Either way it lost the race for the slot, and the answer is the same.
+    [Fact]
+    public void A_deadlock_between_two_inserts_for_one_slot_is_a_lost_race_for_that_slot() =>
+        Assert.True(BookingSlotGuard.IsSlotTaken(new DbUpdateException("x", Pg("40P01", null))));
+
     [Theory]
     [InlineData("23P01", "another_constraint")] // an exclusion violation of some other constraint
     [InlineData("23505", "bookings_no_overlap")] // a unique violation

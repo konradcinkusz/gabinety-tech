@@ -18,9 +18,15 @@ public static class BookingSlotGuard
 {
     public const string ConstraintName = "bookings_no_overlap";
     const string ExclusionViolation = "23P01";
+    const string DeadlockDetected = "40P01";
 
+    /// <summary>
+    /// The insert lost the race for the slot: the exclusion constraint refused it (23P01), or PostgreSQL broke a deadlock between two concurrent
+    /// inserts of overlapping intervals by aborting this one (40P01; measured in CI, where the loser of the race sometimes gets this instead of 23P01).
+    /// The creation path takes the practitioner lock first, so in practice only one creator is in flight; this is the safety net behind that lock.
+    /// </summary>
     public static bool IsSlotTaken(DbUpdateException e) =>
-        e.InnerException is PostgresException { SqlState: ExclusionViolation, ConstraintName: ConstraintName };
+        e.InnerException is PostgresException { SqlState: ExclusionViolation, ConstraintName: ConstraintName } or PostgresException { SqlState: DeadlockDetected };
 
     /// <summary>SaveChanges, mapping the exclusion violation to <see cref="SlotTakenException"/>; anything else passes through.</summary>
     public static async Task SaveAsync(BookingDbContext db, CancellationToken ct)

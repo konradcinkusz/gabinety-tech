@@ -62,12 +62,12 @@ public class SkeletonMigrationIntegrationTests
         await using var pg = new PostgreSqlBuilder("postgres:17-alpine").Build();
         await pg.StartAsync();
         var cs = pg.GetConnectionString();
-        const string history = """select "MigrationId" from "__EFMigrationsHistory" order by 1""";
+        const string history = """select "MigrationId" from "__EFMigrationsHistory" order by "MigrationId" collate "C" """;
 
-        using var probe = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("Llm:Provider", "Fake"));
-        using var scope = probe.Services.CreateScope();
-        var declared = scope.ServiceProvider.GetRequiredService<AssistantDbContext>().GetService<IMigrationsAssembly>()
-            .Migrations.Keys.Order().ToList();
+        // The ids of every migration declared in the assembly (a DbContext without a provider cannot list them, so read the attribute).
+        var declared = typeof(AssistantDbContext).Assembly.GetTypes()
+            .Select(t => (Attribute.GetCustomAttribute(t, typeof(Microsoft.EntityFrameworkCore.Migrations.MigrationAttribute)) as Microsoft.EntityFrameworkCore.Migrations.MigrationAttribute)?.Id)
+            .OfType<string>().Order(StringComparer.Ordinal).ToList();
         Assert.Equal(["20261116130000_T-06.01_Usage"], declared);
 
         await MigrateOnce(cs);

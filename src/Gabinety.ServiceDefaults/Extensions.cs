@@ -22,6 +22,8 @@ public static class Extensions
     {
         builder.Services.AddHealthChecks();
         builder.Services.AddProblemDetails();
+        builder.Services.AddAuthentication();
+        builder.Services.AddAuthorization();
         builder.Services.AddServiceDiscovery();
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
@@ -47,12 +49,16 @@ public static class Extensions
         return app;
     }
 
-    /// <summary>Registers every IServiceFeature of the calling assembly.</summary>
-    public static IServiceCollection AddFeatures(this IServiceCollection services)
+    /// <summary>Instantiates every IServiceFeature of the calling assembly, lets it register its services, and keeps it for mapping (P9, P10).</summary>
+    public static TBuilder AddFeatures<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         foreach (var t in FeatureTypes(System.Reflection.Assembly.GetCallingAssembly()))
-            services.AddSingleton(typeof(IServiceFeature), t);
-        return services;
+        {
+            var feature = (IServiceFeature)Activator.CreateInstance(t)!;
+            feature.Add(builder);
+            builder.Services.AddSingleton(feature);
+        }
+        return builder;
     }
 
     public static WebApplication MapFeatures(this WebApplication app)

@@ -8,7 +8,7 @@
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-    <ProjectReference Include="../../src/Gabinety.Directory/Gabinety.Directory.csproj" />
+    <ProjectReference Include="../../src/Gabinety.Directory/Gabinety.Directory.csproj" Aliases="DirectoryApp" />
     <ProjectReference Include="../../tools/Gabinety.DevIdentity/Gabinety.DevIdentity.csproj" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,25 @@
+{
+  "version": "2026-11-v1",
+  "categories": [
+    { "slug": "audyt-kodu", "kind": "problem", "namePl": "Audyt kodu", "sort": 1 },
+    { "slug": "migracja-legacy-dotnet", "kind": "problem", "namePl": "Migracja legacy .NET", "sort": 2 },
+    { "slug": "integracja-ai", "kind": "problem", "namePl": "Integracja AI", "sort": 3 },
+    { "slug": "automatyzacja-procesow", "kind": "problem", "namePl": "Automatyzacja procesów", "sort": 4 },
+    { "slug": "architektura-systemu", "kind": "problem", "namePl": "Architektura systemu", "sort": 5 },
+    { "slug": "code-review", "kind": "problem", "namePl": "Code review", "sort": 6 },
+    { "slug": "wycena-projektu", "kind": "problem", "namePl": "Wycena i plan projektu", "sort": 7 },
+    { "slug": "rozwiazanie-awarii", "kind": "problem", "namePl": "Rozwiązanie awarii", "sort": 8 },
+    { "slug": "dotnet", "kind": "tech", "namePl": ".NET", "sort": 1 },
+    { "slug": "csharp", "kind": "tech", "namePl": "C#", "sort": 2 },
+    { "slug": "aspnet-core", "kind": "tech", "namePl": "ASP.NET Core", "sort": 3 },
+    { "slug": "entity-framework", "kind": "tech", "namePl": "Entity Framework", "sort": 4 },
+    { "slug": "azure", "kind": "tech", "namePl": "Azure", "sort": 5 },
+    { "slug": "sql-server", "kind": "tech", "namePl": "SQL Server", "sort": 6 },
+    { "slug": "postgresql", "kind": "tech", "namePl": "PostgreSQL", "sort": 7 },
+    { "slug": "python", "kind": "tech", "namePl": "Python", "sort": 8 },
+    { "slug": "llm", "kind": "tech", "namePl": "LLM i agenci", "sort": 9 },
+    { "slug": "kubernetes", "kind": "tech", "namePl": "Kubernetes", "sort": 10 },
+    { "slug": "react", "kind": "tech", "namePl": "React", "sort": 11 },
+    { "slug": "typescript", "kind": "tech", "namePl": "TypeScript", "sort": 12 }
+  ]
+}

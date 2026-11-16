@@ -171,6 +171,60 @@ namespace Gabinety.Directory.Persistence.Migrations
 
                     b.ToTable("practitioners", (string)null);
                 });
+
+            modelBuilder.Entity("Gabinety.Directory.Features.Taxonomy.Category", b =>
+                {
+                    b.Property<string>("Slug")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("slug");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("NamePl")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name_pl");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort");
+
+                    b.HasKey("Slug");
+
+                    b.HasIndex("Kind", "IsActive", "Sort");
+
+                    b.ToTable("categories", (string)null);
+                });
+
+            modelBuilder.Entity("Gabinety.Directory.Features.Taxonomy.TaxonomyMeta", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("taxonomy_meta", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_taxonomy_meta_single_row", "id = 1");
+                        });
+                });
 #pragma warning restore 612, 618
         }
     }

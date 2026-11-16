@@ -68,4 +68,25 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build -warnaserror
+      - name: Start PostgreSQL and the real authservice image (pinned by digest)
+        run: |
+          set -euo pipefail
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$RUNNER_TEMP/jwt.pem"
+          docker network create authnet
+          docker run -d --name authpg --network authnet -e POSTGRES_PASSWORD=ci-only -e POSTGRES_DB=authdb postgres:17-alpine
+          until docker exec authpg pg_isready -U postgres -d authdb; do sleep 1; done
+          docker run -d --name authsvc --network authnet -p 8081:8080 \
+            -e ConnectionStrings__DefaultConnection="Host=authpg;Port=5432;Database=authdb;Username=postgres;Password=ci-only" \
+            -e DATABASE_PROVIDER=PostgreSQL -e Jwt__Algorithm=RS256 -e Jwt__Issuer=gabinety-contract -e Jwt__Audience=gabinety \
+            -e Auth__RequireConfirmedEmail=false -e "Jwt__PrivateKeyPem=$(cat "$RUNNER_TEMP/jwt.pem")" \
+            ghcr.io/konradcinkusz/authservice@sha256:d0309a94f6b6300d4b8091381786c160ae7717a022416debaaa6d8d19a244645
+          for i in $(seq 1 90); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8081/health/ready)" = 200 ] && break
+            sleep 2
+          done
+          curl -fsS http://localhost:8081/health/ready
+          echo "AUTH_BASE_URL=http://localhost:8081" >> "$GITHUB_ENV"
       - run: dotnet test --no-build --filter "tier=integration" --logger "console;verbosity=detailed"
+      - name: authservice log on failure
+        if: failure()
+        run: docker logs authsvc 2>&1 | tail -60

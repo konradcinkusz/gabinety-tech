@@ -19,7 +19,7 @@ public sealed class ProfilesFeature : IServiceFeature
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<INipValidator, NipChecksumValidator>();
         builder.Services.AddSingleton<IContactDetailDetector, ContactDetailDetector>();
-        builder.Services.AddSingleton<IChecklistFacts, NoOfferingsYet>();
+        builder.Services.TryAddSingleton<IChecklistFacts, NoOfferingsYet>(); // the offerings feature registers the real one; whichever feature is added first, it wins
 #pragma warning disable EXTEXP0001 // the kernel adds the standard resilience handler (with retries) to every client; this one must not retry
         builder.Services.AddHttpClient<IEmailVerifiedLookup, HttpEmailVerifiedLookup>(c => c.Timeout = HttpEmailVerifiedLookup.Timeout)
             .RemoveAllResilienceHandlers();

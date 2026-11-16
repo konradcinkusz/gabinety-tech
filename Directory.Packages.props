@@ -3,6 +3,9 @@
   <ItemGroup>
     <!-- Llm only (SPEC 3.2). Pinned to the chess project's version until T-01.02 says otherwise. -->
     <PackageVersion Include="GitHub.Copilot.SDK" Version="1.0.28" />
+    <!-- AppHost -->
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.6.5" />
     <!-- tests -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />

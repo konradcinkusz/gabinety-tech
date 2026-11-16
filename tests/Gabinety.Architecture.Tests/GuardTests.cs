@@ -40,7 +40,7 @@ public class GuardTests
     [Fact]
     public void Contracts_references_nothing_but_the_framework()
     {
-        var refs = typeof(Gabinety.Contracts.Marker).Assembly.GetReferencedAssemblies()
+        var refs = typeof(Gabinety.Contracts.Common.MoneyDto).Assembly.GetReferencedAssemblies()
             .Select(a => a.Name!).Where(n => !n.StartsWith("System.") && n != "mscorlib" && n != "netstandard").ToList();
         Assert.Empty(refs);
     }

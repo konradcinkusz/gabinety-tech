@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as login } from "../../app/api/auth/login/route";
 import { POST as register } from "../../app/api/auth/register/route";
 import { POST as logout } from "../../app/api/auth/logout/route";
-import { POST as refresh } from "../../app/api/auth/refresh/route";
+import { POST as refresh, GET as refreshAndGo } from "../../app/api/auth/refresh/route";
 import { GET as sessionGet } from "../../app/api/auth/session/route";
 import { GET as githubStart } from "../../app/api/auth/github/start/route";
 import { GET as githubCallback } from "../../app/api/auth/github/callback/route";
@@ -150,6 +150,39 @@ describe("refresh", () => {
     fakeBackend(() => tokenBody());
     expect((await refresh(json("/api/auth/refresh", {}))).status).toBe(401);
   });
+});
+
+describe("refresh by navigation (GET /api/auth/refresh?redirect=)", () => {
+  const nav = (query: string, cookies: Record<string, string>) =>
+    refreshAndGo(new Request(SITE + "/api/auth/refresh" + query, { headers: { cookie: cookieHeader(cookies) } }));
+  it("renews the cookies and redirects to the safe path the user asked for", async () => {
+    fakeBackend(() => tokenBody("AT-NEW", "RT-NEW"));
+    const res = await nav("?redirect=%2Fmoje%2Frezerwacje%3Fa%3D1", { gt_rt: "RT-OLD" });
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location")!, SITE).pathname + new URL(res.headers.get("location")!, SITE).search).toBe("/moje/rezerwacje?a=1");
+    expect(setCookies(res).find((c) => c.startsWith("gt_at="))).toContain("AT-NEW");
+    expect(setCookies(res).find((c) => c.startsWith("gt_rt="))).toContain("RT-NEW");
+  });
+  it("sends the user to login, with cookies cleared, when the refresh token is rejected", async () => {
+    fakeBackend(() => new Response("{}", { status: 401 }));
+    const res = await nav("?redirect=%2Fmoje", { gt_rt: "RT-USED" });
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/logowanie?redirect=%2Fmoje");
+    expect(setCookies(res).every((c) => c.includes("Max-Age=0"))).toBe(true);
+  });
+  it("goes to login when there is no refresh cookie", async () => {
+    fakeBackend(() => tokenBody());
+    const res = await nav("?redirect=%2Fmoje", {});
+    expect(res.headers.get("location")).toContain("/logowanie?redirect=%2Fmoje");
+  });
+  it.each(["https://evil.test/", "//evil.test", "/api/auth/refresh?redirect=%2Fx", "/api/proxy/directory/x", "javascript:alert(1)"])(
+    "ignores an unsafe target %s and goes to /",
+    async (target) => {
+      fakeBackend(() => tokenBody("AT-NEW", "RT-NEW"));
+      const res = await nav("?redirect=" + encodeURIComponent(target), { gt_rt: "RT-OLD" });
+      expect(new URL(res.headers.get("location")!, SITE).pathname).toBe("/");
+    },
+  );
 });
 
 describe("session", () => {

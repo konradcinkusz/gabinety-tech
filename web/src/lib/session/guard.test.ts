@@ -12,7 +12,26 @@ const fake: Verifier = async (t) => {
   if (t === "admins") return { sub: "u", [ADMIN_ROLE]: ["User", "SuperAdmin"] };
   throw new Error("bad token");
 };
-const input = (pathname: string, at?: string, search = "") => ({ pathname, search, accessToken: at });
+const input = (pathname: string, at?: string, search = "", refresh?: string) => ({ pathname, search, accessToken: at, refreshToken: refresh });
+
+describe("decide with a refresh cookie", () => {
+  it("renews through /api/auth/refresh when the access cookie is gone but a refresh cookie remains", async () => {
+    expect(await decide(input("/moje", undefined, "?a=1", "RT"), fake)).toEqual({
+      action: "redirect",
+      to: "/api/auth/refresh?redirect=" + encodeURIComponent("/moje?a=1"),
+    });
+  });
+  it("does not loop: a present but invalid access token goes to login even with a refresh cookie", async () => {
+    expect((await decide(input("/moje", "altered", "", "RT"), fake)).action).toBe("redirect");
+    expect(await decide(input("/moje", "altered", "", "RT"), fake)).toEqual({ action: "redirect", to: "/logowanie?redirect=%2Fmoje" });
+  });
+  it("still sends a visitor with no cookies to login", async () => {
+    expect(await decide(input("/moje"), fake)).toEqual({ action: "redirect", to: "/logowanie?redirect=%2Fmoje" });
+  });
+  it("leaves public pages alone", async () => {
+    expect(await decide(input("/programisci", undefined, "", "RT"), fake)).toEqual({ action: "next" });
+  });
+});
 
 describe("decide (fake verifier)", () => {
   it("lets a valid token through on a protected prefix", async () => {

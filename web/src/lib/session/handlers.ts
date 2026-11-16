@@ -97,6 +97,23 @@ export async function refresh(request: Request): Promise<Response> {
   return setSessionCookies(ok({ authenticated: true }), tokens, site);
 }
 
+/**
+ * GET /api/auth/refresh?redirect=: a browser navigation that renews the session and returns the user to where they were going.
+ * It only touches the caller's own cookies and takes no credentials. The target must be a same-site page path (never /api/...).
+ */
+export async function refreshAndRedirect(request: Request): Promise<Response> {
+  const site = readConfig().siteBaseUrl;
+  const asked = safeRedirect(new URL(request.url).searchParams.get("redirect"));
+  const target = asked.startsWith("/api/") ? "/" : asked;
+  const go = (to: string) => new Response(null, { status: 307, headers: { location: new URL(to, site).toString(), "Cache-Control": "no-store" } });
+  const rt = parseCookies(request.headers.get("cookie"))[REFRESH_COOKIE];
+  const login = "/logowanie?redirect=" + encodeURIComponent(target);
+  if (!rt) return go(login);
+  const tokens = await refreshOnce(rt);
+  if (!tokens) return clearSessionCookies(go(login), site);
+  return setSessionCookies(go(target), tokens, site);
+}
+
 export function session(request: Request): Response {
   const who = readIdentity(parseCookies(request.headers.get("cookie"))[ACCESS_COOKIE]);
   return ok(who ? { authenticated: true, ...who } : { authenticated: false, userId: null, email: null, isAdmin: false });

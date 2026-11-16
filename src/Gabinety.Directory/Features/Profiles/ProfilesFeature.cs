@@ -132,6 +132,7 @@ public sealed class ProfilesFeature : IServiceFeature
         p.Nip = nip; p.NipValid = nip is not null; // a stored NIP has passed the checksum
         p.ProfileCompleteness = ProfileCompleteness.Compute(headline.Length > 0, bio.Length >= 200,
             await facts.ActiveOfferingCountAsync(p.Id, ct) > 0, p.GithubLinked, portfolio is not null, p.NipValid, p.OpenSlots14d > 0);
+        Ranking.RankingRecalculator.Recompute(p);
         p.UpdatedAt = time.GetUtcNow();
         await db.SaveChangesAsync(ct);
         return Results.Ok(await View(p, ctx, email, ct));

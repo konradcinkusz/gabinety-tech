@@ -126,6 +126,7 @@ public sealed class OfferingsFeature : IServiceFeature
         var hasActive = await db.Offerings.AnyAsync(o => o.PractitionerId == p.Id && o.IsActive, ct);
         p.ProfileCompleteness = ProfileCompleteness.Compute(p.Headline.Length > 0, p.Bio.Length >= 200, hasActive, p.GithubLinked,
             p.PortfolioUrl is not null, p.NipValid, p.OpenSlots14d > 0);
+        Ranking.RankingRecalculator.Recompute(p);
         p.UpdatedAt = time.GetUtcNow();
         await db.SaveChangesAsync(ct);
     }

@@ -1,0 +1,5 @@
+.field { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-4); }
+.label { font-weight: var(--font-weight-medium); }
+.marker { font-weight: var(--font-weight-normal); color: var(--color-muted); }
+.hint { margin: 0; color: var(--color-muted); font-size: var(--font-size-sm); }
+.error { margin: 0; color: var(--color-danger); font-size: var(--font-size-sm); }

@@ -22,6 +22,79 @@ namespace Gabinety.Directory.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Gabinety.Directory.Features.Offerings.Offering", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)")
+                        .HasColumnName("description");
+
+                    b.Property<short>("DurationMinutes")
+                        .HasColumnType("smallint")
+                        .HasColumnName("duration_minutes");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("MeetingUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("meeting_url");
+
+                    b.Property<Guid>("PractitionerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("practitioner_id");
+
+                    b.Property<long>("PriceMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("price_minor");
+
+                    b.Property<string>("ProblemSlug")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("problem_slug");
+
+                    b.PrimitiveCollection<string[]>("TechSlugs")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("tech_slugs");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PractitionerId");
+
+                    b.HasIndex("TechSlugs");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("TechSlugs"), "gin");
+
+                    b.HasIndex("ProblemSlug", "IsActive");
+
+                    b.ToTable("offerings", (string)null);
+                });
+
             modelBuilder.Entity("Gabinety.Directory.Features.Profiles.Practitioner", b =>
                 {
                     b.Property<Guid>("Id")
@@ -224,6 +297,21 @@ namespace Gabinety.Directory.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_taxonomy_meta_single_row", "id = 1");
                         });
+                });
+
+            modelBuilder.Entity("Gabinety.Directory.Features.Offerings.Offering", b =>
+                {
+                    b.HasOne("Gabinety.Directory.Features.Profiles.Practitioner", null)
+                        .WithMany()
+                        .HasForeignKey("PractitionerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Gabinety.Directory.Features.Taxonomy.Category", null)
+                        .WithMany()
+                        .HasForeignKey("ProblemSlug")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

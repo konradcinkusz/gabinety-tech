@@ -6,6 +6,7 @@ namespace Gabinety.Directory.Persistence;
 public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> options) : DbContext(options)
 {
     public DbSet<Features.Profiles.Practitioner> Practitioners => Set<Features.Profiles.Practitioner>();
+    public DbSet<Features.Offerings.Offering> Offerings => Set<Features.Offerings.Offering>();
     public DbSet<Features.Taxonomy.Category> Categories => Set<Features.Taxonomy.Category>();
     public DbSet<Features.Taxonomy.TaxonomyMeta> TaxonomyMeta => Set<Features.Taxonomy.TaxonomyMeta>();
 

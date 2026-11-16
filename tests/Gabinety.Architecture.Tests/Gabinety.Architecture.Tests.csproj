@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable><IsTestProject>true</IsTestProject></PropertyGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <ProjectReference Include="../../src/Gabinety.ServiceDefaults/Gabinety.ServiceDefaults.csproj" />
+    <ProjectReference Include="../../src/Gabinety.Contracts/Gabinety.Contracts.csproj" />
+    <ProjectReference Include="../../src/Gabinety.Llm/Gabinety.Llm.csproj" />
+    <ProjectReference Include="../../src/Gabinety.Directory/Gabinety.Directory.csproj" />
+    <ProjectReference Include="../../src/Gabinety.Booking/Gabinety.Booking.csproj" />
+    <ProjectReference Include="../../src/Gabinety.Reputation/Gabinety.Reputation.csproj" />
+    <ProjectReference Include="../../src/Gabinety.Assistant/Gabinety.Assistant.csproj" />
+  </ItemGroup>
+</Project>

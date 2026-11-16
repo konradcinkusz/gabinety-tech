@@ -35,6 +35,9 @@ public sealed class Practitioner
     public decimal ProfileCompleteness { get; set; }
     public decimal RankingScore { get; set; }
     public string RankingVersion { get; set; } = "";
+    public string? GithubChallengeCode { get; set; }
+    public string? GithubChallengeLogin { get; set; }
+    public DateTimeOffset? GithubChallengeExpiresAt { get; set; }
 }
 
 public sealed class PractitionerConfiguration : IEntityTypeConfiguration<Practitioner>
@@ -71,6 +74,10 @@ public sealed class PractitionerConfiguration : IEntityTypeConfiguration<Practit
         b.Property(x => x.ProfileCompleteness).HasColumnName("profile_completeness").HasPrecision(3, 2);
         b.Property(x => x.RankingScore).HasColumnName("ranking_score").HasPrecision(5, 2);
         b.Property(x => x.RankingVersion).HasColumnName("ranking_version").HasMaxLength(20).IsRequired();
+        b.Property(x => x.GithubChallengeCode).HasColumnName("github_challenge_code").HasMaxLength(40);
+        b.Property(x => x.GithubChallengeLogin).HasColumnName("github_challenge_login").HasMaxLength(39);
+        b.Property(x => x.GithubChallengeExpiresAt).HasColumnName("github_challenge_expires_at");
+        // ux on lower(github_login) where github_linked is raw SQL in migration T-03.05 (EF cannot model an expression index)
         b.HasIndex(x => x.UserId).IsUnique();
         b.HasIndex(x => x.Slug).IsUnique();
         b.HasIndex(x => new { x.Status, x.RankingScore, x.ApprovedAt, x.Id }).IsDescending(false, true, false, false); // for later: the public listing

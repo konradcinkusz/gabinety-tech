@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Secret scan of staged changes. Install: git config core.hooksPath scripts/hooks
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact -c .gitleaks.toml || { echo "pre-commit: possible secret staged"; exit 1; }
+else
+  echo "pre-commit: gitleaks not installed; CI will still scan (install: https://github.com/gitleaks/gitleaks)"
+fi

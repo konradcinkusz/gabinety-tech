@@ -2,6 +2,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 namespace Gabinety.ServiceDefaults;
 
@@ -14,16 +17,31 @@ public interface IServiceFeature
 
 public static class Extensions
 {
+    /// <summary>Telemetry, health, service discovery, resilience, problem details (P2, P15).</summary>
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddHealthChecks();
         builder.Services.AddProblemDetails();
+        builder.Services.AddServiceDiscovery();
+        builder.Services.ConfigureHttpClientDefaults(http =>
+        {
+            http.AddStandardResilienceHandler();
+            http.AddServiceDiscovery();
+        });
+
+        var otel = builder.Services.AddOpenTelemetry();
+        otel.WithMetrics(m => m.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddRuntimeInstrumentation());
+        otel.WithTracing(t => t
+            .AddAspNetCoreInstrumentation(o => o.Filter = ctx =>
+                !ctx.Request.Path.StartsWithSegments("/health") && !ctx.Request.Path.StartsWithSegments("/alive"))
+            .AddHttpClientInstrumentation());
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+            otel.UseOtlpExporter();
         return builder;
     }
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        
         app.MapHealthChecks("/health");
         app.MapHealthChecks("/alive", new() { Predicate = _ => false });
         return app;

@@ -1,0 +1,6 @@
+title = "gabinety-tech"
+[extend]
+useDefault = true
+[allowlist]
+description = "synthetic development values are not secrets"
+paths = ['''web/pnpm-lock\.yaml''']

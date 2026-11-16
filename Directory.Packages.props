@@ -3,6 +3,15 @@
   <ItemGroup>
     <!-- Llm only (SPEC 3.2). Pinned to the chess project's version until T-01.02 says otherwise. -->
     <PackageVersion Include="GitHub.Copilot.SDK" Version="1.0.28" />
+    <!-- ServiceDefaults (SPEC 3.2 budget) -->
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.21.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.15" />
     <!-- AppHost -->
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.6.5" />
@@ -11,5 +20,7 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.15" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
 </Project>

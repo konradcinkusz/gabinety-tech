@@ -1,0 +1,10 @@
+:root {
+  --color-bg: #ffffff;
+  --color-text: #14181f;
+  --color-accent: #1f4fd8;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-4: 1rem;
+  --font-body: system-ui, sans-serif;
+}
+body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); }

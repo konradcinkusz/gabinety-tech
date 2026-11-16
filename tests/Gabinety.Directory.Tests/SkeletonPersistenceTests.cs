@@ -91,12 +91,18 @@ public class SkeletonMigrationIntegrationTests
     {
         await using var c = new NpgsqlConnection(cs);
         await c.OpenAsync();
-        await using var cmd = new NpgsqlCommand("""select "MigrationId" from "__EFMigrationsHistory" """, c);
+        await using var cmd = new NpgsqlCommand("""select "MigrationId" from "__EFMigrationsHistory" order by "MigrationId" collate "C" """, c);
         await using var r = await cmd.ExecuteReaderAsync();
         var rows = new List<string>();
         while (await r.ReadAsync()) rows.Add(r.GetString(0));
         return rows;
     }
+
+    /// <summary>The ids of every migration declared in the Directory assembly, in order. The history table must equal this list exactly: nothing missing, nothing twice.</summary>
+    static string[] DeclaredMigrationIds() =>
+        typeof(Gabinety.Directory.Persistence.DirectoryDbContext).Assembly.GetTypes()
+            .Select(t => (Attribute.GetCustomAttribute(t, typeof(Microsoft.EntityFrameworkCore.Migrations.MigrationAttribute)) as Microsoft.EntityFrameworkCore.Migrations.MigrationAttribute)?.Id)
+            .OfType<string>().Order(StringComparer.Ordinal).ToArray();
 
     [Fact]
     public async Task Migration_runs_once_and_a_second_start_is_a_no_op()
@@ -112,7 +118,7 @@ public class SkeletonMigrationIntegrationTests
             await state.WaitForCompletionAsync(TimeSpan.FromSeconds(30));
             Assert.Equal(MigrationStatus.Done, state.Status);
         }
-        Assert.Equal(["20261116000000_T-03.01_Baseline"], await History(cs));
+        Assert.Equal(DeclaredMigrationIds(), await History(cs)); // every migration of the assembly, each exactly once
 
         using (var second = Host(cs))
         {
@@ -121,6 +127,6 @@ public class SkeletonMigrationIntegrationTests
             await state.WaitForCompletionAsync(TimeSpan.FromSeconds(30));
             Assert.Equal(MigrationStatus.Done, state.Status);
         }
-        Assert.Equal(["20261116000000_T-03.01_Baseline"], await History(cs));
+        Assert.Equal(DeclaredMigrationIds(), await History(cs)); // every migration of the assembly, each exactly once
     }
 }

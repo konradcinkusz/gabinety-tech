@@ -64,8 +64,11 @@ public class SlotsConstraintIntegrationTests : IAsyncLifetime
             }
 
             var results = await Task.WhenAll(Task.Run(() => Racer(start)), Task.Run(() => Racer(start.AddMinutes(30))));
-            Assert.Single(results, r => r is null);
-            Assert.Single(results, r => r is SlotTakenException);
+            // Say WHAT happened when it goes wrong: the types and the inner exceptions of both racers.
+            var what = $"round {round}: " + string.Join(" | ", results.Select(r => r is null ? "ok"
+                : $"{r.GetType().Name}: {r.Message.Split('\n')[0]} <- {r.InnerException?.GetType().Name}: {r.InnerException?.Message.Split('\n')[0]}"));
+            Assert.True(results.Count(r => r is null) == 1, what);
+            Assert.True(results.Count(r => r is SlotTakenException) == 1, what);
             await using var check = Db();
             Assert.Equal(1, await check.Bookings.CountAsync(b => b.PractitionerId == practitioner));
         }

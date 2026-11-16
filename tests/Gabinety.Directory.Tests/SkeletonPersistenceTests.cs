@@ -91,7 +91,7 @@ public class SkeletonMigrationIntegrationTests
     {
         await using var c = new NpgsqlConnection(cs);
         await c.OpenAsync();
-        await using var cmd = new NpgsqlCommand("""select "MigrationId" from "__EFMigrationsHistory" """, c);
+        await using var cmd = new NpgsqlCommand("""select "MigrationId" from "__EFMigrationsHistory" order by "MigrationId" collate "C" """, c);
         await using var r = await cmd.ExecuteReaderAsync();
         var rows = new List<string>();
         while (await r.ReadAsync()) rows.Add(r.GetString(0));

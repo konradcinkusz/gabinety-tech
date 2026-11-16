@@ -1,5 +1,6 @@
 <Project>
-  <PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup>
+  <PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled></PropertyGroup>
   <ItemGroup>
     <!-- Llm only (SPEC 3.2). Pinned to the chess project's version until T-01.02 says otherwise. -->
     <PackageVersion Include="GitHub.Copilot.SDK" Version="1.0.28" />
@@ -15,6 +16,7 @@
     <!-- Services with a database (SPEC 3.2 budget) -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.15" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.15" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.15" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />

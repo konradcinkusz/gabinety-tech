@@ -26,6 +26,20 @@ public class BookingSlotGuardTests
     public void A_deadlock_between_two_inserts_for_one_slot_is_a_lost_race_for_that_slot() =>
         Assert.True(BookingSlotGuard.IsSlotTaken(new DbUpdateException("x", Pg("40P01", null))));
 
+    // Measured in CI: without a retrying execution strategy EF wraps a transient error (the deadlock) as
+    // InvalidOperationException("... likely due to a transient failure") <- DbUpdateException <- PostgresException. The guard must see through it.
+    [Fact]
+    public void A_deadlock_wrapped_by_the_execution_strategy_is_still_a_lost_race()
+    {
+        var wrapped = new InvalidOperationException("An exception has been raised that is likely due to a transient failure.",
+            new DbUpdateException("x", Pg("40P01", null)));
+        Assert.True(BookingSlotGuard.IsSlotTaken(wrapped));
+    }
+
+    [Fact]
+    public void An_unrelated_wrapped_error_is_not_a_taken_slot() =>
+        Assert.False(BookingSlotGuard.IsSlotTaken(new InvalidOperationException("x", new DbUpdateException("y", Pg("23505", "bookings_no_overlap")))));
+
     [Theory]
     [InlineData("23P01", "another_constraint")] // an exclusion violation of some other constraint
     [InlineData("23505", "bookings_no_overlap")] // a unique violation

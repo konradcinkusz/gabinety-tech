@@ -22,17 +22,23 @@ public static class BookingSlotGuard
 
     /// <summary>
     /// The insert lost the race for the slot: the exclusion constraint refused it (23P01), or PostgreSQL broke a deadlock between two concurrent
-    /// inserts of overlapping intervals by aborting this one (40P01; measured in CI, where the loser of the race sometimes gets this instead of 23P01).
-    /// The creation path takes the practitioner lock first, so in practice only one creator is in flight; this is the safety net behind that lock.
+    /// inserts of overlapping intervals by aborting this one (40P01). Both were measured in CI: the loser sometimes gets the deadlock, and without a
+    /// retrying execution strategy EF wraps it as InvalidOperationException ("likely due to a transient failure") around the DbUpdateException,
+    /// so the whole inner-exception chain is searched. The creation path takes the practitioner lock first; this is the safety net behind that lock.
     /// </summary>
-    public static bool IsSlotTaken(DbUpdateException e) =>
-        e.InnerException is PostgresException { SqlState: ExclusionViolation, ConstraintName: ConstraintName } or PostgresException { SqlState: DeadlockDetected };
+    public static bool IsSlotTaken(Exception e)
+    {
+        for (var x = e; x is not null; x = x.InnerException)
+            if (x is PostgresException { SqlState: ExclusionViolation, ConstraintName: ConstraintName } or PostgresException { SqlState: DeadlockDetected })
+                return true;
+        return false;
+    }
 
     /// <summary>SaveChanges, mapping the exclusion violation to <see cref="SlotTakenException"/>; anything else passes through.</summary>
     public static async Task SaveAsync(BookingDbContext db, CancellationToken ct)
     {
         try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException e) when (IsSlotTaken(e)) { throw new SlotTakenException(e); }
+        catch (Exception e) when (e is not OperationCanceledException && IsSlotTaken(e)) { throw new SlotTakenException(e); }
     }
 
     /// <summary>Takes pg_advisory_xact_lock for the practitioner in the CURRENT transaction (the caller must have begun one); a no-op on other providers.</summary>

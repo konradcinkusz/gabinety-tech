@@ -31,8 +31,11 @@ public sealed partial class ContactDetailDetector : IContactDetailDetector
     [GeneratedRegex(@"(?<![\w.,])\+?\d(?:[ \-]?\d){6,}(?![\w])")] private static partial Regex Phone();
     [GeneratedRegex(@"(?<![\w@])@\w{2,}")] private static partial Regex Handle();
 
+    // Years are not phone numbers: "2015-2023", "2019 - obecnie", "2020 2021" are removed before the phone check, so a real number next to them is still found.
+    [GeneratedRegex(@"\b(?:19|20)\d{2}\s?[-–—]\s?(?:(?:19|20)\d{2}|obecnie|teraz)\b|\b(?:19|20)\d{2} (?:19|20)\d{2}\b", RegexOptions.IgnoreCase)] private static partial Regex YearRange();
+
     public bool ContainsContactDetails(string? text) =>
-        !string.IsNullOrEmpty(text) && (Email().IsMatch(text) || Phone().IsMatch(text) || Handle().IsMatch(text));
+        !string.IsNullOrEmpty(text) && (Email().IsMatch(text) || Phone().IsMatch(YearRange().Replace(text, " ")) || Handle().IsMatch(text));
 }
 
 public static partial class SlugGenerator

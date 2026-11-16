@@ -6,6 +6,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <ProjectReference Include="../Gabinety.ServiceDefaults/Gabinety.ServiceDefaults.csproj" />
+    <EmbeddedResource Include="Persistence/Seeds/*.json" />
     <ProjectReference Include="../Gabinety.Contracts/Gabinety.Contracts.csproj" />
     <ProjectReference Include="../Gabinety.Ranking/Gabinety.Ranking.csproj" />
   </ItemGroup>

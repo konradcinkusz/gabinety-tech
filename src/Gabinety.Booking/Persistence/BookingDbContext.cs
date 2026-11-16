@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using BookingEntity = Gabinety.Booking.Features.Bookings.Entities.Booking;
 
 namespace Gabinety.Booking.Persistence;
 
@@ -25,6 +26,7 @@ public sealed class BookingDbContext(DbContextOptions<BookingDbContext> options)
 {
     public DbSet<AvailabilityRule> Rules => Set<AvailabilityRule>();
     public DbSet<AvailabilityException> Exceptions => Set<AvailabilityException>();
+    public DbSet<BookingEntity> Bookings => Set<BookingEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BookingDbContext).Assembly);

@@ -5,6 +5,8 @@ namespace Gabinety.Directory.Persistence;
 /// <summary>Owns directorydb (P3). Entities and their IEntityTypeConfiguration classes arrive with T-03.02 onward.</summary>
 public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> options) : DbContext(options)
 {
+    public DbSet<Features.Profiles.Practitioner> Practitioners => Set<Features.Profiles.Practitioner>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DirectoryDbContext).Assembly);
 }

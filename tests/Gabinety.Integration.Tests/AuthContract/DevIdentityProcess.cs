@@ -5,14 +5,10 @@ using System.Net.Sockets;
 namespace Gabinety.Integration.Tests.AuthContract;
 
 /// <summary>
-/// Runs the built tools/Gabinety.DevIdentity as a child process on a free port with GABINETY_FAKE=1. A process, not a project reference:
-/// this project may not take a reference or package without the supervisor. The solution build produces the dll.
+/// Starts the built tools/Gabinety.DevIdentity as a child process. Used only to prove the start-up refusal (exit code), which cannot be seen in process.
 /// </summary>
-public sealed class DevIdentityProcess : IAsyncLifetime
+public static class DevIdentityProcess
 {
-    public string BaseUrl { get; private set; } = "";
-    private Process? _process;
-
     public static string DllPath()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -42,29 +38,5 @@ public sealed class DevIdentityProcess : IAsyncLifetime
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return $"http://127.0.0.1:{port}";
-    }
-
-    public async Task InitializeAsync()
-    {
-        BaseUrl = FreeUrl();
-        _process = Start(BaseUrl, "1");
-        _process.OutputDataReceived += (_, _) => { };
-        _process.BeginOutputReadLine();
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-        var deadline = DateTime.UtcNow.AddSeconds(60); // generous: waits on the condition, not on a fixed delay
-        while (true)
-        {
-            if (_process.HasExited) throw new InvalidOperationException($"DevIdentity exited early with code {_process.ExitCode}: {await _process.StandardError.ReadToEndAsync()}");
-            try { if ((await http.GetAsync(BaseUrl + "/health")).IsSuccessStatusCode) return; } catch (HttpRequestException) { } catch (TaskCanceledException) { }
-            if (DateTime.UtcNow > deadline) throw new TimeoutException("DevIdentity did not answer /health within 60 s");
-            await Task.Delay(100);
-        }
-    }
-
-    public Task DisposeAsync()
-    {
-        if (_process is { HasExited: false }) { _process.Kill(entireProcessTree: true); _process.WaitForExit(10_000); }
-        _process?.Dispose();
-        return Task.CompletedTask;
     }
 }

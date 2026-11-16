@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Gabinety.Integration.Tests.AuthContract;
 
 /// <summary>Minimal JWT reading and RS256 verification, so the suite needs no token library.</summary>
-internal sealed record ParsedJwt(JsonElement Header, JsonElement Payload, byte[] SigningInput, byte[] Signature)
+public sealed record ParsedJwt(JsonElement Header, JsonElement Payload, byte[] SigningInput, byte[] Signature)
 {
     public static ParsedJwt Parse(string jwt)
     {

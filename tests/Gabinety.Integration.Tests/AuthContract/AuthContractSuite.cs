@@ -10,15 +10,28 @@ namespace Gabinety.Integration.Tests.AuthContract;
 /// and against the real authservice image in the integration tier, so the stand-in cannot drift from the real surface.
 /// Wire names are those of docs/spikes/authservice.md.
 /// </summary>
-public abstract class AuthContractSuite(string baseUrl) : IDisposable
+public abstract class AuthContractSuite(HttpClient http) : IDisposable
 {
     public const string RoleClaim = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
     // Fixed synthetic value for users this suite registers; not a secret.
     protected const string Password = "Contract-Pass-123!";
 
-    protected HttpClient Http { get; } = new() { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(30) };
+    protected HttpClient Http { get; } = http;
+
+    /// <summary>A client for a real base URL (the real authservice image).</summary>
+    protected static HttpClient ForBaseUrl(string baseUrl) => new() { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(30) };
 
     public void Dispose() => Http.Dispose();
+
+    /// <summary>The claims of an ordinary user's access token, measured on the real authservice v0.3.4 (CI run 43933246622). No email_verified, no iat, no nbf.</summary>
+    protected static readonly string[] OrdinaryClaims =
+    [
+        "aud", "email", "exp", "iss", "jti", "sub",
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+    ];
+
+    protected static string[] ClaimNames(ParsedJwt jwt) => jwt.Payload.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal).ToArray();
 
     protected static string NewEmail() => $"demo-contract-{Guid.NewGuid():N}@example.test";
 
@@ -61,7 +74,7 @@ public abstract class AuthContractSuite(string baseUrl) : IDisposable
     }
 
     [ContractFact]
-    public async Task Register_returns_tokens_whose_claims_follow_the_spike()
+    public async Task Register_returns_tokens_with_exactly_the_claims_of_the_real_service()
     {
         var email = NewEmail();
         var tokens = await RegisterAsync(email);
@@ -69,9 +82,12 @@ public abstract class AuthContractSuite(string baseUrl) : IDisposable
 
         var jwt = ParsedJwt.Parse(tokens.GetProperty("accessToken").GetString()!);
         Assert.Equal("RS256", jwt.Header.GetProperty("alg").GetString());
+        Assert.Equal("JWT", jwt.Header.GetProperty("typ").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(jwt.Header.GetProperty("kid").GetString()));
+        Assert.Equal(OrdinaryClaims.Order(StringComparer.Ordinal), ClaimNames(jwt));
         Assert.False(string.IsNullOrWhiteSpace(jwt.Payload.GetProperty("sub").GetString()));
         Assert.Equal(email, jwt.Payload.GetProperty("email").GetString(), ignoreCase: true);
-        Assert.Equal(JsonValueKind.True, jwt.Payload.GetProperty("email_verified").ValueKind);
+        Assert.Equal(JsonValueKind.Number, jwt.Payload.GetProperty("exp").ValueKind);
     }
 
     [ContractFact]

@@ -1,20 +1,26 @@
-using System.Diagnostics;
+using Microsoft.AspNetCore.Mvc.Testing;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace Gabinety.Integration.Tests.AuthContract;
 
-/// <summary>Unit tier: the contract against DevIdentity.</summary>
-public class DevIdentityContractTests(DevIdentityProcess identity) : AuthContractSuite(identity.BaseUrl), IClassFixture<DevIdentityProcess>;
+/// <summary>DevIdentity hosted in process. The guard needs GABINETY_FAKE=1, exactly as the AppHost sets it.</summary>
+public sealed class DevIdentityHost : WebApplicationFactory<Program>
+{
+    public DevIdentityHost() => Environment.SetEnvironmentVariable("GABINETY_FAKE", "1");
+}
+
+/// <summary>Unit tier: the contract against DevIdentity, in process.</summary>
+public class DevIdentityContractTests(DevIdentityHost host) : AuthContractSuite(host.CreateClient()), IClassFixture<DevIdentityHost>;
 
 /// <summary>Integration tier: the same contract against the real authservice image. The supervisor sets AUTH_BASE_URL; unset, every test is reported as skipped.</summary>
 [Trait("tier", "integration")]
 [RequiresEnv("AUTH_BASE_URL")]
-public class RealAuthServiceContractTests() : AuthContractSuite(Environment.GetEnvironmentVariable("AUTH_BASE_URL") is { Length: > 0 } url ? url : "http://unset.invalid");
+public class RealAuthServiceContractTests() : AuthContractSuite(ForBaseUrl(Environment.GetEnvironmentVariable("AUTH_BASE_URL") is { Length: > 0 } url ? url : "http://unset.invalid"));
 
 /// <summary>What only the stand-in promises: the seeded synthetic users of SPEC 6.7 and the role claim of the admin.</summary>
-public class DevIdentitySeedTests(DevIdentityProcess identity) : AuthContractSuite(identity.BaseUrl), IClassFixture<DevIdentityProcess>
+public class DevIdentitySeedTests(DevIdentityHost host) : AuthContractSuite(host.CreateClient()), IClassFixture<DevIdentityHost>
 {
     // Fixed development value stated in tools/Gabinety.DevIdentity/README.md; not a secret.
     private const string SeedPassword = "Demo-Dev-Passw0rd!";
@@ -35,7 +41,6 @@ public class DevIdentitySeedTests(DevIdentityProcess identity) : AuthContractSui
     {
         var jwt = await LoginTokenAsync(name);
         Assert.Equal($"{name}@demo.example", jwt.Payload.GetProperty("email").GetString());
-        Assert.Equal(JsonValueKind.True, jwt.Payload.GetProperty("email_verified").ValueKind);
         Assert.False(string.IsNullOrWhiteSpace(jwt.Payload.GetProperty("sub").GetString()));
     }
 
@@ -45,6 +50,7 @@ public class DevIdentitySeedTests(DevIdentityProcess identity) : AuthContractSui
         var jwt = await LoginTokenAsync("demo-admin");
         Assert.Equal("Admin", jwt.Payload.GetProperty(RoleClaim).GetString());
         Assert.False(jwt.Payload.TryGetProperty("role", out _));
+        Assert.Equal(OrdinaryClaims.Append(RoleClaim).Order(StringComparer.Ordinal), ClaimNames(jwt));
     }
 
     [Theory]
@@ -53,17 +59,16 @@ public class DevIdentitySeedTests(DevIdentityProcess identity) : AuthContractSui
     public async Task Other_seeded_users_carry_no_role(string name)
     {
         var jwt = await LoginTokenAsync(name);
-        Assert.False(jwt.Payload.TryGetProperty(RoleClaim, out _));
+        Assert.Equal(OrdinaryClaims.Order(StringComparer.Ordinal), ClaimNames(jwt));
     }
 
     [Fact]
-    public async Task Tokens_have_no_iat_or_nbf_as_the_real_service()
+    public async Task Tokens_have_no_iat_nbf_or_email_verified_as_the_real_service()
     {
         var jwt = await LoginTokenAsync("demo-client");
         Assert.False(jwt.Payload.TryGetProperty("iat", out _));
         Assert.False(jwt.Payload.TryGetProperty("nbf", out _));
-        Assert.True(jwt.Payload.TryGetProperty("exp", out _));
-        Assert.True(jwt.Payload.TryGetProperty("jti", out _));
+        Assert.False(jwt.Payload.TryGetProperty("email_verified", out _));
     }
 
     [Fact]

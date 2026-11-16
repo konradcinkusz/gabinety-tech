@@ -26,7 +26,6 @@ public sealed class TokenIssuer(TimeProvider time, string issuer, string audienc
         {
             ["sub"] = user.Id,
             ["email"] = user.Email,
-            ["email_verified"] = true, // JSON boolean, always present
             ["jti"] = Guid.NewGuid().ToString(),
             [NameIdentifierClaim] = user.Id,
             [NameClaim] = user.Email,

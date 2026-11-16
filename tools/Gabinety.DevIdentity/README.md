@@ -27,7 +27,7 @@ GABINETY_FAKE=1 ASPNETCORE_URLS=http://localhost:5100 dotnet run --project tools
 | `GET /.well-known/jwks.json` | one key |
 | `GET /.well-known/openid-configuration` | `issuer` and `jwks_uri` |
 
-Token response: `{accessToken, refreshToken, expiresIn, tokenType:"Bearer"}`. Access token: 60 minutes, `iss` and `aud` both `AuthService` (override `Jwt__Issuer`, `Jwt__Audience`; `Jwt__PublicBaseUrl` sets the origin of `jwks_uri`), claims `sub`, `email`, `email_verified` (JSON boolean), `jti`, `exp`, the `nameidentifier` and `name` URI claims, and the role claim `http://schemas.microsoft.com/ws/2008/06/identity/claims/role`. No `iat`, no `nbf`. Not issued: `organization` claims (there are no organizations here).
+Token response: `{accessToken, refreshToken, expiresIn, tokenType:"Bearer"}`. Access token: 60 minutes, `iss` and `aud` both `AuthService` (override `Jwt__Issuer`, `Jwt__Audience`; `Jwt__PublicBaseUrl` sets the origin of `jwks_uri`), exactly the claims measured on the real authservice v0.3.4 (CI run 43933246622): `sub`, `email`, `jti`, `exp`, `iss`, `aud` and the `nameidentifier` and `name` URI claims. No `email_verified` (this corrects the spike), no `iat`, no `nbf`. Only `demo-admin` also carries the role claim `http://schemas.microsoft.com/ws/2008/06/identity/claims/role` = `Admin`. Not issued: `organization` claims.
 
 ## Seeded synthetic users (SPEC 6.7)
 

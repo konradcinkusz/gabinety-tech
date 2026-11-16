@@ -11,13 +11,15 @@ if (Environment.GetEnvironmentVariable("GABINETY_FAKE") != "1")
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton(sp => new IdentityStore(sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton(sp => { var store = new IdentityStore(sp.GetRequiredService<TimeProvider>()); store.Seed(); return store; });
 builder.Services.AddSingleton(sp => new TokenIssuer(sp.GetRequiredService<TimeProvider>(),
     builder.Configuration["Jwt:Issuer"] ?? "AuthService", builder.Configuration["Jwt:Audience"] ?? "AuthService")); // authservice defaults
 var app = builder.Build();
-app.Services.GetRequiredService<IdentityStore>().Seed();
 
 app.MapGet("/health", () => Results.Ok("Healthy"));
 app.MapDevIdentityEndpoints(builder.Configuration["Jwt:PublicBaseUrl"]);
 app.Run();
 return 0;
+
+// Lets WebApplicationFactory<Program> host this app in process (tests/Gabinety.Integration.Tests/AuthContract).
+public partial class Program;

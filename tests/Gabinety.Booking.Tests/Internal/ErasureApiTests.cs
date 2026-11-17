@@ -17,7 +17,7 @@ namespace Gabinety.Booking.Tests;
 public class ErasureApiTests
 {
     internal const string InternalKey = "k-internal-DO-NOT-LEAK-9012";
-    internal const string SecretBrief = "TEKST-BRIEF-NIE-DO-LOGU", SecretDispute = "TEKST-SPOR-NIE-DO-LOGU", SecretReason = "POWOD-NIE-DO-LOGU";
+    internal const string SecretBrief = "TEKST-BRIEF-NIE-DO-LOGU", SecretDispute = "TEKST-SPOR-NIE-DO-LOGU", SecretReason = "POWOD-NIE-DO-LOGU", MeetingUrl = "https://meet.demo.invalid/personal-room";
 
     internal static CreateHost NewHost()
     {
@@ -50,7 +50,7 @@ public class ErasureApiTests
             {
                 Id = id, ClientUserId = client, PractitionerId = pid, PractitionerUserId = practitionerUser, OfferingId = h.Offering, OfferingTitle = "demo-offering",
                 DurationMinutes = 60, PriceMinor = 12345, StartUtc = start, EndUtc = start.AddHours(1), Status = status,
-                StatusReason = withTexts ? SecretReason : null, BriefText = SecretBrief, BriefProblemSlug = "demo-problem", BriefAiAssisted = true,
+                StatusReason = withTexts ? SecretReason : null, BriefText = SecretBrief, BriefProblemSlug = "demo-problem", BriefAiAssisted = true, MeetingUrlSnapshot = MeetingUrl,
                 DisputeKind = withTexts ? "other" : null, DisputeText = withTexts ? SecretDispute : null, FeeMinor = 1851, PayoutMinor = 10494,
                 IdempotencyKey = key ?? Guid.NewGuid(), CreatedAt = h.Clock.GetUtcNow(), ConfirmedAt = h.Clock.GetUtcNow(),
             });
@@ -191,6 +191,36 @@ public class ErasureApiTests
         Assert.Equal(HttpStatusCode.NoContent, (await Erase(h, user)).StatusCode);
         Assert.Equal((0, 0), await RowsMatching(h, user));
         Assert.Equal(n, await h.Query(db => db.Bookings.CountAsync(b => b.ClientUserId == Token(user) && b.BriefText == "[usunięto]")));
+    }
+
+    [Fact]
+    public async Task Erasing_the_practitioner_clears_the_meeting_link_and_the_offering_title_and_the_client_still_sees_the_booking()
+    {
+        using var h = NewHost();
+        var prac = NewUser("prac"); var client = NewUser("client");
+        var id = await SeedBooking(h, client, prac);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await Erase(h, prac)).StatusCode);
+
+        var b = await Row(h, id);
+        Assert.Equal((null, ErasureFeature.ErasedBrief, "[usunięto]"), (b.MeetingUrlSnapshot, b.OfferingTitle, b.OfferingTitle));
+        Assert.Equal((client, Token(prac), "[usunięto]"), (b.ClientUserId, b.PractitionerUserId, b.BriefText)); // the client's id stays; the brief is erased in both roles (task rule)
+        var res = await h.ClientFor(client).GetAsync($"/api/v1/bookings/{id}");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.DoesNotContain("personal-room", await res.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Erasing_the_client_leaves_the_meeting_link_and_the_offering_title_of_the_practitioner()
+    {
+        using var h = NewHost();
+        var prac = NewUser("prac"); var client = NewUser("client");
+        var id = await SeedBooking(h, client, prac);
+
+        await Erase(h, client);
+
+        var b = await Row(h, id);
+        Assert.Equal((MeetingUrl, "demo-offering", prac), (b.MeetingUrlSnapshot, b.OfferingTitle, b.PractitionerUserId));
     }
 
     [Theory]

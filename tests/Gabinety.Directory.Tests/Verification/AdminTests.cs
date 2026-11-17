@@ -178,10 +178,10 @@ public class AdminTransitionTests(VerificationFactory f) : IClassFixture<Verific
         // the only writer offers one public method, and it adds
         var methods = typeof(VerificationEvents).GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly);
         Assert.Equal(["Record"], methods.Select(m => m.Name));
-        // and no endpoint changes or removes an event
+        // and no endpoint changes or removes an event: a route about events may only be read (GET; T-03.10 added the read endpoint)
         var routes = f.Services.GetServices<Microsoft.AspNetCore.Routing.EndpointDataSource>().SelectMany(s => s.Endpoints)
             .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>().Where(e => e.RoutePattern.RawText?.Contains("event", StringComparison.OrdinalIgnoreCase) == true);
-        Assert.Empty(routes);
+        Assert.All(routes, r => Assert.Equal(["GET"], r.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods));
     }
 }
 
@@ -190,6 +190,8 @@ public class AdminAuthorizationTests(VerificationFactory f) : IClassFixture<Veri
     static readonly (HttpMethod Method, string Path, bool SuperAdminOnly)[] Endpoints =
     [
         (HttpMethod.Get, "/api/v1/admin/practitioners", false),
+        (HttpMethod.Get, $"/api/v1/admin/practitioners/{Guid.NewGuid()}", false),
+        (HttpMethod.Get, $"/api/v1/admin/practitioners/{Guid.NewGuid()}/verification-events", false),
         (HttpMethod.Post, $"/api/v1/admin/practitioners/{Guid.NewGuid()}/approve", false),
         (HttpMethod.Post, $"/api/v1/admin/practitioners/{Guid.NewGuid()}/reject", false),
         (HttpMethod.Post, $"/api/v1/admin/practitioners/{Guid.NewGuid()}/suspend", false),

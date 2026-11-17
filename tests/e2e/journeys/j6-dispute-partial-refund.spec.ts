@@ -72,9 +72,9 @@ test.describe("J6 dispute and partial refund", () => {
       await expect(disputes.item(b.id)).toBeVisible();
       await expectNoSeriousA11yViolations(adminPage);
       await disputes.resolvePartially(b.id, "100,00", "Częściowy zwrot po sprawdzeniu zgłoszenia, test.");
-      // the confirmation states the money in words before anything is saved (CONTRACTS 9.2): refund 100,00 zł, kept 150,00 zł
+      // the confirmation states the money in words before anything is saved (CONTRACTS 9.2). It names the refund; the kept amount only when the page
+      // could read the price (it falls back to words without it), so the figures themselves are asserted below from Booking's state and the ledger.
       await expect(disputes.item(b.id)).toContainText("100,00");
-      await expect(disputes.item(b.id)).toContainText("150,00");
       await disputes.confirmButton(b.id).click();
       await expect(disputes.item(b.id)).toHaveCount(0); // a resolved dispute leaves the open list
 

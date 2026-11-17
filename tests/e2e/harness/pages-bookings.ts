@@ -3,9 +3,19 @@ import { expect, type Locator, type Page } from "@playwright/test";
 /** Page objects of the booking detail (/moje/rezerwacje/{id}) and the administrator's disputes list (/admin/spory), for J5 and J6. Role and label locators only. */
 export class BookingDetailPage {
   constructor(readonly page: Page) {}
+  /** Opens the detail; a page that shows an error banner instead (the services answered 429/503 under the shared rate limit) is reloaded a few times. */
   async goto(bookingId: string) {
-    await this.page.goto(`/moje/rezerwacje/${bookingId}?role=client`);
-    await expect(this.page.getByRole("heading", { level: 2 }).first()).toBeVisible();
+    const heading = this.page.getByRole("heading", { level: 2 }).first();
+    for (let attempt = 1; ; attempt++) {
+      await this.page.goto(`/moje/rezerwacje/${bookingId}?role=client`);
+      try {
+        await expect(heading).toBeVisible({ timeout: 8_000 });
+        return;
+      } catch (e) {
+        if (attempt >= 4) throw e;
+        await this.page.waitForTimeout(5_000); // waiting out a rate limit window, not business time
+      }
+    }
   }
   /** The value cells (`dd`) carry the status badge and the payment line; they have the role `definition`. */
   value(text: string | RegExp): Locator { return this.page.getByRole("definition").filter({ hasText: text }); }

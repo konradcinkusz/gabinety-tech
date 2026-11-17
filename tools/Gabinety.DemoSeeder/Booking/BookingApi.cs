@@ -32,7 +32,7 @@ public sealed class BookingApi(HttpClient http, SeedOptions options, TimeProvide
             if (idempotencyKey is { } k) req.Headers.Add("Idempotency-Key", k.ToString());
             if (body is not null) req.Content = JsonContent.Create(body, options: J);
             using var res = await http.SendAsync(req, ct);
-            if (res.StatusCode == HttpStatusCode.TooManyRequests && attempt < MaxAttempts) // the 60 per minute limit (CONTRACTS 10.2): wait for the window, then retry
+            if ((res.StatusCode == HttpStatusCode.TooManyRequests || await IsDependencyUnavailableAsync(res, ct)) && attempt < MaxAttempts) // the 60 per minute limit (CONTRACTS 10.2): wait for the window, then retry
             {
                 await Task.Delay(res.Headers.RetryAfter?.Delta ?? SeedRetry.DefaultWait, time, ct);
                 continue;
@@ -44,6 +44,14 @@ public sealed class BookingApi(HttpClient http, SeedOptions options, TimeProvide
             }
             return new Reply(res.StatusCode, json);
         }
+    }
+
+    /// <summary>503 dependency_unavailable: Booking could not reach the Directory, which shares its per-address rate limit with the seeder. Waiting for the window is the cure.</summary>
+    static async Task<bool> IsDependencyUnavailableAsync(HttpResponseMessage res, CancellationToken ct)
+    {
+        if (res.StatusCode != HttpStatusCode.ServiceUnavailable) return false;
+        try { return (await res.Content.ReadFromJsonAsync<JsonElement>(J, ct)) is { ValueKind: JsonValueKind.Object } o && o.TryGetProperty("code", out var c) && c.GetString() == "dependency_unavailable"; }
+        catch (JsonException) { return false; }
     }
 
     static string Code(Reply r) => r.Json is { ValueKind: JsonValueKind.Object } o && o.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString()! : "-";

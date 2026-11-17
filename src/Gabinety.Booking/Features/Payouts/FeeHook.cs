@@ -34,6 +34,8 @@ public sealed class FeeHook(IConfiguration config, PlatformFeeClaims claims) : I
         var b = context.Booking;
         if (b.FeeMinor is not null) return; // computed once
         var price = Money.Pln(b.PriceMinor);
+        // refund_partial: `kept` reads payment.RefundedMinor, so the refunded amount must be set BEFORE the hooks run (T-04.07c's effects do this for a
+        // provider that confirms at once, the Mock). For an asynchronous provider the fee is to be settled when the refund is confirmed (T-04.07c brief).
         var kept = Kept(context.To, b.DisputeResolution, price, context.Payment?.RefundedMinor ?? 0);
         if (kept is null) return;
 
@@ -50,6 +52,7 @@ public sealed class FeeHook(IConfiguration config, PlatformFeeClaims claims) : I
     /// <summary>Writes the PlatformFee row for the pair; false when the pair already has one. The unique partial index decides a race.</summary>
     async Task<bool> ClaimPairAsync(BookingTransitionContext context, BookingEntity b, long feeMinor, CancellationToken ct)
     {
+        // Assumes user ids are GUIDs (36 chars): the key is then 73 chars and fits pair_key varchar(80) (CONTRACTS 4.1).
         var pairKey = $"{b.ClientUserId}:{b.PractitionerId}";
         var id = Guid.CreateVersion7();
         if (context.Db.Database.IsNpgsql())

@@ -150,6 +150,11 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("DisputeKind")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("dispute_kind");
+
                     b.Property<DateTimeOffset?>("DisputeOpenedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dispute_opened_at");
@@ -158,6 +163,11 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("dispute_resolution");
+
+                    b.Property<string>("DisputeText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("dispute_text");
 
                     b.Property<short>("DurationMinutes")
                         .HasColumnType("smallint")

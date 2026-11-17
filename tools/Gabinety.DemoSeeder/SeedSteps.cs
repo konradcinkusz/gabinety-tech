@@ -7,6 +7,6 @@ public static class SeedSteps
     {
         new DirectorySeedStep(),
         new BookingSeedStep(),
-        // new ReputationSeedStep(),  // T-08.01c
+        new ReputationSeedStep(),
     }.OrderBy(s => s.Order).ToArray();
 }

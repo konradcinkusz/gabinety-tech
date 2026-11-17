@@ -9,10 +9,10 @@ export const REPLY_MIN = 10;
 export const REPLY_MAX = 1000; // CONTRACTS 5.2
 
 /**
- * The reply form is built and tested, but `POST /api/v1/reviews/{id}/reply` (T-05.02b) is not on main when this task is written.
- * Switch this ONE constant to true once that endpoint is merged; nothing else needs to change.
+ * The reply form calls `POST /api/v1/reviews/{id}/reply` (T-05.02b, merged: only the reviewed practitioner, once, to a Published review;
+ * the reply passes the same leakage rules as a review). This ONE constant switches the form on; it was off while the endpoint did not exist.
  */
-export const REPLY_ENABLED = false;
+export const REPLY_ENABLED = true;
 
 /** What to tell the user for a failed call, from its code and status only (never from the server's title or detail). */
 export function failureKey(f: Failure): ReviewsTextKey {

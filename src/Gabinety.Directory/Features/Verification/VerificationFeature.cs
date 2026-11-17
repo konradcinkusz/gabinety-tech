@@ -32,6 +32,7 @@ public sealed class VerificationFeature : IServiceFeature
     public void Add(IHostApplicationBuilder builder)
     {
         builder.Services.TryAddSingleton(TimeProvider.System);
+        if (Internal.DemoReset.NonDeployedProfile.IsActive(builder.Configuration)) { FakeGithubProfileLookup.Register(builder.Services); return; } // fake profile: no network
 #pragma warning disable EXTEXP0001 // the kernel adds the retrying resilience handler to every client; GitHub is called once, 5 s, no retry
         builder.Services.AddHttpClient<IGithubProfileLookup, HttpGithubProfileLookup>(c => c.Timeout = HttpGithubProfileLookup.Timeout)
             .RemoveAllResilienceHandlers();

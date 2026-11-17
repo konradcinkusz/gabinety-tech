@@ -7,7 +7,6 @@ using Gabinety.Contracts.Common;
 using Gabinety.Contracts.Directory;
 using Gabinety.Directory.Features.Profiles;
 using Gabinety.Directory.Persistence;
-using Gabinety.Ranking;
 using Gabinety.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -109,6 +108,7 @@ public sealed class VerificationFeature : IServiceFeature
         p.GithubChallengeCode = null; p.GithubChallengeLogin = null; p.GithubChallengeExpiresAt = null;
         p.ProfileCompleteness = ProfileCompleteness.Compute(p.Headline.Length > 0, p.Bio.Length >= 200, await facts.ActiveOfferingCountAsync(p.Id, ct) > 0,
             true, p.PortfolioUrl is not null, p.NipValid, p.OpenSlots14d > 0);
+        Ranking.RankingRecalculator.Recompute(p);
         p.UpdatedAt = now;
         VerificationEvents.Record(db, p.Id, VerificationEventKind.GithubLinked, uid, login, time);
         try { await db.SaveChangesAsync(ct); }
@@ -136,13 +136,8 @@ public sealed class VerificationFeature : IServiceFeature
 
         var now = time.GetUtcNow();
         p.Status = next; p.StatusReason = note; p.UpdatedAt = now;
-        if (trigger == PractitionerTrigger.Approve)
-        {
-            p.ApprovedAt = now;
-            p.RankingScore = (decimal)Ranker.Score(new RankingInput(p.RatingCount, (double)p.RatingAvg, p.CompletedCount, p.PractitionerCancelCount,
-                p.NoShowUpheldCount, (double)p.ProfileCompleteness, p.OpenSlots14d));
-            p.RankingVersion = RankingRules.Version;
-        }
+        if (trigger == PractitionerTrigger.Approve) p.ApprovedAt = now;
+        Ranking.RankingRecalculator.Recompute(p); // scores an Approved row (approve and reinstate); a no-op for any other status
         var kind = trigger switch
         {
             PractitionerTrigger.Approve => VerificationEventKind.Approved,

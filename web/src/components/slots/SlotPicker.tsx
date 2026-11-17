@@ -8,8 +8,8 @@ import { ss } from "./strings";
 
 type State = { status: "loading" | "ready" | "unavailable"; slots: Slot[]; next: number };
 
-/** Loads slots for one offering through the BFF (never Booking directly) and lists them by Warsaw day, each as a link into the booking flow. */
-export function SlotPicker({ practitionerId, offeringId, now }: { practitionerId: string; offeringId: string; now?: Date }) {
+/** Loads slots for one offering through the BFF (never Booking directly) and lists them by Warsaw day, each as a link into the booking flow. The booking page resolves the offering through the public profile, so the link carries `gabinet` (the profile slug) next to `start`. */
+export function SlotPicker({ practitionerId, offeringId, profileSlug, now }: { practitionerId: string; offeringId: string; profileSlug: string; now?: Date }) {
   const [clock] = useState(() => now ?? new Date());
   const [state, setState] = useState<State>({ status: "loading", slots: [], next: 0 });
 
@@ -67,7 +67,7 @@ export function SlotPicker({ practitionerId, offeringId, now }: { practitionerId
           <ul className={styles.times}>
             {d.slots.map((s) => (
               <li key={s.startUtc}>
-                <Link className={styles.time} href={`/rezerwacja/${offeringId}?start=${encodeURIComponent(s.startUtc)}`}>{warsawTime(s.startUtc)}</Link>
+                <Link className={styles.time} href={`/rezerwacja/${offeringId}?start=${encodeURIComponent(s.startUtc)}&gabinet=${encodeURIComponent(profileSlug)}`}>{warsawTime(s.startUtc)}</Link>
               </li>
             ))}
           </ul>

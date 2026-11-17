@@ -32,8 +32,8 @@ describe("profile page without JavaScript", () => {
     const p = profile(1);
     installProfileDirectory(p);
     const html = await render(p.slug);
-    expect(html).toContain('href="/rezerwacja/00000000-0000-0000-0000-0000000000a1"');
-    expect(html).toContain('href="/rezerwacja/00000000-0000-0000-0000-0000000000a2"');
+    expect(html).toContain(`href="/rezerwacja/00000000-0000-0000-0000-0000000000a1?gabinet=${encodeURIComponent(p.slug)}"`);
+    expect(html).toContain(`href="/rezerwacja/00000000-0000-0000-0000-0000000000a2?gabinet=${encodeURIComponent(p.slug)}"`);
   });
 
   it("explains each badge accessibly", async () => {

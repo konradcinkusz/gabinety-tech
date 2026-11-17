@@ -1,0 +1,78 @@
+import { expect, test } from "../harness/fixtures";
+import { restoreClock } from "../harness/clock";
+import { resetAndReseed } from "../harness/demo-data";
+import { expectNoSeriousA11yViolations } from "../harness/a11y";
+import { BookingDetailPage } from "../harness/pages-bookings";
+import { bookAndPay, getBooking, publicProfile, registerDemoUser, uniqueDemoName } from "../harness/booking-support";
+
+// J5 (SPEC 10): a client cancels 24 h or more ahead and the refund shows; cancels late and does not (CONTRACTS 8.1, 9.2).
+// Set-up (a fresh client, a paid booking) goes through the BFF; the cancel itself and what the client then sees are driven through the UI,
+// and the follow-up state (booking status, payment) is read from Booking's API. Business time moves only with the test clock.
+test.describe("J5 cancel: refund early, none late", () => {
+  const SLUG = "demo-bartosz-testowy";
+
+  test.afterAll(async () => {
+    test.setTimeout(11 * 60_000);
+    await restoreClock();
+    await resetAndReseed(); // once per file (README); removes the fresh demo clients and their bookings
+  });
+
+  test("cancelling more than 24 h ahead shows the refund and the payment is Refunded", async ({ page, context, clock }) => {
+    const profile = await publicProfile(SLUG);
+    const offering = profile.offerings[0];
+    await registerDemoUser(context, uniqueDemoName("j5-early"));
+    const b = await bookAndPay(context, { practitionerId: profile.id, offeringId: offering.id, now: new Date((await clock.read()).now), minAheadHours: 72 });
+
+    const detail = new BookingDetailPage(page);
+    await detail.goto(b.id);
+    await expect(detail.value("Potwierdzona")).toBeVisible();
+    await expect(detail.value("Opłacona")).toBeVisible();
+    await expectNoSeriousA11yViolations(page);
+
+    await detail.cancelButton().click();
+    // the rule is stated before the confirm button (both outcomes are named there); the outcome below is what proves it
+    await expect(detail.cancelDialog()).toContainText("co najmniej 24 godziny, zwrot wynosi 100% ceny");
+    await detail.confirmCancel().click();
+
+    await expect(page.getByText("Rezerwacja została anulowana.")).toBeVisible();
+    await expect(detail.value(/^Anulowana przez klienta$/)).toBeVisible();
+    await expect(detail.value("Zwrócona w całości")).toBeVisible();
+    const m = offering.price.amountMinor; // below 1000 zł: no thousands separator
+    await expect(detail.value(/Zwrócono:/)).toContainText(`${Math.floor(m / 100)},${String(m % 100).padStart(2, "0")}`);
+    await expectNoSeriousA11yViolations(page);
+
+    await expect.poll(async () => (await getBooking(context, b.id)).payment.status, { message: "payment of the early cancel" }).toBe("Refunded");
+    const view = await getBooking(context, b.id);
+    expect(view.status).toBe("CancelledByClient");
+    expect(view.payment.refunded.amountMinor).toBe(offering.price.amountMinor); // 100 %, CONTRACTS 9.2
+  });
+
+  test("cancelling inside 24 h shows no refund and the payment is unchanged", async ({ page, context, clock }) => {
+    const profile = await publicProfile(SLUG);
+    const offering = profile.offerings[0];
+    await registerDemoUser(context, uniqueDemoName("j5-late"));
+    const b = await bookAndPay(context, { practitionerId: profile.id, offeringId: offering.id, now: new Date((await clock.read()).now), minAheadHours: 72, skip: 3 });
+
+    // 12 h before the start: well inside the 24 h window, and the clock (never a sleep) is what gets us there
+    const now = new Date((await clock.read()).now);
+    await clock.advanceHours((b.start.getTime() - now.getTime()) / 3_600_000 - 12);
+
+    const detail = new BookingDetailPage(page);
+    await detail.goto(b.id);
+    await expect(detail.value("Opłacona")).toBeVisible();
+    await detail.cancelButton().click();
+    await expect(detail.cancelDialog()).toContainText("mniej niż 24 godziny, brak zwrotu");
+    await detail.confirmCancel().click();
+
+    await expect(page.getByText("Rezerwacja została anulowana.")).toBeVisible();
+    await expect(detail.value("Anulowana przez klienta (bez zwrotu)")).toBeVisible();
+    await expect(detail.value("Opłacona")).toBeVisible(); // the payment line did not change ...
+    await expect(page.getByText(/Zwrócono:/)).toHaveCount(0); // ... and shows no refund
+    await expectNoSeriousA11yViolations(page);
+
+    const view = await getBooking(context, b.id);
+    expect(view.status).toBe("LateCancelledByClient");
+    expect(view.payment.status).toBe("Succeeded");
+    expect(view.payment.refunded.amountMinor).toBe(0);
+  });
+});

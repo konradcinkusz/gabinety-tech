@@ -14,6 +14,21 @@ public class DisputesListTests
         return ([.. root.GetProperty("items").EnumerateArray()], root.TryGetProperty("nextCursor", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null);
     }
 
+    /// <summary>Every page of the list. The InMemory database is shared by all tests of the process, so the rows of other tests are in the same newest-first list and a single page can miss this test's rows.</summary>
+    static async Task<List<JsonElement>> All(CreateHost h, string query = "")
+    {
+        var items = new List<JsonElement>();
+        string? cursor = null;
+        do
+        {
+            var q = cursor is null ? query : query + (query.Contains('?') ? "&" : "?") + "cursor=" + Uri.EscapeDataString(cursor);
+            var (page, next) = await Page(await Adm.List(h, q));
+            items.AddRange(page);
+            cursor = next;
+        } while (cursor is not null);
+        return items;
+    }
+
     static string[] Mine(List<JsonElement> items, CreateHost h) =>
         [.. items.Where(i => i.GetProperty("practitionerUserId").GetString() == h.OwnerUserId).Select(i => i.GetProperty("bookingId").GetString()!)];
 
@@ -26,11 +41,11 @@ public class DisputesListTests
         var (done, _) = await Adm.Seed(h, BookingStatus.Resolved, resolution: "refund_partial", openedAt: now.AddHours(-9), resolvedAt: now.AddHours(-1));
         foreach (var s in Enum.GetValues<BookingStatus>().Where(s => s is not (BookingStatus.Disputed or BookingStatus.Resolved))) await Adm.Seed(h, s);
 
-        var (openItems, _) = await Page(await Adm.List(h));
+        var openItems = await All(h);
         Assert.Equal([open.ToString()], Mine(openItems, h));
-        var (defaultItems, _) = await Page(await Adm.List(h, "?status=open"));
+        var defaultItems = await All(h, "?status=open");
         Assert.Equal(Mine(openItems, h), Mine(defaultItems, h));
-        var (resolvedItems, _) = await Page(await Adm.List(h, "?status=resolved"));
+        var resolvedItems = await All(h, "?status=resolved");
         Assert.Equal([done.ToString()], Mine(resolvedItems, h));
 
         var item = openItems.Single(i => i.GetProperty("bookingId").GetString() == open.ToString());
@@ -53,10 +68,10 @@ public class DisputesListTests
     {
         await using var h = Adm.Host(new RecordingProvider());
         var (id, _) = await Adm.Seed(h);
-        Assert.Contains(id.ToString(), Mine((await Page(await Adm.List(h))).Items, h));
+        Assert.Contains(id.ToString(), Mine(await All(h), h));
         Assert.Equal(HttpStatusCode.OK, (await Adm.Resolve(h, id, Adm.Body("release"))).StatusCode);
-        Assert.DoesNotContain(id.ToString(), Mine((await Page(await Adm.List(h))).Items, h));
-        var resolved = (await Page(await Adm.List(h, "?status=resolved"))).Items.Single(i => i.GetProperty("bookingId").GetString() == id.ToString());
+        Assert.DoesNotContain(id.ToString(), Mine(await All(h), h));
+        var resolved = (await All(h, "?status=resolved")).Single(i => i.GetProperty("bookingId").GetString() == id.ToString());
         Assert.Equal("release", resolved.GetProperty("resolution").GetString());
         Assert.Equal(Adm.Note, resolved.GetProperty("note").GetString());
     }

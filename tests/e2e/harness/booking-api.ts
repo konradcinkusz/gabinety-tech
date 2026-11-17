@@ -36,8 +36,7 @@ export interface Slot { startUtc: string; endUtc: string }
 
 /** The Directory's public profile, read directly (fresh: the web page of the same data is cached for 5 minutes). */
 export async function publicProfile(slug: string): Promise<PublicProfile> {
-  const body = await json<Record<string, unknown>>(await fetchRetrying(`${urls.directory}/api/v1/practitioners/${encodeURIComponent(slug)}`), `profile ${slug}`);
-  return ((body.card as Record<string, unknown> | undefined) ? { ...(body.card as object), ...body } : body) as unknown as PublicProfile;
+  return json<PublicProfile>(await fetchRetrying(`${urls.directory}/api/v1/practitioners/${encodeURIComponent(slug)}`), `profile ${slug}`); // flat per CONTRACTS 3.2 (#100)
 }
 
 const warsawDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit" });

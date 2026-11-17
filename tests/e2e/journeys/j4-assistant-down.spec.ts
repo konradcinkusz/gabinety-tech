@@ -15,6 +15,7 @@ const BRIEF = "Chcę zautomatyzować obieg faktur między skrzynką a arkuszem [
 
 test.describe("J4 the Assistant is down", () => {
   test.afterAll(async () => {
+    test.setTimeout(900_000); // the reseed takes 1 to 6 minutes; the default hook timeout is 60 s
     await resetAndReseed(); // SPEC 7: remove the demo rows this journey wrote (once per journey)
   });
 
@@ -28,8 +29,9 @@ test.describe("J4 the Assistant is down", () => {
     await expect(slot).toBeVisible();
     const link = new URL((await slot.getAttribute("href"))!, urls.web);
     const startUtc = link.searchParams.get("start")!;
-    if (!link.searchParams.has("gabinet")) link.searchParams.set("gabinet", SLUG); // see the J3 note
-    await page.goto(link.pathname + link.search);
+    expect(link.searchParams.get("gabinet")).toBe(SLUG); // the slot link carries the profile slug (#99)
+    await slot.click();
+    await page.waitForURL(/\/rezerwacja\//);
 
     const form = new BookingFormPage(page);
     await form.brief().fill(BRIEF);

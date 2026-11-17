@@ -37,6 +37,7 @@ test.describe("J3 book, pay, complete, review", () => {
   test.describe.configure({ mode: "serial" });
   // The clock is global to the fake profile: whatever happens, leave it at the baseline, then remove the demo rows this journey wrote (SPEC 7).
   test.afterAll(async () => {
+    test.setTimeout(900_000); // the reseed takes 1 to 6 minutes; the default hook timeout is 60 s and would kill it half way
     await restoreClock();
     await resetAndReseed();
   });
@@ -63,9 +64,9 @@ test.describe("J3 book, pay, complete, review", () => {
     await expect(slot).toBeVisible(); // the picker found free slots
     const link = new URL((await slot.getAttribute("href"))!, urls.web);
     const startUtc = link.searchParams.get("start")!;
-    // The slot link reaches the booking page with the profile slug only when it carries `gabinet`; add it if the link does not (see PR notes).
-    if (!link.searchParams.has("gabinet")) link.searchParams.set("gabinet", SLUG);
-    await page.goto(link.pathname + link.search);
+    expect(link.searchParams.get("gabinet")).toBe(SLUG); // the slot link carries the profile slug (#99)
+    await slot.click();
+    await page.waitForURL(/\/rezerwacja\//);
     const form = new BookingFormPage(page);
     await expect(page.getByRole("heading", { level: 1, name: "Rezerwacja konsultacji" })).toBeVisible();
     await expect(page.getByText(offering.title)).toBeVisible();

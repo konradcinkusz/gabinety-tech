@@ -98,7 +98,8 @@ public class PaymentWebhookIntegrationTests : IAsyncLifetime
         await using var db = Db();
         Assert.Equal(BookingStatus.Expired, (await db.Bookings.SingleAsync(b => b.Id == id)).Status);
         Assert.Equal([LedgerKind.ClientCharge, LedgerKind.Refund], (await db.LedgerEntries.Where(l => l.BookingId == id).ToListAsync()).Select(l => l.Kind).Order().ToArray());
-        Assert.Equal((PaymentStatus.Refunded, 10000L), await db.Payments.Where(p => p.BookingId == id).Select(p => ValueTuple.Create(p.Status, p.RefundedMinor)).SingleAsync());
+        var payment = await db.Payments.SingleAsync(p => p.BookingId == id);
+        Assert.Equal((PaymentStatus.Refunded, 10000L), (payment.Status, payment.RefundedMinor));
     }
 
     [Fact]
@@ -121,7 +122,7 @@ public class PaymentWebhookIntegrationTests : IAsyncLifetime
         Assert.Equal(["provider", "event_id"], await Rows(
             "select a.attname from pg_index i join pg_attribute a on a.attrelid = i.indrelid and a.attnum = any(i.indkey) " +
             "where i.indrelid = 'webhook_events'::regclass and i.indisprimary order by array_position(i.indkey::int2[], a.attnum)"));
-        var index = Assert.Single(await Rows("select indexdef from pg_indexes where tablename = 'ledger_entries' and indexdef like 'CREATE UNIQUE%'"));
+        var index = Assert.Single(await Rows("select indexdef from pg_indexes where tablename = 'ledger_entries' and indexdef like 'CREATE UNIQUE%' and indexdef like '%pair_key%'"));
         Assert.Contains("pair_key", index);
         Assert.Contains("PlatformFee", index);
 

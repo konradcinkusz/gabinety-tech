@@ -11,6 +11,9 @@ namespace Gabinety.Booking.Notifications;
 /// row only one UPDATE matches; the other gets a concurrency exception and skips the row. This is the same on PostgreSQL and InMemory, so it needs no lock.
 /// <c>sent_at</c> is set only after the sender accepted the message, so a crash between the two costs one attempt, never a lost message
 /// (a rare duplicate is possible: the delivery is at-least-once). A row at <see cref="MaxAttempts"/> attempts is never selected again.</para>
+/// <para>CUT-OFF: a <c>Reminder24h</c>/<c>Reminder1h</c> is useless once the consultation has started, and a retry after backoff (up to 16 h) can land
+/// after the start. When the booking start is not after <c>now</c> the reminder is GIVEN UP: <c>attempts</c> goes to <see cref="MaxAttempts"/>
+/// (the existing give-up state, no new column) and nothing is sent. Other kinds (e.g. <c>ReviewRequest</c>, which is due after the end) are unaffected.</para>
 /// </summary>
 public sealed class NotificationDispatcher(IServiceScopeFactory scopes, TimeProvider time, ILogger<NotificationDispatcher> log)
 {
@@ -57,13 +60,22 @@ public sealed class NotificationDispatcher(IServiceScopeFactory scopes, TimeProv
         var n = await db.Notifications.SingleOrDefaultAsync(x => x.Id == id, ct);
         if (n is null || n.SentAt != null || n.Attempts >= MaxAttempts || n.DueAt > now) return false;
 
+        var booking = await db.Bookings.AsNoTracking().Where(b => b.Id == n.BookingId)
+            .Select(b => new { b.StartUtc, b.PractitionerUserId }).SingleOrDefaultAsync(ct);
+        if (booking is not null && IsReminder(n.Kind) && booking.StartUtc <= now)
+        {
+            n.Attempts = MaxAttempts; // the give-up state: never selected again, sent_at stays null
+            try { await db.SaveChangesAsync(ct); }
+            catch (DbUpdateConcurrencyException) { return false; } // claimed by another dispatcher, which applies the same rule
+            log.LogWarning("Notification {NotificationId} ({Kind}) to user {UserId} given up: the booking start has passed", n.Id, n.Kind, n.ToUserId);
+            return false;
+        }
+
         n.Attempts++;
         if (n.Attempts < MaxAttempts) n.DueAt = now + Backoff[n.Attempts - 1];
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return false; } // another dispatcher claimed it first, or it was cancelled meanwhile
 
-        var booking = await db.Bookings.AsNoTracking().Where(b => b.Id == n.BookingId)
-            .Select(b => new { b.StartUtc, b.PractitionerUserId }).SingleOrDefaultAsync(ct);
         if (booking is null) return Failed(n, "the booking does not exist");
 
         string? address;
@@ -80,6 +92,8 @@ public sealed class NotificationDispatcher(IServiceScopeFactory scopes, TimeProv
         catch (DbUpdateConcurrencyException) { log.LogWarning("Notification {NotificationId} was sent but its row was removed meanwhile", n.Id); }
         return true;
     }
+
+    static bool IsReminder(NotificationKind kind) => kind is NotificationKind.Reminder24h or NotificationKind.Reminder1h;
 
     bool Failed(Notification n, string reason)
     {

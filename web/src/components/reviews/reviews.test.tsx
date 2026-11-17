@@ -190,7 +190,7 @@ describe("review form: server refusals in Polish", () => {
     await mount(<ReviewForm bookingId="demo-b1" />);
     await fill();
     await submit();
-    expect(assign).toHaveBeenCalledWith("/logowanie?returnTo=" + encodeURIComponent("/moje/opinie/demo-b1"));
+    expect(assign).toHaveBeenCalledWith("/logowanie?redirect=" + encodeURIComponent("/moje/opinie/demo-b1"));
   });
 });
 

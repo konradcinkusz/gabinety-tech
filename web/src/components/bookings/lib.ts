@@ -1,4 +1,5 @@
 import { dayHeading, warsawDate, warsawTime } from "@/components/slots/slotTime";
+import { authPath } from "@/components/auth/returnTo";
 import type { BookingDetailView, Failure } from "./api";
 import type { Role } from "./routes";
 import { mb, type BookingsTextKey } from "./strings";
@@ -47,5 +48,5 @@ const go = (to: string) => window.location.assign(to);
 
 /** A signed-out answer sends the user to sign in and back. */
 export function toSignIn(): void {
-  go("/logowanie?returnTo=" + encodeURIComponent(window.location.pathname + window.location.search));
+  go(authPath("/logowanie", window.location.pathname + window.location.search));
 }

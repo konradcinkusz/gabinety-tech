@@ -77,7 +77,7 @@ export function ProfilePage({ profile: p, url }: { profile: PractitionerProfile;
         )}
       </section>
 
-      <ReviewsSlot />
+      <ReviewsSlot profile={p} />
     </>
   );
 }

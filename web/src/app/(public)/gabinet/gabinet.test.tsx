@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
+import { pf } from "@/components/profile/strings";
 import { installProfileDirectory, profile, uninstallProfileDirectory } from "@/components/profile/testFixtures";
 import Page, { generateMetadata } from "./[slug]/page";
 
@@ -51,10 +52,21 @@ describe("profile page without JavaScript", () => {
     expect(html).not.toContain("meetingUrl");
   });
 
-  it("leaves one marked, empty slot for the reviews block", async () => {
-    const p = profile(1);
+  it("renders the reviews block with a heading and the rating summary in the HTML", async () => {
+    const p = profile(1, { isNew: false, rating: { average: 4.5, count: 4 } });
     installProfileDirectory(p);
-    expect(await render(p.slug)).toContain('data-slot="reviews"');
+    const html = await render(p.slug);
+    expect(html).toContain('data-slot="reviews"');
+    expect(html).toContain(pf("reviews.title"));
+    expect(html).toContain(pf("reviews.summary", { average: "4,5", count: 4 }));
+  });
+
+  it("shows 'Nowy' instead of a summary for a practitioner without reviews", async () => {
+    const p = profile(1, { isNew: true, rating: undefined });
+    installProfileDirectory(p);
+    const html = await render(p.slug);
+    expect(html).toContain(pf("reviews.new"));
+    expect(html).not.toContain("aggregateRating");
   });
 
   it("renders the whole profile when Booking is down: the page never calls Booking", async () => {

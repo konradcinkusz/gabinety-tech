@@ -30,6 +30,19 @@ const text = {
     approved: "Zatwierdzony",
     approvedInfo: "Profil został sprawdzony i zatwierdzony przez zespół Gabinety Tech.",
   },
+  reviews: {
+    title: "Opinie",
+    summary: "Średnia ocen {average} na podstawie opinii: {count}",
+    new: "Nowy na platformie: ten programista nie ma jeszcze opinii.",
+    loading: "Ładowanie opinii…",
+    empty: "Nie ma jeszcze opublikowanych opinii.",
+    unavailable: "Opinie są chwilowo niedostępne. Spróbuj za chwilę.",
+    retry: "Spróbuj ponownie",
+    reviewer: "Zweryfikowany klient",
+    rating: "Ocena: {n} z 5",
+    more: "Pokaż więcej opinii",
+    replyHeading: "Odpowiedź programisty",
+  },
 } as const;
 
 export type ProfileTextKey = {

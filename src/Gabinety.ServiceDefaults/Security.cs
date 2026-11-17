@@ -35,9 +35,25 @@ public static class Security
     public static AuthenticationBuilder AddInternalKeyAuthentication(this AuthenticationBuilder auth) =>
         auth.AddScheme<AuthenticationSchemeOptions, InternalKeyHandler>(InternalScheme, null);
 
-    /// <summary>Sliding window per user id when signed in, else per address (CONTRACTS 10.2). Default: 60 per minute.</summary>
-    public static IServiceCollection AddRateLimiting(this IServiceCollection services, int perMinute = 60)
+    public const int DefaultPerMinute = 60;
+
+    /// <summary>
+    /// The same limiter with the limit read from <c>RateLimit:PerMinute</c> (env <c>RateLimit__PerMinute</c>); absent or blank means 60. Only the AppHost fake profile raises it,
+    /// because every caller there shares one localhost address. A value that is not a positive integer stops the service at start.
+    /// </summary>
+    public static IServiceCollection AddRateLimiting(this IServiceCollection services, IConfiguration config)
     {
+        var raw = config["RateLimit:PerMinute"];
+        if (string.IsNullOrWhiteSpace(raw)) return services.AddRateLimiting(DefaultPerMinute);
+        if (!int.TryParse(raw, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var perMinute) || perMinute <= 0)
+            throw new InvalidOperationException("RateLimit:PerMinute must be a positive integer.");
+        return services.AddRateLimiting(perMinute);
+    }
+
+    /// <summary>Sliding window per user id when signed in, else per address (CONTRACTS 10.2). Default: 60 per minute.</summary>
+    public static IServiceCollection AddRateLimiting(this IServiceCollection services, int perMinute = DefaultPerMinute)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(perMinute);
         services.AddRateLimiter(o =>
         {
             o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;

@@ -120,6 +120,11 @@ export async function createReview(request: APIRequestContext, bookingId: string
   return (await res.json()) as { status: string };
 }
 
+/** The status code of a review attempt, for the one that must be refused (a second review of the same booking: 409 `already_reviewed`). */
+export async function reviewAttemptStatus(request: APIRequestContext, bookingId: string, rating: number, text: string): Promise<number> {
+  return (await retrying(() => request.post(`${REPUTATION}/reviews`, { data: { bookingId, rating, text } }))).status();
+}
+
 /** The booking id out of a `/checkout/mock/<id>` or `/rezerwacja/potwierdzenie/<id>` address. */
 export function bookingIdFromUrl(url: string): string {
   const m = /\/(?:checkout\/mock|rezerwacja\/potwierdzenie|moje\/opinie|moje\/rezerwacje)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(url);

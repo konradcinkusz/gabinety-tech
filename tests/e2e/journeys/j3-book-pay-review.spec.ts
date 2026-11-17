@@ -4,7 +4,7 @@ import { restoreClock } from "../harness/clock";
 import { urls } from "../harness/env";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
 import {
-  reseedIfRequested, bookingIdFromUrl, createBooking, createReview, earliestOnDistinctDays, freeSlots, getBooking, publicProfile, simulatePayment, waitForStatus, warsawDate,
+  reseedIfRequested, reviewAttemptStatus, bookingIdFromUrl, createBooking, createReview, earliestOnDistinctDays, freeSlots, getBooking, publicProfile, simulatePayment, waitForStatus, warsawDate,
 } from "../harness/booking-api";
 import { BookingFormPage, MockCheckoutPage, PractitionerProfilePage, ReviewFormPage } from "../harness/pages-booking";
 
@@ -146,7 +146,7 @@ test.describe("J3 book, pay, complete, review", () => {
     await reviewForm.submit(REVIEWS[0]!.rating, REVIEWS[0]!.text);
     await expect(page.getByRole("heading", { name: "Dziękujemy za opinię" })).toBeVisible();
     await expect(page.getByText("Opinia została opublikowana na profilu programisty.")).toBeVisible();
-    expect((await getBooking(client, bookingIds[0]!)).canReview).toBe(false); // one review per booking
+    expect(await reviewAttemptStatus(client, bookingIds[0]!, 1, REVIEWS[0]!.text)).toBe(409); // one review per booking (the flag canReview does not know)
 
     // ---- 6. reviews 2 (still "Nowy") and 3 (the average) ----
     expect((await createReview(client, bookingIds[1]!, REVIEWS[1]!.rating, REVIEWS[1]!.text)).status).toBe("Published");

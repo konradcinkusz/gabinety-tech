@@ -8,5 +8,6 @@
     <ProjectReference Include="../Gabinety.ServiceDefaults/Gabinety.ServiceDefaults.csproj" />
     <ProjectReference Include="../Gabinety.Contracts/Gabinety.Contracts.csproj" />
     <ProjectReference Include="../Gabinety.Llm/Gabinety.Llm.csproj" />
+    <EmbeddedResource Include="Prompts/*.txt" />
   </ItemGroup>
 </Project>

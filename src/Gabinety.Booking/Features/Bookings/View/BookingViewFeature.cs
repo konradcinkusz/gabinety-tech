@@ -39,6 +39,9 @@ public sealed class BookingViewFeature : IServiceFeature
         return Results.Ok(ToView(booking, payment, sub, admin, time));
     }
 
+    /// <summary>The admin's resolution note is stored in <c>status_reason</c> of a Resolved booking and is for the admin only (CONTRACTS 4.3); a cancel reason is for both parties.</summary>
+    static string? StatusReasonFor(BookingEntity b, bool admin) => b.Status == Gabinety.Billing.BookingStatus.Resolved && !admin ? null : b.StatusReason;
+
     /// <summary>
     /// The meeting URL is for a party of a Confirmed booking only; the brief for the client always and for the practitioner from Confirmed onward (any status but PendingPayment and Expired); fee and payout for
     /// the practitioner and admin. The flags are the caller's at <paramref name="time"/> (<see cref="TimeProvider.System"/> when omitted: the callers that
@@ -55,7 +58,7 @@ public sealed class BookingViewFeature : IServiceFeature
         var money = (long? m) => m is { } v ? new MoneyDto(v) : null;
         var flags = BookingPermissions.For(b, callerId, time ?? TimeProvider.System);
         return new BookingView(
-            b.Id, Enum.Parse<ContractsStatus>(b.Status.ToString()), b.StatusReason, b.StartUtc, b.EndUtc, b.DurationMinutes, b.OfferingTitle,
+            b.Id, Enum.Parse<ContractsStatus>(b.Status.ToString()), StatusReasonFor(b, admin), b.StartUtc, b.EndUtc, b.DurationMinutes, b.OfferingTitle,
             new MoneyDto(b.PriceMinor), new PractitionerRef(b.PractitionerId, names?.PractitionerDisplayName ?? "", names?.PractitionerSlug ?? ""),
             isPractitioner && wasConfirmed && names?.ClientDisplayName is { } clientName ? new ClientRef(clientName) : null,
             isClient || (isPractitioner && wasConfirmed) ? new BriefDto(b.BriefText, b.BriefProblemSlug, b.BriefAiAssisted) : null,

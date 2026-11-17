@@ -164,4 +164,22 @@ public class BookingPermissionsTests
             Assert.Null(Gabinety.Booking.Features.Payments.BookingViewFeature.ToView(b, null, Stranger, false, new Clock(Start), names).Brief);
         }
     }
+
+    [Fact]
+    public void The_resolution_note_of_a_Resolved_booking_is_for_the_admin_only_and_a_cancel_reason_stays_for_the_parties()
+    {
+        static Gabinety.Contracts.Booking.BookingView V(BookingEntity b, string who, bool admin) =>
+            Gabinety.Booking.Features.Payments.BookingViewFeature.ToView(b, null, who, admin);
+
+        var resolved = Row(BookingStatus.Resolved);
+        resolved.StatusReason = "demo-admin-note: the practitioner was late";
+        Assert.Null(V(resolved, Client, false).StatusReason);
+        Assert.Null(V(resolved, Practitioner, false).StatusReason);
+        Assert.Equal("demo-admin-note: the practitioner was late", V(resolved, "demo-admin", true).StatusReason);
+
+        var cancelled = Row(BookingStatus.CancelledByClient);
+        cancelled.StatusReason = "demo-cancel-reason";
+        Assert.Equal("demo-cancel-reason", V(cancelled, Client, false).StatusReason);
+        Assert.Equal("demo-cancel-reason", V(cancelled, Practitioner, false).StatusReason);
+    }
 }

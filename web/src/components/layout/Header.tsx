@@ -3,7 +3,7 @@ import { t, type MessageKey } from "@/i18n/pl";
 import styles from "./layout.module.css";
 
 const NAV: ReadonlyArray<readonly [string, MessageKey]> = [
-  ["/szukaj", "nav.search"],
+  ["/programisci", "nav.search"],
   ["/jak-to-dziala", "nav.howItWorks"],
   ["/zasady-rankingu", "nav.rankingRules"],
   ["/cennik", "nav.pricing"],

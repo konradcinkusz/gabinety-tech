@@ -28,6 +28,13 @@ for ((i = 0; i < LIMIT; i++)); do
   sleep 1
 done
 if [ "$found" -ge "$WANT" ]; then echo "ok   seeded practitioners: $found (wanted $WANT)"; else echo "FAIL seeded practitioners: $found (wanted $WANT)"; fail=1; fi
-code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://localhost:3000/programisci || true)
-if [ "$code" = "200" ]; then echo "ok   web /programisci"; else echo "FAIL web /programisci (status: $code)"; fail=1; fi
+# The seeder, Booking and the web app all call the Directory from this machine, and the Directory's 60-per-minute limit is per client address (CONTRACTS 10.2), so while the
+# seeder is busy the web app's list page can answer 500 (it reports the Directory's 429 as directory_unavailable). Retry until the seeding has calmed down.
+code=000
+for ((i = 0; i < LIMIT; i++)); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://localhost:3000/programisci || true)
+  if [ "$code" = "200" ]; then break; fi
+  sleep 1
+done
+if [ "$code" = "200" ]; then echo "ok   web /programisci"; else echo "FAIL web /programisci (last status: $code)"; fail=1; fi
 exit $fail

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { urls } from "../harness/env";
 import { addDays, bff, day, openSlots, publicProfile, registerDemoUser, uniqueDemoName } from "../harness/booking-support";
 import { restoreClock } from "../harness/clock";
+import { resetAndReseed } from "../harness/demo-data";
 
 // J7 (SPEC 10, 11): a state-changing request through the web origin with a foreign Origin, or from a cross-site fetch, is refused with 403
 // `cross_site_request` (CONTRACTS 10.1) and changes nothing: no booking exists afterwards. A same-origin request with the same body is the control.
@@ -17,8 +18,13 @@ test.describe("J7 foreign Origin is refused", () => {
     }
   });
 
-  // No resetAndReseed: the only rows are a fresh `demo-j7-` client and one PendingPayment control booking whose hold expires by itself.
-  test.afterAll(async () => { await restoreClock(); });
+  // Every row this journey writes is unique to it (a fresh `demo-` client and its bookings). CI runs on a fresh stack, so the 1 to 6 minute reseed
+  // only runs on request, for a local re-run: E2E_RESEED=1 (README).
+  test.afterAll(async () => {
+    test.setTimeout(11 * 60_000);
+    await restoreClock();
+    if (process.env.E2E_RESEED === "1" && !failed) await resetAndReseed();
+  });
 
   test("a foreign Origin and a cross-site fetch get 403 and create no booking", async ({ context, clock }) => {
     await registerDemoUser(context, uniqueDemoName("j7"));

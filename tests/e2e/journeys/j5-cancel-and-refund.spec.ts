@@ -1,5 +1,6 @@
 import { expect, test } from "../harness/fixtures";
 import { restoreClock } from "../harness/clock";
+import { resetAndReseed } from "../harness/demo-data";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
 import { BookingDetailPage } from "../harness/pages-bookings";
 import { bookAndPay, getBooking, publicProfile, registerDemoUser, uniqueDemoName } from "../harness/booking-support";
@@ -21,9 +22,13 @@ test.describe("J5 cancel: refund early, none late", () => {
     }
   });
 
-  // No resetAndReseed here: every row this journey writes (a fresh `demo-j5-` client, its two bookings) is unique to it and touches no seeded row or
-  // statistic (a client cancel leaves stats unchanged, CONTRACTS 8.1), and a reseed of 1 to 6 minutes does not fit the E2E budget three more times.
-  test.afterAll(async () => { await restoreClock(); });
+  // Every row this journey writes is unique to it (a fresh `demo-` client and its bookings). CI runs on a fresh stack, so the 1 to 6 minute reseed
+  // only runs on request, for a local re-run: E2E_RESEED=1 (README).
+  test.afterAll(async () => {
+    test.setTimeout(11 * 60_000);
+    await restoreClock();
+    if (process.env.E2E_RESEED === "1" && !failed) await resetAndReseed();
+  });
 
   test("cancelling more than 24 h ahead shows the refund and the payment is Refunded", async ({ page, context, clock }) => {
     const profile = await publicProfile(SLUG);

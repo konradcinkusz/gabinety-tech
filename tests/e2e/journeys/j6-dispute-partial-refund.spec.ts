@@ -27,8 +27,8 @@ test.describe("J6 dispute and partial refund", () => {
   test.afterAll(async () => {
     test.setTimeout(11 * 60_000);
     await restoreClock();
-    // once per file: removes the fresh client, the extra offering and the booking. Skipped after a failure (the run is red anyway, and the 6 minutes are the budget's).
-    if (!failed) await resetAndReseed();
+    // Only on request (E2E_RESEED=1, README): CI runs on a fresh stack and a reseed is 1 to 6 minutes of its budget. Removes the fresh client, the extra offering and the booking.
+    if (process.env.E2E_RESEED === "1" && !failed) await resetAndReseed();
   });
 
   test("the arithmetic of CONTRACTS 9.1 holds for the journey's figures", () => {

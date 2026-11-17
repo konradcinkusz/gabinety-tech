@@ -1,7 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { Alert, Button, Field, LinkButton, TextInput } from "@/components/ui";
-import { safeReturnTo } from "./returnTo";
+import { RETURN_PARAM, safeReturnTo } from "./returnTo";
 import { at } from "./strings";
 
 export type Navigate = (to: string) => void;
@@ -9,7 +9,7 @@ const defaultNavigate: Navigate = (to) => window.location.assign(to);
 
 export function GithubButton({ returnTo }: { returnTo: string }) {
   const back = safeReturnTo(returnTo);
-  const href = "/api/auth/github/start" + (back === "/" ? "" : "?redirect=" + encodeURIComponent(back));
+  const href = "/api/auth/github/start" + (back === "/" ? "" : "?" + RETURN_PARAM + "=" + encodeURIComponent(back));
   return <LinkButton href={href} variant="secondary">{at("login.github")}</LinkButton>;
 }
 

@@ -159,3 +159,23 @@ export async function ledgerRows(admin: BrowserContext, from: string, to: string
       .map(([bookingId, kind, amount]) => ({ bookingId, kind, amountMinor: Number(amount) })),
   };
 }
+
+/**
+ * The download route of /admin/ksiega (BFF `/admin/ksiega/csv`, which streams Booking's ledger.csv with the administrator's cookie): one request, retried a few
+ * times while it answers anything but 200 (it maps every upstream failure, 429 included, to 503). Returns what the browser would get.
+ */
+export async function ledgerDownload(admin: BrowserContext, from: string, to: string): Promise<{ status: number; contentType: string; disposition: string; header: string }> {
+  let last = { status: 0, contentType: "", disposition: "", header: "" };
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const res = await admin.request.get(`/admin/ksiega/csv?from=${from}&to=${to}`, { failOnStatusCode: false });
+    last = {
+      status: res.status(),
+      contentType: res.headers()["content-type"] ?? "",
+      disposition: res.headers()["content-disposition"] ?? "",
+      header: res.status() === 200 ? ((await res.text()).split(/\r?\n/)[0] ?? "") : "",
+    };
+    if (last.status === 200) break;
+    await sleep(5_000); // a rate limit window, not business time
+  }
+  return last;
+}

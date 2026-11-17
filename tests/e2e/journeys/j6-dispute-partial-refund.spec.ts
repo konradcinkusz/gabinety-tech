@@ -4,7 +4,7 @@ import { resetAndReseed } from "../harness/demo-data";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
 import { AdminDisputesPage, BookingDetailPage } from "../harness/pages-bookings";
 import {
-  actorContext, addDays, addOffering, bookAndPay, day, feeOf, getBooking, ledgerRows, type LedgerRow, publicProfile, registerDemoUser, uniqueDemoName,
+  actorContext, addDays, addOffering, bookAndPay, day, feeOf, getBooking, ledgerDownload, ledgerRows, type LedgerRow, publicProfile, registerDemoUser, uniqueDemoName,
 } from "../harness/booking-support";
 
 // J6 (SPEC 10): a dispute is opened, an administrator resolves it with a partial refund, the ledger CSV shows the entries.
@@ -105,6 +105,13 @@ test.describe("J6 dispute and partial refund", () => {
       expect(byKind).toEqual({ ClientCharge: PRICE, Refund: REFUND, PlatformFee: FEE, PractitionerPayout: PAYOUT });
       expect(rows).toHaveLength(4); // one row each, no PayoutReversal
       expect(byKind.ClientCharge - byKind.Refund).toBe(byKind.PlatformFee + byKind.PractitionerPayout); // kept = fee + payout
+
+      // the download route of the page (streams the same CSV to the browser): 200, text/csv, an attachment with the period in its name, the contract's header
+      const dl = await ledgerDownload(admin, from, to);
+      expect(dl.status, "ledger download route").toBe(200);
+      expect(dl.contentType).toContain("text/csv");
+      expect(dl.disposition).toContain(`attachment; filename="ledger-${from}-${to}.csv"`);
+      expect(dl.header).toBe("booking_id,kind,amount_minor,currency,created_at");
 
       await adminPage.goto("/admin/ksiega");
       await expectNoSeriousA11yViolations(adminPage);

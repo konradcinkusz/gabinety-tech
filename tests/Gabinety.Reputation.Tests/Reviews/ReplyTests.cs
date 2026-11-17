@@ -170,10 +170,10 @@ public class ReplyTests
 
         Assert.Equal(HttpStatusCode.BadRequest, (await ReplyHost.Reply(c, tooLong, Varied(1001))).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await ReplyHost.Reply(c, longest, "  " + Varied(1000) + "  ")).StatusCode);
-        Assert.Equal(HttpStatusCode.Created, (await ReplyHost.Reply(c, shortest, " 0123456789 ")).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await ReplyHost.Reply(c, shortest, " abcdefghij ")).StatusCode);
 
         Assert.Equal(Varied(1000), (await h.ReviewOf(longest)).ReplyText);
-        Assert.Equal("0123456789", (await h.ReviewOf(shortest)).ReplyText);
+        Assert.Equal("abcdefghij", (await h.ReviewOf(shortest)).ReplyText);
     }
 
     [Fact]

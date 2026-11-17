@@ -1,4 +1,5 @@
 using Gabinety.Booking.Features.Bookings.Create;
+using Gabinety.Booking.Features.Payments;
 using Microsoft.EntityFrameworkCore;
 using BookingEntity = Gabinety.Booking.Features.Bookings.Entities.Booking;
 
@@ -30,6 +31,8 @@ public sealed class BookingDbContext(DbContextOptions<BookingDbContext> options)
     public DbSet<BookingEntity> Bookings => Set<BookingEntity>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BookingDbContext).Assembly);

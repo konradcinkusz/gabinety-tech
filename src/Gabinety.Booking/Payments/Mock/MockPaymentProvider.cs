@@ -30,9 +30,10 @@ public sealed class MockPaymentProvider(string siteBaseUrl, string? webhookSecre
         {
             using var doc = JsonDocument.Parse(rawBody.ToArray());
             var r = doc.RootElement;
+            if (r.ValueKind != JsonValueKind.Object) return new WebhookEvent("", WebhookEventKind.Unknown, null, null, null);
             string? Str(string n) => r.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
             var kind = Enum.TryParse<WebhookEventKind>(Str("kind"), out var k) ? k : WebhookEventKind.Unknown;
-            long? amount = r.TryGetProperty("amountMinor", out var a) && a.TryGetInt64(out var m) ? m : null;
+            long? amount = r.TryGetProperty("amountMinor", out var a) && a.ValueKind == JsonValueKind.Number && a.TryGetInt64(out var m) ? m : null;
             return new WebhookEvent(Str("eventId") ?? "", kind, Str("providerPaymentId"), amount, Str("currency"));
         }
         catch (JsonException) { return new WebhookEvent("", WebhookEventKind.Unknown, null, null, null); }

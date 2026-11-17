@@ -23,13 +23,9 @@ export async function streamLedger(token: string, from: string, to: string, sign
       cache: "no-store",
     });
     clearTimeout(timer);
-    if (res.status === 403 || res.status === 400) {
-      await res.body?.cancel();
-      return problem(res.status, res.status === 403 ? "forbidden" : "validation_failed");
-    }
     if (!res.ok || !res.body) {
-      await res.body?.cancel();
-      return problem(503, "dependency_unavailable");
+      console.warn(`ledger.csv upstream status ${res.status}`); // the status only: no body, address or period
+      return refusalOf(res);
     }
     return new Response(res.body, {
       status: 200,
@@ -42,7 +38,44 @@ export async function streamLedger(token: string, from: string, to: string, sign
     });
   } catch {
     clearTimeout(timer);
+    console.warn("ledger.csv upstream unreachable");
     forgetBackend("booking");
     return problem(503, "dependency_unavailable"); // never echo the error: it can carry the backend address
+  }
+}
+
+const PROBLEM_CODE = /^[a-z][a-z0-9_]{0,63}$/;
+const RETRY_AFTER = /^[0-9A-Za-z ,:+-]{1,64}$/;
+
+/** Booking's answer to a refused export, mapped without echoing it: 401/403/404 as they are, 400 with a well-formed problem code, 429 with Retry-After, the rest is an outage. */
+async function refusalOf(res: Response): Promise<Response> {
+  switch (res.status) {
+    case 400: {
+      let code = "validation_failed";
+      try {
+        const found = ((await res.json()) as { code?: unknown } | null)?.code;
+        if (typeof found === "string" && PROBLEM_CODE.test(found)) code = found;
+      } catch {
+        await res.body?.cancel().catch(() => {});
+      }
+      return problem(400, code);
+    }
+    case 401:
+      await res.body?.cancel();
+      return problem(401, "unauthorized");
+    case 403:
+      await res.body?.cancel();
+      return problem(403, "forbidden");
+    case 404:
+      await res.body?.cancel();
+      return problem(404, "not_found");
+    case 429: {
+      await res.body?.cancel();
+      const wait = res.headers.get("retry-after");
+      return problem(429, "rate_limited", wait && RETRY_AFTER.test(wait) ? { "Retry-After": wait } : undefined);
+    }
+    default:
+      await res.body?.cancel();
+      return problem(503, "dependency_unavailable");
   }
 }

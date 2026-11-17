@@ -1,0 +1,110 @@
+using System.Security.Claims;
+using Gabinety.Booking.Clients;
+using Gabinety.Contracts.Booking;
+using Gabinety.Booking.Payments.Abstractions;
+using Gabinety.Booking.Persistence;
+using Gabinety.Contracts.Common;
+using Gabinety.ServiceDefaults;
+using Microsoft.EntityFrameworkCore;
+using ProviderEvent = Gabinety.Booking.Payments.Abstractions.WebhookEvent;
+
+namespace Gabinety.Booking.Features.Payments;
+
+/// <summary>
+/// POST /webhooks/payments/{provider} and POST /api/v1/payments/simulate (CONTRACTS 4.2, 4.3). Both end in <see cref="PaymentEventHandler"/>.
+/// The webhook is public: the signature over the RAW body is the only authentication. The brief, the meeting URL and the signature never reach a log.
+/// </summary>
+public sealed class PaymentWebhookFeature : IServiceFeature
+{
+    public const string SignatureHeader = "X-Payment-Signature";
+    public const int MaxBodyBytes = 64 * 1024;
+    public static readonly TimeSpan RetryAfter = TimeSpan.FromSeconds(30);
+
+    public void Add(IHostApplicationBuilder builder) => builder.Services.AddScoped<PaymentEventHandler>();
+
+    public void Map(IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapPost("/webhooks/payments/{provider}", WebhookAsync).AllowAnonymous();
+        endpoints.MapPost("/api/v1/payments/simulate", SimulateAsync).RequireAuthorization("Authenticated");
+    }
+
+    static async Task<IResult> WebhookAsync(string provider, HttpContext http, IPaymentProvider payments, IConfiguration config,
+        PaymentEventHandler handler, ILogger<PaymentWebhookFeature> log, CancellationToken ct)
+    {
+        if (!string.Equals(provider, payments.Name, StringComparison.OrdinalIgnoreCase)) return Problem(ErrorCodes.NotFound, "Not found", 404);
+
+        var raw = await ReadRawAsync(http.Request, ct);
+        if (raw is null) return Problem(ErrorCodes.ValidationFailed, "Validation failed", 413, "The body is larger than 64 KB.");
+
+        // No secret configured: accepted in Mock mode, rejected in every other mode, before the adapter is asked.
+        if (string.IsNullOrEmpty(config["Payments:WebhookSecret"]) && !IsMock(payments))
+        {
+            log.LogWarning("Webhook for {Provider} rejected: no webhook secret is configured", payments.Name);
+            return Problem(ErrorCodes.Unauthenticated, "Unauthenticated", 401);
+        }
+        var verified = payments.VerifyWebhook(raw, http.Request.Headers[SignatureHeader].FirstOrDefault());
+        if (verified is null)
+        {
+            log.LogWarning("Webhook for {Provider} rejected: the signature is invalid", payments.Name);
+            return Problem(ErrorCodes.Unauthenticated, "Unauthenticated", 401);
+        }
+        return await RunAsync(handler, payments.Name, verified, http, ct);
+    }
+
+    static async Task<IResult> SimulateAsync(SimulatePaymentRequest? req, IPaymentProvider payments, BookingDbContext db, PaymentEventHandler handler,
+        HttpContext http, CancellationToken ct)
+    {
+        if (!IsMock(payments)) return Problem(ErrorCodes.Forbidden, "Forbidden", 403, "Payments are not simulated outside Mock mode.");
+        var outcome = req?.Outcome?.ToLowerInvariant();
+        if (req is null || req.BookingId == Guid.Empty || outcome is not ("succeeded" or "failed"))
+            return Problem(ErrorCodes.ValidationFailed, "Validation failed", 422, null,
+                new() { ["outcome"] = ["outcome must be succeeded or failed"] });
+
+        var payment = await db.Payments.AsNoTracking().SingleOrDefaultAsync(p => p.BookingId == req.BookingId, ct);
+        var booking = payment is null ? null : await db.Bookings.AsNoTracking().SingleOrDefaultAsync(b => b.Id == req.BookingId, ct);
+        if (payment is null || booking is null) return Problem(ErrorCodes.NotFound, "Not found", 404);
+
+        var kind = outcome == "succeeded" ? WebhookEventKind.PaymentSucceeded : WebhookEventKind.PaymentFailed;
+        var e = new ProviderEvent($"sim_{req.BookingId:N}_{outcome}", kind, payment.ProviderPaymentId, booking.PriceMinor, PaymentEventHandler.Currency);
+        return await RunAsync(handler, payments.Name, e, http, ct);
+    }
+
+    static async Task<IResult> RunAsync(PaymentEventHandler handler, string provider, ProviderEvent e, HttpContext http, CancellationToken ct)
+    {
+        try
+        {
+            var result = await handler.HandleAsync(provider, e, ct);
+            if (result.Outcome is not { } outcome)
+            {
+                http.Response.Headers.RetryAfter = ((int)RetryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return Results.Json(new { outcome = "RetryLater" }, statusCode: 202);
+            }
+            return Results.Ok(new { outcome = outcome.ToString() });
+        }
+        catch (DirectoryUnavailableException)
+        {
+            http.Response.Headers.RetryAfter = ((int)RetryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return Problem(ErrorCodes.DependencyUnavailable, "Dependency unavailable", 503, "A required service is temporarily unavailable.");
+        }
+    }
+
+    /// <summary>The Mock provider is the only one that may run without a secret and the only one that may be simulated.</summary>
+    static bool IsMock(IPaymentProvider payments) => string.Equals(payments.Name, "Mock", StringComparison.OrdinalIgnoreCase);
+
+    static async Task<byte[]?> ReadRawAsync(HttpRequest request, CancellationToken ct)
+    {
+        if (request.ContentLength > MaxBodyBytes) return null;
+        using var ms = new MemoryStream();
+        var buffer = new byte[8192];
+        int n;
+        while ((n = await request.Body.ReadAsync(buffer, ct)) > 0)
+        {
+            if (ms.Length + n > MaxBodyBytes) return null;
+            ms.Write(buffer, 0, n);
+        }
+        return ms.ToArray();
+    }
+
+    internal static IResult Problem(string code, string title, int status, string? detail = null, Dictionary<string, string[]>? errors = null) =>
+        Results.Json(ApiProblem.Of(code, title, status, detail, errors), statusCode: status, contentType: "application/problem+json");
+}

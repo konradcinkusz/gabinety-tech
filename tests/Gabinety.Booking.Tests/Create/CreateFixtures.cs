@@ -61,6 +61,8 @@ sealed class CreateHost : WebApplicationFactory<Program>
     public long PriceMinor = 10000;
     public string Status = "Approved";
     public bool Active = true;
+    public string? MeetingUrl;
+    public Action<IServiceCollection>? Configure;
 
     public CreateHost()
     {
@@ -69,7 +71,7 @@ sealed class CreateHost : WebApplicationFactory<Program>
             {
                 offeringId = Offering, practitionerId = Practitioner, practitionerUserId = OwnerUserId, practitionerStatus = Status,
                 title = Title, durationMinutes = Minutes, price = new { amountMinor = PriceMinor, currency = "PLN" },
-                meetingUrl = (string?)null, isActive = Active,
+                meetingUrl = MeetingUrl, isActive = Active,
             })
             : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
     }
@@ -102,6 +104,7 @@ sealed class CreateHost : WebApplicationFactory<Program>
             s.RemoveAll<TimeProvider>();
             s.AddSingleton<TimeProvider>(Clock);
             s.AddLogging(b => b.SetMinimumLevel(LogLevel.Trace).AddProvider(Logs));
+            Configure?.Invoke(s);
             s.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, o =>
             {
                 var cfg = new OpenIdConnectConfiguration { Issuer = Issuer };

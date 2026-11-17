@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Gabinety.Directory.Tests;
@@ -89,4 +90,76 @@ public class KernelTests
         Assert.Equal(3, codes.Count(x => x == HttpStatusCode.OK));
         Assert.Equal(2, codes.Count(x => x == HttpStatusCode.TooManyRequests));
     }
+
+    /// <summary>A host whose limit comes from configuration (<c>RateLimit:PerMinute</c>, env <c>RateLimit__PerMinute</c>), as the services wire it.</summary>
+    static async Task<WebApplication> ConfiguredHost(string? perMinute)
+    {
+        var b = WebApplication.CreateBuilder();
+        b.WebHost.UseTestServer();
+        if (perMinute is not null) b.Configuration["RateLimit:PerMinute"] = perMinute;
+        b.Services.AddRateLimiting(b.Configuration);
+        var app = b.Build();
+        app.UseRateLimiter();
+        app.MapGet("/read", () => "ok");
+        await app.StartAsync();
+        return app;
+    }
+
+    static async Task<(int ok, int limited)> Burst(WebApplication app, int requests)
+    {
+        var c = app.GetTestClient();
+        int ok = 0, limited = 0;
+        for (var i = 0; i < requests; i++)
+        {
+            var code = (await c.GetAsync("/read")).StatusCode;
+            if (code == HttpStatusCode.OK) ok++; else if (code == HttpStatusCode.TooManyRequests) limited++;
+        }
+        return (ok, limited);
+    }
+
+    [Fact]
+    public async Task Without_configuration_the_limit_stays_60_per_minute()
+    {
+        await using var app = await ConfiguredHost(null);
+        Assert.Equal((60, 5), await Burst(app, 65));
+    }
+
+    [Fact]
+    public async Task A_configured_limit_is_honoured()
+    {
+        await using var app = await ConfiguredHost("7");
+        Assert.Equal((7, 3), await Burst(app, 10));
+    }
+
+    [Fact]
+    public async Task A_high_configured_limit_lets_a_fake_profile_burst_through()
+    {
+        await using var app = await ConfiguredHost("6000");
+        Assert.Equal((200, 0), await Burst(app, 200));
+    }
+
+    [Fact]
+    public async Task A_blank_value_means_not_configured()
+    {
+        await using var app = await ConfiguredHost("  ");
+        Assert.Equal((60, 1), await Burst(app, 61));
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("abc")]
+    [InlineData("1.5")]
+    [InlineData("99999999999")]
+    public async Task An_invalid_configured_limit_is_rejected_at_start(string value)
+    {
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => ConfiguredHost(value));
+        Assert.Contains("RateLimit:PerMinute", ex.Message);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void A_non_positive_explicit_limit_is_rejected(int perMinute) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ServiceCollection().AddRateLimiting(perMinute));
 }

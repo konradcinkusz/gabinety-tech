@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddFeatures();
 builder.AddLlmGateway(); // Copilot by default, Fake with Llm:Provider=Fake; adds the "llm" health check
-builder.Services.AddRateLimiting();
+builder.Services.AddRateLimiting(builder.Configuration);
 
 // Authentication is registered here and only here.
 builder.Services.AddJwtAuthentication(builder.Configuration);

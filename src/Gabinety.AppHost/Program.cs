@@ -27,6 +27,7 @@ IResourceBuilder<ProjectResource> Service<TProject>(string name, int port) where
     if (fake)
     {
         p = p.WithEnvironment("GABINETY_FAKE", "1")
+             .WithEnvironment("RateLimit__PerMinute", "6000") // every caller (seeder, services, web server, journeys) is one localhost address: one shared bucket at 60 (CONTRACTS 10.2)
              .WithEnvironment("Llm__Provider", "Fake")
              .WithEnvironment("Database__Provider", "InMemory")
              .WithEnvironment("Payments__Provider", "Mock")

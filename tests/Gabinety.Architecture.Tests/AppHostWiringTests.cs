@@ -54,4 +54,23 @@ public class AppHostWiringTests
 
     [Fact]
     public void A_second_seeder_resource_resets_and_seeds_again_on_request() => Assert.Contains("Seeder(\"seeder-reset\", \"--reset\");", Program);
+
+    [Fact]
+    public void The_rate_limit_is_raised_in_the_fake_profile_only()
+    {
+        var service = ServiceHelper();
+        var fakeBlock = Regex.Match(service, @"if \(fake\)\s*\{.*?\n    \}\n", RegexOptions.Singleline).Value;
+        var m = Regex.Match(fakeBlock, @"WithEnvironment\(""RateLimit__PerMinute"", ""(\d+)""\)");
+        Assert.True(m.Success, "the fake profile block must set RateLimit__PerMinute");
+        Assert.True(int.Parse(m.Groups[1].Value) >= 1000);
+        Assert.Single(Regex.Matches(Program, "RateLimit__PerMinute")); // never in the default profile, never anywhere else
+    }
+
+    [Theory]
+    [InlineData("Directory"), InlineData("Booking"), InlineData("Reputation"), InlineData("Assistant")]
+    public void Every_service_reads_its_rate_limit_from_configuration(string service)
+    {
+        var program = File.ReadAllText(Path.Combine(Repo.Root, $"src/Gabinety.{service}/Program.cs"));
+        Assert.Contains("AddRateLimiting(builder.Configuration)", program);
+    }
 }

@@ -108,8 +108,13 @@ test.describe("J2 practitioner onboards, administrator approves, profile becomes
 
       // The first visit to this profile page is after approval (a 404 would be cached for the page's revalidation window).
       const view = new PublicProfilePage(page);
-      await page.goto(`/gabinet/${slug}`);
-      await expect(view.heading(displayName)).toBeVisible();
+      // The Directory limits 60 requests a minute per address and J1 ran just before: if the page render hit a 429 or a 5xx, load it again
+      // (an error render is not cached; the profile itself is already proven public by the API read above).
+      await expect(async () => {
+        const res = await page.goto(`/gabinet/${slug}`);
+        expect(res?.status()).toBe(200);
+        await expect(view.heading(displayName)).toBeVisible({ timeout: 3_000 });
+      }).toPass({ timeout: 90_000, intervals: [2_000, 5_000, 10_000] });
       await expect(page.getByText(headline)).toBeVisible();
       await expect(page.getByText("Zatwierdzony", { exact: true })).toBeVisible();
       await expect(view.bookLink(offeringTitle)).toBeVisible();

@@ -61,8 +61,8 @@ test.describe("J1 visitor browses a category and opens a profile", () => {
         for (const o of profile!.offerings) {
           await expect(p.getByRole("heading", { level: 3, name: o.title })).toBeVisible();
           await expect(p.getByText(o.description)).toBeVisible();
-          // booking works without scripts: a plain link to the booking page of that offering
-          await expect(view.bookLink(o.title)).toHaveAttribute("href", `/rezerwacja/${o.id}`);
+          // booking works without scripts: a plain link to the booking page of that offering (the page adds `?gabinet=<slug>` to come back to)
+          await expect(view.bookLink(o.title)).toHaveAttribute("href", new RegExp(`^/rezerwacja/${o.id}(\\?.*)?$`));
         }
         // structured data for search engines is in the document too
         await expect(p.locator('script[type="application/ld+json"]')).toHaveCount(1);

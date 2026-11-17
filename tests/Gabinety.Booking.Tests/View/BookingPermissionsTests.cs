@@ -142,4 +142,26 @@ public class BookingPermissionsTests
         foreach (var s in All.Where(s => s is not (BookingStatus.Completed or BookingStatus.Resolved)))
             Assert.False(Flags(Row(s, resolution: "release"), Client, Start + 2 * H).CanReview, s.ToString());
     }
+
+    [Fact]
+    public void The_practitioner_sees_brief_and_client_name_from_Confirmed_onward_and_the_client_always()
+    {
+        var names = new Gabinety.Booking.Features.Payments.PartyNames(ClientDisplayName: "demo-client-name");
+        foreach (var s in All)
+        {
+            var b = Row(s);
+            b.BriefText = "demo-brief";
+            var seen = s is not (BookingStatus.PendingPayment or BookingStatus.Expired);
+            var p = Gabinety.Booking.Features.Payments.BookingViewFeature.ToView(b, null, Practitioner, admin: false, new Clock(Start), names);
+            Assert.Equal(seen, p.Brief is not null);
+            Assert.Equal(seen, p.Client is not null);
+            var c = Gabinety.Booking.Features.Payments.BookingViewFeature.ToView(b, null, Client, admin: false, new Clock(Start), names);
+            Assert.NotNull(c.Brief);
+            Assert.Null(c.Client);
+            // the meeting URL rule is unchanged: Confirmed only
+            b.MeetingUrlSnapshot = "https://meet.demo.invalid/x";
+            Assert.Equal(s == BookingStatus.Confirmed, Gabinety.Booking.Features.Payments.BookingViewFeature.ToView(b, null, Practitioner, false, new Clock(Start)).MeetingUrl is not null);
+            Assert.Null(Gabinety.Booking.Features.Payments.BookingViewFeature.ToView(b, null, Stranger, false, new Clock(Start), names).Brief);
+        }
+    }
 }

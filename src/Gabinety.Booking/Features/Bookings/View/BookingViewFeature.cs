@@ -40,7 +40,7 @@ public sealed class BookingViewFeature : IServiceFeature
     }
 
     /// <summary>
-    /// The meeting URL is for a party of a Confirmed booking only; the brief for the client always and for the practitioner once Confirmed; fee and payout for
+    /// The meeting URL is for a party of a Confirmed booking only; the brief for the client always and for the practitioner from Confirmed onward (any status but PendingPayment and Expired); fee and payout for
     /// the practitioner and admin. The flags are the caller's at <paramref name="time"/> (<see cref="TimeProvider.System"/> when omitted: the callers that
     /// pass nothing build the view of a booking that has just left Confirmed, where every flag is false whatever the clock says).
     /// </summary>
@@ -49,13 +49,16 @@ public sealed class BookingViewFeature : IServiceFeature
         var isClient = b.ClientUserId == callerId;
         var isPractitioner = b.PractitionerUserId == callerId;
         var confirmed = b.Status == Gabinety.Billing.BookingStatus.Confirmed;
+        // CONTRACTS 4.4 "after Confirmed": the practitioner sees the brief and the client name once the booking was confirmed at some point, i.e. from any
+        // status but PendingPayment and Expired. Decided by status, not by confirmed_at (not every row sets it).
+        var wasConfirmed = b.Status is not (Gabinety.Billing.BookingStatus.PendingPayment or Gabinety.Billing.BookingStatus.Expired);
         var money = (long? m) => m is { } v ? new MoneyDto(v) : null;
         var flags = BookingPermissions.For(b, callerId, time ?? TimeProvider.System);
         return new BookingView(
             b.Id, Enum.Parse<ContractsStatus>(b.Status.ToString()), b.StatusReason, b.StartUtc, b.EndUtc, b.DurationMinutes, b.OfferingTitle,
             new MoneyDto(b.PriceMinor), new PractitionerRef(b.PractitionerId, names?.PractitionerDisplayName ?? "", names?.PractitionerSlug ?? ""),
-            isPractitioner && confirmed && names?.ClientDisplayName is { } clientName ? new ClientRef(clientName) : null,
-            isClient || (isPractitioner && confirmed) ? new BriefDto(b.BriefText, b.BriefProblemSlug, b.BriefAiAssisted) : null,
+            isPractitioner && wasConfirmed && names?.ClientDisplayName is { } clientName ? new ClientRef(clientName) : null,
+            isClient || (isPractitioner && wasConfirmed) ? new BriefDto(b.BriefText, b.BriefProblemSlug, b.BriefAiAssisted) : null,
             confirmed && (isClient || isPractitioner) ? b.MeetingUrlSnapshot : null,
             b.Status == Gabinety.Billing.BookingStatus.PendingPayment ? b.HoldExpiresAt : null,
             new PaymentView(payment?.Status ?? PaymentStatus.Created, new MoneyDto(payment?.RefundedMinor ?? 0)),

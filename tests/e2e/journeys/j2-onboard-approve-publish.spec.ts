@@ -9,7 +9,7 @@ import { PractitionerArea, PublicProfilePage, RegisterPage, VerificationQueuePag
 
 // J2 (SPEC 10): a new practitioner onboards, an administrator approves, the profile becomes public.
 // Everything this journey creates is in the `demo-` namespace under a unique suffix (the account, the profile slug), so it neither depends on nor
-// disturbs what other journeys create. The Directory reset in afterAll removes it (and, as SPEC 7 defines, reseeds the dataset).
+// disturbs what other journeys create. With E2E_RESEED=1 the Directory reset in afterAll removes it (and, as SPEC 7 defines, reseeds the dataset); by default it is left, as CI's stack is thrown away.
 
 const NIP_WEIGHTS = [6, 5, 7, 2, 3, 4, 5, 6, 7];
 /** A checksum-valid NIP in the synthetic range 99xxxxxxxx (the Directory checks the checksum only), derived from the run's suffix. */
@@ -27,8 +27,11 @@ const BIO =
   "Pracuję spokojnie, bez żargonu, a po spotkaniu dostajesz krótką listę kroków do wdrożenia.";
 
 test.describe("J2 practitioner onboards, administrator approves, profile becomes public", () => {
+  // CI runs on a fresh ephemeral stack, so the (slow, 1 to 6 minutes) reset runs only when asked: E2E_RESEED=1 for a local re-run on a long-lived profile.
+  // The journey does not need it: it creates its own `demo-` practitioner under a unique suffix and reads nothing another run left behind.
   test.afterAll(async ({ demoData }) => {
-    test.setTimeout(600_000); // the reset takes 1 to 6 minutes; the default hook timeout (60 s) would kill the seeder halfway and leave a half-reset Directory
+    if (process.env.E2E_RESEED !== "1") return;
+    test.setTimeout(600_000); // the default hook timeout (60 s) would kill the seeder halfway and leave a half-reset Directory
     await demoData.resetAndReseed();
   });
 

@@ -370,6 +370,49 @@ namespace Gabinety.Booking.Persistence.Migrations
                     b.ToTable("payouts", (string)null);
                 });
 
+            modelBuilder.Entity("Gabinety.Booking.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_id");
+
+                    b.Property<DateTimeOffset>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("ToUserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("to_user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId", "Kind", "ToUserId")
+                        .IsUnique();
+
+                    b.ToTable("notifications", (string)null);
+                });
+
             modelBuilder.Entity("Gabinety.Booking.Persistence.AvailabilityException", b =>
                 {
                     b.Property<Guid>("Id")

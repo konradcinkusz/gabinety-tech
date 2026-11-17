@@ -44,7 +44,7 @@ public class SkeletonMigrationStateTests
 [Trait("tier", "integration")]
 public class SkeletonMigrationIntegrationTests
 {
-    static readonly string[] Expected = ["20261116000000_T-04.03_Baseline", "20261116110000_T-04.03_Availability", "20261116130000_T-04.04_Bookings", "20261116160000_T-04.05_Payments", "20261117090000_T-04.06_Webhook", "20261118090000_T-04.07b_Disputes", "20261118100000_T-04.08c_Payouts"];
+    static readonly string[] Expected = ["20261116000000_T-04.03_Baseline", "20261116110000_T-04.03_Availability", "20261116130000_T-04.04_Bookings", "20261116160000_T-04.05_Payments", "20261117090000_T-04.06_Webhook", "20261118090000_T-04.07b_Disputes", "20261118100000_T-04.08c_Payouts", "20261118110000_T-04.09a_Notifications"];
 
     static WebApplicationFactory<Program> Host(string cs) => new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
     {

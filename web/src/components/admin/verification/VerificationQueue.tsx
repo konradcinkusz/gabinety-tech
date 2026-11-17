@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, Badge, Button, Card, TextArea } from "@/components/ui";
@@ -36,7 +37,9 @@ function Row({ row }: { row: AdminPractitionerRow }) {
   return (
     <li>
       <Card>
-        <h2>{row.displayName}</h2>
+        <h2>
+          <Link href={`/admin/weryfikacja/${encodeURIComponent(row.id)}`}>{row.displayName}</Link>
+        </h2>
         <p>{row.headline}</p>
         <Badge>{av(`status.${row.status}` as AvKey)}</Badge>
         <dl>

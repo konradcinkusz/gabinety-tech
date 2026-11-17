@@ -46,6 +46,10 @@ describe("facts and actions", () => {
     expect(host.textContent).toContain(av("fact.nipInvalid"));
     expect(host.querySelector("time")?.getAttribute("datetime")).toBe("2026-11-02T10:00:00Z");
   });
+  it("the name links to the detail view", () => {
+    render(<VerificationQueue items={[row({ id: "a b" })]} />);
+    expect(host.querySelector('h2 a')?.getAttribute("href")).toBe("/admin/weryfikacja/a%20b");
+  });
   it.each([
     ["Submitted", [/zatwierdź/i, /odrzuć/i], [/zawieś/i, /przywróć/i]],
     ["Approved", [/zawieś/i], [/zatwierdź/i, /odrzuć/i, /przywróć/i]],

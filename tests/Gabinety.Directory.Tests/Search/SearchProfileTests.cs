@@ -13,6 +13,36 @@ public class SearchProfileTests(SearchFactory f)
 {
     static string Url(string slug) => "/api/v1/practitioners/" + slug;
 
+    record Extras(string Bio, string? PortfolioUrl, IReadOnlyList<Offering> Offerings, int CompletedCount, DateTimeOffset MemberSince);
+
+    /// <summary>Reads the flat wire body (the card's fields and the extras side by side) back into the contract record.</summary>
+    static PractitionerProfile Flat(string json)
+    {
+        var card = JsonSerializer.Deserialize<PractitionerCard>(json, Sk.J)!;
+        var x = JsonSerializer.Deserialize<Extras>(json, Sk.J)!;
+        return new PractitionerProfile(card, x.Bio, x.PortfolioUrl, x.Offerings, x.CompletedCount, x.MemberSince);
+    }
+
+    [Fact]
+    public async Task The_profile_JSON_is_flat_camelCase_with_exactly_the_contract_properties_and_never_a_meetingUrl()
+    {
+        await f.Reset();
+        var p = await f.Approved(x => { x.Bio = "Demo bio"; x.PortfolioUrl = "https://portfolio.example.test/me"; x.RatingCount = 3; x.RatingAvg = 4.5m; x.GithubLinked = true; x.GithubLogin = "demo-gh"; },
+            new Spec("code-review", ["dotnet"], 30, 12000));
+        await f.Db(async db => { db.Offerings.Where(o => o.PractitionerId == p.Id).ToList().ForEach(o => o.MeetingUrl = "https://meet.example.test/x"); await db.SaveChangesAsync(); return 0; });
+        using var doc = JsonDocument.Parse(await f.Anon().GetStringAsync(Url(p.Slug)));
+        var root = doc.RootElement;
+        Assert.Equal(
+            ["id", "slug", "displayName", "headline", "githubLogin", "badges", "rating", "isNew", "fromPrice", "problemSlugs", "durations",
+             "bio", "portfolioUrl", "offerings", "completedCount", "memberSince"],
+            root.EnumerateObject().Select(o => o.Name).ToArray());
+        Assert.Equal(p.Slug, root.GetProperty("slug").GetString());
+        Assert.False(root.TryGetProperty("card", out _));
+        Assert.Equal(["id", "title", "description", "durationMinutes", "price", "problemSlug", "techSlugs"],
+            root.GetProperty("offerings")[0].EnumerateObject().Select(o => o.Name).ToArray());
+        Assert.DoesNotContain("meetingUrl", root.GetRawText(), StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task An_Approved_profile_is_public_and_carries_the_card_the_bio_and_only_active_offerings()
     {
@@ -21,7 +51,7 @@ public class SearchProfileTests(SearchFactory f)
             new Spec("code-review", ["dotnet"], 30, 12000), new Spec("audyt-kodu", ["csharp", "azure"], 60, 30000), new Spec("code-review", ["dotnet"], 30, 500, Active: false));
         var r = await f.Anon().GetAsync(Url(p.Slug));
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
-        var body = (await r.Content.ReadFromJsonAsync<PractitionerProfile>(Sk.J))!;
+        var body = Flat(await r.Content.ReadAsStringAsync());
         Assert.Equal(p.Id, body.Card.Id);
         Assert.Equal("Demo bio text", body.Bio);
         Assert.Equal("https://portfolio.example.test/me", body.PortfolioUrl);
@@ -64,7 +94,7 @@ public class SearchProfileTests(SearchFactory f)
     {
         await f.Reset();
         var p = await f.Seed(PractitionerStatus.Approved, null, new Spec(Active: false));
-        var body = (await f.Anon().GetFromJsonAsync<PractitionerProfile>(Url(p.Slug), Sk.J))!;
+        var body = Flat(await f.Anon().GetStringAsync(Url(p.Slug)));
         Assert.Empty(body.Offerings);
         Assert.Equal(new MoneyDto(0, "PLN"), body.Card.FromPrice);
         Assert.Empty(body.Card.ProblemSlugs);

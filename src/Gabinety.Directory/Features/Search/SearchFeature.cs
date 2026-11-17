@@ -87,7 +87,7 @@ public sealed class SearchFeature : IServiceFeature
         var active = await db.Offerings.AsNoTracking().Where(o => o.PractitionerId == p.Id && o.IsActive).OrderBy(o => o.CreatedAt).ThenBy(o => o.Id).ToListAsync(ct);
         var offerings = active.Select(o => new Gabinety.Contracts.Directory.Offering(o.Id, o.Title, o.Description, o.DurationMinutes, new MoneyDto(o.PriceMinor, o.Currency),
             o.ProblemSlug, o.TechSlugs.ToList())).ToList();
-        var body = new PractitionerProfile(Card(p, active, null), p.Bio, p.PortfolioUrl, offerings, p.CompletedCount, p.ApprovedAt ?? p.CreatedAt);
+        var body = ProfileWire.Of(new PractitionerProfile(Card(p, active, null), p.Bio, p.PortfolioUrl, offerings, p.CompletedCount, p.ApprovedAt ?? p.CreatedAt));
         return PublicJson.Respond(ctx, body, "public, max-age=300, stale-while-revalidate=3600", etag: true);
     }
 
@@ -117,4 +117,16 @@ public sealed class SearchFeature : IServiceFeature
             .Select(c => new SitemapCategory(c.Key, c.Value.Count, c.Value.Count >= IndexableFrom)).ToList();
         return PublicJson.Respond(ctx, new SitemapDto(pages, categories), "public, max-age=60");
     }
+}
+
+/// <summary>The wire shape of `PractitionerProfile` (CONTRACTS 3.2): the card's fields and the extras side by side (flat), not the card nested under `card`.</summary>
+internal sealed record ProfileWire(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin,
+    IReadOnlyList<Badge> Badges, RatingDto? Rating, bool IsNew, MoneyDto FromPrice,
+    IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations,
+    string Bio, string? PortfolioUrl, IReadOnlyList<Gabinety.Contracts.Directory.Offering> Offerings, int CompletedCount,
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantConverter))] DateTimeOffset MemberSince)
+{
+    public static ProfileWire Of(PractitionerProfile p) => new(p.Card.Id, p.Card.Slug, p.Card.DisplayName, p.Card.Headline, p.Card.GithubLogin,
+        p.Card.Badges, p.Card.Rating, p.Card.IsNew, p.Card.FromPrice, p.Card.ProblemSlugs, p.Card.Durations,
+        p.Bio, p.PortfolioUrl, p.Offerings, p.CompletedCount, p.MemberSince);
 }

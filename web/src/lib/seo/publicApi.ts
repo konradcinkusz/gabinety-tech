@@ -37,24 +37,45 @@ export class DirectoryUnavailableError extends Error {
   }
 }
 
-async function get(path: string): Promise<Response> {
-  const base = await resolveBackend("directory");
-  if (!base) throw new DirectoryUnavailableError(0);
-  let res: Response;
+const MAX_RETRY_WAIT_MS = 2_000;
+const DEFAULT_RETRY_WAIT_MS = 500;
+
+/** Retry-After in delta-seconds or an HTTP date, bounded to [0, 2 s]; absent or unparsable means a short default. */
+function retryWaitMs(res: Response): number {
+  const h = res.headers.get("retry-after");
+  if (!h) return DEFAULT_RETRY_WAIT_MS;
+  const secs = Number(h);
+  const ms = Number.isFinite(secs) ? secs * 1000 : Date.parse(h) - Date.now();
+  return Number.isNaN(ms) ? DEFAULT_RETRY_WAIT_MS : Math.min(Math.max(ms, 0), MAX_RETRY_WAIT_MS);
+}
+
+async function attempt(url: string): Promise<Response> {
   try {
-    res = await backendFetch(base + path, {
+    return await backendFetch(url, {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(5_000),
       next: { revalidate: REVALIDATE_SECONDS },
     } as RequestInit);
   } catch {
-    throw new DirectoryUnavailableError(0);
+    throw new DirectoryUnavailableError(0); // timeout or network: never the cause, which could carry a URL or text
   }
-  return res;
+}
+
+/**
+ * The one server-side read of the Directory for public pages. A 429 (per-client rate limit) is retried once after Retry-After, at most 2 s;
+ * every other outcome is returned to the caller, and network failures and timeouts become a DirectoryUnavailableError carrying a status only.
+ */
+export async function directoryGet(path: string): Promise<Response> {
+  const base = await resolveBackend("directory");
+  if (!base) throw new DirectoryUnavailableError(0);
+  const res = await attempt(base + path);
+  if (res.status !== 429) return res;
+  await new Promise((r) => setTimeout(r, retryWaitMs(res)));
+  return attempt(base + path);
 }
 
 async function json<T>(path: string): Promise<T> {
-  const res = await get(path);
+  const res = await directoryGet(path);
   if (!res.ok) throw new DirectoryUnavailableError(res.status);
   return (await res.json()) as T;
 }
@@ -67,7 +88,7 @@ export async function listPractitioners(query: ListQuery): Promise<PractitionerP
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== "") p.set(k, String(v));
   const qs = p.toString();
-  const res = await get(`/api/v1/practitioners${qs ? `?${qs}` : ""}`);
+  const res = await directoryGet(`/api/v1/practitioners${qs ? `?${qs}` : ""}`);
   if (res.status === 400 || res.status === 422) return null;
   if (!res.ok) throw new DirectoryUnavailableError(res.status);
   return (await res.json()) as PractitionerPage;

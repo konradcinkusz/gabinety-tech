@@ -19,7 +19,7 @@ public partial class ArchitectureRules
         ["Gabinety.Reputation"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts"],
         ["Gabinety.Assistant"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts", "Gabinety.Llm"],
         ["Gabinety.AppHost"] = [.. Services.Select(s => "Gabinety." + s)],
-        ["Gabinety.DevIdentity"] = [],
+        ["Gabinety.DevIdentity"] = [], ["Gabinety.DemoSeeder"] = [], // tools/: no project reference at all
     };
 
     /// <summary>

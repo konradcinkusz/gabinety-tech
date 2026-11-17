@@ -5,6 +5,10 @@ namespace Gabinety.DemoSeeder;
 /// <summary>Endpoints and keys, from configuration only (command line <c>--Backend:Directory=...</c> or environment <c>Backend__Directory</c>). Nothing is hard-coded but the documented development password.</summary>
 public sealed record SeedOptions(string DirectoryUrl, string DirectoryKey, string IdentityAuthority, string DemoPassword)
 {
+    /// <summary>Booking (T-08.01b): <c>Backend:Booking</c> and <c>Internal:Keys:Booking</c>. Init-only so the four-argument constructor of the skeleton stays as it is.</summary>
+    public string BookingUrl { get; init; } = "";
+    public string BookingKey { get; init; } = "";
+
     /// <summary>The fixed development password of tools/Gabinety.DevIdentity (README). It protects nothing; override with Identity:DemoPassword.</summary>
     public const string DevIdentityPassword = "Demo-Dev-Passw0rd!";
 
@@ -15,8 +19,11 @@ public sealed record SeedOptions(string DirectoryUrl, string DirectoryKey, strin
         var directory = FirstUrl(Need("Backend:Directory"));
         var key = Need("Internal:Keys:Directory");
         var authority = Need("Identity:Authority").TrimEnd('/');
+        var booking = FirstUrl(c["Backend:Booking"] ?? ""); // optional: without it the Booking step says so and is skipped
+        var bookingKey = c["Internal:Keys:Booking"]?.Trim() ?? "";
         if (missing.Count > 0) throw new SeedException("missing configuration: " + string.Join(", ", missing)); // names of keys, never values
-        return new SeedOptions(directory, key, authority, c["Identity:DemoPassword"] is { Length: > 0 } p ? p : DevIdentityPassword);
+        return new SeedOptions(directory, key, authority, c["Identity:DemoPassword"] is { Length: > 0 } p ? p : DevIdentityPassword)
+            { BookingUrl = booking, BookingKey = bookingKey };
     }
 
     /// <summary>The web app's Backend:* values are candidate lists; the seeder takes the first.</summary>

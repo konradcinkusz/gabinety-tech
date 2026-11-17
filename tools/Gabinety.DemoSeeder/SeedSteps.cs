@@ -6,7 +6,7 @@ public static class SeedSteps
     public static IReadOnlyList<ISeedStep> All { get; } = new ISeedStep[]
     {
         new DirectorySeedStep(),
-        // new BookingSeedStep(),     // T-08.01b
+        new BookingSeedStep(),
         // new ReputationSeedStep(),  // T-08.01c
     }.OrderBy(s => s.Order).ToArray();
 }

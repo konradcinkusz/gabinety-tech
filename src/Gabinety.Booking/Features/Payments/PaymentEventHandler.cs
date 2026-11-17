@@ -1,6 +1,7 @@
 using Gabinety.Billing;
 using Gabinety.Booking.Clients;
 using Gabinety.Booking.Features.Bookings.Create;
+using Gabinety.Booking.Features.Lifecycle.Core;
 using Gabinety.Booking.Payments.Abstractions;
 using Gabinety.Booking.Persistence;
 using Gabinety.Contracts.Booking;
@@ -160,16 +161,8 @@ public sealed class PaymentEventHandler(BookingDbContext db, IDirectoryClient di
     }
 
     /// <summary>The provider confirms a refund it was asked for (CONTRACTS 9.2: the ledger row is written then). Already recorded in full is a no-op.</summary>
-    WebhookOutcome ApplyRefundSucceeded(BookingEntity booking, Payment payment, ProviderEvent e, DateTimeOffset now)
-    {
-        if (e.AmountMinor is not > 0 || payment.RefundedMinor >= payment.AmountMinor) return WebhookOutcome.Ignored;
-        if (payment.RefundedMinor + e.AmountMinor > payment.AmountMinor) return WebhookOutcome.Rejected;
-        AddLedger(booking.Id, LedgerKind.Refund, e.AmountMinor.Value, now);
-        payment.RefundedMinor += e.AmountMinor.Value;
-        payment.Status = payment.RefundedMinor == payment.AmountMinor ? PaymentStatus.Refunded : PaymentStatus.PartiallyRefunded;
-        payment.UpdatedAt = now;
-        return WebhookOutcome.Applied;
-    }
+    WebhookOutcome ApplyRefundSucceeded(BookingEntity booking, Payment payment, ProviderEvent e, DateTimeOffset now) =>
+        RefundLedger.Record(db, booking.Id, payment, e.AmountMinor, now); // shared with the cancel flow (T-04.07a)
 
     void AddLedger(Guid bookingId, LedgerKind kind, long amount, DateTimeOffset now) =>
         db.LedgerEntries.Add(new LedgerEntry { Id = Guid.CreateVersion7(), BookingId = bookingId, Kind = kind, AmountMinor = amount, CreatedAt = now });

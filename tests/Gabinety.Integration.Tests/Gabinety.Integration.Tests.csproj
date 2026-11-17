@@ -10,5 +10,6 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <ProjectReference Include="../../src/Gabinety.Directory/Gabinety.Directory.csproj" Aliases="DirectoryApp" />
     <ProjectReference Include="../../tools/Gabinety.DevIdentity/Gabinety.DevIdentity.csproj" />
+    <ProjectReference Include="../../tools/Gabinety.DemoSeeder/Gabinety.DemoSeeder.csproj" />
   </ItemGroup>
 </Project>

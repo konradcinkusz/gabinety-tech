@@ -94,7 +94,7 @@ public class DisputesListTests
             seen.AddRange(Mine(items, h));
             cursor = next;
             pages++;
-        } while (cursor is not null && pages < 20);
+        } while (cursor is not null && pages < 5000); // the list is global and the InMemory database is shared by every test of the process: walk all of it (2 rows per page), only this host's owner is counted
 
         Assert.Equal(6, seen.Count);
         Assert.Equal(seen.Count, seen.Distinct().Count());

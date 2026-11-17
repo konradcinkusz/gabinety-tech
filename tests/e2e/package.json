@@ -1,0 +1,18 @@
+{
+  "name": "@gabinety-tech/e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright journeys against the running fake profile (T-08.03). The harness starts nothing: CI (or you) starts `dotnet run --project src/Gabinety.AppHost --launch-profile fake`.",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "wait": "node harness/wait-for-profile.cjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

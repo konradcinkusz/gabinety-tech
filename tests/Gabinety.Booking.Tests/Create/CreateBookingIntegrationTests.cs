@@ -90,7 +90,7 @@ public class CreateBookingIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task An_expired_hold_that_the_database_still_counts_is_expired_first_and_the_slot_can_be_booked()
     {
-        var start = Day(50);
+        var start = Day(35); // must stay inside the 60-day horizon
         await host.Seed(db => db.Bookings.Add(Slots.NewBooking(host.Practitioner, DateTimeOffset.Parse(start), 60, Gabinety.Billing.BookingStatus.PendingPayment, host.Clock.GetUtcNow().AddMinutes(-1))));
         var r = await CreateHost.Post(host.ClientFor("demo-client-a"), host.Req(start), CreateHost.Key());
         Assert.Equal(HttpStatusCode.Created, r.StatusCode);

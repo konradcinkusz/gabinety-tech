@@ -11,3 +11,6 @@ TestResults/
 *.tsbuildinfo
 apphost.log
 evals/reports/
+
+# Signing keys are secrets (T-09.04)
+*.pem

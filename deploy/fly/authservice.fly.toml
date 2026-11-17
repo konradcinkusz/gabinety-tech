@@ -1,0 +1,52 @@
+# authservice (T-09.04, SPEC 4.3): the identity provider. Image published by konradcinkusz/authservice, pinned by digest (A-02, spike D6).
+# Deploy:  fly deploy --config deploy/fly/authservice.fly.toml --image ghcr.io/konradcinkusz/authservice@sha256:<digest>
+# Nothing secret lives in this file. Secrets are set once with `fly secrets set` (see docs/operations/AUTH.md section 3).
+# Placeholders in <angle brackets> are filled by the owner after T-09.01 (Fly organisation) and when the domain is chosen.
+
+app = "gabinety-authservice-staging"
+primary_region = "fra"
+
+[build]
+  # Tag v0.3.4 on 2026-11-16 (docs/spikes/authservice.md section 4). The digest is the multi-platform index; re-check before a bump.
+  image = "ghcr.io/konradcinkusz/authservice@sha256:d0309a94f6b6300d4b8091381786c160ae7717a022416debaaa6d8d19a244645"
+
+[env]
+  DATABASE_PROVIDER = "PostgreSQL"
+  # Schema is created on first start (spike section 5). Switch to Migrate (+ Database__MigrationsAssembly) only if upstream asks for it.
+  Database__SchemaMode = "EnsureCreated"
+  Jwt__Algorithm = "RS256"
+  # Issuer and audience are free strings; every service sets Identity__Audience to the same audience. The issuer is read from discovery.
+  Jwt__Issuer = "gabinety-staging"
+  Jwt__Audience = "gabinety"
+  # Public origin used for jwks_uri in discovery. PLACEHOLDER: the staging hostname (default <app>.fly.dev until a domain is chosen).
+  Jwt__PublicBaseUrl = "https://<authservice-public-host>"
+  # E-mail confirmation stays off on staging until T-09.06 provides a sender (spike: default is on only when SendGrid is configured).
+  Auth__RequireConfirmedEmail = "false"
+  Cors__AllowedOrigins__0 = "https://<web-public-host>"
+  # GitHub sign-in is OPTIONAL and enabled only if OAuth__GitHub__ClientId and __ClientSecret secrets are both set (docs/operations/AUTH.md section 5).
+  OAuth__CallbackBaseUrl = "https://<authservice-public-host>"
+  OAuth__PostLoginRedirectBaseUrl = "https://<web-public-host>"
+  OAuth__PostLoginRedirectAllowedBaseUrls__0 = "https://<web-public-host>"
+
+# Secrets (NOT here):  ConnectionStrings__DefaultConnection, Jwt__PrivateKeyPem,
+#                      optional OAuth__GitHub__ClientId, OAuth__GitHub__ClientSecret.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Every service fetches the JWKS from this app, so it is never stopped (SPEC 4.3, P7).
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Fly checks (Fly ignores a Dockerfile HEALTHCHECK). Readiness (503 until the database answers), as the spike advises.
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health/ready"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

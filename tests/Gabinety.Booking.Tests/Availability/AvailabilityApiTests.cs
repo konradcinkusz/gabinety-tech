@@ -269,6 +269,22 @@ public class PractitionerResolverTests
     }
 
     [Fact]
+    public async Task Clear_makes_the_next_resolve_ask_the_directory_again()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var current = first;
+        var dir = new Counting(_ => current);
+        var resolver = new PractitionerResolver(dir, new ManualClock());
+        Assert.Equal(first, await resolver.ResolveAsync("demo-user-1", default));
+
+        current = second; // the Directory was reset and reseeded: the same user has a new practitioner id
+        Assert.Equal(first, await resolver.ResolveAsync("demo-user-1", default)); // still inside the 60 s
+        resolver.Clear();
+        Assert.Equal(second, await resolver.ResolveAsync("demo-user-1", default));
+    }
+
+    [Fact]
     public async Task A_non_practitioner_resolves_to_null_and_is_not_cached()
     {
         var dir = new Counting(_ => null);

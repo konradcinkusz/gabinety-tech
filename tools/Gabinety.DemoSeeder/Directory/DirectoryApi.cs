@@ -14,7 +14,7 @@ public sealed record TaxonomyView(string[] Problems, string[] Techs);
 public sealed class DirectoryApi(HttpClient http, SeedOptions options, TimeProvider time)
 {
     static readonly JsonSerializerOptions J = new(JsonSerializerDefaults.Web);
-    const int MaxAttempts = 6;
+    const int MaxAttempts = SeedRetry.MaxAttempts;
 
     sealed record Reply(HttpStatusCode Status, JsonElement? Json);
 
@@ -29,7 +29,7 @@ public sealed class DirectoryApi(HttpClient http, SeedOptions options, TimeProvi
             using var res = await http.SendAsync(req, ct);
             if (res.StatusCode == HttpStatusCode.TooManyRequests && attempt < MaxAttempts) // the 60 per minute limit (CONTRACTS 10.2): wait for the window, then retry
             {
-                await Task.Delay(res.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(10), time, ct);
+                await Task.Delay(res.Headers.RetryAfter?.Delta ?? SeedRetry.DefaultWait, time, ct);
                 continue;
             }
             JsonElement? json = null;
@@ -125,6 +125,13 @@ public sealed class DirectoryApi(HttpClient http, SeedOptions options, TimeProvi
         var r = await SendAsync(HttpMethod.Post, $"/api/v1/admin/practitioners/{id}/{trigger.ToString().ToLowerInvariant()}", admin.AccessToken, false,
             reason is null ? null : new { reason }, ct);
         if (r.Status != HttpStatusCode.NoContent) throw Fail($"admin {trigger}", r);
+    }
+
+    /// <returns>how many practitioners the Directory removed (CONTRACTS 10.4).</returns>
+    public async Task<int> ResetAsync(CancellationToken ct)
+    {
+        var r = await SendAsync(HttpMethod.Post, "/internal/v1/demo/reset", null, true, new { }, ct);
+        return r is { Status: HttpStatusCode.OK, Json: { } j } ? j.GetProperty("practitioners").GetInt32() : throw Fail("demo reset", r);
     }
 
     // ---- internal pushes (CONTRACTS 3.6): monotonic, a version not above the stored one is ignored with 204

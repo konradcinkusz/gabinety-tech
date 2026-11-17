@@ -12,6 +12,9 @@ public sealed class DirectorySeedStep : ISeedStep
     public string Name => "directory";
     public int Order => 100;
 
+    public async Task<int> ResetAsync(SeedContext context, CancellationToken ct) =>
+        await new DirectoryApi(context.Http.For(SeedService.Directory), context.Options, context.Time).ResetAsync(ct);
+
     public async Task RunAsync(SeedContext context, CancellationToken ct)
     {
         var api = new DirectoryApi(context.Http.For(SeedService.Directory), context.Options, context.Time);

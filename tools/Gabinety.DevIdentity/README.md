@@ -42,4 +42,4 @@ All seeded users share one fixed **development** password. It is not a secret: i
 | `demo-practitioner-1` to `demo-practitioner-8` | none |
 | `demo-admin` | `Admin` |
 
-`sub` is an opaque string, derived from the user name so it is the same on every start.
+`sub` of a demo user (address `demo-<name>@demo.example`: the seeded ones and any later registered one) is its user name, e.g. `demo-practitioner-3`, the same on every start: the Booking and Reputation demo reset removes rows whose user id starts with `demo-` (CONTRACTS 10.4). Any other user gets a random opaque id.

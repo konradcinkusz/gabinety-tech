@@ -1,3 +1,4 @@
+using Gabinety.Booking.Features.Availability;
 using Gabinety.Booking.Features.Internal.TestClock;
 using Gabinety.Booking.Persistence;
 using Gabinety.ServiceDefaults;
@@ -25,7 +26,7 @@ public sealed class DemoResetFeature : IServiceFeature
         endpoints.MapPost("/internal/v1/demo/reset", ResetAsync).RequireAuthorization("Internal");
     }
 
-    static async Task<IResult> ResetAsync(BookingDbContext db, CancellationToken ct)
+    static async Task<IResult> ResetAsync(BookingDbContext db, PractitionerResolver practitioners, CancellationToken ct)
     {
         // StartsWith translates to a case-sensitive prefix match on PostgreSQL (LIKE) and on the in-memory provider (ordinal).
         var bookings = await db.Bookings.Where(b => b.ClientUserId.StartsWith(Ns) || b.PractitionerUserId.StartsWith(Ns)).ToListAsync(ct);
@@ -41,6 +42,7 @@ public sealed class DemoResetFeature : IServiceFeature
         db.RemoveRange(events);
         db.RemoveRange(bookings);
         await db.SaveChangesAsync(ct); // one unit of work: all or nothing
+        practitioners.Clear(); // the practitioner ids it cached belong to a Directory that is being reset too
 
         return Results.Ok(new
         {

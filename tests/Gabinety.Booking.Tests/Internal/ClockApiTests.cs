@@ -94,6 +94,45 @@ public class ClockApiTests
         Assert.Equal(baseNow, zero.GetProperty("now").GetDateTimeOffset());
     }
 
+    static Task<HttpResponseMessage> GetClock(CreateHost h, string? key = InternalKey)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Get, "/internal/v1/test/clock");
+        if (key != null) req.Headers.Add("X-Internal-Key", key);
+        return h.CreateClient().SendAsync(req);
+    }
+
+    [Fact]
+    public async Task GET_clock_reads_the_offset_and_now_without_changing_them()
+    {
+        await using var h = FakeHost();
+        var baseNow = h.Clock.GetUtcNow();
+        var fresh = await (await GetClock(h)).Body();
+        Assert.Equal(0, fresh.GetProperty("offsetMinutes").GetInt64());
+        Assert.Equal(baseNow, fresh.GetProperty("now").GetDateTimeOffset());
+
+        await SetOffset(h, 90);
+        for (var i = 0; i < 2; i++) // a read twice: it changes nothing
+        {
+            var j = await (await GetClock(h)).Body();
+            Assert.Equal(90, j.GetProperty("offsetMinutes").GetInt64());
+            Assert.Equal(baseNow.AddMinutes(90), j.GetProperty("now").GetDateTimeOffset());
+        }
+    }
+
+    [Fact]
+    public async Task GET_clock_needs_the_internal_key_and_exists_only_outside_a_deployed_environment()
+    {
+        await using var h = FakeHost();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await GetClock(h, null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await GetClock(h, "wrong-key")).StatusCode);
+
+        await using var prod = new CreateHost();
+        prod.Settings["Internal:Key"] = InternalKey;
+        prod.Settings["Environment:Kind"] = "Production";
+        prod.Configure = s => s.AddTestClock();
+        Assert.Equal(HttpStatusCode.NotFound, (await GetClock(prod)).StatusCode);
+    }
+
     [Fact]
     public async Task Every_reader_of_TimeProvider_sees_the_offset_time()
     {

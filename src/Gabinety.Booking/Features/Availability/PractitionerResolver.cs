@@ -9,6 +9,9 @@ public sealed class PractitionerResolver(IDirectoryClient directory, TimeProvide
     public static readonly TimeSpan Ttl = TimeSpan.FromSeconds(60);
     readonly ConcurrentDictionary<string, (Guid Id, DateTimeOffset At)> _cache = new();
 
+    /// <summary>Forgets every answer. The demo reset calls it: the Directory is reset and reseeded together with Booking, and the same demo user then has a new practitioner id.</summary>
+    public void Clear() => _cache.Clear();
+
     /// <summary>Null when the user is not a practitioner. Throws DirectoryUnavailableException when Directory cannot answer.</summary>
     public async Task<Guid?> ResolveAsync(string userId, CancellationToken ct)
     {

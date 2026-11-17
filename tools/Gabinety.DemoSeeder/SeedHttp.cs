@@ -30,3 +30,13 @@ public sealed class ConfiguredSeedHttp(SeedOptions options) : ISeedHttp
         return _clients[service] = new HttpClient { BaseAddress = new Uri(url + "/"), Timeout = TimeSpan.FromSeconds(30) };
     }
 }
+
+/// <summary>
+/// Waiting out the services' rate limit (CONTRACTS 10.2: 60 per minute, a sliding window of six 10 s segments, no Retry-After header). A burst of requests inside one segment frees up
+/// only 60 to 70 s later, so a 429 without Retry-After is retried every 10 s for up to 80 s before the step gives up.
+/// </summary>
+public static class SeedRetry
+{
+    public const int MaxAttempts = 9;
+    public static readonly TimeSpan DefaultWait = TimeSpan.FromSeconds(10);
+}

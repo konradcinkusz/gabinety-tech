@@ -12,10 +12,21 @@ public enum ReviewOutcome { Created, AlreadyReviewed, NotReviewable }
 /// The Reputation API as the seeder uses it: one user call (<c>POST /api/v1/reviews</c>) with the client's bearer token. Errors name the status and the error code,
 /// never a body (a body can carry the review text).
 /// </summary>
-public sealed class ReputationApi(HttpClient http, TimeProvider time)
+public sealed class ReputationApi(HttpClient http, TimeProvider time, string internalKey = "")
 {
     static readonly JsonSerializerOptions J = new(JsonSerializerDefaults.Web);
-    const int MaxAttempts = 6;
+    const int MaxAttempts = SeedRetry.MaxAttempts;
+
+    /// <returns>how many reviews Reputation removed (CONTRACTS 10.4).</returns>
+    public async Task<int> ResetAsync(CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Post, "internal/v1/demo/reset") { Content = JsonContent.Create(new { }, options: J) };
+        req.Headers.Add("X-Internal-Key", internalKey);
+        using var res = await http.SendAsync(req, ct);
+        var json = await ReadAsync(res, ct);
+        return res.StatusCode == HttpStatusCode.OK && json is { ValueKind: JsonValueKind.Object } o ? o.GetProperty("reviews").GetInt32()
+            : throw new SeedException($"reputation: demo reset answered {(int)res.StatusCode}");
+    }
 
     public async Task<(ReviewOutcome Outcome, string? Status)> CreateReviewAsync(DemoUser client, Guid bookingId, int rating, string text, CancellationToken ct)
     {
@@ -26,7 +37,7 @@ public sealed class ReputationApi(HttpClient http, TimeProvider time)
             using var res = await http.SendAsync(req, ct);
             if (res.StatusCode == HttpStatusCode.TooManyRequests && attempt < MaxAttempts) // the 60 per minute limit (CONTRACTS 10.2)
             {
-                await Task.Delay(res.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(10), time, ct);
+                await Task.Delay(res.Headers.RetryAfter?.Delta ?? SeedRetry.DefaultWait, time, ct);
                 continue;
             }
             var json = await ReadAsync(res, ct);

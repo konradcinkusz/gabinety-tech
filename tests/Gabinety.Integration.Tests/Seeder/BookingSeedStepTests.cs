@@ -203,6 +203,22 @@ public class BookingSeedStepFailureTests
     }
 
     [Fact]
+    public async Task Unless_told_otherwise_the_baseline_is_what_the_clock_reads_at_the_start_and_it_is_restored_exactly()
+    {
+        await using var w = new BookingWorld();
+        await w.SeedDirectoryAsync();
+        await using var job = new CompletionJobStandIn(w.Booking);
+        w.Booking.SetClockOffset(180); // a running system whose clock was moved before the seeder started
+        var step = BookingWorld.Step(); // BaselineOffsetMinutes not set
+
+        await step.RunAsync(w.Context, CancellationToken.None);
+
+        Assert.Equal(180, w.Booking.ClockOffsetMinutes);
+        Assert.Contains(w.Calls.Requests, r => r.Method == HttpMethod.Get && r.Path == "/internal/v1/test/clock");
+        Assert.Equal(12, (await w.Booking.Bookings()).Count);
+    }
+
+    [Fact]
     public async Task Without_the_completion_job_the_run_still_finishes_the_other_states_says_so_and_restores_the_clock()
     {
         await using var w = new BookingWorld(); // no CompletionJobStandIn: main has no auto-complete job yet

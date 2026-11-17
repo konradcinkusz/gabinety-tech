@@ -12,6 +12,13 @@ public sealed class ReputationSeedStep : ISeedStep
     public string Name => "reputation";
     public int Order => 300;
 
+    public async Task<int> ResetAsync(SeedContext context, CancellationToken ct)
+    {
+        if (context.Options.ReputationUrl.Length == 0) return -1;
+        if (context.Options.ReputationKey.Length == 0) throw new SeedException("reputation: Internal:Keys:Reputation is not configured");
+        return await new ReputationApi(context.Http.For(SeedService.Reputation), context.Time, context.Options.ReputationKey).ResetAsync(ct);
+    }
+
     public async Task RunAsync(SeedContext context, CancellationToken ct)
     {
         if (context.Options.ReputationUrl.Length == 0) { context.Log.Info("reputation: skipped (Backend:Reputation is not configured)"); return; }

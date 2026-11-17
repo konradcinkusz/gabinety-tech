@@ -1,3 +1,4 @@
+import { authPath } from "@/components/auth/returnTo";
 import type { Failure } from "./api";
 import { mr, type ReviewsTextKey } from "./strings";
 
@@ -31,7 +32,7 @@ export const isPublished = (status: string): boolean => status === "Published";
 /** A signed-out answer sends the user to sign in and back. */
 const go = (to: string) => window.location.assign(to);
 export function toSignIn(): void {
-  go("/logowanie?returnTo=" + encodeURIComponent(window.location.pathname + window.location.search));
+  go(authPath("/logowanie", window.location.pathname + window.location.search));
 }
 
 export const ratingLabel = (n: number): string => mr("list.rating", { n });

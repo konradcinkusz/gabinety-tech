@@ -38,8 +38,9 @@ public class DisputeIntegrationTests : IAsyncLifetime
     {
         for (var round = 0; round < 10; round++)
         {
-            // Ended 2 h ago: inside the dispute window and inside the 60-day horizon of the test clock.
-            var id = await Life.Seed(host, BookingStatus.Confirmed, TimeSpan.FromHours(-3));
+            // A Disputed booking stays in the no-overlap constraint, so each round gets its own slot, 4 h apart: 3 h to 39 h back, each ended
+            // less than 48 h ago (inside the dispute window, and inside the 60-day horizon of the test clock).
+            var id = await Life.Seed(host, BookingStatus.Confirmed, TimeSpan.FromHours(-3 - 4 * round));
             var texts = new[] { $"demo-dispute-A-{round:00}-text", $"demo-dispute-B-{round:00}-text" };
             var rs = await Task.WhenAll(texts.Select(t => Task.Run(() => DisputeApiTests.Dispute(host, id, Life.Client, new { kind = "other", text = t }))));
             var codes = rs.Select(r => (int)r.StatusCode).Order().ToArray();

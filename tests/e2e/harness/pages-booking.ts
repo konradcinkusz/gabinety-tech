@@ -43,11 +43,21 @@ export class BookingFormPage {
 export class MockCheckoutPage {
   constructor(readonly page: Page) {}
   succeed(): Locator { return this.page.getByRole("button", { name: "Symuluj udaną płatność" }); }
+  /**
+   * The checkout and confirmation pages read the booking through the BFF; when the per-address rate limit (60/min, shared with the whole run) answers 429
+   * they show "Odśwież stronę" and no button. A reload is what that message asks for, so reload until the page has the booking.
+   */
   async paySuccessfully() {
-    await expect(this.succeed()).toBeEnabled();
+    await expect(async () => {
+      if (!(await this.succeed().isVisible())) await this.page.reload();
+      await expect(this.succeed()).toBeEnabled({ timeout: 5_000 });
+    }).toPass({ timeout: 90_000, intervals: [2_000, 5_000, 10_000] });
     await this.succeed().click();
     await this.page.waitForURL(/\/rezerwacja\/potwierdzenie\//);
-    await expect(this.page.getByText("Rezerwacja potwierdzona. Dziękujemy!")).toBeVisible();
+    await expect(async () => {
+      if (!(await this.page.getByText("Rezerwacja potwierdzona. Dziękujemy!").isVisible())) await this.page.reload();
+      await expect(this.page.getByText("Rezerwacja potwierdzona. Dziękujemy!")).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 90_000, intervals: [2_000, 5_000, 10_000] });
   }
 }
 

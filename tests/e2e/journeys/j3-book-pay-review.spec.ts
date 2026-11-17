@@ -34,7 +34,8 @@ const REVIEWS = [
 const AVERAGE = (5 + 4 + 3) / 3;
 
 test.describe("J3 book, pay, complete, review", () => {
-  test.describe.configure({ mode: "serial" });
+  // No retry: a retry would run the reseed in afterAll first (minutes) and the web app's 5 minute page cache would still hold the old offering ids.
+  test.describe.configure({ mode: "serial", retries: 0 });
   // The clock is global to the fake profile: whatever happens, leave it at the baseline, then remove the demo rows this journey wrote (SPEC 7).
   test.afterAll(async () => {
     test.setTimeout(900_000); // the reseed takes 1 to 6 minutes; the default hook timeout is 60 s and would kill it half way

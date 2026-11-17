@@ -14,6 +14,7 @@ const NAME = "Dariusz Fikcyjny";
 const BRIEF = "Chcę zautomatyzować obieg faktur między skrzynką a arkuszem [[unavailable]] (j4).";
 
 test.describe("J4 the Assistant is down", () => {
+  test.describe.configure({ retries: 0 }); // see J3: a retry would reseed first and meet the web app's cached profile pages
   test.afterAll(async () => {
     test.setTimeout(900_000); // the reseed takes 1 to 6 minutes; the default hook timeout is 60 s
     await resetAndReseed(); // SPEC 7: remove the demo rows this journey wrote (once per journey)

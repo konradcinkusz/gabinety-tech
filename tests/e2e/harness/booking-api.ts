@@ -1,5 +1,6 @@
 import { expect, type APIRequestContext, type APIResponse } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { resetAndReseed } from "./demo-data";
 import { urls } from "./env";
 import { fetchRetrying, json } from "./http";
 
@@ -124,4 +125,12 @@ export function bookingIdFromUrl(url: string): string {
   const m = /\/(?:checkout\/mock|rezerwacja\/potwierdzenie|moje\/opinie|moje\/rezerwacje)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(url);
   if (!m) throw new Error("no booking id in the address");
   return m[1]!;
+}
+
+/**
+ * `afterAll` cleanup of a journey (SPEC 7). CI runs on a fresh ephemeral stack, so the reseed (1 to 6 minutes) is off by default; set `E2E_RESEED=1` for a local
+ * re-run on a stack that is kept (journeys assume the seeded starting data, e.g. J3 needs a profile with no review). Not for test-scoped fixtures: use inside `afterAll`.
+ */
+export async function reseedIfRequested(): Promise<void> {
+  if (process.env.E2E_RESEED === "1") await resetAndReseed();
 }

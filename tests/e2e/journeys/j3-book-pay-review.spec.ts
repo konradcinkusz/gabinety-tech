@@ -1,11 +1,10 @@
 import { test, expect } from "../harness/fixtures";
 import { signInViaBff } from "../harness/auth";
 import { restoreClock } from "../harness/clock";
-import { resetAndReseed } from "../harness/demo-data";
 import { urls } from "../harness/env";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
 import {
-  bookingIdFromUrl, createBooking, createReview, earliestOnDistinctDays, freeSlots, getBooking, publicProfile, simulatePayment, waitForStatus, warsawDate,
+  reseedIfRequested, bookingIdFromUrl, createBooking, createReview, earliestOnDistinctDays, freeSlots, getBooking, publicProfile, simulatePayment, waitForStatus, warsawDate,
 } from "../harness/booking-api";
 import { BookingFormPage, MockCheckoutPage, PractitionerProfilePage, ReviewFormPage } from "../harness/pages-booking";
 
@@ -34,13 +33,13 @@ const REVIEWS = [
 const AVERAGE = (5 + 4 + 3) / 3;
 
 test.describe("J3 book, pay, complete, review", () => {
-  // No retry: a retry would run the reseed in afterAll first (minutes) and the web app's 5 minute page cache would still hold the old offering ids.
+  // No retry: a retry meets the data the failed attempt left (J3 needs a profile with no review).
   test.describe.configure({ mode: "serial", retries: 0 });
   // The clock is global to the fake profile: whatever happens, leave it at the baseline, then remove the demo rows this journey wrote (SPEC 7).
   test.afterAll(async () => {
-    test.setTimeout(900_000); // the reseed takes 1 to 6 minutes; the default hook timeout is 60 s and would kill it half way
+    test.setTimeout(900_000); // E2E_RESEED=1 only: the reseed takes 1 to 6 minutes, the default hook timeout is 60 s
     await restoreClock();
-    await resetAndReseed();
+    await reseedIfRequested();
   });
 
   test("a client books and pays, the booking completes after 48 h, three reviews turn \"Nowy\" into an average", async ({ page, context, browser, signInAs, clock }) => {

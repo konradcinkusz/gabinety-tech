@@ -123,7 +123,8 @@ public sealed class AdminDisputesFeature : IServiceFeature
         if (refund > 0)
         {
             var payment = await db.Payments.AsNoTracking().SingleOrDefaultAsync(p => p.BookingId == id, ct);
-            if (payment is null) return PaymentWebhookFeature.Problem(ErrorCodes.InvalidTransition, "Invalid transition", 409);
+            // A concurrent resolve may have refunded already (the booking read above is unlocked): answer 409 without calling the provider.
+            if (payment is null || payment.RefundedMinor + refund > payment.AmountMinor) return PaymentWebhookFeature.Problem(ErrorCodes.InvalidTransition, "Invalid transition", 409);
             try { ticket = await refunds.RequestAsync(id, payment, refund, DisputeResolvedReason, ct); }
             catch (InvalidOperationException) { return PaymentWebhookFeature.Problem(ErrorCodes.InvalidTransition, "Invalid transition", 409); } // nothing left to refund
             catch (HttpRequestException) { return Unavailable(); }

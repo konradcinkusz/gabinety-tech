@@ -3,7 +3,7 @@ using Gabinety.ServiceDefaults;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddFeatures();
-builder.Services.AddRateLimiting();
+builder.Services.AddRateLimiting(builder.Configuration);
 
 // Authentication is registered here and only here: Me no longer calls it.
 builder.Services.AddJwtAuthentication(builder.Configuration);

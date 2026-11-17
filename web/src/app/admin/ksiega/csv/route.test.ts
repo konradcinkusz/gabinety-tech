@@ -52,22 +52,74 @@ describe("GET /admin/ksiega/csv (BFF)", () => {
     expect(r.headers.get("set-cookie")).toBeNull();
     expect(await r.text()).toBe("row1\r\nrow2\r\nrow3\r\n");
   });
-  it("maps Booking's refusals and outages without echoing them", async () => {
+  it.each([[401, "unauthorized"], [403, "forbidden"], [404, "not_found"]])("maps Booking's %i faithfully without echoing the body", async (status, code) => {
     const t = await token(["Admin"]);
-    backend.mockResolvedValueOnce(new Response("secret", { status: 403 }));
-    expect((await get(Q, t)).status).toBe(403);
-    backend.mockResolvedValueOnce(new Response("secret", { status: 400 }));
-    expect((await get(Q, t)).status).toBe(400);
-    backend.mockResolvedValueOnce(new Response("secret", { status: 500 }));
+    backend.mockResolvedValueOnce(new Response("secret", { status }));
+    const r = await get(Q, t);
+    expect(r.status).toBe(status);
+    const text = await r.text();
+    expect(text).not.toContain("secret");
+    expect(JSON.parse(text).code).toBe(code);
+  });
+  it("maps Booking's 400 and passes a well-formed problem code, otherwise validation_failed", async () => {
+    const t = await token(["Admin"]);
+    backend.mockResolvedValueOnce(new Response(JSON.stringify({ code: "period_too_long", detail: "secret" }), { status: 400 }));
+    const r = await get(Q, t);
+    expect(r.status).toBe(400);
+    const text = await r.text();
+    expect(JSON.parse(text).code).toBe("period_too_long");
+    expect(text).not.toContain("secret");
+    for (const body of ["not json", JSON.stringify({ code: "Free text with spaces <b>" }), JSON.stringify({ code: 5 })]) {
+      backend.mockResolvedValueOnce(new Response(body, { status: 400 }));
+      const x = await get(Q, t);
+      expect(x.status).toBe(400);
+      expect(JSON.parse(await x.text()).code).toBe("validation_failed");
+    }
+  });
+  it("maps 429 to 429 and forwards Retry-After only when well-formed", async () => {
+    const t = await token(["Admin"]);
+    backend.mockResolvedValueOnce(new Response("secret", { status: 429, headers: { "retry-after": "17" } }));
+    const r = await get(Q, t);
+    expect(r.status).toBe(429);
+    expect(r.headers.get("retry-after")).toBe("17");
+    expect(JSON.parse(await r.text()).code).toBe("rate_limited");
+    backend.mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "soon\u0001<x>" } }));
+    expect((await get(Q, t)).headers.get("retry-after")).toBeNull();
+    backend.mockResolvedValueOnce(new Response("", { status: 429 }));
+    expect((await get(Q, t)).headers.get("retry-after")).toBeNull();
+  });
+  it.each([500, 502, 503, 504, 418, 302])("maps Booking's %i to 503 dependency_unavailable without echoing", async (status) => {
+    const t = await token(["Admin"]);
+    backend.mockResolvedValueOnce(new Response("secret", { status }));
     const r = await get(Q, t);
     expect(r.status).toBe(503);
-    expect(await r.text()).not.toContain("secret");
+    const text = await r.text();
+    expect(text).not.toContain("secret");
+    expect(JSON.parse(text).code).toBe("dependency_unavailable");
+    expect(r.headers.get("retry-after")).toBeNull();
+  });
+  it("maps network errors, timeouts and an unresolvable backend to 503", async () => {
+    const t = await token(["Admin"]);
     backend.mockRejectedValueOnce(new Error("http://10.0.0.5 refused"));
     const e = await get(Q, t);
     expect(e.status).toBe(503);
     expect(await e.text()).not.toContain("10.0.0.5");
+    backend.mockRejectedValueOnce(new DOMException("aborted", "AbortError"));
+    expect((await get(Q, t)).status).toBe(503);
     base = null;
     expect((await get(Q, t)).status).toBe(503);
+  });
+  it("logs only the upstream status at warning level, no body and no address", async () => {
+    const t = await token(["Admin"]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    backend.mockResolvedValueOnce(new Response("secret-free-text", { status: 429 }));
+    await get(Q, t);
+    backend.mockRejectedValueOnce(new Error("http://10.0.0.5 refused"));
+    await get(Q, t);
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(logged).toContain("429");
+    expect(logged).not.toMatch(/secret|10\.0\.0\.5|demo-u|2026-01-01/);
   });
   it("the timeout guards the response headers, not the body", async () => {
     const t = await token(["Admin"]);

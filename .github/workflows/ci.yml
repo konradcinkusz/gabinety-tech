@@ -90,3 +90,31 @@ jobs:
       - name: authservice log on failure
         if: failure()
         run: docker logs authsvc 2>&1 | tail -60
+  # ---- docker-build: web (T-09.02). Separate job so the backend images' rows do not conflict with this one. ----
+  docker-build-web:
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the web image
+        run: docker build -t gabinety-web:ci web
+      - name: Runs as non-root
+        run: |
+          uid=$(docker run --rm --entrypoint id gabinety-web:ci -u)
+          echo "uid=$uid"; [ "$uid" != 0 ]
+      - name: Europe/Warsaw resolves
+        run: |
+          docker run --rm --entrypoint node gabinety-web:ci -e \
+            'const z=new Intl.DateTimeFormat("en",{timeZone:"Europe/Warsaw",timeZoneName:"short"}).format(new Date()); if(!/GMT\+[12]|CE/.test(z)) {console.error(z); process.exit(1)}'
+          docker run --rm --entrypoint test gabinety-web:ci -e /usr/share/zoneinfo/Europe/Warsaw
+      - name: Answers /api/health
+        run: |
+          docker run -d --name web -p 8080:8080 gabinety-web:ci
+          for i in $(seq 1 30); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/health)" = 200 ] && break
+            sleep 1
+          done
+          curl -fsS http://localhost:8080/api/health
+      - name: Image log on failure
+        if: failure()
+        run: docker logs web 2>&1 | tail -60 || true

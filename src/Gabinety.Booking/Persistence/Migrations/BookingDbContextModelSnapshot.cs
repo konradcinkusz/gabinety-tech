@@ -315,6 +315,51 @@ namespace Gabinety.Booking.Persistence.Migrations
                     b.ToTable("webhook_events", (string)null);
                 });
 
+            modelBuilder.Entity("Gabinety.Booking.Features.Payouts.Payout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("PractitionerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("practitioner_id");
+
+                    b.Property<string>("ProviderRef")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_ref");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique();
+
+                    b.ToTable("payouts", (string)null);
+                });
+
             modelBuilder.Entity("Gabinety.Booking.Persistence.AvailabilityException", b =>
                 {
                     b.Property<Guid>("Id")

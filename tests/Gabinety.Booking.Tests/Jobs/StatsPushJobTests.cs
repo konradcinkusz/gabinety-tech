@@ -63,9 +63,10 @@ public class StatsPushJobTests : IDisposable
         var versions = client.For(h.Practitioner).Select(p => p.Version).ToList();
         Assert.Equal(4, versions.Count);
         Assert.Equal(versions.OrderBy(v => v).Distinct(), versions);
-        // the shared test database holds other practitioners, each taking a number from the same counter, so the first one is the clock value plus at most a few
+        // the version counter is shared by every test host in the process and other tests advance their own clocks (by minutes) before pushing,
+        // so the first version is this clock's value or later, but never a different unit (seconds, ticks): allow a day of drift upwards
         var clockMs = h.Clock.GetUtcNow().ToUnixTimeMilliseconds();
-        Assert.InRange(versions[0], clockMs, clockMs + 1000);
+        Assert.InRange(versions[0], clockMs, clockMs + (long)TimeSpan.FromDays(1).TotalMilliseconds);
     }
 
     [Fact]

@@ -59,6 +59,25 @@ jobs:
       - name: AppHost log on failure
         if: failure()
         run: tail -100 apphost.log
+  # --- docker-build (backend images; T-09.02). The web image has its own entry. ---
+  docker-build-backend:
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [directory, booking, reputation, assistant]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image (context = repository root)
+        run: |
+          svc="$(tr a-z A-Z <<< "${MATRIX_SERVICE:0:1}")${MATRIX_SERVICE:1}"
+          docker build -f "src/Gabinety.$svc/Dockerfile" --build-arg VCS_REF="$GITHUB_SHA" -t "gabinety-$MATRIX_SERVICE:ci" .
+        env:
+          MATRIX_SERVICE: ${{ matrix.service }}
+      - name: Non-root, /alive, Europe/Warsaw
+        run: scripts/check-docker-image.sh "gabinety-${{ matrix.service }}:ci" ${{ matrix.service == 'assistant' && '--copilot-runtime' || '' }}
+  # --- end docker-build (backend) ---
   integration:
     runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
     timeout-minutes: 15

@@ -23,5 +23,9 @@ export async function listedInProblem(problemSlug: string): Promise<{ slug: stri
 export async function publicProfile(slug: string): Promise<PublicProfile | null> {
   const res = await fetchRetrying(`${urls.directory}/api/v1/practitioners/${encodeURIComponent(slug)}`);
   if (res.status === 404) return null;
-  return json<PublicProfile>(res, "public profile");
+  // On the wire the profile is `{ card: { slug, displayName, headline, ... }, bio, offerings, ... }` (the record `PractitionerProfile(Card, ...)`);
+  // the flat shape CONTRACTS 3.2 may suggest is read too, so this helper reports the Directory's data either way.
+  const raw = await json<{ card?: Partial<PublicProfile> } & Partial<PublicProfile>>(res, "public profile");
+  const c = raw.card ?? raw;
+  return { slug: c.slug ?? "", displayName: c.displayName ?? "", headline: c.headline ?? "", bio: raw.bio ?? "", offerings: raw.offerings ?? [] };
 }

@@ -27,7 +27,10 @@ const BIO =
   "Pracuję spokojnie, bez żargonu, a po spotkaniu dostajesz krótką listę kroków do wdrożenia.";
 
 test.describe("J2 practitioner onboards, administrator approves, profile becomes public", () => {
-  test.afterAll(async ({ demoData }) => demoData.resetAndReseed());
+  test.afterAll(async ({ demoData }) => {
+    test.setTimeout(600_000); // the reset takes 1 to 6 minutes; the default hook timeout (60 s) would kill the seeder halfway and leave a half-reset Directory
+    await demoData.resetAndReseed();
+  });
 
   test("onboarding to approval to a public profile", async ({ page, browser }) => {
     test.setTimeout(240_000); // many page loads against the Directory (60 requests a minute per address: the harness retries only direct calls)

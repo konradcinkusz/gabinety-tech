@@ -28,12 +28,29 @@ describe("profile page without JavaScript", () => {
     expect(count(html, /<h1[\s>]/g)).toBe(1);
   });
 
+  it("renders from the exact flat JSON the Directory sends (CONTRACTS 3.2: card fields and extras side by side)", async () => {
+    const wire = {
+      id: "00000000-0000-0000-0000-000000000001", slug: "demo-wire", displayName: "demo-Wire Dev", headline: "demo-wire headline", githubLogin: "demo-gh",
+      badges: ["email", "approved"], isNew: true, fromPrice: { amountMinor: 12000, currency: "PLN" }, problemSlugs: ["code-review"], durations: [30],
+      bio: "demo-wire bio", portfolioUrl: "https://demo.example/p",
+      offerings: [{ id: "00000000-0000-0000-0000-0000000000b1", title: "demo-wire offer", description: "d", durationMinutes: 30, price: { amountMinor: 12000, currency: "PLN" }, problemSlug: "code-review", techSlugs: ["dotnet"] }],
+      completedCount: 7, memberSince: "2026-05-01T00:00:00Z",
+    };
+    installProfileDirectory(wire as unknown as Parameters<typeof installProfileDirectory>[0]);
+    const html = await render("demo-wire");
+    expect(html).toMatch(/<h1[^>]*>demo-Wire Dev<\/h1>/);
+    expect(html).toContain("demo-wire headline");
+    expect(html).toContain("demo-wire offer");
+    expect(html).toContain("120,00");
+    expect(count(html, /<h1[\s>]/g)).toBe(1);
+  });
+
   it("links every offering to the booking route, which works without scripts", async () => {
     const p = profile(1);
     installProfileDirectory(p);
     const html = await render(p.slug);
-    expect(html).toContain('href="/rezerwacja/00000000-0000-0000-0000-0000000000a1"');
-    expect(html).toContain('href="/rezerwacja/00000000-0000-0000-0000-0000000000a2"');
+    expect(html).toContain(`href="/rezerwacja/00000000-0000-0000-0000-0000000000a1?gabinet=${encodeURIComponent(p.slug)}"`);
+    expect(html).toContain(`href="/rezerwacja/00000000-0000-0000-0000-0000000000a2?gabinet=${encodeURIComponent(p.slug)}"`);
   });
 
   it("explains each badge accessibly", async () => {

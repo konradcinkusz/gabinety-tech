@@ -242,13 +242,19 @@ describe("practitioner's reviews list: text only", () => {
 });
 
 describe("reply form", () => {
-  it("is switched off by one constant (the reply endpoint, T-05.02b, is not on main yet)", () => {
-    expect(REPLY_ENABLED).toBe(false);
+  it("is switched on by one constant (the reply endpoint, T-05.02b, is on main)", () => {
+    expect(REPLY_ENABLED).toBe(true);
   });
 
-  it("the list shows no reply form while the constant is off", async () => {
+  it("the list shows the reply form by default for an unanswered review", async () => {
     stub(reviewsApi([review()]));
     await mount(<PractitionerReviews />);
+    expect(host.querySelector("textarea")).not.toBeNull();
+  });
+
+  it("the list shows no reply form when the feature is switched off", async () => {
+    stub(reviewsApi([review()]));
+    await mount(<PractitionerReviews replyEnabled={false} />);
     expect(host.querySelector("textarea")).toBeNull();
   });
 

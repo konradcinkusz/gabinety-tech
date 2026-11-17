@@ -74,6 +74,68 @@ public class NotificationDispatcherTests
         Assert.Equal(NotificationDispatcher.MaxAttempts, (await t.Row(n.Id)).Attempts);
     }
 
+    [Theory]
+    [InlineData(NotificationKind.Reminder1h)]
+    [InlineData(NotificationKind.Reminder24h)]
+    public async Task A_reminder_retried_after_backoff_past_the_start_is_given_up_and_never_sent(NotificationKind kind)
+    {
+        using var t = new NotificationHost();
+        var booking = await t.AddBooking(edit: b => { b.StartUtc = t.Now.AddHours(5); b.EndUtc = b.StartUtc.AddHours(1); });
+        var late = t.Add(booking.Id, kind, "demo-client");
+        t.Sender.AlwaysFail = true;
+        Assert.Equal(0, await t.Run()); // fails, next attempt in 10 min
+        t.Sender.AlwaysFail = false;
+        t.Host.Clock.Advance(TimeSpan.FromHours(6)); // past the start (+5 h) before the retry runs
+        var calls = t.Sender.Calls;
+        Assert.Equal(0, await t.Run());
+
+        Assert.Equal(calls, t.Sender.Calls); // nothing was sent
+        var row = await t.Row(late.Id);
+        Assert.Null(row.SentAt);
+        Assert.Equal(NotificationDispatcher.MaxAttempts, row.Attempts); // the give-up status: never selected again
+        t.Host.Clock.Advance(TimeSpan.FromDays(1));
+        Assert.Equal(0, await t.Run());
+        Assert.Equal(calls, t.Sender.Calls);
+        Assert.Contains(t.Host.Logs.Lines, l => l.Contains(late.Id.ToString()) && l.Contains(kind.ToString()) && l.Contains("start"));
+        Assert.DoesNotContain(t.Host.Logs.Lines, l => l.Contains("demo-person@demo.invalid"));
+    }
+
+    [Fact]
+    public async Task A_reminder_is_sent_up_to_the_start_and_given_up_from_the_start_on()
+    {
+        using var t = new NotificationHost();
+        var booking = await t.AddBooking(edit: b => { b.StartUtc = t.Now.AddMinutes(30); b.EndUtc = b.StartUtc.AddHours(1); });
+        var before = t.Add(booking.Id, NotificationKind.Reminder1h, "demo-before", t.Now);
+        var atStart = t.Add(booking.Id, NotificationKind.Reminder1h, "demo-at-start", t.Now.AddMinutes(30));
+
+        Assert.Equal(1, await t.Run());
+        Assert.NotNull((await t.Row(before.Id)).SentAt);
+        t.Host.Clock.Advance(TimeSpan.FromMinutes(30)); // now == start: the consultation has begun
+        Assert.Equal(0, await t.Run());
+        Assert.Equal(1, t.Sender.Calls);
+        var row = await t.Row(atStart.Id);
+        Assert.Null(row.SentAt);
+        Assert.Equal(NotificationDispatcher.MaxAttempts, row.Attempts);
+    }
+
+    [Theory]
+    [InlineData(NotificationKind.BookingConfirmed)]
+    [InlineData(NotificationKind.ReviewRequest)]
+    [InlineData(NotificationKind.Cancelled)]
+    [InlineData(NotificationKind.DisputeOpened)]
+    [InlineData(NotificationKind.DisputeResolved)]
+    [InlineData(NotificationKind.PayoutSent)]
+    public async Task Other_kinds_are_still_sent_after_the_booking_start(NotificationKind kind)
+    {
+        using var t = new NotificationHost();
+        var booking = await t.AddBooking(edit: b => { b.StartUtc = t.Now.AddHours(-3); b.EndUtc = b.StartUtc.AddHours(1); });
+        var n = t.Add(booking.Id, kind, "demo-client");
+
+        Assert.Equal(1, await t.Run());
+        Assert.NotNull((await t.Row(n.Id)).SentAt);
+        Assert.Equal(1, (await t.Row(n.Id)).Attempts);
+    }
+
     [Fact]
     public async Task A_notification_that_fails_once_and_then_succeeds_is_sent_with_two_attempts()
     {

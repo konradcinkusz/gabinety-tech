@@ -1,4 +1,5 @@
 "use client";
+import { authPath } from "@/components/auth/returnTo";
 import { useRef, useState } from "react";
 import { Alert, Button, Card, Field, LinkButton, TextArea } from "@/components/ui";
 import { formatPln } from "@/components/ui/format";
@@ -64,7 +65,7 @@ export function BookingForm({ offering, practitioner, startUtc, api = defaultApi
     setPending(false);
     if (r.ok) return setProblem({ key: "error.generic", toProfile: false });
     if (r.status === 401) {
-      return navigate("/logowanie?returnTo=" + encodeURIComponent(`/rezerwacja/${offering.id}?start=${encodeURIComponent(startUtc)}&gabinet=${practitioner.slug}`));
+      return navigate(authPath("/logowanie", `/rezerwacja/${offering.id}?start=${encodeURIComponent(startUtc)}&gabinet=${practitioner.slug}`));
     }
     if (r.code === "idempotency_conflict") attempt.current = null;
     const reason = REASONS[r.code];

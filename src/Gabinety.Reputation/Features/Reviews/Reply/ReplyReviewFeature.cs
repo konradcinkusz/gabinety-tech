@@ -4,6 +4,7 @@ using Gabinety.Contracts.Reputation;
 using Gabinety.Reputation.Clients;
 using Gabinety.Reputation.Features.Reviews.Summary;
 using Gabinety.Reputation.Persistence;
+using Gabinety.Reputation.Rules;
 using Gabinety.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,7 +13,8 @@ namespace Gabinety.Reputation.Features.Reviews.Reply;
 /// <summary>
 /// POST /api/v1/reviews/{id}/reply (CONTRACTS 5.2, SPEC 6.3, D-29): the practitioner a review is ABOUT replies once, and only to a <c>Published</c> review.
 /// The reply is user free text: it is stored in the review row only and never reaches a log, an exception message, a metric, a trace or an error body.
-/// Order: input shape (400), the caller's practitioner id from Directory (503 on outage, 404 for a user who is no practitioner), the review (404 when it is
+/// Order: input shape (400), the review rules except the review's own length floor (422 <c>contact_details_not_allowed</c> for a link or contact detail,
+/// <c>invalid_input</c> for a blocked term or repetition; refused, never held), the caller's practitioner id from Directory (503 on outage, 404 for a user who is no practitioner), the review (404 when it is
 /// unknown, someone else's or not Published, so nothing about other reviews is revealed), then one reply per review (409 <c>already_replied</c>).
 /// The write is one conditional UPDATE (no reply yet, still Published, still this practitioner's) with its <c>Replied</c> event in one transaction, so two
 /// concurrent replies produce exactly one 201 and one 409, and a reply that loses to a rejection is a 404. The rating summary is not touched.
@@ -20,6 +22,7 @@ namespace Gabinety.Reputation.Features.Reviews.Reply;
 public sealed class ReplyReviewFeature : IServiceFeature
 {
     public const int MinLength = 10, MaxLength = 1000;
+    const string TooShortAfterTrim = "too_short_after_trim";
 
     public void Add(IHostApplicationBuilder builder) { }
 
@@ -27,7 +30,7 @@ public sealed class ReplyReviewFeature : IServiceFeature
         endpoints.MapPost("/api/v1/reviews/{id:guid}/reply", HandleAsync).RequireAuthorization("Authenticated");
 
     static async Task<IResult> HandleAsync(Guid id, ReplyRequest? req, ClaimsPrincipal user, ReputationDbContext db, IDirectoryClient directory,
-        TimeProvider time, ILogger<ReplyReviewFeature> log, CancellationToken ct)
+        IEnumerable<IReviewRule> rules, TimeProvider time, ILogger<ReplyReviewFeature> log, CancellationToken ct)
     {
         var sub = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (sub is null) return Results.Unauthorized();
@@ -36,6 +39,16 @@ public sealed class ReplyReviewFeature : IServiceFeature
         var text = req.Text?.Trim() ?? "";
         if (text.Length is < MinLength or > MaxLength)
             return Problem(ErrorCodes.ValidationFailed, "Validation failed", 400, new() { ["text"] = [$"text must be {MinLength} to {MaxLength} characters"] }); // never the text
+
+        // A reply is public text: the review rules that are about leakage and abuse apply to it (SPEC 9). It is refused, never held: the practitioner is told and can retry.
+        // too_short_after_trim is the review's 20 character floor and does not apply (the reply's own floor is 10, checked above).
+        var tripped = rules.Where(r => r.Code != TooShortAfterTrim).Select(r => r.Check(ReviewText.From(text))).OfType<string>().ToList();
+        if (tripped.Count > 0)
+        {
+            var leak = tripped.Any(c => c is "contains_link" or "contact_details");
+            return Problem(leak ? ErrorCodes.ContactDetailsNotAllowed : ErrorCodes.InvalidInput, leak ? "Contact details not allowed" : "Invalid input", 422,
+                new() { ["text"] = [.. tripped] }); // reason codes only, never the text
+        }
 
         Guid practitionerId;
         try

@@ -15,6 +15,9 @@ public class ReplyTests
     static async Task<string> Code(HttpResponseMessage r) =>
         (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString()!;
 
+    /// <summary>Text of exact length that no review rule trips (no run of one character or word).</summary>
+    static string Varied(int n) => string.Concat(Enumerable.Repeat("abcdefghij", n / 10 + 1))[..n];
+
     static (ReplyHost h, string user, Guid pract) Arrange()
     {
         var h = new ReplyHost();
@@ -165,11 +168,11 @@ public class ReplyTests
         var c = h.ClientFor(user);
         var tooLong = await h.SeedReview(pract); var longest = await h.SeedReview(pract); var shortest = await h.SeedReview(pract);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await ReplyHost.Reply(c, tooLong, new string('a', 1001))).StatusCode);
-        Assert.Equal(HttpStatusCode.Created, (await ReplyHost.Reply(c, longest, "  " + new string('a', 1000) + "  ")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ReplyHost.Reply(c, tooLong, Varied(1001))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await ReplyHost.Reply(c, longest, "  " + Varied(1000) + "  ")).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await ReplyHost.Reply(c, shortest, " 0123456789 ")).StatusCode);
 
-        Assert.Equal(new string('a', 1000), (await h.ReviewOf(longest)).ReplyText);
+        Assert.Equal(Varied(1000), (await h.ReviewOf(longest)).ReplyText);
         Assert.Equal("0123456789", (await h.ReviewOf(shortest)).ReplyText);
     }
 

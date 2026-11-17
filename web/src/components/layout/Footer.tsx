@@ -9,7 +9,7 @@ export function Footer({ year }: { year: number }) {
         <p>{t("footer.copyright", { year })}</p>
         <ul className={styles.nav}>
           <li><Link href="/regulamin">{t("footer.terms")}</Link></li>
-          <li><Link href="/prywatnosc">{t("footer.privacy")}</Link></li>
+          <li><Link href="/polityka-prywatnosci">{t("footer.privacy")}</Link></li>
         </ul>
       </div>
     </footer>

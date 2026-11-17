@@ -68,8 +68,8 @@ export function ProfilePage({ profile: p, url }: { profile: PractitionerProfile;
                     <PriceTag amount={o.price.amountMinor} className={styles.price} />
                   </p>
                   {/* Works without JavaScript; the picker below adds concrete start times when scripts run. */}
-                  <LinkButton href={`/rezerwacja/${o.id}`} aria-label={pf("page.bookOffering", { title: o.title })}>{pf("page.book")}</LinkButton>
-                  <SlotPicker practitionerId={p.id} offeringId={o.id} />
+                  <LinkButton href={`/rezerwacja/${o.id}?gabinet=${encodeURIComponent(p.slug)}`} aria-label={pf("page.bookOffering", { title: o.title })}>{pf("page.book")}</LinkButton>
+                  <SlotPicker practitionerId={p.id} offeringId={o.id} profileSlug={p.slug} />
                 </Card>
               </li>
             ))}

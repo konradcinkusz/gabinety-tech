@@ -9,6 +9,7 @@ import { ss } from "./strings";
 
 const NOW = new Date("2027-03-26T10:00:00Z");
 const PID = "00000000-0000-0000-0000-000000000001";
+const SLUG = "demo-anna-kowalska";
 const OID = "00000000-0000-0000-0000-0000000000a1";
 let host: HTMLElement;
 let root: Root;
@@ -23,7 +24,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 const mount = async () => {
-  await act(async () => root.render(<SlotPicker practitionerId={PID} offeringId={OID} now={NOW} />));
+  await act(async () => root.render(<SlotPicker practitionerId={PID} offeringId={OID} profileSlug={SLUG} now={NOW} />));
   await act(async () => {}); // let the effect's fetch settle
 };
 const stub = (impl: (url: string) => Response | Promise<Response>) => {
@@ -42,8 +43,17 @@ describe("slot picker", () => {
     await mount();
     const links = [...host.querySelectorAll("a")];
     expect(links.map((a) => a.textContent)).toEqual(["00:30", "03:30"]);
-    expect(links[1].getAttribute("href")).toBe(`/rezerwacja/${OID}?start=${encodeURIComponent("2027-03-28T01:30:00Z")}`);
+    expect(links[1].getAttribute("href")).toBe(`/rezerwacja/${OID}?start=${encodeURIComponent("2027-03-28T01:30:00Z")}&gabinet=${SLUG}`);
     expect(host.textContent).toContain("28 marca");
+  });
+
+  it("carries the profile slug so the booking page can resolve the offering (it reads start and gabinet)", async () => {
+    stub(() => slots("2027-03-28T01:30:00Z"));
+    await mount();
+    const url = new URL(host.querySelector("a")!.getAttribute("href")!, "http://x.test");
+    expect(url.pathname).toBe(`/rezerwacja/${OID}`);
+    expect(url.searchParams.get("start")).toBe("2027-03-28T01:30:00Z");
+    expect(url.searchParams.get("gabinet")).toBe(SLUG);
   });
 
   it("reads slots through the BFF only, with the offering and a window of at most 14 days", async () => {
@@ -66,7 +76,7 @@ describe("slot picker", () => {
 
   it("shows a clear empty state when there are no slots at all", async () => {
     stub(() => slots());
-    await act(async () => root.render(<SlotPicker practitionerId={PID} offeringId={OID} now={new Date("2027-05-20T10:00:00Z")} />));
+    await act(async () => root.render(<SlotPicker practitionerId={PID} offeringId={OID} profileSlug={SLUG} now={new Date("2027-05-20T10:00:00Z")} />));
     await act(async () => {});
     await act(async () => {});
     expect(host.textContent).toContain(ss("slots.empty"));

@@ -23,6 +23,7 @@ public sealed class ConfiguredSeedHttp(SeedOptions options) : ISeedHttp
         {
             SeedService.Directory => options.DirectoryUrl,
             SeedService.Identity => options.IdentityAuthority,
+            SeedService.Booking => options.BookingUrl,
             _ => throw new SeedException($"no endpoint is configured for {service} yet"),
         };
         return _clients[service] = new HttpClient { BaseAddress = new Uri(url + "/"), Timeout = TimeSpan.FromSeconds(30) };

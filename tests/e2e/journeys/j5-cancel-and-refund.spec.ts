@@ -40,9 +40,7 @@ test.describe("J5 cancel: refund early, none late", () => {
     await detail.cancelButton().click();
     // the rule is stated before the confirm button (both outcomes are named there); the outcome below is what proves it
     await expect(detail.cancelDialog()).toContainText("co najmniej 24 godziny, zwrot wynosi 100% ceny");
-    await detail.confirmCancel().click();
-
-    await expect(page.getByText("Rezerwacja została anulowana.")).toBeVisible();
+    await detail.confirmCancelAndWait();
     await expect(detail.value(/^Anulowana przez klienta$/)).toBeVisible();
     await expect(detail.value("Zwrócona w całości")).toBeVisible();
     const m = offering.price.amountMinor; // below 1000 zł: no thousands separator
@@ -70,9 +68,7 @@ test.describe("J5 cancel: refund early, none late", () => {
     await expect(detail.value("Opłacona")).toBeVisible();
     await detail.cancelButton().click();
     await expect(detail.cancelDialog()).toContainText("mniej niż 24 godziny, brak zwrotu");
-    await detail.confirmCancel().click();
-
-    await expect(page.getByText("Rezerwacja została anulowana.")).toBeVisible();
+    await detail.confirmCancelAndWait();
     await expect(detail.value("Anulowana przez klienta (bez zwrotu)")).toBeVisible();
     await expect(detail.value("Opłacona")).toBeVisible(); // the payment line did not change ...
     await expect(page.getByText(/Zwrócono:/)).toHaveCount(0); // ... and shows no refund

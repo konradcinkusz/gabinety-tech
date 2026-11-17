@@ -22,6 +22,25 @@ export class BookingDetailPage {
   cancelButton(): Locator { return this.page.getByRole("button", { name: "Anuluj rezerwację" }); }
   cancelDialog(): Locator { return this.page.getByRole("alertdialog", { name: "Czy na pewno anulować rezerwację?" }); }
   confirmCancel(): Locator { return this.page.getByRole("button", { name: "Tak, anuluj rezerwację" }); }
+  /**
+   * Confirms the cancel and waits for the success line. A danger banner (the services answered 429/503/...) is logged (product copy only) and the confirm
+   * is pressed again a few times: the cancel is all-or-nothing on the server, so a repeat after a failure cannot cancel twice.
+   */
+  async confirmCancelAndWait() {
+    const done = this.page.getByText("Rezerwacja została anulowana.");
+    for (let attempt = 1; ; attempt++) {
+      await this.confirmCancel().click();
+      try {
+        await expect(done).toBeVisible({ timeout: 10_000 });
+        return;
+      } catch (e) {
+        const banners = await this.page.getByRole("alert").allInnerTexts();
+        console.log(`[cancel attempt ${attempt}] banner: ${banners.join(" | ") || "none"}`);
+        if (attempt >= 4) throw e;
+        await this.page.waitForTimeout(5_000); // waiting out a rate limit window, not business time
+      }
+    }
+  }
   disputeButton(): Locator { return this.page.getByRole("button", { name: "Zgłoś spór" }); }
   async openDispute(text: string) {
     await this.disputeButton().click();
@@ -47,4 +66,20 @@ export class AdminDisputesPage {
     await item.getByRole("button", { name: "Przejdź do potwierdzenia" }).click();
   }
   confirmButton(bookingId: string): Locator { return this.item(bookingId).getByRole("button", { name: "Potwierdź rozstrzygnięcie" }); }
+  /** Confirms and waits until the dispute leaves the open list; a danger banner is logged (product copy only) and the confirm pressed again a few times. */
+  async confirmAndWait(bookingId: string) {
+    for (let attempt = 1; ; attempt++) {
+      const button = this.confirmButton(bookingId);
+      if (await button.isVisible()) await button.click();
+      try {
+        await expect(this.item(bookingId)).toHaveCount(0, { timeout: 10_000 });
+        return;
+      } catch (e) {
+        const banners = await this.item(bookingId).getByRole("alert").allInnerTexts();
+        console.log(`[resolve attempt ${attempt}] banner: ${banners.join(" | ") || "none"}`);
+        if (attempt >= 4) throw e;
+        await this.page.waitForTimeout(5_000);
+      }
+    }
+  }
 }

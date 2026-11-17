@@ -75,8 +75,7 @@ test.describe("J6 dispute and partial refund", () => {
       // the confirmation states the money in words before anything is saved (CONTRACTS 9.2). It names the refund; the kept amount only when the page
       // could read the price (it falls back to words without it), so the figures themselves are asserted below from Booking's state and the ledger.
       await expect(disputes.item(b.id)).toContainText("100,00");
-      await disputes.confirmButton(b.id).click();
-      await expect(disputes.item(b.id)).toHaveCount(0); // a resolved dispute leaves the open list
+      await disputes.confirmAndWait(b.id); // a resolved dispute leaves the open list
 
       // follow-up state: what Booking says
       const view = await getBooking(admin, b.id);

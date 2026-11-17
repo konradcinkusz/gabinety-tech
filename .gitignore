@@ -10,3 +10,4 @@ TestResults/
 *.log
 *.tsbuildinfo
 apphost.log
+evals/reports/

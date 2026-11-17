@@ -4,9 +4,22 @@ import { bookingIdFromUrl } from "./booking-api";
 /** Page objects of the booking and review flow (J3, J4). Role and label locators; texts are the Polish strings of web/src/components/{booking,bookings,reviews,profile}/strings.ts. */
 export class PractitionerProfilePage {
   constructor(readonly page: Page) {}
+  /**
+   * The profile page is rendered by the web app from the Directory, which limits each client address to 60 requests a minute (shared with the whole run),
+   * so the page can be an error page for a moment. Reload until the h1 is there (bounded); on failure say what the page showed (title and first heading only).
+   */
   async goto(slug: string, displayName: string) {
+    const h1 = this.page.getByRole("heading", { level: 1, name: displayName });
     await this.page.goto(`/gabinet/${slug}`);
-    await expect(this.page.getByRole("heading", { level: 1, name: displayName })).toBeVisible();
+    try {
+      await expect(async () => {
+        if (!(await h1.isVisible())) await this.page.reload();
+        await expect(h1).toBeVisible({ timeout: 5_000 });
+      }).toPass({ timeout: 90_000, intervals: [2_000, 5_000, 10_000] });
+    } catch (err) {
+      const first = await this.page.getByRole("heading").first().textContent({ timeout: 2_000 }).catch(() => null);
+      throw new Error(`profile page of ${slug} did not render: title "${await this.page.title()}", first heading "${first ?? ""}"`, { cause: err });
+    }
   }
   /** The offering's card: the one list item that holds the offering's heading (the time list inside it has no heading). */
   offering(title: string): Locator {

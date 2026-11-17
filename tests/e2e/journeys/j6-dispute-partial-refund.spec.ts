@@ -13,10 +13,22 @@ import {
 const PRICE = 25000, REFUND = 10000, KEPT = PRICE - REFUND, FEE = 2250, PAYOUT = KEPT - FEE;
 
 test.describe("J6 dispute and partial refund", () => {
+  test.describe.configure({ retries: 0 });
+  let failed = false;
+
+  // CI diagnostics: the list reporter prints failure details only at the very end of the run, so say why a test failed as it happens (assertion text only).
+  test.afterEach(async ({}, testInfo) => {
+    if (testInfo.status !== testInfo.expectedStatus) {
+      failed = true;
+      console.log(`[${testInfo.title}] ${(testInfo.error?.message ?? "failed").split("\n").slice(0, 12).join(" | ")}`);
+    }
+  });
+
   test.afterAll(async () => {
     test.setTimeout(11 * 60_000);
     await restoreClock();
-    await resetAndReseed(); // once per file; removes the fresh client, the extra offering and the booking
+    // once per file: removes the fresh client, the extra offering and the booking. Skipped after a failure (the run is red anyway, and the 6 minutes are the budget's).
+    if (!failed) await resetAndReseed();
   });
 
   test("the arithmetic of CONTRACTS 9.1 holds for the journey's figures", () => {

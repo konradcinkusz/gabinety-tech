@@ -9,6 +9,10 @@ public sealed record SeedOptions(string DirectoryUrl, string DirectoryKey, strin
     public string BookingUrl { get; init; } = "";
     public string BookingKey { get; init; } = "";
 
+    /// <summary>Reputation (T-08.01c): <c>Backend:Reputation</c> and <c>Internal:Keys:Reputation</c>.</summary>
+    public string ReputationUrl { get; init; } = "";
+    public string ReputationKey { get; init; } = "";
+
     /// <summary>The fixed development password of tools/Gabinety.DevIdentity (README). It protects nothing; override with Identity:DemoPassword.</summary>
     public const string DevIdentityPassword = "Demo-Dev-Passw0rd!";
 
@@ -21,9 +25,11 @@ public sealed record SeedOptions(string DirectoryUrl, string DirectoryKey, strin
         var authority = Need("Identity:Authority").TrimEnd('/');
         var booking = FirstUrl(c["Backend:Booking"] ?? ""); // optional: without it the Booking step says so and is skipped
         var bookingKey = c["Internal:Keys:Booking"]?.Trim() ?? "";
+        var reputation = FirstUrl(c["Backend:Reputation"] ?? ""); // optional: without it the Reputation step says so and is skipped
+        var reputationKey = c["Internal:Keys:Reputation"]?.Trim() ?? "";
         if (missing.Count > 0) throw new SeedException("missing configuration: " + string.Join(", ", missing)); // names of keys, never values
         return new SeedOptions(directory, key, authority, c["Identity:DemoPassword"] is { Length: > 0 } p ? p : DevIdentityPassword)
-            { BookingUrl = booking, BookingKey = bookingKey };
+            { BookingUrl = booking, BookingKey = bookingKey, ReputationUrl = reputation, ReputationKey = reputationKey };
     }
 
     /// <summary>The web app's Backend:* values are candidate lists; the seeder takes the first.</summary>

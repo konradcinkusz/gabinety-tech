@@ -10,6 +10,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <ProjectReference Include="../../src/Gabinety.Directory/Gabinety.Directory.csproj" Aliases="DirectoryApp" />
     <ProjectReference Include="../../src/Gabinety.Booking/Gabinety.Booking.csproj" Aliases="BookingApp" />
+    <ProjectReference Include="../../src/Gabinety.Reputation/Gabinety.Reputation.csproj" Aliases="ReputationApp" />
     <ProjectReference Include="../../tools/Gabinety.DevIdentity/Gabinety.DevIdentity.csproj" />
     <ProjectReference Include="../../tools/Gabinety.DemoSeeder/Gabinety.DemoSeeder.csproj" />
   </ItemGroup>

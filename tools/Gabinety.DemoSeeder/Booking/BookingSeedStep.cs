@@ -87,7 +87,7 @@ public sealed class BookingSeedStep : ISeedStep
     }
 
     /// <summary>The demo key a booking was made under: the <c>[demo-...]</c> at the start of its brief.</summary>
-    static string? KeyOf(BookingInfo b) =>
+    internal static string? KeyOf(BookingInfo b) =>
         b.BriefText is { Length: > 2 } t && t[0] == '[' && t.IndexOf(']') is > 1 and var end && DemoNames.IsDemo(t[1..end]) ? t[1..end] : null;
 
     // ---- availability

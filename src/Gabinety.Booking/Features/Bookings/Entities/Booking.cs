@@ -33,6 +33,10 @@ public sealed class Booking
     public DateTimeOffset? EndedAt { get; set; }
     public DateTimeOffset? CancelledAt { get; set; }
     public DateTimeOffset? DisputeOpenedAt { get; set; }
+    /// <summary>not_as_described, practitioner_no_show or other (T-04.07b). Read by the admin list (T-04.07c).</summary>
+    public string? DisputeKind { get; set; }
+    /// <summary>The client's free text. Never logged. The erasure endpoint (T-04.10b) must anonymise it.</summary>
+    public string? DisputeText { get; set; }
     public string? DisputeResolution { get; set; }
     public DateTimeOffset? ResolvedAt { get; set; }
 }
@@ -69,6 +73,8 @@ sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         b.Property(x => x.EndedAt).HasColumnName("ended_at");
         b.Property(x => x.CancelledAt).HasColumnName("cancelled_at");
         b.Property(x => x.DisputeOpenedAt).HasColumnName("dispute_opened_at");
+        b.Property(x => x.DisputeKind).HasColumnName("dispute_kind").HasMaxLength(30);
+        b.Property(x => x.DisputeText).HasColumnName("dispute_text").HasMaxLength(1000);
         b.Property(x => x.DisputeResolution).HasColumnName("dispute_resolution").HasMaxLength(20);
         b.Property(x => x.ResolvedAt).HasColumnName("resolved_at");
         b.HasIndex(x => new { x.PractitionerId, x.StartUtc });

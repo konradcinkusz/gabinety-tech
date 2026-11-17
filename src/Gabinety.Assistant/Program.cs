@@ -1,5 +1,9 @@
+using Gabinety.Assistant.Features.OwnerSmoke;
 using Gabinety.Llm;
 using Gabinety.ServiceDefaults;
+
+// The owner's smoke verb (T-02.05) runs before any web host exists: it is not reachable as a server.
+if (SmokeCommand.IsSmoke(args)) return await SmokeCommand.RunAsync(args, Console.Out, Environment.GetEnvironmentVariable);
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
@@ -25,5 +29,6 @@ app.MapDefaultEndpoints();
 app.MapFeatures();
 app.MapOpenApi("/openapi/v1.json");
 app.Run();
+return 0;
 
 public partial class Program;

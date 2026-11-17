@@ -76,19 +76,25 @@ sealed class CreateHost : WebApplicationFactory<Program>
             : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
     }
 
-    public HttpClient ClientFor(string? userId)
+    /// <summary><paramref name="roles"/> become the WS-Federation role claim authservice issues (<c>Admin</c>, <c>SuperAdmin</c>).</summary>
+    public HttpClient ClientFor(string? userId, params string[] roles)
     {
         var c = CreateClient();
-        if (userId != null) c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(userId));
+        if (userId != null) c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(userId, roles));
         return c;
     }
 
-    string Token(string sub) => new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+    string Token(string sub, string[] roles)
     {
-        Issuer = Issuer, Audience = Audience, Expires = DateTime.UtcNow.AddMinutes(5),
-        Claims = new Dictionary<string, object> { ["sub"] = sub },
-        SigningCredentials = new SigningCredentials(new RsaSecurityKey(_rsa) { KeyId = "k1" }, SecurityAlgorithms.RsaSha256),
-    });
+        var claims = new Dictionary<string, object> { ["sub"] = sub };
+        if (roles.Length > 0) claims["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] = roles.Length == 1 ? roles[0] : roles;
+        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = Issuer, Audience = Audience, Expires = DateTime.UtcNow.AddMinutes(5),
+            Claims = claims,
+            SigningCredentials = new SigningCredentials(new RsaSecurityKey(_rsa) { KeyId = "k1" }, SecurityAlgorithms.RsaSha256),
+        });
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

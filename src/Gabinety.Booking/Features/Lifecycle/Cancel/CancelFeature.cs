@@ -56,6 +56,9 @@ public sealed class CancelFeature : IServiceFeature
         {
             var payment = await db.Payments.AsNoTracking().SingleOrDefaultAsync(p => p.BookingId == id, ct);
             if (payment is null) return PaymentWebhookFeature.Problem(ErrorCodes.NotFound, "Not found", 404);
+            // Lost a race: the booking was read as Confirmed, but the winning cancel has refunded the payment since. The transition is gone: 409, no provider call.
+            if (payment.RefundedMinor + plan.Value.Refund > payment.AmountMinor)
+                return PaymentWebhookFeature.Problem(ErrorCodes.InvalidTransition, "Invalid transition", 409);
             try { ticket = await refunds.RequestAsync(id, payment, plan.Value.Refund, plan.Value.Reason, ct); }
             catch (HttpRequestException) { return Unavailable(); }
             catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return Unavailable(); }

@@ -16,6 +16,29 @@ export type AdminPractitionerRow = {
   submittedAt?: string | null;
 };
 export type AdminPractitionerPage = { items: AdminPractitionerRow[]; nextCursor?: string | null };
+/** One profile as a reviewer sees it (GET /admin/practitioners/{id}); never carries the owner's user id or the GitHub challenge. Bio, reason and note are user free text. */
+export type AdminPractitionerDetail = {
+  id: string;
+  slug: string;
+  displayName: string;
+  headline: string;
+  bio: string;
+  status: PractitionerStatus;
+  statusReason?: string | null;
+  githubLinked: boolean;
+  githubLogin?: string | null;
+  nip?: string | null;
+  nipValid: boolean;
+  portfolioUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  submittedAt?: string | null;
+  approvedAt?: string | null;
+};
+export const EVENT_KINDS = ["Submitted", "Approved", "Rejected", "Suspended", "Reinstated", "GithubLinked", "NipChanged"] as const;
+export type VerificationEventKind = (typeof EVENT_KINDS)[number];
+/** One append-only history entry (GET /admin/practitioners/{id}/verification-events, oldest first). */
+export type AdminVerificationEvent = { id: string; kind: VerificationEventKind; actorUserId: string; note?: string | null; at: string };
 export type AdminAction = "approve" | "reject" | "suspend" | "reinstate";
 
 /** The practitioner state machine (SPEC 8.2): what an administrator may do from each status. The API still decides. */

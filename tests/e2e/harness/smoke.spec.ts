@@ -20,14 +20,16 @@ test.describe("harness smoke", () => {
   });
 
   test("the test clock moves and is restored", async ({ clock }) => {
-    const before = await clock.read();
+    const before = await clock.read(); // relative: whatever offset the clock has now, not an assumed 0
     await clock.advanceHours(49);
     const moved = await clock.read();
     expect(moved.offsetMinutes - before.offsetMinutes).toBe(49 * 60);
+    await clock.advanceHours(-49); // back to exactly where it was
+    expect((await clock.read()).offsetMinutes).toBe(before.offsetMinutes);
   });
 
   test("the previous test left the clock restored", async ({ clock }) => {
-    expect((await clock.read()).offsetMinutes).toBe(0);
+    expect((await clock.read()).offsetMinutes).toBe(0); // the fixture restores 0; globalSetup waited for the seeder, so nothing else moves it
   });
 
   test("a demo user signs in", async ({ page, context, signInAs }) => {

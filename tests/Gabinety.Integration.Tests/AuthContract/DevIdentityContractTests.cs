@@ -71,6 +71,37 @@ public class DevIdentitySeedTests(DevIdentityHost host) : AuthContractSuite(host
         Assert.False(jwt.Payload.TryGetProperty("email_verified", out _));
     }
 
+    // T-08.02: the Booking and Reputation demo reset keys on a user id starting with "demo-" (CONTRACTS 10.4), so the stand-in issues such subs for demo users.
+    [Theory]
+    [MemberData(nameof(SeededNames))]
+    public async Task A_seeded_demo_user_has_the_user_name_as_its_sub(string name)
+    {
+        var jwt = await LoginTokenAsync(name);
+        Assert.Equal(name, jwt.Payload.GetProperty("sub").GetString());
+    }
+
+    [Fact]
+    public async Task A_demo_user_registered_later_gets_a_demo_sub_and_me_agrees()
+    {
+        var tokens = await RegisterAsync("demo-client-7@demo.example");
+        var access = tokens.GetProperty("accessToken").GetString()!;
+        Assert.Equal("demo-client-7", ParsedJwt.Parse(access).Payload.GetProperty("sub").GetString());
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/v1/auth/me");
+        request.Headers.Authorization = new("Bearer", access);
+        Assert.Equal("demo-client-7", (await ReadJson(await Http.SendAsync(request))).GetProperty("id").GetString());
+    }
+
+    [Theory]
+    [InlineData("someone-else@demo.example")]
+    [InlineData("demo-sneaky@example.com")]
+    public async Task Any_other_user_keeps_an_opaque_sub_outside_the_demo_namespace(string email)
+    {
+        var tokens = await RegisterAsync(email);
+        var sub = ParsedJwt.Parse(tokens.GetProperty("accessToken").GetString()!).Payload.GetProperty("sub").GetString()!;
+        Assert.DoesNotContain("demo-", sub);
+        Assert.True(Guid.TryParseExact(sub, "N", out _));
+    }
+
     [Fact]
     public async Task Health_stays_up()
     {

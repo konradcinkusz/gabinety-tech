@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 
 namespace Gabinety.DevIdentity;
 
@@ -37,11 +36,19 @@ public sealed class IdentityStore(TimeProvider time)
         Add("demo-admin", "Admin"); // SPEC 6.7: the admin carries the authservice platform role Admin
 
         void Add(string name, params string[] roles) =>
-            TryAdd($"{name}@{SeedEmailDomain}", SeedPassword, roles, StableId(name), out _);
+            TryAdd($"{name}@{SeedEmailDomain}", SeedPassword, roles, null, out _);
     }
 
-    // Opaque to the web app, stable across restarts so development data can refer to it.
-    private static string StableId(string name) => new Guid(SHA256.HashData(Encoding.UTF8.GetBytes("gabinety-devidentity:" + name))[..16]).ToString("N");
+    // The subject of a demo user is its user name (demo-client, demo-practitioner-3, ...), because the Booking and Reputation demo reset removes rows whose user id
+    // starts with "demo-" (CONTRACTS 10.4). Only the demo address domain qualifies, so a real-looking registration can never land in the namespace.
+    // Any other user gets a random opaque id (lost with the process, like the user).
+    private static string IdFor(string email)
+    {
+        var at = email.LastIndexOf('@');
+        if (at > 0 && email[(at + 1)..].Equals(SeedEmailDomain, StringComparison.OrdinalIgnoreCase) && email[..at].StartsWith("demo-", StringComparison.OrdinalIgnoreCase))
+            return email[..at].ToLowerInvariant();
+        return Guid.NewGuid().ToString("N");
+    }
 
     public bool TryAdd(string email, string password, string[] roles, string? id, out DevUser user)
     {
@@ -49,7 +56,7 @@ public sealed class IdentityStore(TimeProvider time)
         {
             if (_byEmail.TryGetValue(email, out user!)) return false;
             var salt = RandomNumberGenerator.GetBytes(16);
-            user = new DevUser(id ?? Guid.NewGuid().ToString("N"), email, salt, Hash(password, salt), roles, time.GetUtcNow());
+            user = new DevUser(id ?? IdFor(email), email, salt, Hash(password, salt), roles, time.GetUtcNow());
             _byEmail[email] = user;
             _byId[user.Id] = user;
             return true;

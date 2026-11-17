@@ -29,6 +29,7 @@ public partial class ArchitectureRules
     static readonly Dictionary<(string Project, string Ref), string> EdgeExceptions = new()
     {
         [("Gabinety.AppHost", "Gabinety.DevIdentity")] = "AppHost orchestrates the dev identity stand-in; composition root, no code dependency",
+        [("Gabinety.AppHost", "Gabinety.DemoSeeder")] = "AppHost starts the demo seeder as a resource (T-08.02); Aspire needs the project reference for Projects.*, no code dependency",
     };
 
     /// <summary>SPEC 3.2 dependency budget: the only packages a project may reference (absent = unchecked here).</summary>

@@ -11,8 +11,9 @@ public sealed class BookingSeedStep : ISeedStep
     public string Name => "booking";
     public int Order => 200;
 
-    /// <summary>The offset the clock has before and after the run. The clock endpoint only sets, it cannot be read (CONTRACTS 10.4), so the baseline is a setting: 0 is a freshly started fake profile.</summary>
-    public long BaselineOffsetMinutes { get; set; }
+    /// <summary>The offset the clock has before and after the run. Null (the default): whatever <c>GET /internal/v1/test/clock</c> answers at the start, so a clock someone moved is put back where it was.
+    /// A value forces that baseline instead (0 puts a clock left moved by an interrupted run back to real time).</summary>
+    public long? BaselineOffsetMinutes { get; set; }
     /// <summary>How long to wait, after the clock passed end + 48 h, for the service's auto-complete job to make a booking Completed (the job runs every 60 s on the offset time).</summary>
     public TimeSpan CompletionWait { get; init; } = TimeSpan.FromSeconds(75);
     public TimeSpan CompletionPoll { get; init; } = TimeSpan.FromSeconds(3);
@@ -24,8 +25,12 @@ public sealed class BookingSeedStep : ISeedStep
     sealed record Due(Work Work, DateTimeOffset At, Func<Task> Act);
     sealed record Work(DemoBooking Plan, DemoUser Client, DemoUser Practitioner, SeededPractitioner Seeded, Guid OfferingId, BookingInfo Info);
 
-    public async Task<int> ResetAsync(SeedContext context, CancellationToken ct) =>
-        await new BookingApi(context.Http.For(SeedService.Booking), context.Options, context.Time).ResetAsync(ct);
+    public async Task<int> ResetAsync(SeedContext context, CancellationToken ct)
+    {
+        if (context.Options.BookingUrl.Length == 0) return -1;
+        if (context.Options.BookingKey.Length == 0) throw new SeedException("booking: Internal:Keys:Booking is not configured");
+        return await new BookingApi(context.Http.For(SeedService.Booking), context.Options, context.Time).ResetAsync(ct);
+    }
 
     public async Task RunAsync(SeedContext context, CancellationToken ct)
     {
@@ -38,12 +43,13 @@ public sealed class BookingSeedStep : ISeedStep
         if (clients.Count == 0) throw new SeedException("booking: no demo clients (run the directory step first)");
         var admin = await context.Identity.SignInAsync("demo-admin", ct);
 
-        var clock = new Clock(api, BaselineOffsetMinutes);
+        var baseline = BaselineOffsetMinutes ?? (await api.GetClockAsync(ct)).Offset;
+        var clock = new Clock(api, baseline);
         var changes = 0;
         var finished = false;
         try
         {
-            var now0 = await clock.SetAsync(BaselineOffsetMinutes, ct); // "now" is what the target system answers, never this machine's clock
+            var now0 = await clock.SetAsync(baseline, ct); // "now" is what the target system answers, never this machine's clock
             changes += await EnsureAvailabilityAsync(context, api, approved, ct);
 
             var known = await KnownAsync(api, clients, ct);
@@ -69,7 +75,7 @@ public sealed class BookingSeedStep : ISeedStep
             await clock.RestoreAsync(context.Log, throwOnFailure: finished);
         }
 
-        var nowBack = await clock.SetAsync(BaselineOffsetMinutes, ct); // the clock is at its baseline again
+        var nowBack = await clock.SetAsync(baseline, ct); // the clock is at its baseline again
         var knownNow = await KnownAsync(api, clients, ct);
         foreach (var plan in BookingPlan.All.Where(p => p.Target == BookingTarget.PendingPayment))
             if ((await BuildAsync(context, api, plan, approved, clients, knownNow, nowBack, ct)).Created) changes++;

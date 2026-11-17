@@ -26,6 +26,32 @@ public class DirectoryApiTests
         Assert.Equal(3, handler.Calls);
     }
 
+    /// <summary>A clock whose timers fire at once and remember how long they were asked to wait.</summary>
+    sealed class InstantTime : TimeProvider
+    {
+        public TimeSpan Waited;
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            Waited += dueTime;
+            return base.CreateTimer(callback, state, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    [Fact]
+    public async Task A_429_without_Retry_After_is_outwaited_for_longer_than_the_services_one_minute_window()
+    {
+        // CONTRACTS 10.2: 60 per minute in six 10 s segments, and the service sends no Retry-After. A burst in one segment frees up only 60 to 70 s later.
+        var replies = Enumerable.Range(0, 7).Select(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests)).Append(new HttpResponseMessage(HttpStatusCode.NoContent)).ToArray();
+        var handler = new Scripted(replies);
+        var time = new InstantTime();
+        var api = new DirectoryApi(new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") }, Options, time);
+
+        await api.PushReputationAsync(Guid.NewGuid(), 1, 4.5m, 1, CancellationToken.None);
+
+        Assert.Equal(8, handler.Calls);
+        Assert.True(time.Waited >= TimeSpan.FromSeconds(70), $"waited only {time.Waited}");
+    }
+
     [Fact]
     public async Task An_error_names_the_status_and_code_but_never_the_key_or_the_body()
     {

@@ -58,7 +58,7 @@ public static class TestClockServiceExtensions
 }
 
 /// <summary>
-/// POST /internal/v1/test/clock (CONTRACTS 10.4): <c>{ offsetMinutes }</c> moves the Reputation service's clock; 0 resets it. Mapped, and the offset
+/// POST /internal/v1/test/clock (CONTRACTS 10.4; its GET, added by T-08.02, answers the same <c>{ offsetMinutes, now }</c> and changes nothing): <c>{ offsetMinutes }</c> moves the Reputation service's clock; 0 resets it. Mapped, and the offset
 /// registered, only outside a deployed environment (<see cref="NonDeployedProfile"/>).
 /// </summary>
 public sealed class TestClockFeature : IServiceFeature
@@ -75,6 +75,8 @@ public sealed class TestClockFeature : IServiceFeature
     {
         if (!NonDeployedProfile.IsActive(endpoints.ServiceProvider.GetRequiredService<IConfiguration>())) return;
         endpoints.MapPost("/internal/v1/test/clock", SetAsync).RequireAuthorization("Internal");
+        endpoints.MapGet("/internal/v1/test/clock", (TestClockOffset offset, TimeProvider clock) =>
+            Results.Ok(new { offsetMinutes = offset.Minutes, now = clock.GetUtcNow() })).RequireAuthorization("Internal"); // the read the seeder uses to restore a non-zero baseline
     }
 
     static async Task<IResult> SetAsync(HttpRequest request, TestClockOffset offset, TimeProvider clock, CancellationToken ct)

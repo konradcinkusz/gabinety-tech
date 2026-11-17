@@ -13,5 +13,6 @@
     <ProjectReference Include="../Gabinety.Reputation/Gabinety.Reputation.csproj" />
     <ProjectReference Include="../Gabinety.Assistant/Gabinety.Assistant.csproj" />
     <ProjectReference Include="../../tools/Gabinety.DevIdentity/Gabinety.DevIdentity.csproj" />
+    <ProjectReference Include="../../tools/Gabinety.DemoSeeder/Gabinety.DemoSeeder.csproj" />
   </ItemGroup>
 </Project>

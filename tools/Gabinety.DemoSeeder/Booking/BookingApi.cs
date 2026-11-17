@@ -18,7 +18,7 @@ public sealed record CreateOutcome(BookingInfo? Created, bool SlotTaken);
 public sealed class BookingApi(HttpClient http, SeedOptions options, TimeProvider time)
 {
     static readonly JsonSerializerOptions J = new(JsonSerializerDefaults.Web);
-    const int MaxAttempts = 6;
+    const int MaxAttempts = SeedRetry.MaxAttempts;
 
     sealed record Reply(HttpStatusCode Status, JsonElement? Json);
 
@@ -34,7 +34,7 @@ public sealed class BookingApi(HttpClient http, SeedOptions options, TimeProvide
             using var res = await http.SendAsync(req, ct);
             if (res.StatusCode == HttpStatusCode.TooManyRequests && attempt < MaxAttempts) // the 60 per minute limit (CONTRACTS 10.2): wait for the window, then retry
             {
-                await Task.Delay(res.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(10), time, ct);
+                await Task.Delay(res.Headers.RetryAfter?.Delta ?? SeedRetry.DefaultWait, time, ct);
                 continue;
             }
             JsonElement? json = null;
@@ -54,7 +54,13 @@ public sealed class BookingApi(HttpClient http, SeedOptions options, TimeProvide
     static BookingInfo ToInfo(JsonElement v) => new(v.GetProperty("id").GetGuid(), v.GetProperty("status").GetString()!, v.GetProperty("startUtc").GetDateTimeOffset(),
         v.GetProperty("endUtc").GetDateTimeOffset(), v.TryGetProperty("brief", out var b) && b.ValueKind == JsonValueKind.Object ? b.GetProperty("text").GetString() : null);
 
-    // ---- the test clock (internal). The endpoint only SETS an offset and answers the effective now; there is no read.
+    // ---- the test clock (internal): POST sets an offset and answers the effective now; GET (T-08.02, fake profile) reads the same pair.
+
+    public async Task<(long Offset, DateTimeOffset Now)> GetClockAsync(CancellationToken ct)
+    {
+        var j = Need(await SendAsync(HttpMethod.Get, "/internal/v1/test/clock", null, true, null, ct), "get clock", HttpStatusCode.OK);
+        return (j.GetProperty("offsetMinutes").GetInt64(), j.GetProperty("now").GetDateTimeOffset());
+    }
 
     public async Task<(long Offset, DateTimeOffset Now)> SetClockAsync(long offsetMinutes, CancellationToken ct)
     {

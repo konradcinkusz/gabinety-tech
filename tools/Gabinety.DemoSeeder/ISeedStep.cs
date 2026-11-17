@@ -10,4 +10,10 @@ public interface ISeedStep
     string Name { get; }
     int Order { get; }
     Task RunAsync(SeedContext context, CancellationToken ct);
+
+    /// <summary>
+    /// Removes what this step's system holds in the <c>demo-</c> namespace through its <c>POST /internal/v1/demo/reset</c> (CONTRACTS 10.4); returns how many top-level rows went,
+    /// or -1 when the step has no endpoint configured and did nothing. Never touches a row outside the namespace.
+    /// </summary>
+    Task<int> ResetAsync(SeedContext context, CancellationToken ct);
 }

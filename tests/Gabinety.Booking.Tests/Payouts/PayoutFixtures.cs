@@ -13,7 +13,7 @@ namespace Gabinety.Booking.Tests;
 /// <summary>Helpers for the fee and payout tests: bookings of any pair seeded in any status, and a transition applied through <see cref="BookingTransitions"/>.</summary>
 static class Fee
 {
-    public static string NewClient() => "demo-client-" + Guid.NewGuid().ToString("N");
+    public static string NewClient() => "demo-" + Guid.NewGuid().ToString("N");
 
     /// <summary>A booking with a succeeded payment (and its charge) for the given pair, starting <paramref name="startIn"/> after the host clock.</summary>
     public static async Task<Guid> Seed(CreateHost h, BookingStatus status, string client, Guid practitioner, long price, TimeSpan? startIn = null, long refunded = 0, string? resolution = null)

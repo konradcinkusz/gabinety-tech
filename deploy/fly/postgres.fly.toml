@@ -1,0 +1,42 @@
+# PostgreSQL (T-09.04, SPEC 4.3): one instance, five databases (init-databases.sql), private network only, one volume.
+# Plain `postgres` image on a Fly Machine (not Fly's managed Postgres): the owner decides if that changes (see docs/operations/AUTH.md section 7).
+# Deploy:  fly deploy --config deploy/fly/postgres.fly.toml      (first: fly volumes create pgdata --app gabinety-postgres-staging --region fra --size 5)
+# Secret:  fly secrets set --app gabinety-postgres-staging POSTGRES_PASSWORD="$(openssl rand -base64 33)"   (never committed, never in a chat)
+
+app = "gabinety-postgres-staging"
+primary_region = "fra"
+
+[build]
+  image = "postgres:17-alpine"
+
+[env]
+  # PGDATA is a subdirectory of the mount: a volume root holds lost+found, which makes initdb refuse the directory.
+  PGDATA = "/var/lib/postgresql/data/pgdata"
+  POSTGRES_USER = "postgres"
+  POSTGRES_DB = "postgres"
+
+[mounts]
+  source = "pgdata"
+  destination = "/var/lib/postgresql/data"
+
+# Run by the image entrypoint ONLY when the data directory is empty (first start). On an existing volume run it by hand: AUTH.md section 7.
+[[files]]
+  guest_path = "/docker-entrypoint-initdb.d/init-databases.sql"
+  local_path = "init-databases.sql"
+
+# No [http_service] and no public [[services]]: nothing is exposed. Apps reach it at gabinety-postgres-staging.internal:5432
+# over the private network. Do NOT run `fly ips allocate-v4`.
+
+[[services]]
+  internal_port = 5432
+  protocol = "tcp"
+  # No [[services.ports]]: no public listener. The block only carries the check below.
+  [[services.checks]]
+    type = "tcp"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

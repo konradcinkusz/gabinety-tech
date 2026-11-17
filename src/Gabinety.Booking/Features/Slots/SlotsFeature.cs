@@ -5,12 +5,8 @@ using Gabinety.Booking.Persistence;
 using Gabinety.Contracts.Booking;
 using Gabinety.Contracts.Common;
 using Gabinety.Contracts.Directory;
-using Gabinety.Scheduling;
 using Gabinety.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
-using BookingStatus = Gabinety.Billing.BookingStatus;
-using SchedulingException = Gabinety.Scheduling.AvailabilityException;
-using SchedulingRule = Gabinety.Scheduling.AvailabilityRule;
 
 namespace Gabinety.Booking.Features.Slots;
 
@@ -18,7 +14,6 @@ namespace Gabinety.Booking.Features.Slots;
 public sealed class SlotsFeature : IServiceFeature
 {
     public const int MaxRangeDays = 14;
-    static readonly TimeZoneInfo Warsaw = TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
 
     public void Add(IHostApplicationBuilder builder) { }
 
@@ -56,30 +51,8 @@ public sealed class SlotsFeature : IServiceFeature
         if (found.PractitionerStatus != PractitionerStatus.Approved)
             return Problem(ApiProblem.Of(ErrorCodes.PractitionerNotBookable, "Practitioner not bookable", 422));
 
-        var now = time.GetUtcNow();
-        var windowStart = new DateTimeOffset(fromDate!.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).AddDays(-1);
-        var windowEnd = new DateTimeOffset(toDate!.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).AddDays(2);
-
-        var rules = (await db.Rules.AsNoTracking().Where(r => r.PractitionerId == practitionerId).ToListAsync(ct))
-            .Select(r => new SchedulingRule(r.IsoWeekday, r.StartLocal, r.EndLocal)).ToList();
-        var days = (await db.Exceptions.AsNoTracking().Where(e => e.PractitionerId == practitionerId).ToListAsync(ct))
-            .Select(e => new SchedulingException(e.DateLocal)).ToList();
-
-        // An EXPIRED hold does not block here (the database constraint still counts it until it is moved to Expired: see BookingSlotGuard).
-        var busy = (await db.Bookings.AsNoTracking()
-                .Where(b => b.PractitionerId == practitionerId && b.StartUtc < windowEnd && b.EndUtc > windowStart
-                    && (b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.Disputed
-                        || (b.Status == BookingStatus.PendingPayment && b.HoldExpiresAt > now)))
-                .Select(b => new { b.StartUtc, b.EndUtc }).ToListAsync(ct))
-            .Select(b => new BusyInterval(b.StartUtc, b.EndUtc)).ToList();
-
-        var options = new SlotOptions(
-            MinLeadHours: config.GetValue("Booking:MinLeadHours", 12),
-            HorizonDays: config.GetValue("Booking:HorizonDays", 60),
-            BufferMinutes: config.GetValue("Booking:BufferMinutes", 15));
         var duration = TimeSpan.FromMinutes(found.DurationMinutes);
-
-        var starts = SlotGenerator.Generate(rules, days, duration, busy, now, fromDate.Value, toDate.Value, options, Warsaw);
+        var starts = await new SlotCalculator(db, config, time).ComputeAsync(practitionerId, duration, fromDate!.Value, toDate!.Value, ct);
         return Results.Json(new SlotsResponse(starts.Select(s => new SlotDto(s, s + duration)).ToList()));
     }
 

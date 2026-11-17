@@ -1,3 +1,4 @@
+using Gabinety.Booking.Features.Bookings.Create;
 using Microsoft.EntityFrameworkCore;
 using BookingEntity = Gabinety.Booking.Features.Bookings.Entities.Booking;
 
@@ -27,6 +28,8 @@ public sealed class BookingDbContext(DbContextOptions<BookingDbContext> options)
     public DbSet<AvailabilityRule> Rules => Set<AvailabilityRule>();
     public DbSet<AvailabilityException> Exceptions => Set<AvailabilityException>();
     public DbSet<BookingEntity> Bookings => Set<BookingEntity>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BookingDbContext).Assembly);

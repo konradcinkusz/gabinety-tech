@@ -124,7 +124,7 @@ describe("booking form", () => {
     await mount();
     await type(BRIEF);
     await act(async () => button(bk("form.pay")).click());
-    expect(navigate).toHaveBeenCalledWith("/logowanie?returnTo=" + encodeURIComponent(`/rezerwacja/demo-o1?start=${encodeURIComponent(START)}&gabinet=demo-jan`));
+    expect(navigate).toHaveBeenCalledWith("/logowanie?redirect=" + encodeURIComponent(`/rezerwacja/demo-o1?start=${encodeURIComponent(START)}&gabinet=demo-jan`));
   });
 });
 

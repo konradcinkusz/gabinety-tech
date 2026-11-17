@@ -15,3 +15,11 @@ export function safeReturnTo(raw: string | null | undefined): string {
   if (AUTH_PAGES.some((p) => u.pathname === p || u.pathname.startsWith(p + "/"))) return "/";
   return raw;
 }
+
+/** The ONE query parameter that carries the page to return to after sign-in. The edge guard, /api/auth/refresh and the GitHub start/callback read it. */
+export const RETURN_PARAM = "redirect";
+
+/** `/logowanie` (or `/rejestracja`) with the return target attached; "/" needs no parameter. */
+export function authPath(page: "/logowanie" | "/rejestracja", back: string): string {
+  return back === "/" ? page : `${page}?${RETURN_PARAM}=${encodeURIComponent(back)}`;
+}

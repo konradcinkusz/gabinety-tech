@@ -38,7 +38,7 @@ jobs:
       - run: pnpm --dir web build
   e2e:
     runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -56,6 +56,23 @@ jobs:
           nohup dotnet run --project src/Gabinety.AppHost --launch-profile fake > apphost.log 2>&1 &
       - name: Every service answers /health
         run: scripts/check-fake-profile.sh
+      # --- e2e harness (T-08.03a): Playwright against the running fake profile. Journeys J1-J7 only add specs under tests/e2e/journeys. ---
+      - run: pnpm --dir tests/e2e install --frozen-lockfile
+      - run: pnpm --dir tests/e2e exec playwright install --with-deps chromium
+      - name: Playwright (harness smoke and journeys)
+        run: pnpm --dir tests/e2e test
+        env:
+          CI: "true"
+      - name: Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+          retention-days: 7
+      # --- end e2e harness ---
       - name: AppHost log on failure
         if: failure()
         run: tail -100 apphost.log

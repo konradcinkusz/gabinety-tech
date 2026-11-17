@@ -25,8 +25,7 @@ test.describe("J4 the Assistant is down", () => {
     const offering = target.offerings[0]!;
     const profile = new PractitionerProfilePage(page);
     await profile.goto(SLUG, NAME);
-    const slot = profile.slotLinks(offering.title).first();
-    await expect(slot).toBeVisible();
+    const slot = await profile.firstSlot(offering.title);
     const link = new URL((await slot.getAttribute("href"))!, urls.web);
     const startUtc = link.searchParams.get("start")!;
     expect(link.searchParams.get("gabinet")).toBe(SLUG); // the slot link carries the profile slug (#99)

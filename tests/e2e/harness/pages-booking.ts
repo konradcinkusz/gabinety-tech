@@ -26,6 +26,23 @@ export class PractitionerProfilePage {
     return this.page.getByRole("listitem").filter({ has: this.page.getByRole("heading", { level: 3, name: title }) });
   }
   slotLinks(offeringTitle: string): Locator { return this.offering(offeringTitle).getByRole("link", { name: /^\d{2}:\d{2}$/ }); }
+  /**
+   * The first free time of the offering. The picker reads the slots through the BFF after the page has loaded, so a rate limited or slow answer shows
+   * "Nie możemy teraz pokazać terminów" or no times at first: reload until a time is there (bounded); say what the section showed otherwise.
+   */
+  async firstSlot(offeringTitle: string): Promise<Locator> {
+    const first = this.slotLinks(offeringTitle).first();
+    try {
+      await expect(async () => {
+        if (!(await first.isVisible())) await this.page.reload();
+        await expect(first).toBeVisible({ timeout: 8_000 });
+      }).toPass({ timeout: 90_000, intervals: [2_000, 5_000, 10_000] });
+    } catch (err) {
+      const shown = await this.offering(offeringTitle).locator("p").allTextContents().catch(() => []);
+      throw new Error(`no free time shown for "${offeringTitle}"; the card said: ${shown.map((t) => t.slice(0, 80)).join(" | ")}`, { cause: err });
+    }
+    return first;
+  }
   newBadge(): Locator { return this.page.getByText("Nowy", { exact: true }); }
   reviewsSection(): Locator { return this.page.getByRole("region", { name: "Opinie" }); }
 }

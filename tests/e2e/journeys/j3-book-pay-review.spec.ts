@@ -60,8 +60,7 @@ test.describe("J3 book, pay, complete, review", () => {
     await expectNoSeriousA11yViolations(page);
 
     // ---- 1. book and pay through the UI ----
-    const slot = profile.slotLinks(offering.title).first();
-    await expect(slot).toBeVisible(); // the picker found free slots
+    const slot = await profile.firstSlot(offering.title); // the picker found free slots
     const link = new URL((await slot.getAttribute("href"))!, urls.web);
     const startUtc = link.searchParams.get("start")!;
     expect(link.searchParams.get("gabinet")).toBe(SLUG); // the slot link carries the profile slug (#99)
@@ -93,17 +92,24 @@ test.describe("J3 book, pay, complete, review", () => {
     try {
       await signInViaBff(pctx, PRACTITIONER_USER);
       const pp = await pctx.newPage();
+      // the API first: the practitioner's own view of the booking (status, payment, the brief that only a Confirmed booking shows them)
+      const seen = await getBooking(pctx.request, bookingIds[0]!);
+      expect(seen.status).toBe("Confirmed");
+      expect(seen.payment.status).toBe("Succeeded");
+      expect(seen.brief?.text).toBe(BRIEFS[0]);
       await pp.goto("/moje/rezerwacje?role=practitioner");
       const row = pp.getByRole("listitem").filter({ hasText: "Potwierdzona" }).filter({ hasText: offering.title });
       await expect(row).toHaveCount(1);
       await expectNoSeriousA11yViolations(pp);
       await row.getByRole("link", { name: "Szczegóły" }).click();
       await pp.waitForURL(new RegExp(bookingIds[0]!));
-      await expect(pp.getByText("Opis problemu (klient)")).toBeVisible();
+      // the detail page reads the booking in the browser: reload while it shows the load error instead of the booking
+      await expect(async () => {
+        if (!(await pp.getByText("Opis problemu (klient)").isVisible())) await pp.reload();
+        await expect(pp.getByText("Opis problemu (klient)")).toBeVisible({ timeout: 5_000 });
+      }).toPass({ timeout: 60_000, intervals: [2_000, 5_000] });
       await expect(pp.getByText(BRIEFS[0]!)).toBeVisible();
       await expect(pp.getByText("Opłacona")).toBeVisible();
-      const seen = await getBooking(pctx.request, bookingIds[0]!);
-      expect(seen.status).toBe("Confirmed");
     } finally {
       await pctx.close();
     }

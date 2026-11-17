@@ -140,14 +140,22 @@ export const feeOf = (kept: number): number => Math.floor((kept * FEE_BPS + 5000
 
 export interface LedgerRow { bookingId: string; kind: string; amountMinor: number }
 
-/** The CSV of /admin/ksiega for a period, parsed; only the rows of `bookingIds` (other journeys' rows and global totals are none of our business). */
-export async function ledgerRows(admin: BrowserContext, from: string, to: string, bookingIds: string[]): Promise<LedgerRow[]> {
-  const res = await admin.request.get(`/admin/ksiega/csv?from=${from}&to=${to}`, { failOnStatusCode: false });
-  expect(res.status(), "ledger csv").toBe(200);
+/**
+ * The ledger CSV (T-04.08b, `GET /api/v1/admin/ledger.csv`, read through the BFF proxy with the administrator's cookie) for a period, only the rows of
+ * `bookingIds` (other journeys' rows and global totals are none of our business). `null` with the status when the answer is not a 200 (a caller may poll).
+ */
+export async function ledgerRows(admin: BrowserContext, from: string, to: string, bookingIds: string[]): Promise<{ rows: LedgerRow[] } | { status: number; code: string }> {
+  const res = await bff(admin.request, "GET", `/api/proxy/booking/api/v1/admin/ledger.csv?from=${from}&to=${to}`);
+  if (res.status() !== 200) {
+    const code = ((await res.json().catch(() => null)) as { code?: string } | null)?.code ?? "-"; // the machine code only, never a body
+    return { status: res.status(), code };
+  }
   const [header, ...lines] = (await res.text()).split(/\r?\n/).filter((l) => l.length > 0);
   expect(header).toBe("booking_id,kind,amount_minor,currency,created_at");
-  return lines
-    .map((l) => l.split(","))
-    .filter(([id]) => bookingIds.includes(id))
-    .map(([bookingId, kind, amount]) => ({ bookingId, kind, amountMinor: Number(amount) }));
+  return {
+    rows: lines
+      .map((l) => l.split(","))
+      .filter(([id]) => bookingIds.includes(id))
+      .map(([bookingId, kind, amount]) => ({ bookingId, kind, amountMinor: Number(amount) })),
+  };
 }

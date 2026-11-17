@@ -4,7 +4,7 @@ import { resetAndReseed } from "../harness/demo-data";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
 import { AdminDisputesPage, BookingDetailPage } from "../harness/pages-bookings";
 import {
-  actorContext, addDays, addOffering, bookAndPay, day, feeOf, getBooking, ledgerRows, publicProfile, registerDemoUser, uniqueDemoName,
+  actorContext, addDays, addOffering, bookAndPay, day, feeOf, getBooking, ledgerRows, type LedgerRow, publicProfile, registerDemoUser, uniqueDemoName,
 } from "../harness/booking-support";
 
 // J6 (SPEC 10): a dispute is opened, an administrator resolves it with a partial refund, the ledger CSV shows the entries.
@@ -89,10 +89,19 @@ test.describe("J6 dispute and partial refund", () => {
       // the ledger CSV (T-04.08b): our booking's rows only, in a period that covers the moved clock; the payout row comes from the payout job
       const from = day(addDays(now, -1));
       const to = day(addDays(new Date((await clock.read()).now), 1));
-      let rows = await ledgerRows(admin, from, to, [b.id]);
+      let rows: LedgerRow[] = [];
+      let last = "no answer yet";
       await expect
-        .poll(async () => (rows = await ledgerRows(admin, from, to, [b.id])).some((r) => r.kind === "PractitionerPayout"), { timeout: 150_000, intervals: [5_000], message: "payout job writes PractitionerPayout" })
-        .toBe(true);
+        .poll(
+          async () => {
+            const r = await ledgerRows(admin, from, to, [b.id]);
+            if ("rows" in r) { rows = r.rows; last = "200"; } else last = `${r.status} ${r.code}`;
+            return rows.some((x) => x.kind === "PractitionerPayout");
+          },
+          { timeout: 150_000, intervals: [5_000], message: "payout job writes PractitionerPayout" },
+        )
+        .toBe(true)
+        .catch((e) => { throw new Error(`${e.message} (last ledger answer: ${last}; rows: ${rows.map((x) => x.kind).join(",")})`); });
       const byKind = Object.fromEntries(rows.map((r) => [r.kind, r.amountMinor]));
       expect(byKind).toEqual({ ClientCharge: PRICE, Refund: REFUND, PlatformFee: FEE, PractitionerPayout: PAYOUT });
       expect(rows).toHaveLength(4); // one row each, no PayoutReversal

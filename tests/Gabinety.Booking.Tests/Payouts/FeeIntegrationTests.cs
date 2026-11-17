@@ -76,6 +76,22 @@ public class FeeIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_64_character_client_id_does_not_overflow_pair_key_and_still_gives_one_fee_per_pair()
+    {
+        var client = "demo-" + Guid.NewGuid().ToString("N") + new string('z', 27); // 64 characters: the spec format would be 101
+        var practitioner = Guid.NewGuid();
+        var a = await Fee.Seed(host, BookingStatus.Confirmed, client, practitioner, 25000, TimeSpan.FromDays(1));
+        var b = await Fee.Seed(host, BookingStatus.Confirmed, client, practitioner, 25000, TimeSpan.FromDays(2));
+        var results = await Task.WhenAll(new[] { a, b }.Select(id => Task.Run(() => Fee.Apply(host, id, BookingTrigger.CompletionWindowElapsed))));
+        Assert.All(results, r => Assert.True(r.Applied));
+
+        await using var db = Db();
+        var row = Assert.Single(await db.LedgerEntries.Where(l => l.Kind == LedgerKind.PlatformFee && l.PairKey == PairKey.For(client, practitioner)).ToListAsync());
+        Assert.StartsWith("h:", row.PairKey);
+        Assert.Equal(new long?[] { 0, 3750 }, (await db.Bookings.Where(x => x.Id == a || x.Id == b).Select(x => x.FeeMinor).ToListAsync()).Order().ToArray());
+    }
+
+    [Fact]
     public async Task The_payouts_table_exists_and_booking_id_is_unique()
     {
         await using var db = Db();

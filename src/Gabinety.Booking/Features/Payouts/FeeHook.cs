@@ -52,8 +52,7 @@ public sealed class FeeHook(IConfiguration config, PlatformFeeClaims claims) : I
     /// <summary>Writes the PlatformFee row for the pair; false when the pair already has one. The unique partial index decides a race.</summary>
     async Task<bool> ClaimPairAsync(BookingTransitionContext context, BookingEntity b, long feeMinor, CancellationToken ct)
     {
-        // Assumes user ids are GUIDs (36 chars): the key is then 73 chars and fits pair_key varchar(80) (CONTRACTS 4.1).
-        var pairKey = $"{b.ClientUserId}:{b.PractitionerId}";
+        var pairKey = PairKey.For(b.ClientUserId, b.PractitionerId); // spec format when it fits varchar(80), hashed otherwise
         var id = Guid.CreateVersion7();
         if (context.Db.Database.IsNpgsql())
         {

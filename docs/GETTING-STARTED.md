@@ -326,4 +326,6 @@ Steps that needed fixing (all in this file):
 - **Seeding wait**: the guide gave the rule but no command and no measured cold-start time; added both. `check-fake-profile.sh` green does not mean seeding is over (already said, now measured).
 - **"The review is on the public profile"** cannot be checked with `curl` on the page (the list is rendered by the browser); after 12 minutes the HTML still read "Nowy na platformie: ... nie ma jeszcze opinii". The review is read from the public API instead; a note was added.
 
-Not done in this walkthrough: any real browser session (clicking, the Polish labels, the review list on the profile as a person sees it); J1, J2, J4 to J7; cancelling, disputes, the administrator pages; posting the review after the clock was already back at 0 (it was posted with the clock still shifted, so its `createdAt` shows the shifted date); the default profile, Docker and the tests of section 6 (not asked for).
+Not done: a real-browser click-through. It needs a person on a machine with a browser (it cannot be done from a cloud container); the Playwright journeys J1 to J7 cover the UI in CI.
+
+Also not done in this walkthrough: any real browser session (clicking, the Polish labels, the review list on the profile as a person sees it); J1, J2, J4 to J7; cancelling, disputes, the administrator pages; posting the review after the clock was already back at 0 (it was posted with the clock still shifted, so its `createdAt` shows the shifted date); the default profile, Docker and the tests of section 6 (not asked for).

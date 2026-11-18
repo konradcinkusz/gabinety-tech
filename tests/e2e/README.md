@@ -20,8 +20,8 @@ Import `test` and `expect` from `../harness/fixtures`, never from `@playwright/t
 |---|---|
 | Be a seeded demo user | `await signInAs("demo-client")` (BFF, fast) or `signInAs.viaForm(page, name)` (real form). Users: `demo-client`, `demo-admin`, `demo-practitioner-1..8`, one fixed development password (`harness/env.ts`, not a secret) |
 | Pass business time (24 h, 48 h, 14 days) | `clock.advanceHours(49)`, `clock.advanceDays(15)`. Moves the test clock of Booking and Reputation (CONTRACTS 10.4); restored to 0 after every test by the fixture. **Never `waitForTimeout` for business time.** |
-| Clean up after a journey that wrote data | `test.afterAll(...)` calling `demoData.resetAndReseed()` (SPEC 7) **only when `process.env.E2E_RESEED === "1"`** (default off: CI's stack is ephemeral and each reseed costs about 6 minutes of the job's 25). Set `E2E_RESEED=1` for a local re-run on a long-lived profile. Journeys must not depend on leftovers: unique `demo-` ids, their own data. Once per journey, not per test |
-| Call a service directly | `fetchRetrying(url)` from `harness/http.ts`: waits and retries on 429 and 503. The Directory limits **60 requests a minute per client address** and everything here is `localhost`, so a 429 is normal |
+| Clean up after a journey that wrote data | `test.afterAll(...)` calling `reseedIfRequested()` from `harness/booking-api.ts` (it runs `resetAndReseed()` from `harness/demo-data.ts`, SPEC 7) **only when `process.env.E2E_RESEED === "1"`** (default off: CI's stack is ephemeral and each reseed costs about 6 minutes of the job's 25). Set `E2E_RESEED=1` for a local re-run on a long-lived profile. Journeys must not depend on leftovers: unique `demo-` ids, their own data. Once per journey, not per test |
+| Call a service directly | `fetchRetrying(url)` from `harness/http.ts`: waits and retries on 429 and 503. The services limit requests per client address (60 a minute by default; the AppHost fake profile raises it to 6000 with `RateLimit__PerMinute`) and everything here is `localhost`, so a 429 can still happen against a profile started another way |
 | Page objects | `harness/pages.ts`; add yours there, not selectors in specs |
 | Accessibility | `await expectNoSeriousA11yViolations(page)` on every page a journey visits (T-08.03) |
 
@@ -38,9 +38,15 @@ A skeleton:
 
 ```ts
 import { test, expect } from "../harness/fixtures";
+import { restoreClock } from "../harness/clock";
+import { reseedIfRequested } from "../harness/booking-api";
 
 test.describe("J3 book and review", () => {
-  test.afterAll(async ({ demoData }) => demoData.resetAndReseed());
+  test.afterAll(async () => {
+    test.setTimeout(900_000); // a reseed takes minutes; the default hook timeout is 60 s
+    await restoreClock();
+    await reseedIfRequested(); // does nothing unless E2E_RESEED=1
+  });
 
   test("client books, time passes, booking completes", async ({ page, signInAs, clock }) => {
     await signInAs("demo-client");

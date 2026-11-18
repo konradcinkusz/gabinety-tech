@@ -24,6 +24,7 @@ using Booking = Gabinety.Booking.Features.Bookings.Entities.Booking;
 sealed class LogSink : ILoggerProvider
 {
     public ConcurrentQueue<string> Lines { get; } = new();
+    public ConcurrentQueue<(LogLevel Level, int EventId, string Line)> Entries { get; } = new();
     public ILogger CreateLogger(string categoryName) => new Sink(this, categoryName);
     public void Dispose() { }
 
@@ -34,7 +35,9 @@ sealed class LogSink : ILoggerProvider
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             var values = state is IEnumerable<KeyValuePair<string, object?>> kv ? string.Join(",", kv.Select(p => $"{p.Key}={p.Value}")) : "";
-            owner.Lines.Enqueue($"{category}: {formatter(state, exception)} [{values}] {exception}");
+            var line = $"{category}: {formatter(state, exception)} [{values}] {exception}";
+            owner.Lines.Enqueue(line);
+            owner.Entries.Enqueue((logLevel, eventId.Id, line));
         }
     }
 }

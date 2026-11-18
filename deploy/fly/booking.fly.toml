@@ -1,0 +1,52 @@
+# booking (T-09.02, SPEC 4.3): Bookings, payments and jobs; owns bookingdb.
+# Deploy (T-09.03 automates this): fly deploy --config deploy/fly/booking.fly.toml --ha=false   (run from the repository root)
+# Nothing secret and no real hostname lives in this file. Placeholders in <angle brackets> are filled by the owner after T-09.01 (Fly organisation) and the domain decision.
+# Fly ignores a Dockerfile HEALTHCHECK, so the checks below repeat what the Dockerfile asks.
+
+app = "gabinety-booking-staging"
+primary_region = "fra"
+
+[build]
+  # Both paths are relative to THIS file. The context is the repository root (the Dockerfile copies src/** and the solution files).
+  dockerfile = "../../src/Gabinety.Booking/Dockerfile"
+  context = "../.."
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_HTTP_PORTS = "8080"
+  TZ = "Europe/Warsaw"
+  Database__Provider = "PostgreSQL"
+  # NOT set here, on purpose: Environment__Kind and GABINETY_FAKE (CONTRACTS 10.4: the /internal/v1/test and demo endpoints must stay unmapped in staging).
+  # Authservice is public (it is the JWT issuer): the same URL the web app and every validator use.
+  Identity__Authority = "https://<authservice-public-host>"
+  Identity__Audience = "gabinety"
+  Backend__Directory = "http://gabinety-directory-staging.internal:8080"
+  Site__BaseUrl = "https://<web-public-host>"
+  Payments__Provider = "Mock"        # PLACEHOLDER until T-09.05 names the provider; Mock refuses nothing and moves no money.
+  Notifications__Provider = "Log"    # PLACEHOLDER until T-09.06 provides a sender.
+  # Billing__FirstConsultationFeeBps is the owner's constant (CONTRACTS 9, D-17): not set here, the code default applies.
+# Secrets (NOT here), set once with `fly secrets set --app gabinety-booking-staging`:
+#   ConnectionStrings__bookingdb
+#   Internal__Key, Internal__Keys__Directory
+#   Payments__WebhookSecret   (required when Payments__Provider is not Mock)
+#   Notifications__Smtp__* (only with T-09.06; names defined there)
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  # Public listener: the payment webhook POST /webhooks/payments/{provider} (SPEC 4.3). Fly cannot expose one path, so the whole app answers on <app>.fly.dev; the public reads (slots, CONTRACTS 10.2) are therefore reachable from outside too; all writes need a token or the internal key. Owner decision pending (see PR). Min 1: in-request and it runs the jobs (stats push, payouts, notifications).
+
+  # Liveness only (/alive runs no dependency check, P7); /health reports optional dependencies and must never fail a deploy. Always on, it runs the jobs (SPEC 4.3).
+  [[http_service.checks]]
+    method = "GET"
+    path = "/alive"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

@@ -1,0 +1,54 @@
+# assistant (T-09.02, SPEC 4.3): Model gateway (brief, triage); owns assistantdb. Optional by design (P8).
+# Deploy (T-09.03 automates this): fly deploy --config deploy/fly/assistant.fly.toml --ha=false   (run from the repository root)
+# Nothing secret and no real hostname lives in this file. Placeholders in <angle brackets> are filled by the owner after T-09.01 (Fly organisation) and the domain decision.
+# Fly ignores a Dockerfile HEALTHCHECK, so the checks below repeat what the Dockerfile asks.
+
+app = "gabinety-assistant-staging"
+primary_region = "fra"
+
+[build]
+  # Both paths are relative to THIS file. The context is the repository root (the Dockerfile copies src/** and the solution files).
+  dockerfile = "../../src/Gabinety.Assistant/Dockerfile"
+  context = "../.."
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_HTTP_PORTS = "8080"
+  TZ = "Europe/Warsaw"
+  Database__Provider = "PostgreSQL"
+  # NOT set here, on purpose: Environment__Kind and GABINETY_FAKE (CONTRACTS 10.4: the /internal/v1/test and demo endpoints must stay unmapped in staging).
+  # Authservice is public (it is the JWT issuer): the same URL the web app and every validator use.
+  Identity__Authority = "https://<authservice-public-host>"
+  Identity__Audience = "gabinety"
+  Backend__Directory = "http://gabinety-directory-staging.internal:8080"
+  Llm__Provider = "Copilot"
+  Assistant__RequireApiKeyModelsForTraffic = "true"
+  Assistant__DailyBudgetUsd = "5"
+  Assistant__BriefTimeoutSeconds = "30"
+  Assistant__TriageTimeoutSeconds = "25"
+  # Custom (bring-your-own-key) models: Llm__CustomModels__0__* ids/endpoints are added by T-09.07 once the owner picks a provider.
+# Secrets (NOT here), set once with `fly secrets set --app gabinety-assistant-staging`:
+#   ConnectionStrings__assistantdb
+#   Internal__Key
+#   Llm__CustomModels__0__ApiKey   (T-09.07; the model account of D-08)
+#   optional Copilot__GitHubToken  (A-04: only after the owner records the terms decision)
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  # No public listener (deploy with --no-public-ips; then `fly ips allocate-v6 --private`). Callers use http://gabinety-assistant-staging.flycast (no port: the proxy listens on 80). Min 0, the only app allowed to stop: the first call after idle may degrade to the plain form (accepted, SPEC 4.3); the web call has a 35 s timeout for the cold start (SPEC 5.1).
+
+  # Liveness only (/alive runs no dependency check, P7); /health reports optional dependencies and must never fail a deploy. May be stopped; a check on a stopped machine does not run.
+  [[http_service.checks]]
+    method = "GET"
+    path = "/alive"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1024mb"

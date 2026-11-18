@@ -21,7 +21,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Directory | ANY | `/health` | Anonymous | all | liveness/readiness |
 | Directory | ANY | `/alive` | Anonymous | all | liveness |
 | Directory | GET | `/health/details` | Anonymous | all | F-07 |
-| Directory | GET | `/openapi/v1.json` | Anonymous | all | F-07 |
+| Directory | GET | `/openapi/v1.json` | Anonymous | fake | F-07: served only in the fake profile |
 | Directory | GET | `/api/v1/taxonomy` | Anonymous | all | public read |
 | Directory | GET | `/api/v1/ranking-rules` | Anonymous | all | public read |
 | Directory | GET | `/api/v1/practitioners` | Anonymous | all | public search |
@@ -61,7 +61,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | ANY | `/health` | Anonymous | all | |
 | Booking | ANY | `/alive` | Anonymous | all | |
 | Booking | GET | `/health/details` | Anonymous | all | F-07 |
-| Booking | GET | `/openapi/v1.json` | Anonymous | all | F-07 |
+| Booking | GET | `/openapi/v1.json` | Anonymous | fake | F-07: served only in the fake profile |
 | Booking | GET | `/api/v1/practitioners/{practitionerId}/slots` | Anonymous | all | public read |
 | Booking | POST | `/webhooks/payments/{provider}` | Anonymous | all | guarded by the provider signature |
 | Booking | POST | `/api/v1/payments/simulate` | Authenticated | fake | Mock provider only, and only the booking's client (F-01, T-10.08); not mapped when deployed |
@@ -90,7 +90,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Reputation | ANY | `/health` | Anonymous | all | |
 | Reputation | ANY | `/alive` | Anonymous | all | |
 | Reputation | GET | `/health/details` | Anonymous | all | F-07 |
-| Reputation | GET | `/openapi/v1.json` | Anonymous | all | F-07 |
+| Reputation | GET | `/openapi/v1.json` | Anonymous | fake | F-07: served only in the fake profile |
 | Reputation | GET | `/api/v1/practitioners/{practitionerId}/reviews` | Anonymous | all | Published only |
 | Reputation | POST | `/api/v1/reviews` | Authenticated | all | |
 | Reputation | POST | `/api/v1/reviews/{id}/reply` | Authenticated | all | |
@@ -110,7 +110,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Assistant | ANY | `/health` | Anonymous | all | |
 | Assistant | ANY | `/alive` | Anonymous | all | |
 | Assistant | GET | `/health/details` | Anonymous | all | F-07 |
-| Assistant | GET | `/openapi/v1.json` | Anonymous | all | F-07 |
+| Assistant | GET | `/openapi/v1.json` | Anonymous | fake | F-07: served only in the fake profile |
 | Assistant | GET | `/api/v1/assistant/status` | Anonymous | all | CONTRACTS 6 |
 | Assistant | POST | `/api/v1/assistant/brief` | Authenticated | all | own limiter |
 | Assistant | POST | `/internal/v1/assistant/review-triage` | Internal | all | caller: Reputation |

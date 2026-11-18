@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # F-03 (T-10.10): the private apps of deploy/estate.conf stay private in the committed config, and the web BFF (the only caller from outside the backends) reaches them over
-# the private network: Backend__Directory/Booking/Reputation = <app>.internal:8080, Backend__Assistant = <app>.flycast. No network, no secrets.
+# the private network: Backend__Directory/Booking/Reputation = <app>.internal:8080, Backend__Assistant = <app>.flycast. Also F-10/F-11: https Site__BaseUrl and the identity settings are in the
+# deployed templates. No network, no secrets.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0; bad() { echo "FAIL: $*" >&2; fail=1; }
@@ -18,4 +19,13 @@ done < deploy/estate.conf
 # the only public apps are the three of SPEC 4.3
 pub="$(awk '!/^#/ && NF && $1 != "shared" && $NF == "public" {print $1}' deploy/estate.conf | sort | tr '\n' ' ')"
 [ "$pub" = "authservice booking web " ] || bad "public apps in deploy/estate.conf are '$pub', expected 'authservice booking web' (SPEC 4.3)"
+# F-10 / F-11 (T-10.16): the settings the code cannot supply for itself stay in the deployed templates: https site URL (the session cookies are Secure only then) and,
+# on every app that validates tokens, an https authority and the audience (the services also refuse to start without them, Gabinety.ServiceDefaults.Edge).
+grep -Eq '^[[:space:]]*Site__BaseUrl = "https://' "$web" || bad "$web: Site__BaseUrl must be an https URL (cookies are Secure only then)"
+grep -Eq '^[[:space:]]*Identity__Audience = "[^"]+"' "$web" || bad "$web: Identity__Audience must be set"
+for k in directory booking reputation assistant; do
+  f="deploy/fly/$k.fly.toml"
+  grep -Eq '^[[:space:]]*Identity__Authority = "https://' "$f" || bad "$f: Identity__Authority must be an https URL"
+  grep -Eq '^[[:space:]]*Identity__Audience = "[^"]+"' "$f" || bad "$f: Identity__Audience must be set"
+done
 exit $fail

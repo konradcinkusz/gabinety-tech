@@ -22,6 +22,24 @@ High and Medium findings and their proposed tasks are listed in section 9 ("Task
 
 Time windows (guide section 3): High = P1 before M3 is claimed; Medium = P2 within a week of staging; Low = P3/P4.
 
+### Status since the review (updated 2026-11-18, T-10.13 backlog pass)
+
+| Finding | Status | Where |
+|---|---|---|
+| F-01 | **Fixed** (PR #117, merged): Mock fails closed outside the non-deployed profile | `Booking/Payments/Mock`, `MockPaymentsFailClosedTests` |
+| F-02 | **Fixed** (PR #113, merged): nonce CSP, frame-ancestors, nosniff, referrer, permissions | `web/src/proxy.ts`; verify the served headers on staging |
+| F-03 | **Fixed in code** (PR #116, merged): edge guard on `/internal/*`, per-caller keys, key strength at start, `Gabinety.ServiceDefaults.Edge`. **Open on staging:** the Fly header list is not verified against a deployed app (RUNBOOK 11, item 9) | `InternalAccess.cs` |
+| F-04 | **Fixed** (PR #110, merged): table of CONTRACTS 10.2, user-id key after authentication, forwarded visitor address with `RateLimit__TrustedProxyKey`. Re-reviewed below; one gap closed in this PR | F-04 section |
+| F-05 | not touched here (T-10.11, another session) | |
+| F-06 | **Fixed** (PR #115, merged): fallback policy and the route table test | `docs/operations/ROUTE-AUTH.md` |
+| F-07 | **Fixed** (this PR): OpenAPI only in the fake profile | `OpenApiExposure.cs` |
+| F-08 | **Accepted** (owner decision D-33); note below | |
+| F-09 | **Partly fixed** (this PR): web renders https links only; the rest is a decision | |
+| F-10 | **Config guard added** (this PR, template check); code change not made, reasons below | `scripts/check-private-topology.sh` |
+| F-11 | **Fixed** (this PR): deployed profile refuses to start without audience and an https authority (services); web side as F-10 | `InternalAccess.ValidateIdentity` |
+| F-12 | **Open: owner decision** | |
+| F-13 | **Accepted / owner**: nothing changed | |
+
 ## 2. Method and commands run
 
 | What | Command | Result |
@@ -256,6 +274,7 @@ Format of the guide: Location, Issue, Current code, Risk, Attack scenario, Impac
 - **Recommendation:** refuse to start with Mock unless `NonDeployedProfile` is active or an explicit `Payments:AllowMock=true` is set (staging may opt in, production never); require `Payments:Provider` explicitly outside the non-deployed profile; in `simulate` require `booking.ClientUserId == sub` (404 otherwise); require `Payments:WebhookSecret` for Mock in a deployed profile.
 - **Better:** put simulate and the mock webhook behind the non-deployed profile like the clock endpoint, and make the real adapter (T-09.05) the only provider that deployed code can select.
 - **Proposed task:** T-10.08.
+- **Status (2026-11-18): FIXED, PR #117 merged.** Mock fails closed outside the non-deployed profile; see `MockPaymentsFailClosedTests`.
 
 ### F-02 The web app sends none of the SPEC 11 security headers
 
@@ -268,6 +287,7 @@ Format of the guide: Location, Issue, Current code, Risk, Attack scenario, Impac
 - **Recommendation:** set the five headers for every response in `proxy.ts` (CSP with a per-request nonce, `frame-ancestors 'none'`, `nosniff`, `strict-origin-when-cross-origin`, a closed `Permissions-Policy`), and a unit test per header; verify on staging.
 - **Better:** a header test in the e2e job that fails when a header is missing on `/`, a profile page and `/moje`.
 - **Proposed task:** T-10.09.
+- **Status (2026-11-18): FIXED, PR #113 merged** (nonce-based CSP, `frame-ancestors 'none'`, `nosniff`, referrer policy, permissions policy in `web/src/proxy.ts`). Still to do: check the headers actually served by Fly on staging (section 12).
 
 ### F-03 Internal endpoints are internet-reachable behind one shared key per callee
 
@@ -280,6 +300,7 @@ Format of the guide: Location, Issue, Current code, Risk, Attack scenario, Impac
 - **Recommendation:** make Directory, Reputation and Assistant private (no `[http_service]`; reach them by `.internal`; the web app stays public, Booking public only for the webhook path if Fly allows, else a separate tiny webhook app); refuse to start when `Internal:Key` is under 32 characters outside the non-deployed profile.
 - **Better:** one key per caller-callee pair (`Internal:Keys:<caller>` on the callee) and the scheme records the caller as a claim; per-route policy "Internal:Booking" so a leaked Booking key cannot call Reputation's route.
 - **Proposed task:** T-10.10.
+- **Status (2026-11-18): FIXED IN CODE, PR #116 merged** (edge guard for `/internal/*`, one key per caller and callee, key strength and distinctness checked at start, in the new project `src/Gabinety.ServiceDefaults.Edge`). **Fly header check still needed on staging:** the list of headers that mark a request from the public edge (`Internal:EdgeHeaders`) was not verified against a deployed app.
 
 ### F-04 Rate limits of CONTRACTS 10.2 are mostly not implemented and the key is always an address
 
@@ -289,6 +310,27 @@ Format of the guide: Location, Issue, Current code, Risk, Attack scenario, Impac
 - **Attack scenario:** through the BFF, all visitors share the web machine's address, so one script sending 61 requests a minute to `/api/proxy/directory/...` makes the public reads fail for everyone (429); `POST /bookings` and `POST /reviews` have no per-user limits at all.
 - **Impact:** cheap denial of service; unbounded booking creation and review submission per user.
 - **Recommendation / status:** **covered by PR #110 (T-10.03). No new task.** Re-review after it merges: the order of middleware, the `RateLimit__TrustedProxyKey` secret on 5 apps, and that the direct public listeners (F-03) do not bypass it.
+- **Status (2026-11-18): FIXED, PR #110 merged** (limits of CONTRACTS 10.2, user-id key, forwarded visitor address). Re-review below.
+
+**Re-review of F-04 after PR #110** (read of the merged code `RateLimits.cs`, `Security.cs`, the four `Program.cs`, and the tests; the whole suite was run, not only the tests cited).
+
+| CONTRACTS 10.2 row | Implementation | Test that proves it |
+|---|---|---|
+| Public reads, 120 a minute | `RateLimitTable`, group `reads` | Reputation `RateLimitTests.Public_reads_allow_120_a_minute_...`; Booking `...reads_of_the_slots_are_public_reads_with_their_own_budget`; the classification of every public read path in `RateLimitTableTests` |
+| `POST /bookings`, 10 a minute and 30 a day per user | group `bookings`, two windows | Booking `RateLimitTests.Bookings_allow_10_a_minute...` and `...30_a_day...` |
+| `POST /assistant/brief`, 5 a minute and 20 a day per user | the Assistant's own `BriefRateLimiter` (the table calls it "other") | `BriefTests` (6th call in a minute, 21st of the day, another user unaffected) |
+| `POST /reviews`, 5 an hour per user | group `reviews` | Reputation `Posting_reviews_allows_5_an_hour...`, `A_refused_review_post_is_not_counted...` |
+| Webhooks, none by address, 64 KB | group `webhooks` is unlimited; the 64 KB cap is the endpoint's | Booking `Webhooks_are_never_limited_by_address`; `PaymentWebhookTests` for the cap |
+| Everything else, 60 a minute | group `other` | Reputation and Booking `Everything_else_...`; Directory `KernelTests.Rate_limit_answers_429...` |
+| Key is the user id when signed in, else the address | `PartitionKey` | Reputation `A_signed_in_reader_is_keyed_by_the_user_id...`, `A_signed_in_user_keeps_the_user_id_key_whatever_address_is_forwarded` |
+| Forwarded visitor address | `AddressOf`: only with the shared key (constant time) and exactly one IP | Reputation tests for no key, wrong key, spoof, a list, a port; web `proxyAddress.test.ts` |
+| Strength of `RateLimit:TrustedProxyKey` | `KeyValidationService` | `InternalAccessTests.A_weak_or_shared_trusted_proxy_key_stops_the_start` |
+
+- **Middleware order:** `UseAuthentication` then `UseRateLimiter` in all four `Program.cs` (read). Gap found: only Booking and Reputation proved the order by behaviour; Directory and Assistant had no test. **Closed in this PR:** `ArchitectureRules.The_rate_limiter_runs_after_authentication_in_every_service` (checked by swapping the two lines in a copy: it fails).
+- **Gap, not closed (needs a deployed app or a decision):** no test builds Directory's or the Assistant's own host and spends the 120-a-minute read budget; they run the same shared code and the classification test covers their paths, so the risk is low.
+- **`RateLimit__TrustedProxyKey` is optional by design** (`deploy/fly/web.fly.toml`). Unset on any one of the five apps, that backend silently degrades to one bucket for every visitor behind the web machine (the F-04 attack scenario returns for that backend). Nothing warns at start. Staging check: the secret exists on the web app and on all four backends.
+- **Direct listener (F-03):** Booking is the one public backend. A direct anonymous caller is keyed by `RemoteIpAddress`; whether Fly rewrites it was not verified (section 12). Direct anonymous callers share that bucket, which does not touch the web app's visitors (they carry the forwarded address). Authenticated direct callers are keyed by user id.
+- **Per instance:** the limiter is in memory; two machines of one app double every limit (CONTRACTS 10.2 says "per instance"). Booking runs the jobs with min 1 machine, so the figure holds today.
 
 ### F-05 GitHub sign-in callback is not bound to the browser that started it
 
@@ -310,24 +352,30 @@ Format of the guide: Location, Issue, Current code, Risk, Attack scenario, Impac
 - **Impact:** an unauthenticated admin or user-data route.
 - **Recommendation:** `.SetFallbackPolicy(RequireAuthenticatedUser)` in `AddServiceDefaults`-level code, with `.AllowAnonymous()` on the explicit public list (already present on most), plus an integration test per service that enumerates `EndpointDataSource`, and compares the anonymous endpoints with a committed list (this document's section 3).
 - **Proposed task:** T-10.12.
+- **Status (2026-11-18): FIXED, PR #115 merged** (fallback authorization policy in every `Program.cs`; route table in `docs/operations/ROUTE-AUTH.md` checked by `RouteAuthTests` in each service).
 
 ### F-07 OpenAPI and `/health/details` are public on deployed services (Low)
 
 - **Location:** `Program.cs:24` (`Assistant:30`); `Features/Health/HealthFeature.cs:22-31`.
 - **Issue / scenario:** anyone can fetch the full route map (including `/internal/v1/*`, `/api/v1/admin/*`), DTO shapes and validation rules; `/health/details` names the dependencies and their state. Guide 7 asks for it to be off in production; CONTRACTS 0 says development and CI.
 - **Risk:** Low. **Recommendation:** map OpenAPI only when `NonDeployedProfile` or `Environment:Kind=CI`; keep `/health` and `/alive`. Proposed task: T-10.13 (with F-06; Low, not blocking).
+- **Status (2026-11-18): FIXED in this PR (T-10.13).** `OpenApiExposure.IsServed(config)` (new, in `src/Gabinety.ServiceDefaults.Edge`, so the 400-line kernel did not grow): `/openapi/v1.json` is mapped only when `GABINETY_FAKE=1` or `Environment:Kind=Development`, the same rule as the other fake-profile routes. The AppHost sets `Environment__Kind=Development` on every service, so the document stays available locally and in CI (`web/scripts/gen-types.mjs`). Tests: `OpenApiExposureTests` and, per service, `RouteAuthTests.The_OpenAPI_document_is_served_in_the_fake_profile_and_is_404_when_deployed`; the ROUTE-AUTH rows are now profile `fake` (the route table test fails if the guard is removed: tried). Since PR #116 the document was already 404 from the public edge of Booking and the other three apps have no public listener; this closes the private-network exposure. **`/health/details` is left as it is** (accepted): it only names the dependencies and their state, and it is reachable only over the private network.
 
 ### F-08 Admin routes have no separation of duties; moderators are inert (Low)
 
 - **Location:** `VerificationFeature.cs:176-203` (`Transition`), `:256-278`, `MeFeature.cs`.
 - **Issue:** an administrator who is also a practitioner can approve their own profile (no `actor != subject` check); the `moderators` table is written (`PUT /admin/moderators/{userId}`) but never read: `isModerator` is hard-coded `false` and moderators gain no right. Anyone adding a moderator expecting a limited role gets nothing; anyone assuming moderators are the only reviewers is wrong, every `Admin` can act.
 - **Risk:** Low. **Recommendation:** refuse approve/reject/suspend on the caller's own practitioner row; either remove the moderator routes or make the `Admin`-group policy read the table. Proposed task: T-10.14.
+- **Status (2026-11-18): ACCEPTED, with a note for the owner.** Evidence: DECISIONS D-33 (2026-11-13, accepted by the owner): "The owner, as authservice `Admin`. No other moderators in the MVP; the moderator role exists in Directory for later." So the `moderators` table being inert is the decision, not a defect, and the owner is the only `Admin`: a rule "an admin cannot approve their own profile" would lock out a solo operator who also offers consultations (the likely bootstrap). Not changed. **Revisit when a second `Admin` or the first moderator is appointed:** then add the `actor != subject` refusal in `Transition` (about 3 lines, 403 `forbidden`) and make the `Admin` group read `moderators`, in one task. Documented in CONTRACTS terms: `isModerator` stays `false` until then.
 
 ### F-09 Approved profile text, portfolio URL and default meeting URL can change without a new review; portfolio URL is not scanned (Low)
 
 - **Location:** `ProfilesFeature.cs:93-139` (`Update`): only a changed NIP resets the status; `Rules.cs:30-38` detector is applied to headline and bio only; `ProfilePage.tsx:44` renders `p.portfolioUrl` without checking the scheme in the web layer.
 - **Scenario:** a practitioner is approved with a harmless portfolio, then changes it to `https://wa.me/48...` (a contact leak) or to a phishing page; the admin checklist "portfolio link opens" is checked once.
 - **Risk:** Low (the server enforces https and a named host; contact detail leakage is a business risk, SPEC 6.1). **Recommendation:** run the detector on the portfolio URL; consider re-queue (`Submitted`) on a change of portfolio URL; in the web component render the link only for `https:`. Proposed task: T-10.15.
+- **Status (2026-11-18): PARTLY FIXED in this PR (T-10.15), the rest is a decision.**
+  - Fixed (web): the profile page and the JSON-LD `sameAs` render the portfolio link only when it is `https:` (`safeHttpsUrl`, `web/src/components/profile/safeUrl.ts`; tests in `safeUrl.test.tsx`, which fail when the page uses the raw value: tried). The server already refuses anything else; this is the second check for a row written by another path.
+  - Not changed, because the cost is a product decision: (1) *the contact detector on the portfolio URL.* **[ran]** the phone pattern on a URL: `https://wa.me/48600100200` matches (wanted), but so do `https://www.linkedin.com/in/jan-kowalski-123456789/` and `https://demo.example/portfolio/2024-05-12` (false positives on ordinary portfolio links). A blocklist of messenger hosts (`wa.me`, `t.me`, ...) would be the precise alternative; that is the owner's call (SPEC 6.1 calls the detector anti-leakage, not security). (2) *Re-queueing an Approved profile when the portfolio URL changes* needs a new state-machine trigger (as `NipChanged`) and a CONTRACTS 3.4 change; the admin checklist "portfolio link opens" is today checked once. Recommendation: the blocklist plus re-queue on a changed portfolio host only.
 
 ### F-10 Cookie `Secure` depends on `Site__BaseUrl` and the refresh cookie path is `/` (Low)
 
@@ -335,23 +383,30 @@ Format of the guide: Location, Issue, Current code, Risk, Attack scenario, Impac
 - **Issue:** `Secure` is set only when the site URL starts with `https://`; the default is `http://localhost:3000`. The refresh cookie (7 days) is sent to every path, including `/api/proxy`, where it is not needed.
 - **Scenario:** a deploy that forgets `Site__BaseUrl` runs with non-Secure cookies on an https site and with an origin guard that compares to the request URL only.
 - **Risk:** Low. **Recommendation:** in production (`NODE_ENV=production`) refuse to start without an https `Site__BaseUrl`; give the refresh cookie `Path=/api/auth`; consider the `__Host-` prefix. Proposed task: T-10.16.
+- **Status (2026-11-18): NOT FIXED IN CODE, guarded in the templates (this PR, T-10.16).**
+  - `Secure` and `https`: `scripts/check-private-topology.sh` (already a CI step, and in `scripts/tests/deploy.test.sh`) now fails when `deploy/fly/web.fly.toml` has no https `Site__BaseUrl`. A start-time refusal in the web app was **not** added: the web image smoke test (`docker-build-web` in `ci.yml`) starts the image with no `Site__BaseUrl` and the AppHost fake profile (e2e) sets `http://localhost:3000`, so a refusal would break CI, and it could not be run in this session (no way to run the e2e job). If the owner wants it: refuse only when `NODE_ENV=production` and `GABINETY_FAKE` is not `1`, and set `GABINETY_FAKE=1` on those two CI steps in the same PR.
+  - Refresh cookie `Path=/api/auth`: **rejected as written.** The proxy refreshes an expired access token itself (`web/src/lib/api/proxy.ts:99` reads `gt_rt` on `/api/proxy/*` requests), so the cookie must reach `/api/proxy`; moving the path would log users out when the access token expires, and a cookie already issued with `Path=/` would need clearing on both paths. Accepted: 7 days, HttpOnly, never in a body.
+  - `__Host-` prefix: not done (needs `Secure`, so it cannot be used in the http dev profile); revisit with the start-time refusal.
 
 ### F-11 Token validation and edge guard are fail-open on missing configuration (Low)
 
 - **Location:** `Security.cs:26-27` (`RequireHttpsMetadata = false`; audience validated only when `Identity:Audience` is set); `web/src/lib/config/index.ts:23-24` (issuer and audience optional).
 - **Scenario:** a service deployed without `Identity__Audience` accepts a token minted by the same authservice for another audience; `RequireHttpsMetadata=false` allows the JWKS to be fetched over HTTP if `Identity:Authority` is ever set to an `http://` address. The staging templates set the audience and an https authority, so there is no exposure with the templates as written.
 - **Risk:** Low. **Recommendation:** require audience and an https authority outside the non-deployed profile (fail at start). Proposed task: T-10.16 (same task as F-10).
+- **Status (2026-11-18): FIXED for the services in this PR (T-10.16).** `InternalAccess.ValidateIdentity`, run by the same start-time hook as the internal key checks (`AddInternalKeyValidation`, already in all four `Program.cs`): outside the fake profile and outside `ASPNETCORE_ENVIRONMENT=Development` (the `Internal:EnforceKeyStrength` switch applies), the service refuses to start when `Identity:Audience` is empty or `Identity:Authority` is not an absolute https URL. The message names the setting, never a value. Tests in `InternalAccessTests` (empty, blank, http, scheme-less, ftp; fake profile and Development not enforced; forced by setting; removing the call fails 7 tests: tried). The deploy templates are checked by `check-private-topology.sh` (https authority and an audience on all four backends and the web app). `RequireHttpsMetadata = false` stays in the kernel (it is at 400 lines); with the check above it is no longer reachable with an http authority in a deployed profile. **Web side** (`Identity__Issuer` / `Identity__Audience` optional in `web/src/lib/config/index.ts`): same decision as F-10, not changed; the services validate the audience on every call, the edge guard is the weaker layer.
 
 ### F-12 Reviews of a suspended or erased practitioner are listed by id (Low)
 
 - **Location:** `ListReviewsFeature.cs:28`: filter is `PractitionerId` and `Published`, not the practitioner's status.
 - **Scenario:** anyone with a practitioner id (from an old page or a cache) reads the published reviews of a profile that was suspended or erased. Reviews are anonymous ("Zweryfikowany klient") so the impact is small.
 - **Risk:** Low. **Recommendation:** decide and write down whether reviews survive suspension (data classification, guide 8); if not, Reputation needs the status (the push already carries a version).
+- **Status (2026-11-18): OPEN, owner decision.** Not a cheap fix: Reputation does not know a practitioner's status, so "reviews disappear on suspension" needs a push from Directory (the reputation push already carries a version) or a new internal read, plus a CONTRACTS 5 change. The public listing needs a practitioner id, and the profile page of a suspended or erased practitioner is 404 (Directory returns `Approved` only), so the ids are not published anywhere once the page is gone; reviews are anonymous. Recommendation: **accept for the MVP and write it into the data classification** ("reviews of a suspended practitioner stay readable by id until erasure, and `DELETE /internal/v1/subjects` removes them"; erasure is already implemented in Reputation, `ErasureApiTests`). Decide before launch.
 
 ### F-13 Supply chain hygiene (Low)
 
 - **Location:** `.github/workflows/*.yml` (actions pinned by tag: `actions/checkout@v4`, `gitleaks/gitleaks-action@v2`, `pnpm/action-setup@v4`); Dockerfiles (`mcr.microsoft.com/dotnet/aspnet:10.0`, `node:22-alpine`, `postgres:17-alpine` by floating tag; the authservice image is pinned by digest, `ci.yml:119`); `pnpm audit` (dev only): `picomatch` ReDoS (high, GHSA-fc5q-39xc-vjpf), `minimatch` ReDoS (moderate, GHSA-g3hv-75wg-m249) and one more high, all through `eslint-config-next`.
 - **Risk:** Low: the audited packages are linters that run on the developer's code in CI, not in the runtime image (**[ran]** `pnpm audit --prod` is clean). **Recommendation:** pin actions by commit SHA and base images by digest with a scheduled update; update `eslint-config-next` when a fix exists. Proposed task: none required (backlog).
+- **Status (2026-11-18): ACCEPTED / owner. Nothing changed.** Evidence: **[ran]** `pnpm audit`: the same 3 findings (2 high, 1 moderate), all under `eslint-config-next` (dev only); `pnpm audit --prod`: no known vulnerabilities. A `pnpm.overrides` to force `picomatch` and `minimatch` onto patched versions would put a major version under the ESLint plugins and cannot be verified against `next lint` here; wait for an `eslint-config-next` release. Pinning actions by commit SHA could not be done here: this session can read only this repository, so the SHAs of `actions/*`, `docker/*`, `gitleaks` and `pnpm` cannot be resolved, and `superfly/flyctl-actions@1.5` is in the deploy workflow (`_deploy-app.yml`), which is the owner's. There is no `.github/dependabot.yml`; adding one (github-actions, docker, nuget, npm; weekly; grouped) is the cheap way to get SHA pins and image bumps proposed as PRs, and is left to the owner because it starts creating PRs at once.
 
 ## 11. Residual risks (acknowledged, not fixed by this review)
 

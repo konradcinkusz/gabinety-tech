@@ -150,11 +150,4 @@ public class SkeletonHealthTests(SkeletonFactory f) : IClassFixture<SkeletonFact
         Assert.NotNull(dir);
         Assert.True(System.IO.File.ReadAllLines(Path.Combine(dir!.FullName, "src/Gabinety.Directory/Program.cs")).Length <= 60);
     }
-
-    [Fact]
-    public async Task Openapi_document_is_published()
-    {
-        var r = await f.CreateClient().GetAsync("/openapi/v1.json");
-        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
-    }
 }

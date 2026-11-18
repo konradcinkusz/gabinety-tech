@@ -98,20 +98,32 @@ public static class InternalAccess
     }
 
     /// <summary>
+    /// F-11: token validation must not be fail-open on a missing setting. <c>Identity:Audience</c> is set (without it any token of the same authservice, minted for another audience, is accepted)
+    /// and <c>Identity:Authority</c> is an absolute https URL (the JWKS is fetched from it, and the JwtBearer metadata check is off). Messages name the setting, never the value.
+    /// </summary>
+    public static void ValidateIdentity(IConfiguration config)
+    {
+        var problems = new List<string>();
+        if (string.IsNullOrWhiteSpace(config["Identity:Audience"])) problems.Add("Identity:Audience is not set");
+        if (!Uri.TryCreate(config["Identity:Authority"], UriKind.Absolute, out var authority) || authority.Scheme != Uri.UriSchemeHttps) problems.Add("Identity:Authority is not an absolute https URL");
+        if (problems.Count > 0) throw new InvalidOperationException($"Token validation is not configured safely: {string.Join("; ", problems)}.");
+    }
+
+    /// <summary>
     /// Strength is enforced outside the fake profile and outside the Development environment (an unset environment is Production), or when <c>Internal:EnforceKeyStrength=true</c>;
     /// <c>false</c> turns it off.
     /// </summary>
     public static bool EnforceKeyStrength(IConfiguration config, IHostEnvironment env) =>
         bool.TryParse(config["Internal:EnforceKeyStrength"], out var set) ? set : config["GABINETY_FAKE"] != "1" && !env.IsDevelopment();
 
-    /// <summary>Registers the startup validation of the internal keys and of <c>RateLimit:TrustedProxyKey</c> (see <see cref="EnforceKeyStrength"/>).</summary>
+    /// <summary>Registers the startup validation of the internal keys, of <c>RateLimit:TrustedProxyKey</c> and (F-11) of the identity settings, all under the same switch (see <see cref="EnforceKeyStrength"/>).</summary>
     public static IServiceCollection AddInternalKeyValidation(this IServiceCollection services) => services.AddHostedService<KeyValidationService>();
 
     internal sealed class KeyValidationService(IConfiguration config, IHostEnvironment env) : IHostedLifecycleService
     {
         public Task StartingAsync(CancellationToken ct)
         {
-            if (EnforceKeyStrength(config, env)) ValidateKeys(config);
+            if (EnforceKeyStrength(config, env)) { ValidateKeys(config); ValidateIdentity(config); }
             return Task.CompletedTask;
         }
         public Task StartAsync(CancellationToken ct) => Task.CompletedTask;

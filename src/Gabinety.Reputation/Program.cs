@@ -24,7 +24,7 @@ app.UseRateLimiter(); // after authentication: the limit is per user id when sig
 app.UseAuthorization();
 app.MapDefaultEndpoints();
 app.MapFeatures();
-app.MapOpenApi("/openapi/v1.json").AllowAnonymous();
+if (OpenApiExposure.IsServed(app.Configuration)) app.MapOpenApi("/openapi/v1.json").AllowAnonymous(); // F-07: not served when deployed
 app.Run();
 
 public partial class Program;

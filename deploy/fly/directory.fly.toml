@@ -1,0 +1,48 @@
+# directory (T-09.02, SPEC 4.3): Practitioner directory; owns directorydb.
+# Deploy (T-09.03 automates this): fly deploy --config deploy/fly/directory.fly.toml --ha=false   (run from the repository root)
+# Nothing secret and no real hostname lives in this file. Placeholders in <angle brackets> are filled by the owner after T-09.01 (Fly organisation) and the domain decision.
+# Fly ignores a Dockerfile HEALTHCHECK, so the checks below repeat what the Dockerfile asks.
+
+app = "gabinety-directory-staging"
+primary_region = "fra"
+
+[build]
+  # Both paths are relative to THIS file. The context is the repository root (the Dockerfile copies src/** and the solution files).
+  dockerfile = "../../src/Gabinety.Directory/Dockerfile"
+  context = "../.."
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_HTTP_PORTS = "8080"
+  TZ = "Europe/Warsaw"
+  Database__Provider = "PostgreSQL"
+  # NOT set here, on purpose: Environment__Kind and GABINETY_FAKE (CONTRACTS 10.4: the /internal/v1/test and demo endpoints must stay unmapped in staging).
+  # Authservice is public (it is the JWT issuer): the same URL the web app and every validator use.
+  Identity__Authority = "https://<authservice-public-host>"
+  Identity__Audience = "gabinety"
+  # Optional: Directory__MeetingHosts__0 etc. (CONTRACTS 10.3); defaults apply when unset.
+  # Ranking__EffectiveFrom and the fee/ranking constants of CONTRACTS 9 are the owner's: not set here, the code defaults apply (D-17).
+
+# Secrets (NOT here), set once with `fly secrets set --app gabinety-directory-staging`:
+#   ConnectionStrings__directorydb  (postgres at gabinety-postgres-staging.internal:5432, database directorydb, its own role)
+#   Internal__Key                   (callee key of Directory; the callers hold it as Internal__Keys__Directory)
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  # No public listener: do NOT run `fly ips allocate-v4`; deploy with --no-public-ips. Reached at gabinety-directory-staging.internal:8080 (private network). Min 1: called in-request by web and Booking (SPEC 4.3, 5.1).
+
+  # Liveness only (/alive runs no dependency check, P7); /health reports optional dependencies and must never fail a deploy. Always on (SPEC 4.3).
+  [[http_service.checks]]
+    method = "GET"
+    path = "/alive"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

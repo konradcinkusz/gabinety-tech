@@ -1,0 +1,54 @@
+# web (T-09.02, SPEC 4.3): the Next.js BFF, the only public listener besides the Booking webhook.
+# Deploy (T-09.03 automates this): fly deploy --config deploy/fly/web.fly.toml --ha=false   (run from the repository root)
+# Nothing secret and no real hostname lives in this file. Placeholders in <angle brackets> are filled by the owner after T-09.01 and the domain decision.
+# Fly ignores a Dockerfile HEALTHCHECK, so the check below repeats what the web Dockerfile asks.
+
+app = "gabinety-web-staging"
+primary_region = "fra"
+
+[build]
+  # Paths relative to THIS file. The Node Dockerfile copies package.json from its own directory, so the context is web/.
+  dockerfile = "../../web/Dockerfile"
+  context = "../../web"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  HOSTNAME = "0.0.0.0"
+  TZ = "Europe/Warsaw"
+  Site__BaseUrl = "https://<web-public-host>"
+  Payments__Provider = "Mock"   # must equal Booking's Payments__Provider (the mock checkout is shown only when Mock); PLACEHOLDER until T-09.05.
+  # Runtime configuration, read per request (FRONTEND-BFF 2). Always-on backends over the private network:
+  Backend__Directory = "http://gabinety-directory-staging.internal:8080"
+  Backend__Booking = "http://gabinety-booking-staging.internal:8080"
+  Backend__Reputation = "http://gabinety-reputation-staging.internal:8080"
+  # Assistant may be stopped (min 0): .flycast goes through the proxy, which starts it.
+  Backend__Assistant = "http://gabinety-assistant-staging.flycast"
+  # authservice is the JWT issuer and is browser-facing (login redirect, OAuth): its public URL.
+  Backend__Auth = "https://<authservice-public-host>"
+  Identity__Issuer = "gabinety-staging"
+  Identity__Audience = "gabinety"
+  Identity__PublicUrl = "https://<authservice-public-host>"
+
+# Secrets (NOT here), set once with `fly secrets set --app gabinety-web-staging`:
+#   None today: the web app forwards the user's token and holds no internal key (grep of web/src finds no Internal__ key and no session-signing secret).
+#   If a later task adds one, it is added here and in SPEC 11 together.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # On the synchronous path of every page (SPEC 4.3).
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/api/health"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

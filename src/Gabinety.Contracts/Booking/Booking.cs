@@ -49,3 +49,6 @@ public sealed record BookingView(Guid Id, BookingStatus Status, string? StatusRe
     bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview);
 
 public sealed record ReviewabilityDto(bool Reviewable, string ClientUserId, Guid PractitionerId, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantNullableConverter))] DateTimeOffset? CompletedAt);
+
+/// <summary>One row of <c>GET /internal/v1/analytics/pair-counts</c> (T-10.03): a client-practitioner pair and its paid bookings. <c>PairKey</c> is the fee hook's key. Ids and a count only.</summary>
+public sealed record PairCountDto(string PairKey, string ClientUserId, Guid PractitionerId, int Bookings);

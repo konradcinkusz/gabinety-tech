@@ -20,3 +20,6 @@ public sealed record ReplyRequest([property: Required, StringLength(1000, Minimu
 public sealed record RejectReviewRequest([property: Required] string Reason);
 
 public sealed record ReputationPush(int RatingCount, double RatingAvg, long Version);
+
+/// <summary>One row of <c>GET /api/v1/admin/suspicious-pairs</c> (T-10.03): a pair with more than two paid bookings and only five-star reviews. Ids and counts only: no review text, no name.</summary>
+public sealed record SuspiciousPairDto(string PairKey, string ClientUserId, Guid PractitionerId, int Bookings, int Reviews);

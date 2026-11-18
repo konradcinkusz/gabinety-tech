@@ -1,0 +1,31 @@
+# T-09.03: static checks of the deploy workflow and its helpers. A separate workflow because ci.yml is not touched by this task; cheap (no .NET, no Docker).
+name: deploy-checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actionlint:
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      # The image bundles shellcheck, so run: scripts are checked too. Pinned by version.
+      - name: actionlint (the deploy workflows, strict)
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color .github/workflows/deploy.yml .github/workflows/_deploy-app.yml .github/workflows/deploy-checks.yml
+      # ci.yml and secret-scan.yml predate this check; only style-level shellcheck infos/warnings that exist today are tolerated, any other finding fails.
+      - name: actionlint (the other workflows)
+        run: >-
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+          -ignore 'shellcheck reported issue in this script: SC(2018|2019|2034):'
+          .github/workflows/ci.yml .github/workflows/secret-scan.yml
+  deploy-scripts:
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck -x scripts/deploy/*.sh scripts/tests/deploy.test.sh
+      - run: scripts/tests/deploy.test.sh

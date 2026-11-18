@@ -1,0 +1,226 @@
+# T-09.03: tag-driven deploy to staging (SPEC 9, FLY-IO-DEPLOYMENT 10-12, reference-architecture P12).
+#   verify-tag -> detect-changes -> build (matrix, GHCR) -> deploy-postgres -> deploy-authservice -> directory -> booking -> reputation -> assistant -> web -> summary
+# The apps, their paths, Dockerfiles and smoke checks are deploy/estate.conf; the secrets are deploy/secrets.map; the steps of one app are _deploy-app.yml.
+# What the owner configures first (GitHub environment "staging", secrets, variables) is docs/operations/DEPLOY.md. Not run against Fly yet (T-09.01).
+name: deploy
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+# Two deploys never interleave: the second waits, it is never cancelled half-way through the estate.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+env:
+  # flyctl is pinned (the tag of superfly/flyctl); the action that installs it is pinned by tag as every action in this repository.
+  FLYCTL_VERSION: "0.5.12"
+jobs:
+  # 1. The tag must be on the default branch. A tag on a side branch is never deployed.
+  verify-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: The tagged commit is on the default branch
+        run: |
+          git fetch --no-tags origin "+refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          scripts/deploy/verify-default-branch.sh "$GITHUB_SHA" "$DEFAULT_BRANCH"
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+
+  # 2. Which apps does this tag deploy? Previous tag diff, per app, plus "an app that does not exist is always selected".
+  detect-changes:
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    outputs:
+      postgres: ${{ steps.detect.outputs.postgres }}
+      authservice: ${{ steps.detect.outputs.authservice }}
+      directory: ${{ steps.detect.outputs.directory }}
+      booking: ${{ steps.detect.outputs.booking }}
+      reputation: ${{ steps.detect.outputs.reputation }}
+      assistant: ${{ steps.detect.outputs.assistant }}
+      web: ${{ steps.detect.outputs.web }}
+      build_matrix: ${{ steps.detect.outputs.build_matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: superfly/flyctl-actions/setup-flyctl@1.5
+        with:
+          version: ${{ env.FLYCTL_VERSION }}
+      - name: Detect
+        id: detect
+        run: |
+          flyctl apps list --json | jq -r '.[] | (.Name // .name)' > "$RUNNER_TEMP/existing-apps.txt"
+          # Diff against the last fully successful deploy (the marker tag), the previous release tag only as the fallback.
+          base="$(scripts/deploy/base-ref.sh "$GITHUB_SHA")"
+          scripts/deploy/detect-changes.sh --estate deploy/estate.conf --existing-apps "$RUNNER_TEMP/existing-apps.txt" \
+            --head "$GITHUB_SHA" ${base:+--base "$base"} --github-output "$GITHUB_OUTPUT" | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  # 3. Build once, push to the registry (GHCR by default) with immutable tags (the release tag and the commit), deploy by the commit tag. Never "latest".
+  build:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.build_matrix != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The environment gives the build FLY_API_TOKEN and variables; it is needed for IMAGE_REGISTRY=registry.fly.io and to read IMAGE_REGISTRY.
+    environment: staging
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # ONE switch for the registry: a repository or environment variable, default ghcr.io. registry.fly.io is the private alternative (docs/operations/DEPLOY.md).
+      IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY || 'ghcr.io' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.detect-changes.outputs.build_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Registry login (ghcr.io with the workflow token)
+        if: ${{ env.IMAGE_REGISTRY == 'ghcr.io' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: The Fly app must exist before its registry repository does (cold estate)
+        if: ${{ env.IMAGE_REGISTRY == 'registry.fly.io' }}
+        uses: superfly/flyctl-actions/setup-flyctl@1.5
+        with:
+          version: ${{ env.FLYCTL_VERSION }}
+      - name: Registry login (registry.fly.io with the Fly token)
+        if: ${{ env.IMAGE_REGISTRY == 'registry.fly.io' }}
+        run: |
+          scripts/deploy/ensure-app.sh "$FLY_APP"
+          printf '%s' "$FLY_API_TOKEN" | docker login registry.fly.io --username x --password-stdin
+        env:
+          FLY_APP: ${{ matrix.fly_app }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_ORG: ${{ vars.FLY_ORG || 'personal' }}
+      - name: Unsupported registry
+        if: ${{ env.IMAGE_REGISTRY != 'ghcr.io' && env.IMAGE_REGISTRY != 'registry.fly.io' }}
+        run: echo "IMAGE_REGISTRY=$IMAGE_REGISTRY is not supported (ghcr.io or registry.fly.io)" >&2; exit 1
+      - name: Image name
+        id: image
+        run: echo "name=$(scripts/deploy/image-ref.sh "$IMAGE_REGISTRY" "$OWNER" "$KEY" "$FLY_APP")" >> "$GITHUB_OUTPUT"
+        env:
+          OWNER: ${{ github.repository_owner }}
+          KEY: ${{ matrix.key }}
+          FLY_APP: ${{ matrix.fly_app }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ github.ref_name }}
+            ${{ steps.image.outputs.name }}:sha-${{ github.sha }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.key }}
+          cache-to: type=gha,scope=${{ matrix.key }},mode=max
+
+  # 4. Deploy in the order of SPEC 9. Every gate: this app is selected, the build did not fail, and NO earlier job failed or was cancelled
+  # (an earlier job that was skipped, selected out or not, passes: success || skipped). Each job lists every earlier deploy in needs so a failure cannot be
+  # hidden behind a skipped neighbour.
+  deploy-postgres:
+    needs: [detect-changes, build]
+    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.postgres == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_deploy-app.yml
+    secrets: inherit
+    with:
+      key: postgres
+  deploy-authservice:
+    needs: [detect-changes, build, deploy-postgres]
+    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.authservice == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_deploy-app.yml
+    secrets: inherit
+    with:
+      key: authservice
+  deploy-directory:
+    needs: [detect-changes, build, deploy-postgres, deploy-authservice]
+    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.directory == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_deploy-app.yml
+    secrets: inherit
+    with:
+      key: directory
+  deploy-booking:
+    needs: [detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory]
+    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.booking == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_deploy-app.yml
+    secrets: inherit
+    with:
+      key: booking
+  deploy-reputation:
+    needs: [detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking]
+    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.reputation == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_deploy-app.yml
+    secrets: inherit
+    with:
+      key: reputation
+  deploy-assistant:
+    needs: [detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation]
+    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.assistant == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_deploy-app.yml
+    secrets: inherit
+    with:
+      key: assistant
+  deploy-web:
+    needs: [detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation, deploy-assistant]
+    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.web == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_deploy-app.yml
+    secrets: inherit
+    with:
+      key: web
+
+  # 5. One table for the run: what was deployed and healthy, what was not selected, what failed. Fails the run when any job failed.
+  summary:
+    needs: [verify-tag, detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation, deploy-assistant, deploy-web]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/deploy/summary.sh "$TAG" | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          TAG: ${{ github.ref_name }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
+
+  # 6. Only now, when the WHOLE run succeeded (every selected app deployed and healthy), move the marker the next run diffs against. A failed or cancelled run
+  # leaves it where it was, so no app can drop out of the next run's selection. The only job with contents: write.
+  mark-deployed:
+    needs: [summary]
+    if: ${{ needs.summary.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move deployed/staging to this commit
+        run: |
+          git tag -f deployed/staging "$GITHUB_SHA"
+          git push --force origin refs/tags/deployed/staging

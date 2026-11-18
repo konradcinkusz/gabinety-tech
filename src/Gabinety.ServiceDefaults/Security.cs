@@ -4,6 +4,7 @@ using System.Text.Encodings.Web;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
@@ -34,6 +35,13 @@ public static class Security
     /// <summary>X-Internal-Key compared in constant time against Internal:Key (ADR-0007).</summary>
     public static AuthenticationBuilder AddInternalKeyAuthentication(this AuthenticationBuilder auth) =>
         auth.AddScheme<AuthenticationSchemeOptions, InternalKeyHandler>(InternalScheme, null);
+
+    /// <summary>
+    /// Deny by default (SPEC 11, T-10.12): a route with no <c>RequireAuthorization</c> and no <c>AllowAnonymous</c> needs a signed-in user instead of being public.
+    /// A public route must say <c>AllowAnonymous()</c>; docs/operations/ROUTE-AUTH.md and the per-service route test list every route.
+    /// </summary>
+    public static AuthorizationBuilder RequireAuthenticatedByDefault(this AuthorizationBuilder auth) =>
+        auth.SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
     public const int DefaultPerMinute = 60;
 

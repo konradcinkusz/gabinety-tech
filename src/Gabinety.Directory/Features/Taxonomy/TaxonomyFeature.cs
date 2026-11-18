@@ -16,7 +16,7 @@ public sealed class TaxonomyFeature : IServiceFeature
         builder.Services.AddHostedService(sp => sp.GetRequiredService<TaxonomySeeder>());
     }
 
-    public void Map(IEndpointRouteBuilder endpoints) => endpoints.MapGet("/api/v1/taxonomy", Get);
+    public void Map(IEndpointRouteBuilder endpoints) => endpoints.MapGet("/api/v1/taxonomy", Get).AllowAnonymous();
 
     static async Task<IResult> Get(DirectoryDbContext db, HttpContext ctx, CancellationToken ct)
     {

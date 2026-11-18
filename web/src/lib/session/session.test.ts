@@ -202,6 +202,14 @@ describe("session", () => {
   });
 });
 
+const STATE_COOKIE = "gt_oauth_state";
+const stateOf = (r: Response) => {
+  const c = setCookies(r).find((x) => x.startsWith(STATE_COOKIE + "="))!;
+  return { header: c, value: c.slice(STATE_COOKIE.length + 1).split(";")[0] };
+};
+const callbackReq = (qs: string, cookie?: string) =>
+  new Request(`${SITE}/api/auth/github/callback?${qs}`, cookie ? { headers: { cookie } } : undefined);
+
 describe("github", () => {
   it("start redirects to the identity service with returnUrl built from Site__BaseUrl", async () => {
     const res = await githubStart(new Request("http://evil.example.test/api/auth/github/start", { headers: { host: "evil.example.test" } }));
@@ -212,26 +220,61 @@ describe("github", () => {
     expect(loc.searchParams.get("provider")).toBe("GitHub");
     expect(loc.searchParams.get("returnUrl")).toMatch(/^http:\/\/localhost:3000\/api\/auth\/github\/callback/);
   });
+  it("start sets a random HttpOnly SameSite=Lax short-lived state cookie and puts the same state in returnUrl (F-05)", async () => {
+    const a = await githubStart(new Request(SITE + "/api/auth/github/start"));
+    const b = await githubStart(new Request(SITE + "/api/auth/github/start"));
+    const { header, value } = stateOf(a);
+    expect(value.length).toBeGreaterThanOrEqual(32);
+    expect(value).not.toBe(stateOf(b).value);
+    expect(header).toContain("HttpOnly");
+    expect(header).toContain("SameSite=Lax");
+    expect(header).toMatch(/Max-Age=(\d+)/);
+    expect(Number(/Max-Age=(\d+)/.exec(header)![1])).toBeLessThanOrEqual(600);
+    const ret = new URL(new URL(a.headers.get("location")!).searchParams.get("returnUrl")!);
+    expect(ret.searchParams.get("state")).toBe(value);
+  });
   it("callback exchanges the code, sets cookies and redirects to a safe relative path", async () => {
     const calls = fakeBackend(() => tokenBody());
-    const res = await githubCallback(new Request(SITE + "/api/auth/github/callback?code=abc&redirect=/moje"));
+    const res = await githubCallback(callbackReq("code=abc&state=s-1&redirect=/moje", `${STATE_COOKIE}=s-1`));
     expect(JSON.parse(String(calls[0].init.body))).toEqual({ code: "abc" });
     expect(res.headers.get("location")).toBe(SITE + "/moje");
-    expect(setCookies(res).length).toBe(2);
+    expect(setCookies(res).filter((c) => c.startsWith("gt_")).length).toBe(3); // at, rt, state cleared
+  });
+  it("callback deletes the state cookie after use (one shot)", async () => {
+    fakeBackend(() => tokenBody());
+    const res = await githubCallback(callbackReq("code=abc&state=s-1", `${STATE_COOKIE}=s-1`));
+    expect(stateOf(res).header).toMatch(/Max-Age=0/);
+  });
+  it.each([
+    ["no state cookie (login CSRF: the victim never started)", "code=abc&state=s-1", undefined],
+    ["no state in the URL", "code=abc", `${STATE_COOKIE}=s-1`],
+    ["a different state", "code=abc&state=s-2", `${STATE_COOKIE}=s-1`],
+    ["an empty state on both sides", "code=abc&state=", `${STATE_COOKIE}=`],
+    ["a state of another length", "code=abc&state=s-11", `${STATE_COOKIE}=s-1`],
+  ])("callback refuses %s: no exchange, no session", async (_n, qs, cookie) => {
+    const calls = fakeBackend(() => tokenBody());
+    const res = await githubCallback(callbackReq(qs, cookie));
+    expect(calls.length).toBe(0);
+    expect(res.headers.get("location")).toContain("/logowanie?error=github_failed");
+    expect(setCookies(res).some((c) => c.startsWith("gt_at=") || c.startsWith("gt_rt="))).toBe(false);
   });
   it.each(["https://evil.example.test/x", "//evil.example.test", "/\\evil.example.test", "javascript:alert(1)"])(
     "callback ignores the redirect target %s",
     async (target) => {
       fakeBackend(() => tokenBody());
-      const res = await githubCallback(
-        new Request(`${SITE}/api/auth/github/callback?code=abc&redirect=${encodeURIComponent(target)}`),
-      );
+      const res = await githubCallback(callbackReq(`code=abc&state=s-1&redirect=${encodeURIComponent(target)}`, `${STATE_COOKIE}=s-1`));
       expect(res.headers.get("location")).toBe(SITE + "/");
     },
   );
+  it("start keeps a safe redirect and drops an unsafe one", async () => {
+    const ok = await githubStart(new Request(SITE + "/api/auth/github/start?redirect=" + encodeURIComponent("/moje?x=1")));
+    expect(new URL(new URL(ok.headers.get("location")!).searchParams.get("returnUrl")!).searchParams.get("redirect")).toBe("/moje?x=1");
+    const bad = await githubStart(new Request(SITE + "/api/auth/github/start?redirect=" + encodeURIComponent("//evil.example.test")));
+    expect(new URL(new URL(bad.headers.get("location")!).searchParams.get("returnUrl")!).searchParams.has("redirect")).toBe(false);
+  });
   it("callback without a code goes back to login with an error code", async () => {
-    const res = await githubCallback(new Request(SITE + "/api/auth/github/callback"));
+    const res = await githubCallback(callbackReq("state=s-1", `${STATE_COOKIE}=s-1`));
     expect(res.headers.get("location")).toContain("/logowanie?error=");
-    expect(setCookies(res)).toEqual([]);
+    expect(setCookies(res).some((c) => c.startsWith("gt_at="))).toBe(false);
   });
 });

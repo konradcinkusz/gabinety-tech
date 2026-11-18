@@ -38,3 +38,32 @@ export function clearSessionCookies(res: Response, siteBaseUrl: string): Respons
   res.headers.append("Set-Cookie", serialize(REFRESH_COOKIE, "", 0, secure));
   return res;
 }
+
+/** F-05: browser-bound nonce of the GitHub sign-in. Set at start, compared at the callback, deleted there. */
+export const OAUTH_STATE_COOKIE = "gt_oauth_state";
+export const OAUTH_STATE_MAX_AGE = 600;
+
+export function newOAuthState(): string {
+  const b = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+export function setOAuthStateCookie(res: Response, state: string, siteBaseUrl: string): Response {
+  res.headers.append("Set-Cookie", serialize(OAUTH_STATE_COOKIE, state, OAUTH_STATE_MAX_AGE, isSecure(siteBaseUrl)));
+  return res;
+}
+
+export function clearOAuthStateCookie(res: Response, siteBaseUrl: string): Response {
+  res.headers.append("Set-Cookie", serialize(OAUTH_STATE_COOKIE, "", 0, isSecure(siteBaseUrl)));
+  return res;
+}
+
+/** Constant-time equality of two strings; false for empty values. */
+export function stateMatches(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const x = new TextEncoder().encode(a);
+  const y = new TextEncoder().encode(b);
+  let d = x.length ^ y.length;
+  for (let i = 0; i < x.length; i++) d |= x[i] ^ (y[i % Math.max(y.length, 1)] ?? 0);
+  return d === 0;
+}

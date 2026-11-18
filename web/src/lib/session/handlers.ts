@@ -2,7 +2,18 @@ import { checkOrigin } from "../api/originGuard";
 import { dependencyUnavailable, problem } from "../api/problem";
 import { resolveBackend } from "../api/backends";
 import { readConfig } from "../config";
-import { ACCESS_COOKIE, REFRESH_COOKIE, clearSessionCookies, parseCookies, setSessionCookies } from "./cookies";
+import {
+  ACCESS_COOKIE,
+  OAUTH_STATE_COOKIE,
+  REFRESH_COOKIE,
+  clearOAuthStateCookie,
+  clearSessionCookies,
+  newOAuthState,
+  parseCookies,
+  setOAuthStateCookie,
+  setSessionCookies,
+  stateMatches,
+} from "./cookies";
 import { readIdentity } from "./claims";
 import { identity, type IdentityResult } from "./identity";
 import { refreshOnce } from "./refresh";
@@ -138,18 +149,26 @@ export async function githubStart(request: Request): Promise<Response> {
   // returnUrl comes from Site__BaseUrl, never from the request's own host.
   const returnUrl = new URL("/api/auth/github/callback", config.siteBaseUrl);
   if (redirect !== "/") returnUrl.searchParams.set("redirect", redirect);
+  // F-05: authservice only binds its own GitHub leg to the browser; the exchange code it returns is not. This nonce is bound to
+  // this browser by an HttpOnly cookie and travels in returnUrl (authservice keeps its query and appends `&code=`).
+  const state = newOAuthState();
+  returnUrl.searchParams.set("state", state);
   const target = new URL("/api/v1/external-auth/login", base);
   target.searchParams.set("provider", "GitHub");
   target.searchParams.set("returnUrl", returnUrl.toString());
-  return new Response(null, { status: 302, headers: { Location: target.toString(), ...noStore } });
+  const res = new Response(null, { status: 302, headers: { Location: target.toString(), ...noStore } });
+  return setOAuthStateCookie(res, state, config.siteBaseUrl);
 }
 
 export async function githubCallback(request: Request): Promise<Response> {
   const config = readConfig();
   const url = new URL(request.url);
-  const to = (path: string) => new Response(null, { status: 302, headers: { Location: config.siteBaseUrl + path, ...noStore } });
+  // The state cookie is single-use: every outcome deletes it.
+  const to = (path: string) =>
+    clearOAuthStateCookie(new Response(null, { status: 302, headers: { Location: config.siteBaseUrl + path, ...noStore } }), config.siteBaseUrl);
+  const bound = stateMatches(url.searchParams.get("state"), parseCookies(request.headers.get("cookie"))[OAUTH_STATE_COOKIE]);
   const code = url.searchParams.get("code");
-  if (!code) return to("/logowanie?error=github_failed");
+  if (!bound || !code) return to("/logowanie?error=github_failed");
   const r = await identity.exchange(code);
   if (r.kind === "two_factor") return to("/logowanie?error=two_factor_not_supported");
   if (r.kind !== "tokens") return to("/logowanie?error=github_failed");

@@ -64,6 +64,7 @@ const w = lines[0].map((_, i) => Math.min(60, Math.max(...lines.map((l) => Strin
 for (const l of lines) console.log(l.map((c, i) => String(c).padEnd(w[i])).join("  "));
 if (pr113.length) {
   console.log("\nPR #113 (ttfb p50/p95 ms, requests per second):");
+  if (pr113.some((p) => p.baseline.nonOk || p.current.nonOk)) console.log("WARNING: some requests of the PR #113 runs did not answer 2xx; those numbers are invalid");
   for (const p of pr113) console.log(`${p.page.padEnd(10)} c=${String(p.clients).padEnd(2)} before ${p.baseline.ttfbMs.p50}/${p.baseline.ttfbMs.p95} ${p.baseline.rps} rps   after ${p.current.ttfbMs.p50}/${p.current.ttfbMs.p95} ${p.current.rps} rps`);
 }
 console.log(`\nwritten: ${out}/results.json`);

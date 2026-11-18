@@ -11,7 +11,8 @@
 #   BASELINE_WEB_URL   a second web app built from the commit before PR #113, for the comparison of section "PR #113" (optional)
 #   DB_PROFILE         label written to the report: postgres | inmemory                BOOKINGS  POST /bookings requests (default 120)
 #   CHROME_PATH        Chromium for Lighthouse (default /opt/pw-browsers/chromium-*/chrome-linux64/chrome)
-#   SKIP_LIGHTHOUSE=1  skip the Lighthouse rows
+#   SKIP_LIGHTHOUSE=1  skip the Lighthouse rows                                  ONLY_PR113=1  run only the PR #113 comparison (needs BASELINE_WEB_URL)
+#   PR113_SIDES        order of the two web apps in the comparison (default "baseline current"; run it again as "current baseline" to see an order effect)
 # Tools: scripts/perf/load.mjs (HTTP load, exact percentiles; the reason it is not autocannon or hey is in its header) and Lighthouse, pinned below, fetched by npx
 # on demand (nothing is added to any package.json). Exit code: 0 when the measurement ran (a miss is a result, not a failure), 1 when it could not run.
 set -euo pipefail
@@ -58,6 +59,7 @@ LISTS=$(jq -r 'join(",")' "$OUT/inputs/list-urls.json"); SLOTS=$(jq -r 'join(","
 CATEGORY=$(jq -r .web.category "$OUT/inputs/prep.json"); PROFILE_URL=$(jq -r .web.profile "$OUT/inputs/prep.json"); TERMS=$(jq -r .web.terms "$OUT/inputs/prep.json"); LIST_PAGE=$(jq -r .web.list "$OUT/inputs/prep.json")
 
 # ---- SPEC 13 rows that load the services ----
+if [ "${ONLY_PR113:-0}" != 1 ]; then
 run list      $LOAD --name list --concurrency "$CONC" --duration "$DURATION" --warmup 3 --urls "$LISTS"
 run slots     $LOAD --name slots --concurrency "$CONC" --duration "$DURATION" --warmup 3 --urls "$SLOTS"
 run bookings  $LOAD --name bookings --concurrency 4 --requests "$OUT/inputs/booking-requests.json"
@@ -80,11 +82,12 @@ if [ "${SKIP_LIGHTHOUSE:-0}" != 1 ]; then
          throttling: .configSettings.throttlingMethod, formFactor: .configSettings.formFactor, finalUrl: .finalDisplayedUrl}' "$OUT/raw/lighthouse-$i.full.json" > "$OUT/raw/lighthouse-$i.json"
   done
 fi
+fi
 
 # ---- PR #113: the same three pages on the web app of the commit before it (BASELINE_WEB_URL) and on this one ----
 if [ -n "${BASELINE_WEB_URL:-}" ]; then
   slug=$(basename "$PROFILE_URL")
-  for side in baseline current; do
+  for side in ${PR113_SIDES:-baseline current}; do
     base="$BASELINE_WEB_URL"; [ $side = current ] && base="$WEB_URL"
     for page in programisci:/programisci gabinet:/gabinet/$slug regulamin:/regulamin; do
       name=${page%%:*}; path=${page#*:}
@@ -94,4 +97,8 @@ if [ -n "${BASELINE_WEB_URL:-}" ]; then
   done
 fi
 
+# the run is valid only if the stack stayed up to the end (a database that died mid-run once left cached pages answering 200 for a while)
+for u in http://localhost:5101/api/v1/sitemap http://localhost:5102/health "$WEB_URL/api/health"; do
+  [ "$(curl -s -o /dev/null -w '%{http_code}' -m 5 "$u" || true)" = 200 ] || { say "INVALID RUN: $u does not answer 200 after the measurement"; exit 1; }
+done
 node "$ROOT/scripts/perf/report.mjs" "$OUT"

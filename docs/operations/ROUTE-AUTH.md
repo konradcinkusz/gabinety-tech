@@ -8,9 +8,11 @@ endpoints of the running host and fails on any route or policy that differs from
 (fallback policy: `Security.RequireAuthenticatedByDefault`, applied in each `Program.cs`).
 
 Columns: **Policy** = what the code declares (checked by the test): `Anonymous`, `Authenticated` (signed-in user, JWT), `Admin` (role `Admin` or `SuperAdmin`),
-`Internal` (only scheme `InternalKey`; one key per callee, ADR-0007), `Role:SuperAdmin` is added on top of the group's `Admin`.
+`Internal` (only scheme `InternalKey`; one key per caller and callee pair, `Internal:Callers:<Caller>`, recorded as the `caller` claim; ADR-0007, F-03), `Role:SuperAdmin` is added on top of the group's `Admin`.
 **Profile** = `all` (every deployment) or `fake` (mapped only when `GABINETY_FAKE=1` or `Environment:Kind=Development`; absent in a deployed profile, checked by the test).
-**Note** is for people and is not checked (callers of an internal route are SPEC 5.1; the code does not tie a key to a caller, security review F-03).
+**Note** is for people and is not checked (callers of an internal route are SPEC 5.1; each caller has its own key on the callee, F-03).
+
+**Public edge (F-03, `Gabinety.ServiceDefaults.Edge`, not a policy so not checked by this table):** a request that arrived through the Fly public edge, or that carries `X-Edge-Key`, never reaches an `/internal/*` row below: it is 404 before authentication, whatever key it carries (default on, off in the fake profile). Booking, the one public app, also answers 404 from the edge to everything except `POST /webhooks/payments/{provider}`, `/alive` and `/api/v1/*` other than `/api/v1/admin/*` (`src/Gabinety.Booking/PublicEdge.cs`). No route was added or changed by T-10.10.
 
 ## Directory
 

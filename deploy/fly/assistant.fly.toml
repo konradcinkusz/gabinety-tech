@@ -21,6 +21,9 @@ primary_region = "fra"
   Identity__Authority = "https://<authservice-public-host>"
   Identity__Audience = "gabinety"
   Backend__Directory = "http://gabinety-directory-staging.internal:8080"
+  # F-03: reached over .flycast, which passes through the Fly proxy; the proxy may add the edge headers that the public-edge guard treats as "arrived from the Internet",
+  # so the code guard is OFF here until the owner confirms on staging that a flycast request carries none of them (RUNBOOK 11, item 9). The control is the network: no public IP (asserted at deploy).
+  Internal__RejectPublicEdge = "false"
   Llm__Provider = "Copilot"
   Assistant__RequireApiKeyModelsForTraffic = "true"
   Assistant__DailyBudgetUsd = "5"
@@ -29,7 +32,8 @@ primary_region = "fra"
   # Custom (bring-your-own-key) models: Llm__CustomModels__0__* ids/endpoints are added by T-09.07 once the owner picks a provider.
 # Secrets (NOT here), set once with `fly secrets set --app gabinety-assistant-staging`:
 #   ConnectionStrings__assistantdb
-#   Internal__Key
+#   Internal__Callers__Reputation   (the key Reputation sends for the triage call; F-03)
+#   optional Internal__Callers__Owner
 #   Llm__CustomModels__0__ApiKey   (T-09.07; the model account of D-08)
 #   optional Copilot__GitHubToken  (A-04: only after the owner records the terms decision)
 

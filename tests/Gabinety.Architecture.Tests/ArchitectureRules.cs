@@ -14,10 +14,11 @@ public partial class ArchitectureRules
     {
         ["Gabinety.Billing"] = [], ["Gabinety.Scheduling"] = [], ["Gabinety.Ranking"] = [], ["Gabinety.Llm"] = [], ["Gabinety.Contracts"] = [],
         ["Gabinety.ServiceDefaults"] = [],
-        ["Gabinety.Directory"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts", "Gabinety.Ranking"],
-        ["Gabinety.Booking"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts", "Gabinety.Billing", "Gabinety.Scheduling"],
-        ["Gabinety.Reputation"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts"],
-        ["Gabinety.Assistant"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts", "Gabinety.Llm"],
+        ["Gabinety.ServiceDefaults.Edge"] = ["Gabinety.ServiceDefaults"], // T-10.10 (F-03): the public-edge guard and key validation, outside the 400-line kernel (SPEC 6)
+        ["Gabinety.Directory"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts", "Gabinety.Ranking"],
+        ["Gabinety.Booking"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts", "Gabinety.Billing", "Gabinety.Scheduling"],
+        ["Gabinety.Reputation"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts"],
+        ["Gabinety.Assistant"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts", "Gabinety.Llm"],
         ["Gabinety.AppHost"] = [.. Services.Select(s => "Gabinety." + s)],
         ["Gabinety.DevIdentity"] = [], ["Gabinety.DemoSeeder"] = [], // tools/: no project reference at all
     };

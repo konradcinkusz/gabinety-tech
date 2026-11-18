@@ -14,7 +14,7 @@ public class KernelTests
 {
     static async Task<WebApplication> Host(int perMinute = 60)
     {
-        var b = WebApplication.CreateBuilder();
+        var b = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" }); // key strength is enforced outside Development (T-10.10)
         b.WebHost.UseTestServer();
         b.Configuration["Internal:Key"] = "k-test-1234";
         b.Services.AddRateLimiting(perMinute);
@@ -94,7 +94,7 @@ public class KernelTests
     /// <summary>A host whose limit comes from configuration (<c>RateLimit:PerMinute</c>, env <c>RateLimit__PerMinute</c>), as the services wire it.</summary>
     static async Task<WebApplication> ConfiguredHost(string? perMinute)
     {
-        var b = WebApplication.CreateBuilder();
+        var b = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" }); // key strength is enforced outside Development (T-10.10)
         b.WebHost.UseTestServer();
         if (perMinute is not null) b.Configuration["RateLimit:PerMinute"] = perMinute;
         b.Services.AddRateLimiting(b.Configuration);

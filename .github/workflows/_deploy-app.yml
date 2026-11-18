@@ -63,6 +63,11 @@ jobs:
           KIND: ${{ steps.app.outputs.kind }}
           IMAGE: ${{ steps.app.outputs.image }}
           NETWORK: ${{ steps.app.outputs.network }}
+      - name: No public address on a private app (F-03)
+        if: ${{ steps.app.outputs.network != 'public' }}
+        run: scripts/deploy/assert-no-public-ip.sh "$FLY_APP"
+        env:
+          FLY_APP: ${{ steps.app.outputs.fly }}
       - name: Private IPv6 for the .flycast name (once; idempotent)
         if: ${{ steps.app.outputs.network == 'flycast' }}
         run: scripts/deploy/ensure-private-ip.sh "$FLY_APP"

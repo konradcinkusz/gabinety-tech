@@ -141,13 +141,16 @@ export function safeRedirect(target: string | null): string {
   }
 }
 
+/** authservice accepts a returnUrl only on its allowed origin with this path (or below it): ExternalAuthController.cs:344-352. */
+export const GITHUB_CALLBACK_PATH = "/oauth/callback";
+
 export async function githubStart(request: Request): Promise<Response> {
   const config = readConfig();
   const base = config.identity.publicUrl ?? (await resolveBackend("auth"));
   if (!base) return dependencyUnavailable();
   const redirect = safeRedirect(new URL(request.url).searchParams.get("redirect"));
   // returnUrl comes from Site__BaseUrl, never from the request's own host.
-  const returnUrl = new URL("/api/auth/github/callback", config.siteBaseUrl);
+  const returnUrl = new URL(GITHUB_CALLBACK_PATH, config.siteBaseUrl);
   if (redirect !== "/") returnUrl.searchParams.set("redirect", redirect);
   // F-05: authservice only binds its own GitHub leg to the browser; the exchange code it returns is not. This nonce is bound to
   // this browser by an HttpOnly cookie and travels in returnUrl (authservice keeps its query and appends `&code=`).

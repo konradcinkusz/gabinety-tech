@@ -5,7 +5,7 @@ import { POST as logout } from "../../app/api/auth/logout/route";
 import { POST as refresh, GET as refreshAndGo } from "../../app/api/auth/refresh/route";
 import { GET as sessionGet } from "../../app/api/auth/session/route";
 import { GET as githubStart } from "../../app/api/auth/github/start/route";
-import { GET as githubCallback } from "../../app/api/auth/github/callback/route";
+import { GET as githubCallback } from "../../app/oauth/callback/route";
 import { resetBackendFetch } from "../api/http";
 import { fakeBackend, makeKey, signToken, tokenBody, cookieHeader } from "../api/testUtils";
 
@@ -208,7 +208,7 @@ const stateOf = (r: Response) => {
   return { header: c, value: c.slice(STATE_COOKIE.length + 1).split(";")[0] };
 };
 const callbackReq = (qs: string, cookie?: string) =>
-  new Request(`${SITE}/api/auth/github/callback?${qs}`, cookie ? { headers: { cookie } } : undefined);
+  new Request(`${SITE}/oauth/callback?${qs}`, cookie ? { headers: { cookie } } : undefined);
 
 describe("github", () => {
   it("start redirects to the identity service with returnUrl built from Site__BaseUrl", async () => {
@@ -218,7 +218,31 @@ describe("github", () => {
     expect(loc.origin).toBe("http://auth.internal");
     expect(loc.pathname).toBe("/api/v1/external-auth/login");
     expect(loc.searchParams.get("provider")).toBe("GitHub");
-    expect(loc.searchParams.get("returnUrl")).toMatch(/^http:\/\/localhost:3000\/api\/auth\/github\/callback/);
+    expect(loc.searchParams.get("returnUrl")).toMatch(/^http:\/\/localhost:3000\/oauth\/callback/);
+  });
+  it("start's returnUrl satisfies authservice's IsAllowedReturnUrl (v0.3.4 ExternalAuthController.cs:344-352)", async () => {
+    // The rule: absolute URL, same scheme+host+port as an allowed base (here Site__BaseUrl), path /oauth/callback or below it.
+    const isAllowed = (returnUrl: string, bases: string[]) => {
+      let c: URL;
+      try {
+        c = new URL(returnUrl);
+      } catch {
+        return false;
+      }
+      const p = c.pathname.toLowerCase();
+      if (!(p === "/oauth/callback" || p.startsWith("/oauth/callback/"))) return false;
+      return bases.some((b) => {
+        const a = new URL(b);
+        return c.protocol === a.protocol && c.hostname === a.hostname && c.port === a.port;
+      });
+    };
+    expect(isAllowed(SITE + "/api/auth/github/callback", [SITE])).toBe(false); // the old value: authservice answered 400
+    for (const q of ["", "?redirect=" + encodeURIComponent("/moje?x=1")]) {
+      const res = await githubStart(new Request(SITE + "/api/auth/github/start" + q));
+      const ret = new URL(res.headers.get("location")!).searchParams.get("returnUrl")!;
+      expect(isAllowed(ret, [SITE])).toBe(true);
+      expect(new URL(ret).searchParams.get("state")).toBeTruthy();
+    }
   });
   it("start sets a random HttpOnly SameSite=Lax short-lived state cookie and puts the same state in returnUrl (F-05)", async () => {
     const a = await githubStart(new Request(SITE + "/api/auth/github/start"));

@@ -44,8 +44,8 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        app.MapHealthChecks("/health");
-        app.MapHealthChecks("/alive", new() { Predicate = _ => false });
+        app.MapHealthChecks("/health").AllowAnonymous(); // probes carry no token; the fallback policy must not catch them
+        app.MapHealthChecks("/alive", new() { Predicate = _ => false }).AllowAnonymous();
         return app;
     }
 

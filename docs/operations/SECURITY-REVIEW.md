@@ -102,7 +102,7 @@ Policies are defined in each service's `Program.cs:11-14`: `Authenticated` (sign
 | `/api/auth/login`, `/register`, `/logout`, `POST /refresh` | `checkOrigin` first (`handlers.ts:46-98`) | tokens only in `Set-Cookie`, never in a body (`finish`, line 25-31) |
 | `GET /api/auth/refresh?redirect=` | none (GET) | touches only the caller's own cookies; target through `safeRedirect`, `/api/` refused (`handlers.ts:104-115`) |
 | `GET /api/auth/session`, `/api/config`, `/api/health` | none | decode-only identity for display (`claims.ts:12`) or public config (no address, key, token) |
-| `GET /api/auth/github/start`, `/callback` | none | F-05 |
+| `GET /api/auth/github/start`, `/callback` | none | `start` sets the `gt_oauth_state` cookie; `callback` refuses unless the `state` query equals it (F-05, fixed) |
 | `/api/proxy/{directory,booking,reputation,assistant}/**` | `checkOrigin` (state-changing), then forwards the user's token from the cookie | segments validated (`safeSegments`), allow-list of 4 backends, `redirect: "manual"`, response `Set-Cookie` dropped (`proxy.ts:61-75, 114-116, 193`). It does not forward `X-Internal-Key` or `X-Payment-Signature` (allow-list `FORWARD_REQUEST`, line 48), so `/internal/*` and the webhook are not usable through it |
 | `/admin/ksiega/csv` | middleware (signature) + cookie decode admin flag; Booking verifies again | filename built from validated dates (`csvFileName`) |
 | `/konto/export` | cookie required; authservice authorises | |
@@ -292,14 +292,15 @@ Format of the guide: Location, Issue, Current code, Risk, Attack scenario, Impac
 
 ### F-05 GitHub sign-in callback is not bound to the browser that started it
 
-- **Location:** `web/src/lib/session/handlers.ts:133-157` (`githubStart`, `githubCallback`).
-- **Issue:** the BFF creates no `state`/nonce cookie. `githubCallback` takes `?code=` from the URL and exchanges it for a session. Whether authservice binds that one-time code to the initiating browser is outside this repository and not verified.
-- **Current code:** `const code = url.searchParams.get("code"); ... const r = await identity.exchange(code); ... return setSessionCookies(to(...), r.tokens, ...)`.
-- **Risk:** **Medium** (login CSRF), to be confirmed or closed against authservice.
-- **Attack scenario:** an attacker signs in with their own GitHub through `/api/auth/github/start`, stops before the final redirect and keeps the callback URL with their `code`. They lure a victim to that URL (a top-level GET; `SameSite=Lax` does not stop it). The victim's browser now holds the attacker's session. The victim then writes a brief, books or enters a practitioner profile, and the attacker, who owns that account, reads it.
-- **Impact:** disclosure of the victim's brief text and booking activity to the attacker; confusion of identities.
-- **Recommendation:** set a random `gt_oauth_state` cookie (HttpOnly, SameSite=Lax, 10 minutes) in `githubStart`, pass it through the authservice `returnUrl` query, and in `githubCallback` refuse unless the query value equals the cookie (constant time), then clear it. If authservice already binds the code to the browser, record that and downgrade.
-- **Proposed task:** T-10.11.
+- **Status: fixed in T-10.11 (this repository). Verified against authservice v0.3.4 (commit `dfcce91`, read-only clone, 2026-11-18).**
+- **Location:** `web/src/lib/session/handlers.ts` (`githubStart`, `githubCallback`), `web/src/lib/session/cookies.ts` (`gt_oauth_state`).
+- **What authservice does [read]:** it generates and validates the OAuth `state` of the GitHub leg itself (the ASP.NET `AddGitHub` handler and its correlation cookie, `Program.cs:231-237`, `ExternalAuthController.cs:87` `Challenge`, `:102` `GetExternalLoginInfoAsync`). That protects only GitHub -> authservice. The leg authservice -> web is `redirect <returnUrl>&code=<single-use code>` (`ExternalAuthController.cs:255,274`), and `POST /external-auth/exchange` redeems the code for tokens with no browser binding (`:293` `RedeemAsync(code)`; no cookie, no state, no PKCE). Whoever holds the code gets that user's session. So the gap was real and in our callback: the web handler accepted any `?code=`.
+- **Attack scenario (unchanged):** the attacker runs the flow with their own GitHub, keeps the callback URL with their `code`, lures the victim to it (top-level GET, `SameSite=Lax` does not stop it); the victim's browser then holds the attacker's session.
+- **Fix:** `githubStart` sets `gt_oauth_state` (32 random bytes, base64url, HttpOnly, SameSite=Lax, Secure on https, host-only, `Max-Age=600`) and adds the same value as `state` to the `returnUrl` query (authservice keeps the query and appends `&code=`). `githubCallback` refuses (no exchange, no session, `/logowanie?error=github_failed`) unless the query `state` equals the cookie (constant time, empty never matches), and every outcome deletes the cookie. The value is not signed: it is random and only ever compared with the cookie of the same browser, so a signature adds no property (a forged cookie needs the victim's browser; the host-only cookie cannot be set from another site).
+- **Tests:** `web/src/lib/session/session.test.ts` (`describe("github")`): cookie attributes and randomness, state in `returnUrl`, one-shot deletion, refusal for missing cookie / missing state / different / empty / other-length state (no backend call), open-redirect targets on start and callback. Three mutations (callback skips the check, comparison always true, empty accepted) each fail the suite. DevIdentity has no external-auth endpoints, so the e2e journeys J1-J7 do not touch this flow; the CI e2e job is the proof they still pass.
+- **Residual, not ours:** authservice has no per-browser binding of the exchange code; an authservice-side fix would be defence in depth. Question for the authservice maintainers: "Can `external-auth/callback` bind the exchange code to the browser that started the flow (a `state` echoed back, or a cookie on the authservice origin checked at `exchange`), or accept an optional client-supplied `state` that is returned unchanged and required at `exchange`?"
+- **Also found and fixed here:** authservice accepts a `returnUrl` only on an allowed origin with path `/oauth/callback` or below it (`ExternalAuthController.cs:344-352`, 400 at `:62`), but we sent `/api/auth/github/callback`, so the real v0.3.4 would have refused GitHub sign-in at start. The callback handler now lives at `web/src/app/oauth/callback/route.ts` and `githubStart` sends `<Site__BaseUrl>/oauth/callback?[redirect=..&]state=..`; a test encodes the authservice rule. The other authservice paths we call (`/api/v1/auth/login|register|refresh|logout|consents/versions`, `/api/v1/external-auth/exchange`) match the spike's table. Deployment: `OAuth__PostLoginRedirectBaseUrl` / `__PostLoginRedirectAllowedBaseUrls__0` must be the web origin (AUTH.md).
+- **Risk before the fix:** **Medium**; after: Low.
 
 ### F-06 No deny-by-default and no mechanical audit of the route table
 
@@ -358,14 +359,14 @@ Format of the guide: Location, Issue, Current code, Risk, Attack scenario, Impac
 1. Mock payment, mock e-mail and the single provider adapter are by design until T-09.05/T-09.06; F-01 only forces the choice to be explicit.
 2. Contact-detail detection is a heuristic (SPEC 6.1 calls it anti-leakage, not security): a user can obfuscate a number.
 3. A review's text and the brief go to an external model (the Assistant); the user is told by the product text, the legal text is T-10.02 (owner).
-4. Authservice (login brute force, MFA, e-mail confirmation, password hashing, the exchange-code binding of F-05) is outside this repository.
+4. Authservice (login brute force, MFA, e-mail confirmation, password hashing, the exchange-code binding, which F-05 works around with our own state cookie) is outside this repository.
 5. No MFA for administrators; any `Admin` can approve profiles, resolve disputes and export the ledger (SPEC 4.3 design).
 6. The guide's penetration-test caveat applies.
 
 ## 12. Not reviewed (needs staging or is out of the repository)
 
 - Headers and TLS actually served by Fly; `force_https`; whether the Fly proxy rewrites `RemoteIpAddress`; whether `/internal/v1/test/*` answers 404 on the deployed apps (needed: CONTRACTS 10.4 integration test); CORS preflight against the public host.
-- authservice behaviour: staging value of `Auth__RequireConfirmedEmail`, rate limiting on login and refresh, the exchange-code binding (F-05), token lifetimes, JWKS with one key (`scripts/assert-jwks-one-key.sh` exists; not run).
+- authservice behaviour: staging value of `Auth__RequireConfirmedEmail`, rate limiting on login and refresh, the exchange-code binding (F-05: read in source at v0.3.4, not run), token lifetimes, JWKS with one key (`scripts/assert-jwks-one-key.sh` exists; not run).
 - The e2e journeys and the whole `dotnet test` suite were not run for this docs-only change; tests are cited by reading them.
 - The pages' accessibility and SEO rules (not security).
 
@@ -377,7 +378,7 @@ Format of the guide: Location, Issue, Current code, Risk, Attack scenario, Impac
 | T-10.09 | Security headers on the web app (CSP with nonce, frame-ancestors, nosniff, referrer, permissions) with a header test | F-02 | Medium | verify on staging after T-09.08 |
 | T-10.10 | Private network for Directory, Reputation, Assistant; internal key minimum strength; per-caller keys | F-03 | Medium | depends on the deployment decision about the Booking webhook path (owner) |
 | (existing) T-10.03 / PR #110 | Rate limits of CONTRACTS 10.2; visitor address | F-04 | Medium | re-review after merge: middleware order, `RateLimit__TrustedProxyKey` on 5 apps, direct listeners |
-| T-10.11 | `state` cookie for the GitHub sign-in callback (or record that authservice binds the code) | F-05 | Medium | confirm with authservice first |
+| T-10.11 | `state` cookie for the GitHub sign-in callback | F-05 | Medium | done (authservice does not bind the code) |
 | T-10.12 | Fallback authorization policy and a route-table test (anonymous list committed) | F-06 | Medium | |
 
 Low findings (F-07 to F-13) are optional backlog: T-10.13 (OpenAPI off outside non-deployed, F-07), T-10.14 (admin separation of duties, F-08), T-10.15 (profile text and URL re-review, F-09), T-10.16 (production config fail-closed, F-10 and F-11).

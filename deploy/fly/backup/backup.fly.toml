@@ -1,0 +1,29 @@
+# Daily backup of the five databases to object storage (T-10.05). A TEMPLATE: never deployed, never validated by `fly config validate` (no account yet).
+# One-off app, no public listener. It runs as a SCHEDULED MACHINE: Fly's scheduler starts it daily and it exits when done (nothing runs between runs).
+#
+#   fly apps create gabinety-backup-staging --org <org>
+#   fly secrets set --app gabinety-backup-staging \
+#       PGPASSWORD="<the POSTGRES_PASSWORD of gabinety-postgres-staging>" \
+#       RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID="<ACCESS_KEY_ID>" RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY="<SECRET_ACCESS_KEY>"
+#   fly deploy --config deploy/fly/backup/backup.fly.toml --build-only --push      # builds the image, prints its reference
+#   fly machine run <image-reference-printed-above> --app gabinety-backup-staging --region fra --schedule daily --vm-size shared-cpu-1x --vm-memory 256
+#   (the flag names are from Fly's documentation of scheduled machines; verify with `fly machine run --help` on first use)
+# The values in [env] are not secret. <BUCKET> and <S3_ENDPOINT> are the owner's choice (open question, see README.md).
+
+app = "gabinety-backup-staging"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PGHOST = "gabinety-postgres-staging.internal"
+  PGPORT = "5432"
+  PGUSER = "postgres"
+  BACKUP_REMOTE = "backup:<BUCKET>/staging"
+  RCLONE_CONFIG_BACKUP_TYPE = "s3"
+  RCLONE_CONFIG_BACKUP_PROVIDER = "Other"
+  RCLONE_CONFIG_BACKUP_ENDPOINT = "<S3_ENDPOINT>"
+  RCLONE_CONFIG_BACKUP_REGION = "<REGION>"
+  KEEP_DAILY = "7"
+  KEEP_WEEKLY = "4"

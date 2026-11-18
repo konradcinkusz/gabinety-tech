@@ -8,5 +8,6 @@ public static class SeedSteps
         new DirectorySeedStep(),
         new BookingSeedStep(),
         new ReputationSeedStep(),
+        new ScaleSeedStep(),
     }.OrderBy(s => s.Order).ToArray();
 }

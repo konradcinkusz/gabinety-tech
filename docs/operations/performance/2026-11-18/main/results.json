@@ -1,0 +1,366 @@
+{
+  "environment": {
+    "date": "2026-11-18T10:56:00Z",
+    "commit": "e272acfb599a18c881cf07e1f94a6a64f6e6a560",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "memoryGiB": 15.7,
+    "kernel": "Linux 6.18.44-fc-v595",
+    "dotnet": "10.0.404",
+    "node": "v22.23.5",
+    "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "dbProfile": "postgres",
+    "approvedPractitioners": 1996,
+    "webUrl": "http://localhost:3000",
+    "webMode": "next start (production build)",
+    "durationSeconds": 20,
+    "concurrency": 20,
+    "lighthouse": "13.6.0"
+  },
+  "rows": [
+    {
+      "id": "list",
+      "row": "GET /api/v1/practitioners (filtered, 12 items), server time, 20 clients",
+      "tool": "scripts/perf/load.mjs",
+      "command": "node /home/user/gabinety-tech/scripts/perf/load.mjs --name list --concurrency 20 --duration 20 --warmup 3 --urls http://localhost:5101/api/v1/practitioners?problem=audyt-kodu&duration=30&limit=12,http://localhost:5101/api/v1/practitioners?problem=audyt-kodu&duration=60&limit=12,http://localhost:5101/api/v1/practitioners?problem=migracja-legacy-dotnet&duration=60&limit=12,http://localhost:5101/api/v1/practitioners?problem=integracja-ai&duration=30&limit=12,http://localhost:5101/api/v1/practitioners?problem=integracja-ai&duration=60&limit=12,http://localhost:5101/api/v1/practitioners?problem=automatyzacja-procesow&duration=60&limit=12,http://localhost:5101/api/v1/practitioners?problem=architektura-systemu&duration=30&limit=12,http://localhost:5101/api/v1/practitioners?problem=architektura-systemu&duration=60&limit=12,http://localhost:5101/api/v1/practitioners?problem=code-review&duration=60&limit=12,http://localhost:5101/api/v1/practitioners?problem=wycena-projektu&duration=30&limit=12,http://localhost:5101/api/v1/practitioners?problem=wycena-projektu&duration=60&limit=12,http://localhost:5101/api/v1/practitioners?problem=rozwiazanie-awarii&duration=60&limit=12,http://localhost:5101/api/v1/practitioners?problem=audyt-kodu&tech=dotnet&limit=12,http://localhost:5101/api/v1/practitioners?problem=audyt-kodu&tech=csharp&limit=12,http://localhost:5101/api/v1/practitioners?problem=audyt-kodu&tech=entity-framework&limit=12,http://localhost:5101/api/v1/practitioners?problem=migracja-legacy-dotnet&tech=csharp&limit=12,http://localhost:5101/api/v1/practitioners?problem=integracja-ai&tech=aspnet-core&limit=12,http://localhost:5101/api/v1/practitioners?problem=integracja-ai&tech=entity-framework&limit=12,http://localhost:5101/api/v1/practitioners?problem=automatyzacja-procesow&tech=entity-framework&limit=12",
+      "metric": "p95 total ms",
+      "value": 29.75,
+      "unit": "ms",
+      "target": 300,
+      "verdict": "pass",
+      "requests": 24103,
+      "rps": 1204.6,
+      "statusCounts": {
+        "200": 24103
+      },
+      "ttfbMs": {
+        "p50": 15.08,
+        "p75": 19.69,
+        "p95": 29.73,
+        "p99": 37.39,
+        "max": 72.04
+      },
+      "totalMs": {
+        "p50": 15.09,
+        "p75": 19.7,
+        "p95": 29.75,
+        "p99": 37.39,
+        "max": 72.05
+      },
+      "note": "1996 approved practitioners; the client-side total includes JSON transfer on loopback, so it is at or above the server time"
+    },
+    {
+      "id": "slots",
+      "row": "GET .../slots, 14 days",
+      "tool": "scripts/perf/load.mjs",
+      "command": "node /home/user/gabinety-tech/scripts/perf/load.mjs --name slots --concurrency 20 --duration 20 --warmup 3 --urls http://localhost:5102/api/v1/practitioners/36a58317-5789-4ba8-8787-b04ebaf579c7/slots?offeringId=f8f3c30f-5950-4cf3-9725-85022cbffef0&from=2026-11-18&to=2026-12-01,http://localhost:5102/api/v1/practitioners/36a58317-5789-4ba8-8787-b04ebaf579c7/slots?offeringId=73757ba9-eb05-4887-975f-6cb2bd4b5d10&from=2026-11-18&to=2026-12-01,http://localhost:5102/api/v1/practitioners/f5629e43-da9c-49e7-a7cf-a686b60bb35a/slots?offeringId=9e8ff6d4-67f3-49f1-ad7a-39f4b6adda7c&from=2026-11-18&to=2026-12-01,http://localhost:5102/api/v1/practitioners/f5629e43-da9c-49e7-a7cf-a686b60bb35a/slots?offeringId=ea7591c4-57da-4933-bfd0-3f9c6f2efe1d&from=2026-11-18&to=2026-12-01,http://localhost:5102/api/v1/practitioners/5fe3d22e-d894-4875-9f74-9d1c1948081d/slots?offeringId=51b4c11c-128e-4f65-81ed-a94ed4e55468&from=2026-11-18&to=2026-12-01,http://localhost:5102/api/v1/practitioners/1141b1bc-9c49-4cdc-984d-12c698a7fea7/slots?offeringId=9960801e-815d-439b-835f-80f895ab0386&from=2026-11-18&to=2026-12-01,http://localhost:5102/api/v1/practitioners/114f7c1e-106f-4abe-b50a-4d69c0281fc0/slots?offeringId=03a142cf-d527-41e3-b939-8149e1bc4217&from=2026-11-18&to=2026-12-01,http://localhost:5102/api/v1/practitioners/114f7c1e-106f-4abe-b50a-4d69c0281fc0/slots?offeringId=18922f65-062b-40f4-b1df-a570ff0dd7d3&from=2026-11-18&to=2026-12-01,http://localhost:5102/api/v1/practitioners/37f8c4b0-71ab-4ce3-a6e6-1ca5b7fa91ad/slots?offeringId=4827ce35-9f15-42a8-b93e-e775acfe25ef&from=2026-11-18&to=2026-12-01,http://localhost:5102/api/v1/practitioners/37f8c4b0-71ab-4ce3-a6e6-1ca5b7fa91ad/slots?offeringId=c3f9a85f-0338-4b94-974f-d4c9bff57be0&from=2026-11-18&to=2026-12-01",
+      "metric": "p95 total ms",
+      "value": 37.77,
+      "unit": "ms",
+      "target": 200,
+      "verdict": "pass",
+      "requests": 17912,
+      "rps": 894.9,
+      "statusCounts": {
+        "200": 17912
+      },
+      "ttfbMs": {
+        "p50": 20.73,
+        "p75": 26.01,
+        "p95": 37.74,
+        "p99": 48.22,
+        "max": 84.13
+      },
+      "totalMs": {
+        "p50": 20.77,
+        "p75": 26.04,
+        "p95": 37.77,
+        "p99": 48.23,
+        "max": 84.13
+      },
+      "note": "20 clients rotating over the slots URLs of the six practitioners with availability"
+    },
+    {
+      "id": "bookings",
+      "row": "POST /api/v1/bookings",
+      "tool": "scripts/perf/load.mjs",
+      "command": "node /home/user/gabinety-tech/scripts/perf/load.mjs --name bookings --concurrency 4 --requests /tmp/claude-0/perf/run2/inputs/booking-requests.json",
+      "metric": "p95 total ms",
+      "value": 19.36,
+      "unit": "ms",
+      "target": 500,
+      "verdict": "pass",
+      "requests": 120,
+      "rps": 318.5,
+      "statusCounts": {
+        "201": 120
+      },
+      "ttfbMs": {
+        "p50": 11.37,
+        "p75": 13.73,
+        "p95": 19.26,
+        "p99": 22.96,
+        "max": 28.62
+      },
+      "totalMs": {
+        "p50": 11.44,
+        "p75": 13.81,
+        "p95": 19.36,
+        "p99": 23.04,
+        "max": 28.72
+      },
+      "note": "120 of 120 wanted requests prepared, 4 clients, distinct slots; the mock payment provider answers in-process, so the provider call is not part of it"
+    },
+    {
+      "id": "category-ttfb",
+      "row": "Category page time to first byte, cached, p75",
+      "tool": "scripts/perf/load.mjs",
+      "command": "node /home/user/gabinety-tech/scripts/perf/load.mjs --name category-c1 --concurrency 1 --duration 20 --warmup 3 --urls http://localhost:3000/programisci/audyt-kodu  |  node /home/user/gabinety-tech/scripts/perf/load.mjs --name category-c20 --concurrency 20 --duration 20 --warmup 3 --urls http://localhost:3000/programisci/audyt-kodu",
+      "metric": "p75 ttfb ms (worse of 1 and 20 clients)",
+      "value": 143.48,
+      "unit": "ms",
+      "target": 800,
+      "verdict": "pass",
+      "detail": {
+        "unloaded": {
+          "p50": 6.16,
+          "p75": 7.66,
+          "p95": 9.81,
+          "p99": 14.08,
+          "max": 124.09
+        },
+        "loaded20": {
+          "p50": 126.9,
+          "p75": 143.48,
+          "p95": 171.64,
+          "p99": 205.8,
+          "max": 289.72
+        },
+        "rpsUnloaded": 142.9,
+        "rpsLoaded20": 150.4
+      },
+      "note": "local loopback to the production build (`next start`), NOT from outside and NOT staging"
+    },
+    {
+      "id": "lcp",
+      "row": "Category page Largest Contentful Paint, mobile profile, lab",
+      "tool": "lighthouse 13.6.0 (npx)",
+      "command": "npx --yes lighthouse@13.6.0 http://localhost:3000/programisci/audyt-kodu --quiet --only-categories=performance --output=json --chrome-flags='--headless --no-sandbox'",
+      "metric": "LCP ms, median of runs (all runs listed)",
+      "value": 911.636,
+      "unit": "ms",
+      "target": 2500,
+      "verdict": "pass",
+      "detail": {
+        "runs": [
+          {
+            "lcpMs": 911.636,
+            "cls": 0,
+            "fcpMs": 911.636,
+            "tbtMs": 59,
+            "ttfbMs": 12,
+            "score": 1
+          },
+          {
+            "lcpMs": 910.1454000000001,
+            "cls": 0,
+            "fcpMs": 910.1454000000001,
+            "tbtMs": 107.99999999999977,
+            "ttfbMs": 9,
+            "score": 0.99
+          },
+          {
+            "lcpMs": 913.5633,
+            "cls": 0,
+            "fcpMs": 913.5633,
+            "tbtMs": 57.5,
+            "ttfbMs": 8,
+            "score": 1
+          }
+        ],
+        "throttling": "simulate",
+        "formFactor": "mobile"
+      },
+      "note": "local production build, Chromium of this container, Lighthouse default mobile emulation with simulated throttling; SPEC 13 asks for CI against staging"
+    },
+    {
+      "id": "brief",
+      "row": "`brief` end to end, p95",
+      "tool": "-",
+      "metric": "p95 s",
+      "value": null,
+      "target": 20000,
+      "verdict": "not measured",
+      "note": "needs the Assistant on a real bring-your-own-key model (T-06.05, owner's key); the fake model proves nothing about it"
+    },
+    {
+      "id": "joblag",
+      "row": "Job lag (hold expiry, auto-complete, payout), p99",
+      "tool": "-",
+      "metric": "p99 s over 24 h",
+      "value": null,
+      "target": 120000,
+      "verdict": "not measured",
+      "note": "staging not deployed; the row asks for 24 h on staging"
+    }
+  ],
+  "pr113": [
+    {
+      "page": "programisci",
+      "clients": 1,
+      "baseline": {
+        "rps": 144.1,
+        "ttfbMs": {
+          "p50": 6.11,
+          "p75": 7.64,
+          "p95": 10.3,
+          "p99": 15.92,
+          "max": 100.85
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 133.5,
+        "ttfbMs": {
+          "p50": 7.13,
+          "p75": 8.22,
+          "p95": 10.94,
+          "p99": 16.2,
+          "max": 32.99
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "programisci",
+      "clients": 20,
+      "baseline": {
+        "rps": 145.9,
+        "ttfbMs": {
+          "p50": 129.95,
+          "p75": 157.61,
+          "p95": 181.79,
+          "p99": 197.87,
+          "max": 321.52
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 148,
+        "ttfbMs": {
+          "p50": 131.12,
+          "p75": 153.2,
+          "p95": 174.56,
+          "p99": 193.8,
+          "max": 207.82
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "gabinet",
+      "clients": 1,
+      "baseline": {
+        "rps": 238.3,
+        "ttfbMs": {
+          "p50": 3.63,
+          "p75": 4.6,
+          "p95": 6.06,
+          "p99": 8.13,
+          "max": 16.59
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 221,
+        "ttfbMs": {
+          "p50": 3.88,
+          "p75": 5.06,
+          "p95": 6.72,
+          "p99": 9.62,
+          "max": 20.29
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "gabinet",
+      "clients": 20,
+      "baseline": {
+        "rps": 255.9,
+        "ttfbMs": {
+          "p50": 73.34,
+          "p75": 86.64,
+          "p95": 107.34,
+          "p99": 119.93,
+          "max": 140.18
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 249.7,
+        "ttfbMs": {
+          "p50": 74.24,
+          "p75": 87.39,
+          "p95": 108.83,
+          "p99": 125.02,
+          "max": 151.43
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "regulamin",
+      "clients": 1,
+      "baseline": {
+        "rps": 972.6,
+        "ttfbMs": {
+          "p50": 0.91,
+          "p75": 1.1,
+          "p95": 1.34,
+          "p99": 2.31,
+          "max": 11.41
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 280.2,
+        "ttfbMs": {
+          "p50": 3.1,
+          "p75": 3.84,
+          "p95": 5.43,
+          "p99": 7.69,
+          "max": 14.06
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "regulamin",
+      "clients": 20,
+      "baseline": {
+        "rps": 1142.1,
+        "ttfbMs": {
+          "p50": 16.09,
+          "p75": 19.68,
+          "p95": 25.55,
+          "p99": 36.26,
+          "max": 60.85
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 329.5,
+        "ttfbMs": {
+          "p50": 56.34,
+          "p75": 65.11,
+          "p95": 84.16,
+          "p99": 102.88,
+          "max": 126
+        },
+        "nonOk": 0
+      }
+    }
+  ],
+  "note": "Measured on one container; NOT comparable with staging."
+}

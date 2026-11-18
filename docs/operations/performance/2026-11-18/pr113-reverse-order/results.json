@@ -1,0 +1,251 @@
+{
+  "environment": {
+    "date": "2026-11-18T11:02:49Z",
+    "commit": "2d83277ec04d70a70f6a331512397827f0c10006",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "memoryGiB": 15.7,
+    "kernel": "Linux 6.18.44-fc-v595",
+    "dotnet": "10.0.404",
+    "node": "v22.23.5",
+    "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "dbProfile": "postgres",
+    "approvedPractitioners": 1996,
+    "webUrl": "http://localhost:3000",
+    "webMode": "next start (production build)",
+    "durationSeconds": 20,
+    "concurrency": 20,
+    "lighthouse": "13.6.0"
+  },
+  "rows": [
+    {
+      "id": "list",
+      "row": "GET /api/v1/practitioners (filtered, 12 items), server time, 20 clients",
+      "tool": "scripts/perf/load.mjs",
+      "metric": "p95 total ms",
+      "value": null,
+      "target": 300,
+      "verdict": "not measured",
+      "note": "no raw result"
+    },
+    {
+      "id": "slots",
+      "row": "GET .../slots, 14 days",
+      "tool": "scripts/perf/load.mjs",
+      "metric": "p95 total ms",
+      "value": null,
+      "target": 200,
+      "verdict": "not measured",
+      "note": "no raw result"
+    },
+    {
+      "id": "bookings",
+      "row": "POST /api/v1/bookings",
+      "tool": "scripts/perf/load.mjs",
+      "metric": "p95 total ms",
+      "value": null,
+      "target": 500,
+      "verdict": "not measured",
+      "note": "no raw result"
+    },
+    {
+      "id": "category-ttfb",
+      "row": "Category page time to first byte, cached, p75",
+      "tool": "-",
+      "metric": "p75 ttfb ms",
+      "value": null,
+      "target": 800,
+      "verdict": "not measured",
+      "note": "no raw result"
+    },
+    {
+      "id": "lcp",
+      "row": "Category page Largest Contentful Paint, mobile profile, lab",
+      "tool": "lighthouse",
+      "metric": "LCP ms",
+      "value": null,
+      "target": 2500,
+      "verdict": "not measured",
+      "note": "Lighthouse did not run (SKIP_LIGHTHOUSE=1 or it failed)"
+    },
+    {
+      "id": "brief",
+      "row": "`brief` end to end, p95",
+      "tool": "-",
+      "metric": "p95 s",
+      "value": null,
+      "target": 20000,
+      "verdict": "not measured",
+      "note": "needs the Assistant on a real bring-your-own-key model (T-06.05, owner's key); the fake model proves nothing about it"
+    },
+    {
+      "id": "joblag",
+      "row": "Job lag (hold expiry, auto-complete, payout), p99",
+      "tool": "-",
+      "metric": "p99 s over 24 h",
+      "value": null,
+      "target": 120000,
+      "verdict": "not measured",
+      "note": "staging not deployed; the row asks for 24 h on staging"
+    }
+  ],
+  "pr113": [
+    {
+      "page": "programisci",
+      "clients": 1,
+      "baseline": {
+        "rps": 154.8,
+        "ttfbMs": {
+          "p50": 5.52,
+          "p75": 7.22,
+          "p95": 9.9,
+          "p99": 14.65,
+          "max": 20.33
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 140.6,
+        "ttfbMs": {
+          "p50": 6.15,
+          "p75": 7.94,
+          "p95": 10.65,
+          "p99": 15.21,
+          "max": 86.76
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "programisci",
+      "clients": 20,
+      "baseline": {
+        "rps": 165,
+        "ttfbMs": {
+          "p50": 113.8,
+          "p75": 131.5,
+          "p95": 159.08,
+          "p99": 184.21,
+          "max": 201.82
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 153.4,
+        "ttfbMs": {
+          "p50": 125.2,
+          "p75": 142.13,
+          "p95": 168.33,
+          "p99": 181.56,
+          "max": 260.93
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "gabinet",
+      "clients": 1,
+      "baseline": {
+        "rps": 240.5,
+        "ttfbMs": {
+          "p50": 3.61,
+          "p75": 4.51,
+          "p95": 6.05,
+          "p99": 8.58,
+          "max": 16.45
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 229.5,
+        "ttfbMs": {
+          "p50": 3.79,
+          "p75": 4.7,
+          "p95": 6.2,
+          "p99": 9.61,
+          "max": 17.64
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "gabinet",
+      "clients": 20,
+      "baseline": {
+        "rps": 262,
+        "ttfbMs": {
+          "p50": 70.92,
+          "p75": 85.68,
+          "p95": 101,
+          "p99": 113.54,
+          "max": 178.2
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 243.1,
+        "ttfbMs": {
+          "p50": 77.21,
+          "p75": 89.64,
+          "p95": 109.23,
+          "p99": 124.31,
+          "max": 133.74
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "regulamin",
+      "clients": 1,
+      "baseline": {
+        "rps": 1044.1,
+        "ttfbMs": {
+          "p50": 0.84,
+          "p75": 0.97,
+          "p95": 1.27,
+          "p99": 2.11,
+          "max": 21.75
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 288.1,
+        "ttfbMs": {
+          "p50": 2.97,
+          "p75": 3.75,
+          "p95": 5.25,
+          "p99": 7.42,
+          "max": 25.77
+        },
+        "nonOk": 0
+      }
+    },
+    {
+      "page": "regulamin",
+      "clients": 20,
+      "baseline": {
+        "rps": 1218.1,
+        "ttfbMs": {
+          "p50": 14.67,
+          "p75": 17.83,
+          "p95": 25.6,
+          "p99": 32.77,
+          "max": 63.27
+        },
+        "nonOk": 0
+      },
+      "current": {
+        "rps": 331.8,
+        "ttfbMs": {
+          "p50": 55.33,
+          "p75": 66.09,
+          "p95": 83.74,
+          "p99": 92.41,
+          "max": 137.03
+        },
+        "nonOk": 0
+      }
+    }
+  ],
+  "note": "Measured on one container; NOT comparable with staging."
+}

@@ -131,7 +131,7 @@ public class ReputationSeedStepTests(ReputationSeedFixture fx) : IClassFixture<R
     public void The_step_runs_after_Booking_and_is_registered_once()
     {
         var names = SeedSteps.All.Select(s => s.Name).ToList();
-        Assert.Equal(["directory", "booking", "reputation"], names);
+        Assert.Equal(["directory", "booking", "reputation", "scale"], names);
         Assert.Equal(300, new ReputationSeedStep().Order);
     }
 

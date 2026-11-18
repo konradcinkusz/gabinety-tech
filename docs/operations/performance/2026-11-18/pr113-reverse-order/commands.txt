@@ -1,0 +1,12 @@
+pr113-current-programisci-c1	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-current-programisci-c1 --concurrency 1 --duration 20 --warmup 3 --urls http://localhost:3000/programisci
+pr113-current-programisci-c20	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-current-programisci-c20 --concurrency 20 --duration 20 --warmup 3 --urls http://localhost:3000/programisci
+pr113-current-gabinet-c1	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-current-gabinet-c1 --concurrency 1 --duration 20 --warmup 3 --urls http://localhost:3000/gabinet/demo-filip-syntetyczny
+pr113-current-gabinet-c20	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-current-gabinet-c20 --concurrency 20 --duration 20 --warmup 3 --urls http://localhost:3000/gabinet/demo-filip-syntetyczny
+pr113-current-regulamin-c1	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-current-regulamin-c1 --concurrency 1 --duration 20 --warmup 3 --urls http://localhost:3000/regulamin
+pr113-current-regulamin-c20	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-current-regulamin-c20 --concurrency 20 --duration 20 --warmup 3 --urls http://localhost:3000/regulamin
+pr113-baseline-programisci-c1	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-baseline-programisci-c1 --concurrency 1 --duration 20 --warmup 3 --urls http://localhost:3001/programisci
+pr113-baseline-programisci-c20	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-baseline-programisci-c20 --concurrency 20 --duration 20 --warmup 3 --urls http://localhost:3001/programisci
+pr113-baseline-gabinet-c1	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-baseline-gabinet-c1 --concurrency 1 --duration 20 --warmup 3 --urls http://localhost:3001/gabinet/demo-filip-syntetyczny
+pr113-baseline-gabinet-c20	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-baseline-gabinet-c20 --concurrency 20 --duration 20 --warmup 3 --urls http://localhost:3001/gabinet/demo-filip-syntetyczny
+pr113-baseline-regulamin-c1	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-baseline-regulamin-c1 --concurrency 1 --duration 20 --warmup 3 --urls http://localhost:3001/regulamin
+pr113-baseline-regulamin-c20	node /home/user/gabinety-tech/scripts/perf/load.mjs --name pr113-baseline-regulamin-c20 --concurrency 20 --duration 20 --warmup 3 --urls http://localhost:3001/regulamin

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace Gabinety.ServiceDefaults;
+// Own project (SPEC 6 caps the kernel at 400 lines): src/Gabinety.ServiceDefaults.Edge, same namespace so Program.cs needs no new using.
 
 /// <summary>
 /// F-03 (T-10.10): defence in depth for the internal routes. The primary control is the network (only Booking has a public Fly listener, deploy/estate.conf);
@@ -15,9 +16,9 @@ public static class InternalAccess
     /// <summary>
     /// Headers the Fly edge proxy sets on a request that arrived from the Internet. A request that reaches a machine directly over the private network
     /// (<c>&lt;app&gt;.internal</c>, 6PN) does not pass the proxy and carries none of them. Not verified against the Fly documentation from this build environment
-    /// (fly.io was unreachable): the list is configurable with <c>Internal:PublicEdgeHeaders</c> (comma separated) and the deployment must confirm it (RUNBOOK 11, item 9).
+    /// (fly.io was unreachable): the list is configurable with <c>Internal:EdgeHeaders</c> (comma separated) and the deployment must confirm it (RUNBOOK 11, item 9).
     /// </summary>
-    public static readonly string[] DefaultPublicEdgeHeaders =
+    public static readonly string[] DefaultEdgeHeaders =
         ["Fly-Client-IP", "X-Forwarded-For", "Fly-Forwarded-Proto", "Fly-Forwarded-Port", "Fly-Forwarded-Ssl", "X-Forwarded-Proto"];
 
     /// <summary><c>Internal:RejectPublicEdge</c>; absent means true, except in the fake profile (<c>GABINETY_FAKE=1</c>), where every caller is localhost and there is no edge.</summary>
@@ -26,9 +27,9 @@ public static class InternalAccess
 
     public static bool IsPublicEdge(HttpRequest request, IConfiguration config)
     {
-        var raw = config["Internal:PublicEdgeHeaders"];
+        var raw = config["Internal:EdgeHeaders"];
         var names = string.IsNullOrWhiteSpace(raw)
-            ? DefaultPublicEdgeHeaders
+            ? DefaultEdgeHeaders
             : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         foreach (var n in names)
             if (request.Headers.ContainsKey(n)) return true;
@@ -45,9 +46,13 @@ public static class InternalAccess
         var config = app.ApplicationServices.GetRequiredService<IConfiguration>();
         return app.Use(async (ctx, next) =>
         {
-            if (RejectPublicEdge(config) && IsPublicEdge(ctx.Request, config)
-                && (ctx.Request.Path.StartsWithSegments("/internal", StringComparison.OrdinalIgnoreCase)
-                    || (publicPath is not null && !publicPath(ctx.Request))))
+            if (!RejectPublicEdge(config)) { await next(); return; }
+            // X-Edge-Key (the BFF's rate-limit proxy key, RateLimitTable) is not an edge header: the web app sends it over the private network to routes Booking filters for the public.
+            // But it must never open /internal/*, which stays behind the internal-key policy only, so a request carrying it is refused there like an edge request.
+            var internalPath = ctx.Request.Path.StartsWithSegments("/internal", StringComparison.OrdinalIgnoreCase);
+            var viaEdge = IsPublicEdge(ctx.Request, config);
+            if ((internalPath && (viaEdge || ctx.Request.Headers.ContainsKey(RateLimitTable.TrustedProxyKeyHeader)))
+                || (viaEdge && publicPath is not null && !publicPath(ctx.Request)))
             {
                 ctx.Response.StatusCode = StatusCodes.Status404NotFound;
                 return;
@@ -70,7 +75,7 @@ public static class InternalAccess
     }
 
     /// <summary>
-    /// Every configured internal key is strong and no two secrets are the same: not two callers on this callee, not the callee key and a caller key,
+    /// Every configured internal key and the rate-limit proxy key are strong and no two secrets are the same: not two callers on this callee, not the callee key and a caller key,
     /// not two outgoing keys of this caller (<c>Internal:Keys:&lt;Callee&gt;</c>). Messages name the settings, never a value. Throws <see cref="InvalidOperationException"/>.
     /// </summary>
     public static void ValidateKeys(IConfiguration config)
@@ -82,6 +87,7 @@ public static class InternalAccess
         foreach (var c in config.GetSection("Internal:Keys").GetChildren())
             if (!string.IsNullOrEmpty(c.Value)) named.Add(($"Internal:Keys:{c.Key}", c.Value));
 
+        if (!string.IsNullOrEmpty(config["RateLimit:TrustedProxyKey"])) named.Add(("RateLimit:TrustedProxyKey", config["RateLimit:TrustedProxyKey"]!));
         var weak = named.Where(n => !IsStrong(n.Key)).Select(n => n.Name).ToList();
         if (weak.Count > 0)
             throw new InvalidOperationException(
@@ -97,6 +103,9 @@ public static class InternalAccess
     /// </summary>
     public static bool EnforceKeyStrength(IConfiguration config, IHostEnvironment env) =>
         bool.TryParse(config["Internal:EnforceKeyStrength"], out var set) ? set : config["GABINETY_FAKE"] != "1" && !env.IsDevelopment();
+
+    /// <summary>Registers the startup validation of the internal keys and of <c>RateLimit:TrustedProxyKey</c> (see <see cref="EnforceKeyStrength"/>).</summary>
+    public static IServiceCollection AddInternalKeyValidation(this IServiceCollection services) => services.AddHostedService<KeyValidationService>();
 
     internal sealed class KeyValidationService(IConfiguration config, IHostEnvironment env) : IHostedLifecycleService
     {

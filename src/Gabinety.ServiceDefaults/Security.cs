@@ -35,13 +35,10 @@ public static class Security
     /// <summary>
     /// X-Internal-Key compared in constant time against the per-caller keys <c>Internal:Callers:&lt;Caller&gt;</c> (the matching caller becomes the <c>caller</c> claim), against
     /// Internal:Key (the single key of the fake profile and tests) and, during a rotation, against Internal:PreviousKey (RUNBOOK 5.3). Blank is the same as absent.
-    /// Outside the fake profile and Development the service refuses to start unless every key is strong and distinct (F-03, ADR-0007).
+    /// Strength and distinctness are checked at start by Gabinety.ServiceDefaults.Edge (F-03, ADR-0007).
     /// </summary>
-    public static AuthenticationBuilder AddInternalKeyAuthentication(this AuthenticationBuilder auth)
-    {
-        auth.Services.AddHostedService<InternalAccess.KeyValidationService>();
-        return auth.AddScheme<AuthenticationSchemeOptions, InternalKeyHandler>(InternalScheme, null);
-    }
+    public static AuthenticationBuilder AddInternalKeyAuthentication(this AuthenticationBuilder auth) =>
+        auth.AddScheme<AuthenticationSchemeOptions, InternalKeyHandler>(InternalScheme, null);
 
     public const int DefaultPerMinute = RateLimitTable.DefaultPerMinute;
 
@@ -133,11 +130,9 @@ public static class Security
 /// <summary>The key check of the internal scheme, shared by every service. A key value is never logged and never put in a message.</summary>
 public static class InternalKey
 {
-    public const string HeaderName = "X-Internal-Key";
-    public const string CurrentSetting = "Internal:Key", PreviousSetting = "Internal:PreviousKey";
+    public const string HeaderName = "X-Internal-Key", CurrentSetting = "Internal:Key", PreviousSetting = "Internal:PreviousKey";
 
-    public const string CallersSection = "Internal:Callers";
-    public const string SharedCaller = "shared";
+    public const string CallersSection = "Internal:Callers", SharedCaller = "shared";
 
     /// <summary>True when a key is set (Internal:Key or any Internal:Callers:*); without one the scheme authenticates nobody.</summary>
     public static bool Configured(IConfiguration config) => !string.IsNullOrEmpty(config[CurrentSetting]) || Callers(config).Any();
@@ -156,9 +151,8 @@ public static class InternalKey
         var g = Encoding.UTF8.GetBytes(given);
         string? hit = null;
         foreach (var (caller, key) in Callers(config)) if (Equal(key, g)) hit ??= caller;
-        var current = Equal(config[CurrentSetting], g);
-        var previous = !string.IsNullOrEmpty(config[CurrentSetting]) && Equal(config[PreviousSetting], g);
-        return current | previous ? hit ?? SharedCaller : hit;
+        var shared = Equal(config[CurrentSetting], g) | (!string.IsNullOrEmpty(config[CurrentSetting]) && Equal(config[PreviousSetting], g));
+        return shared ? hit ?? SharedCaller : hit;
     }
 
     public static bool Matches(IConfiguration config, string? given) => Caller(config, given) is not null;

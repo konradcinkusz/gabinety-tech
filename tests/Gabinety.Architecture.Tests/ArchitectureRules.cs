@@ -14,10 +14,11 @@ public partial class ArchitectureRules
     {
         ["Gabinety.Billing"] = [], ["Gabinety.Scheduling"] = [], ["Gabinety.Ranking"] = [], ["Gabinety.Llm"] = [], ["Gabinety.Contracts"] = [],
         ["Gabinety.ServiceDefaults"] = [],
-        ["Gabinety.Directory"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts", "Gabinety.Ranking"],
-        ["Gabinety.Booking"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts", "Gabinety.Billing", "Gabinety.Scheduling"],
-        ["Gabinety.Reputation"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts"],
-        ["Gabinety.Assistant"] = ["Gabinety.ServiceDefaults", "Gabinety.Contracts", "Gabinety.Llm"],
+        ["Gabinety.ServiceDefaults.Edge"] = ["Gabinety.ServiceDefaults"], // T-10.10 (F-03): the public-edge guard and key validation, outside the 400-line kernel (SPEC 6)
+        ["Gabinety.Directory"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts", "Gabinety.Ranking"],
+        ["Gabinety.Booking"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts", "Gabinety.Billing", "Gabinety.Scheduling"],
+        ["Gabinety.Reputation"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts"],
+        ["Gabinety.Assistant"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts", "Gabinety.Llm"],
         ["Gabinety.AppHost"] = [.. Services.Select(s => "Gabinety." + s)],
         ["Gabinety.DevIdentity"] = [], ["Gabinety.DemoSeeder"] = [], // tools/: no project reference at all
     };
@@ -116,9 +117,7 @@ public partial class ArchitectureRules
     public void Kernel_is_at_most_400_lines_of_csharp()
     {
         var lines = Repo.Files("src/Gabinety.ServiceDefaults", "*.cs").Sum(f => File.ReadAllLines(f).Length);
-        // SPEC 6 says 400. T-10.10 (F-03) adds the public-edge guard and the internal-key validation here (InternalAccess.cs, about 135 lines) on the supervisor's instruction,
-        // and main was already at 366. The ceiling is 520 until the owner either amends SPEC 6 or moves InternalAccess to its own project (PR T-10.10, "Out-of-scope changes needed").
-        Assert.InRange(lines, 1, 520);
+        Assert.InRange(lines, 1, 400);
     }
 
     [Fact]

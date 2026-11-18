@@ -6,6 +6,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <ProjectReference Include="../Gabinety.ServiceDefaults/Gabinety.ServiceDefaults.csproj" />
+    <ProjectReference Include="../Gabinety.ServiceDefaults.Edge/Gabinety.ServiceDefaults.Edge.csproj" />
     <ProjectReference Include="../Gabinety.Contracts/Gabinety.Contracts.csproj" />
   </ItemGroup>
 </Project>

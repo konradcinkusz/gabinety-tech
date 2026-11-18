@@ -69,4 +69,19 @@ public class PublicEdgeTests
         // an unknown booking answers from the handler (not found by id, with the key), not "Unauthorized" and not a blanket guard
         Assert.NotEqual(HttpStatusCode.Unauthorized, (await Send(h, HttpMethod.Get, $"/internal/v1/bookings/{Guid.NewGuid()}/reviewability", edge: false, key: Key)).StatusCode);
     }
+
+    [Fact]
+    public async Task The_web_app_over_the_private_network_with_X_Edge_Key_reaches_admin_but_never_internal()
+    {
+        await using var h = NewHost();
+        Task<HttpResponseMessage> Web(string path, string? key = null)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, path);
+            req.Headers.Add("X-Edge-Key", "demo-QQQQppppOOOOnnnnMMMMllllKKKKjjjj_abcde");
+            if (key != null) req.Headers.Add("X-Internal-Key", key);
+            return h.CreateClient().SendAsync(req);
+        }
+        Assert.NotEqual(HttpStatusCode.NotFound, (await Web("/api/v1/admin/disputes")).StatusCode); // 401: the guard did not filter it
+        Assert.Equal(HttpStatusCode.NotFound, (await Web($"/internal/v1/bookings/{Guid.NewGuid()}/reviewability", Key)).StatusCode);
+    }
 }

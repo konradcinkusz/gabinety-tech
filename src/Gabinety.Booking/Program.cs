@@ -9,6 +9,7 @@ builder.Services.AddRateLimiting(builder.Configuration);
 // Authentication is registered here and only here: Me no longer calls it.
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddAuthentication().AddInternalKeyAuthentication();
+builder.Services.AddInternalKeyValidation(); // F-03: strong, distinct internal keys outside the fake profile
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("Authenticated", p => p.RequireAuthenticatedUser())
     .AddPolicy("Admin", p => p.RequireRole("Admin", "SuperAdmin")) // authservice roles; the claim is the WS-Federation role URI

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Gabinety.Directory.Tests;
+namespace Gabinety.ServiceDefaults.Edge.Tests;
 
 /// <summary>F-03 (T-10.10): the public-edge guard for /internal/*, per-caller internal keys and the startup validation of key strength.</summary>
 public class InternalAccessTests
@@ -23,6 +23,7 @@ public class InternalAccessTests
         b.WebHost.UseTestServer();
         foreach (var (k, v) in settings) b.Configuration[k] = v;
         b.Services.AddAuthentication().AddInternalKeyAuthentication();
+        b.Services.AddInternalKeyValidation();
         b.Services.AddAuthorization(o => o.AddPolicy("internal", p => p.AddAuthenticationSchemes(Security.InternalScheme).RequireAuthenticatedUser()));
         var app = b.Build();
         app.UsePublicEdgeGuard(publicPath);
@@ -114,7 +115,7 @@ public class InternalAccessTests
     [Fact]
     public async Task The_header_list_is_configurable()
     {
-        var s = Keyed(); s["Internal:PublicEdgeHeaders"] = "X-Edge-Only";
+        var s = Keyed(); s["Internal:EdgeHeaders"] = "X-Edge-Only";
         await using var app = await Host(s);
         var c = app.GetTestClient();
         Assert.Equal(HttpStatusCode.NotFound, (await c.SendAsync(Get("/internal/v1/x", KeyA, ("X-Edge-Only", "1")))).StatusCode);
@@ -130,6 +131,27 @@ public class InternalAccessTests
         Assert.Equal(HttpStatusCode.NotFound, (await c.SendAsync(Get("/admin-ish", null, ("Fly-Client-IP", "1.2.3.4")))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.SendAsync(Get("/internal/v1/x", KeyA, ("Fly-Client-IP", "1.2.3.4")))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await c.SendAsync(Get("/admin-ish"))).StatusCode); // private network: everything is served
+    }
+
+    [Fact]
+    public async Task The_trusted_proxy_key_header_never_opens_an_internal_route_and_is_not_an_edge_header()
+    {
+        await using var app = await Host(Keyed(), publicPath: r => r.Path.StartsWithSegments("/api/v1"));
+        var c = app.GetTestClient();
+        // /internal/* with X-Edge-Key: 404, with or without the internal key, and the proxy key is not an internal key
+        Assert.Equal(HttpStatusCode.NotFound, (await c.SendAsync(Get("/internal/v1/x", KeyA, ("X-Edge-Key", KeyC)))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.SendAsync(Get("/internal/v1/x", null, ("X-Edge-Key", KeyC)))).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await c.SendAsync(Get("/internal/v1/x", KeyC))).StatusCode);
+        // the BFF sends it over the private network to routes the public edge may not see: the path list does not apply to it
+        Assert.Equal(HttpStatusCode.OK, (await c.SendAsync(Get("/admin-ish", null, ("X-Edge-Key", KeyC)))).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_trusted_proxy_key_is_not_refused_by_the_guard_when_the_guard_is_off()
+    {
+        var s = Keyed(); s["Internal:RejectPublicEdge"] = "false";
+        await using var app = await Host(s);
+        Assert.Equal(HttpStatusCode.OK, (await app.GetTestClient().SendAsync(Get("/internal/v1/x", KeyA, ("X-Edge-Key", KeyC)))).StatusCode);
     }
 
     // ---- per-caller keys ----
@@ -205,6 +227,19 @@ public class InternalAccessTests
     public async Task The_callee_key_equal_to_a_caller_key_stops_the_start()
     {
         Assert.IsType<InvalidOperationException>(await Start(new() { ["Internal:Key"] = KeyA, ["Internal:Callers:Booking"] = KeyA }));
+    }
+
+    [Fact]
+    public async Task A_weak_or_shared_trusted_proxy_key_stops_the_start()
+    {
+        var weak = await Start(new() { ["RateLimit:TrustedProxyKey"] = "short" });
+        Assert.IsType<InvalidOperationException>(weak);
+        Assert.Contains("RateLimit:TrustedProxyKey", weak!.Message);
+        var shared = await Start(new() { ["RateLimit:TrustedProxyKey"] = KeyA, ["Internal:Callers:Booking"] = KeyA });
+        Assert.IsType<InvalidOperationException>(shared);
+        Assert.DoesNotContain(KeyA, shared!.Message);
+        Assert.Null(await Start(new() { ["RateLimit:TrustedProxyKey"] = KeyC, ["Internal:Callers:Booking"] = KeyA }));
+        Assert.Null(await Start(new() { ["RateLimit:TrustedProxyKey"] = "short" }, "Development"));
     }
 
     [Fact]

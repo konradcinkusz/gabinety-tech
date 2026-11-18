@@ -31,7 +31,7 @@ primary_region = "fra"
   Identity__PublicUrl = "https://<authservice-public-host>"
 
 # Secrets (NOT here), set once with `fly secrets set --app gabinety-web-staging`:
-#   None today: the web app forwards the user's token and holds no internal key (grep of web/src finds no Internal__ key and no session-signing secret).
+#   RateLimit__TrustedProxyKey (optional, T-10.03): shared with the four backends; it is NOT an internal key and opens no route. The web app forwards the user's token and holds no internal key (grep of web/src finds no Internal__ key and no session-signing secret).
 #   If a later task adds one, it is added here and in SPEC 11 together.
 
 [http_service]

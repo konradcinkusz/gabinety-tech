@@ -109,6 +109,9 @@ check "network is public, private or flycast for every app, Assistant is flycast
   awk '!/^#/ && NF && \$1 != \"shared\" {print \$1, \$NF}' '$root/deploy/estate.conf' | grep -Evq ' (public|private|flycast)\$' && exit 1
   awk '\$1 == \"assistant\" {print \$NF}' '$root/deploy/estate.conf' | grep -qx flycast"
 
+# ---------- the web BFF reaches the private apps only over .internal / .flycast (F-03) ----------
+check "private topology: web uses .internal/.flycast, no private app has [[services.ports]]" "$root/scripts/check-private-topology.sh"
+
 # ---------- base-ref: a failed run must not hide an app from the next tag ----------
 b="$tmp/brepo"; git init -q -b main "$b"
 (cd "$b" && git config user.email t@t && git config user.name t && mkdir -p web src/Gabinety.Booking && echo a > web/a && echo a > src/Gabinety.Booking/a && git add -A && git commit -qm one && git tag v1 && git tag deployed/staging
@@ -141,18 +144,28 @@ check "a private IPv6 is allocated when missing" grep -qx 'ips allocate-v6 --pri
 : > "$tmp/log"; STUB_IPS='[{"Type":"private_v6"}]' "$d/ensure-private-ip.sh" gabinety-assistant-staging > /dev/null
 check "an existing private IPv6 is kept" bash -c "! grep -q allocate '$tmp/log'"
 
+# ---------- assert-no-public-ip (flyctl stub) ----------
+: > "$tmp/log"; STUB_IPS='[{"Type":"private_v6"}]' "$d/assert-no-public-ip.sh" gabinety-assistant-staging > /dev/null 2>&1; rc=$?
+check "an app with only a private IPv6 passes" bash -c "[ $rc = 0 ]"
+STUB_IPS='[]' "$d/assert-no-public-ip.sh" gabinety-directory-staging > /dev/null 2>&1; rc=$?
+check "an app with no address passes" bash -c "[ $rc = 0 ]"
+for t in v4 shared_v4 v6; do STUB_IPS="[{\"Type\":\"$t\"}]" "$d/assert-no-public-ip.sh" gabinety-directory-staging > /dev/null 2>&1; rc=$?
+  check "an app with a public $t address fails" bash -c "[ $rc = 1 ]"; done
+
 # ---------- set-secrets ----------
-export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"s3cr3tpw","INTERNAL_KEY_DIRECTORY":"dirkey","FLY_API_TOKEN":"tok","AUTH_JWT_PRIVATE_KEY_PEM":"-----BEGIN PRIVATE KEY-----\nLINE2\n-----END PRIVATE KEY-----"}'
+export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"s3cr3tpw","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"dirkey","INTERNAL_KEY_REPUTATION_TO_DIRECTORY":"repdirkey","FLY_API_TOKEN":"tok","AUTH_JWT_PRIVATE_KEY_PEM":"-----BEGIN PRIVATE KEY-----\nLINE2\n-----END PRIVATE KEY-----"}'
 : > "$tmp/log"; out="$("$d/set-secrets.sh" directory gabinety-directory-staging --map "$root/deploy/secrets.map" 2>&1)"; rc=$?
-check "directory secrets are staged" bash -c "[ $rc = 0 ] && grep -q '^secrets set --stage --app gabinety-directory-staging ConnectionStrings__directorydb=Host=gabinety-postgres-staging.internal;.*Password=s3cr3tpw Internal__Key=dirkey\$' '$tmp/log'"
+check "directory secrets are staged" bash -c "[ $rc = 0 ] && grep -q '^secrets set --stage --app gabinety-directory-staging ConnectionStrings__directorydb=Host=gabinety-postgres-staging.internal;.*Password=s3cr3tpw Internal__Callers__Booking=dirkey Internal__Callers__Reputation=repdirkey\$' '$tmp/log'"
 check "values are masked" has "$out" "::add-mask::Host=gabinety-postgres-staging.internal;Port=5432;Database=directorydb;Username=postgres;Password=s3cr3tpw"
 check "a value is never printed outside ::add-mask::" bash -c "! printf '%s\n' \"\$1\" | grep -v '^::add-mask::' | grep -q -e s3cr3tpw -e dirkey" _ "$out"
 out="$("$d/set-secrets.sh" booking gabinety-booking-staging --map "$root/deploy/secrets.map" 2>&1)"; rc=$?
-check "a missing required secret fails and names it, not its value" bash -c "[ $rc = 1 ]" && check "the failure names INTERNAL_KEY_BOOKING" has "$out" "INTERNAL_KEY_BOOKING"
-export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_BOOKING":"bk","INTERNAL_KEY_DIRECTORY":"dk"}'
+check "a missing required secret fails and names it, not its value" bash -c "[ $rc = 1 ]" && check "the failure names INTERNAL_KEY_REPUTATION_TO_BOOKING" has "$out" "INTERNAL_KEY_REPUTATION_TO_BOOKING"
+export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_REPUTATION_TO_BOOKING":"rb","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"bd"}'
 : > "$tmp/log"; out="$("$d/set-secrets.sh" booking gabinety-booking-staging --map "$root/deploy/secrets.map" 2>&1)"
 check "an optional secret that is unset is skipped" has "$out" "skip Payments__WebhookSecret"
 check "booking stages three secrets" has "$out" "staging 3 secret(s)"
+check "no mapped secret is a single shared callee key" bash -c "! grep -E '^[a-z]+ +Internal__Key +' '$root/deploy/secrets.map'"
+check "every INTERNAL_KEY_ secret of the map is used once per name pair (no key shared between callers)" bash -c "grep -oE '\$\{INTERNAL_KEY_[A-Z_]+\}' '$root/deploy/secrets.map' | sort | uniq -c | awk '\$1 > 2 {bad=1} END {exit bad}'"
 export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","AUTH_JWT_PRIVATE_KEY_PEM":"-----BEGIN X-----\nBODYLINE\n-----END X-----"}'
 out="$("$d/set-secrets.sh" authservice gabinety-authservice-staging --map "$root/deploy/secrets.map" --dry-run 2>&1)"
 check "every line of a multi-line secret is masked" has "$out" "::add-mask::BODYLINE"

@@ -25,7 +25,8 @@ primary_region = "fra"
 
 # Secrets (NOT here), set once with `fly secrets set --app gabinety-directory-staging`:
 #   ConnectionStrings__directorydb  (postgres at gabinety-postgres-staging.internal:5432, database directorydb, its own role)
-#   Internal__Key                   (callee key of Directory; the callers hold it as Internal__Keys__Directory)
+#   Internal__Callers__Booking, Internal__Callers__Reputation   (one key per caller, never shared; the callers hold theirs as Internal__Keys__Directory; F-03)
+#   optional Internal__Callers__Owner                            (the owner's key for the RUNBOOK 8 erasure hook)
 
 [http_service]
   internal_port = 8080
@@ -33,7 +34,7 @@ primary_region = "fra"
   auto_stop_machines = "off"
   auto_start_machines = true
   min_machines_running = 1
-  # No public listener: do NOT run `fly ips allocate-v4`; deploy with --no-public-ips. Reached at gabinety-directory-staging.internal:8080 (private network). Min 1: called in-request by web and Booking (SPEC 4.3, 5.1).
+  # No public listener (F-03): do NOT run `fly ips allocate-v4`; deploy with --no-public-ips (the workflow does, and then asserts no public address: scripts/deploy/assert-no-public-ip.sh). Reached at gabinety-directory-staging.internal:8080 (6PN, direct to the machine: no edge headers, so the code guard Internal:RejectPublicEdge stays on). Min 1: called in-request by web and Booking (SPEC 4.3, 5.1).
 
   # Liveness only (/alive runs no dependency check, P7); /health reports optional dependencies and must never fail a deploy. Always on (SPEC 4.3).
   [[http_service.checks]]

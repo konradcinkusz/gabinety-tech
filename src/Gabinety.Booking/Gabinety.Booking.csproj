@@ -7,6 +7,7 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="MailKit" />
     <ProjectReference Include="../Gabinety.ServiceDefaults/Gabinety.ServiceDefaults.csproj" />
+    <ProjectReference Include="../Gabinety.ServiceDefaults.Edge/Gabinety.ServiceDefaults.Edge.csproj" />
     <ProjectReference Include="../Gabinety.Contracts/Gabinety.Contracts.csproj" />
     <ProjectReference Include="../Gabinety.Billing/Gabinety.Billing.csproj" />
     <ProjectReference Include="../Gabinety.Scheduling/Gabinety.Scheduling.csproj" />

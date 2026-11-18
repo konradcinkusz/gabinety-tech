@@ -10,4 +10,5 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <ProjectReference Include="../../src/Gabinety.Directory/Gabinety.Directory.csproj" />
   </ItemGroup>
+  <ItemGroup><Compile Include="../Shared/RouteAuth.cs" Link="RouteAuth.cs" /></ItemGroup>
 </Project>

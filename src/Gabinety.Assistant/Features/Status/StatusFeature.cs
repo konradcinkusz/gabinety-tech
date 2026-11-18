@@ -37,5 +37,5 @@ public sealed class StatusFeature : IServiceFeature
 
     public void Map(IEndpointRouteBuilder endpoints) =>
         endpoints.MapGet("/api/v1/assistant/status", async (AssistantStatusService status, CancellationToken ct) =>
-            Results.Ok(await status.GetAsync(ct)));
+            Results.Ok(await status.GetAsync(ct))).AllowAnonymous();
 }

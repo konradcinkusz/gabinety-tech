@@ -10,4 +10,5 @@
     <PackageReference Include="Npgsql" />
     <ProjectReference Include="../../src/Gabinety.Booking/Gabinety.Booking.csproj" />
   </ItemGroup>
+  <ItemGroup><Compile Include="../Shared/RouteAuth.cs" Link="RouteAuth.cs" /></ItemGroup>
 </Project>

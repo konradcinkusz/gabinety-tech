@@ -73,13 +73,16 @@ public static class Security
                 await response.WriteAsync("{\"type\":\"urn:gabinety:error:rate_limited\",\"title\":\"Too many requests\",\"status\":429,\"code\":\"rate_limited\"}", ct);
             };
         });
-        services.AddOptions<RateLimiterOptions>().Configure<TimeProvider>((o, time) =>
+        services.AddOptions<RateLimiterOptions>().Configure<TimeProvider, IConfiguration>((o, time, config) =>
+        {
+            var proxyKey = config["RateLimit:TrustedProxyKey"]; // shared with the web app only; see RateLimitTable.PartitionKey
             o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
             {
                 var group = RateLimitTable.GroupOf(ctx.Request.Method, ctx.Request.Path);
                 if (group == RateLimitTable.Webhooks) return RateLimitPartition.GetNoLimiter("webhooks");
-                return RateLimitPartition.Get(RateLimitTable.PartitionKey(group, ctx), _ => new WindowedRateLimiter(time, RateLimitTable.RulesOf(group, perMinute)));
-            }));
+                return RateLimitPartition.Get(RateLimitTable.PartitionKey(group, ctx, proxyKey), _ => new WindowedRateLimiter(time, RateLimitTable.RulesOf(group, perMinute)));
+            });
+        });
         return services;
     }
 

@@ -128,4 +128,108 @@ public class RateLimitTests
         var u = h.As("demo-rl-scaled-reviewer");
         Assert.Equal(10, await CountUntilLimited(u, HttpMethod.Post, "/api/v1/reviews", 20, new { })); // 5 an hour doubled
     }
+
+    // ---- the client address behind the web server (BFF)
+
+    const string EdgeKey = "k-demo-edge-DO-NOT-LEAK";
+
+    static async Task<HttpStatusCode> Read(HttpClient c, string? address, string? key = EdgeKey)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, ReadUrl);
+        if (address is not null) req.Headers.Add("X-Client-Address", address);
+        if (key is not null) req.Headers.Add("X-Edge-Key", key);
+        using var res = await c.SendAsync(req);
+        return res.StatusCode;
+    }
+
+    static async Task<int> ReadsUntilLimited(HttpClient c, string? address, string? key = EdgeKey)
+    {
+        for (var i = 0; i < 130; i++) if (await Read(c, address, key) == HttpStatusCode.TooManyRequests) return i;
+        return 130;
+    }
+
+    [Fact]
+    public async Task With_the_trusted_proxy_key_each_forwarded_address_has_its_own_public_read_budget()
+    {
+        using var h = new ModerationHost();
+        h.Settings["RateLimit:TrustedProxyKey"] = EdgeKey;
+        var web = h.As(null);
+        Assert.Equal(120, await ReadsUntilLimited(web, "203.0.113.10"));
+        Assert.Equal(HttpStatusCode.OK, await Read(web, "203.0.113.11")); // another visitor behind the same web machine
+        Assert.Equal(HttpStatusCode.TooManyRequests, await Read(web, "203.0.113.10"));
+        h.Clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(HttpStatusCode.OK, await Read(web, "203.0.113.10"));
+    }
+
+    [Fact]
+    public async Task The_same_address_written_two_ways_is_one_visitor()
+    {
+        using var h = new ModerationHost();
+        h.Settings["RateLimit:TrustedProxyKey"] = EdgeKey;
+        var web = h.As(null);
+        for (var i = 0; i < 60; i++) await Read(web, "2001:db8::1");
+        for (var i = 0; i < 60; i++) await Read(web, "2001:0db8:0000:0000:0000:0000:0000:0001");
+        Assert.Equal(HttpStatusCode.TooManyRequests, await Read(web, "2001:db8:0:0:0:0:0:1")); // 120 spent under three spellings
+        for (var i = 0; i < 120; i++) await Read(web, "::ffff:203.0.113.20");
+        Assert.Equal(HttpStatusCode.TooManyRequests, await Read(web, "203.0.113.20")); // an IPv4-mapped address is the IPv4 address
+    }
+
+    [Fact]
+    public async Task A_spoofed_address_without_the_key_is_ignored_so_rotating_it_buys_nothing()
+    {
+        using var h = new ModerationHost();
+        h.Settings["RateLimit:TrustedProxyKey"] = EdgeKey;
+        var anon = h.As(null);
+        int ok = 0;
+        for (var i = 0; i < 130; i++) if (await Read(anon, $"198.51.100.{i % 250}", key: null) == HttpStatusCode.OK) ok++;
+        Assert.Equal(120, ok); // every request counted against the real address
+    }
+
+    [Theory]
+    [InlineData("wrong-key")]
+    [InlineData("")]
+    public async Task A_wrong_key_is_ignored_too(string key)
+    {
+        using var h = new ModerationHost();
+        h.Settings["RateLimit:TrustedProxyKey"] = EdgeKey;
+        var anon = h.As(null);
+        int ok = 0;
+        for (var i = 0; i < 130; i++) if (await Read(anon, $"198.51.100.{i % 250}", key) == HttpStatusCode.OK) ok++;
+        Assert.Equal(120, ok);
+    }
+
+    [Fact]
+    public async Task When_the_service_has_no_trusted_proxy_key_the_header_is_never_trusted()
+    {
+        using var h = new ModerationHost();
+        var anon = h.As(null);
+        int ok = 0;
+        for (var i = 0; i < 130; i++) if (await Read(anon, $"198.51.100.{i % 250}", EdgeKey) == HttpStatusCode.OK) ok++;
+        Assert.Equal(120, ok);
+    }
+
+    [Theory]
+    [InlineData("not-an-ip")]
+    [InlineData("203.0.113.1, 203.0.113.2")]
+    [InlineData("203.0.113.1:8080")]
+    [InlineData("")]
+    public async Task A_forwarded_value_that_is_not_one_address_falls_back_to_the_connection_address(string forwarded)
+    {
+        using var h = new ModerationHost();
+        h.Settings["RateLimit:TrustedProxyKey"] = EdgeKey;
+        var web = h.As(null);
+        for (var i = 0; i < 120; i++) await Read(web, null); // the connection address spends the budget
+        Assert.Equal(HttpStatusCode.TooManyRequests, await Read(web, forwarded));
+    }
+
+    [Fact]
+    public async Task A_signed_in_user_keeps_the_user_id_key_whatever_address_is_forwarded()
+    {
+        using var h = new ModerationHost();
+        h.Settings["RateLimit:TrustedProxyKey"] = EdgeKey;
+        var alice = h.As("demo-rl-fwd-alice");
+        for (var i = 0; i < 60; i++) await Read(alice, "203.0.113.30");
+        for (var i = 0; i < 60; i++) await Read(alice, "203.0.113.31");
+        Assert.Equal(HttpStatusCode.TooManyRequests, await Read(alice, "203.0.113.32")); // one user, one budget
+    }
 }

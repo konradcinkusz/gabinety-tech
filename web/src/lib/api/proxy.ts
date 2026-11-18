@@ -1,6 +1,7 @@
 import { readConfig } from "../config";
 import { ACCESS_COOKIE, REFRESH_COOKIE, clearSessionCookies, parseCookies, setSessionCookies, type TokenSet } from "../session/cookies";
 import { refreshOnce } from "../session/refresh";
+import { clientAddressOf } from "./clientAddress";
 import { forgetBackend, resolveBackend } from "./backends";
 import { backendFetch } from "./http";
 import { checkOrigin } from "./originGuard";
@@ -117,6 +118,13 @@ export async function handleProxy(request: Request, matched: string[] = []): Pro
       if (v !== null) headers.set(h, v);
     }
     if (access) headers.set("authorization", `Bearer ${access}`);
+    // The services limit per client address (CONTRACTS 10.2); every visitor reaches them from this machine, so the address goes along with a key that only
+    // says "this is the web app". Both are set here and never copied from the request.
+    const visitor = config.trustedProxyKey ? clientAddressOf(request.headers) : undefined;
+    if (visitor && config.trustedProxyKey) {
+      headers.set("x-client-address", visitor);
+      headers.set("x-edge-key", config.trustedProxyKey);
+    }
     return backendFetch(target, {
       method,
       headers,

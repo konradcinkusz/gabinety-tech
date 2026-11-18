@@ -4,6 +4,8 @@ export type RuntimeConfig = {
   siteBaseUrl: string;
   backends: Record<string, string[]>;
   identity: { issuer?: string; audience?: string; publicUrl?: string };
+  /** Shared with the services (`RateLimit:TrustedProxyKey`): lets them trust the visitor address this server forwards. Not the internal key; opens no route. */
+  trustedProxyKey?: string;
 };
 
 export const SERVICES = ["Directory", "Booking", "Reputation", "Assistant", "Auth"] as const;
@@ -17,6 +19,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     backends[s.toLowerCase()] = raw.split(",").map((x) => x.trim().replace(/\/+$/, "")).filter(Boolean);
   }
   return {
+    trustedProxyKey: opt(env["RateLimit__TrustedProxyKey"]),
     siteBaseUrl: (opt(env["Site__BaseUrl"]) ?? "http://localhost:3000").replace(/\/+$/, ""),
     backends,
     identity: {

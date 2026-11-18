@@ -7,15 +7,14 @@ using Gabinety.Contracts.Booking;
 using Gabinety.Contracts.Common;
 using Gabinety.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
-using BookingStatus = Gabinety.Billing.BookingStatus;
 
 namespace Gabinety.Booking.Features.Analytics;
 
 /// <summary>
 /// <c>GET /internal/v1/analytics/pair-counts?minBookings=3&amp;limit=&amp;cursor=</c> (T-10.03, SPEC 11), behind the "Internal" policy, asked by Reputation for the
 /// administrator's list of suspicious pairs. It answers, per (client, practitioner) pair, how many PAID bookings the pair has; Reputation joins that with its reviews.
-/// A booking counts when money changed hands and stayed: <c>Confirmed</c>, <c>Completed</c>, <c>ClientNoShow</c>, <c>Disputed</c>, <c>Resolved</c> and
-/// <c>LateCancelledByClient</c>. <c>PendingPayment</c>, <c>Expired</c> and the two refunded cancellations do not (they cost the farmer nothing).
+/// A booking counts when it is PAID AND KEPT: it has a payment with status <c>Succeeded</c> or <c>PartiallyRefunded</c>. A booking whose payment was never made
+/// (none, <c>Created</c>, <c>Failed</c>) or was refunded in full costs the farmer nothing and does not count; the booking's own status does not matter.
 /// Privacy: ids, the fee hook's <see cref="PairKey"/> and a count; no brief, no price, no time. Pages in the total order (client id, practitioner id), at most
 /// <see cref="MaxLimit"/> a page, with an opaque cursor.
 /// </summary>
@@ -23,8 +22,7 @@ public sealed class PairCountsFeature : IServiceFeature
 {
     public const int DefaultMinBookings = 3, MinMinBookings = 2, MaxMinBookings = 1000, DefaultLimit = 20, MaxLimit = 50;
 
-    static readonly BookingStatus[] Counted =
-        [BookingStatus.Confirmed, BookingStatus.Completed, BookingStatus.ClientNoShow, BookingStatus.Disputed, BookingStatus.Resolved, BookingStatus.LateCancelledByClient];
+    static readonly PaymentStatus[] Kept = [PaymentStatus.Succeeded, PaymentStatus.PartiallyRefunded];
 
     public void Add(IHostApplicationBuilder builder) { }
 
@@ -47,7 +45,8 @@ public sealed class PairCountsFeature : IServiceFeature
         if (errors.Count > 0) return PaymentWebhookFeature.Problem(ErrorCodes.ValidationFailed, "Validation failed", 400, null, errors);
 
         var take = Math.Min(limit ?? DefaultLimit, MaxLimit);
-        var q = db.Bookings.AsNoTracking().Where(b => Counted.Contains(b.Status));
+        var q = db.Bookings.AsNoTracking()
+            .Where(b => db.Payments.Any(p => p.BookingId == b.Id && Kept.Contains(p.Status)));
         if (hasCursor)
             q = q.Where(b => string.Compare(b.ClientUserId, afterClient) > 0 || (b.ClientUserId == afterClient && b.PractitionerId.CompareTo(afterPractitioner) > 0));
         var rows = await q.GroupBy(b => new { b.ClientUserId, b.PractitionerId })

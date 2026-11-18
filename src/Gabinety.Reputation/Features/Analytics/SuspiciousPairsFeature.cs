@@ -12,6 +12,7 @@ namespace Gabinety.Reputation.Features.Analytics;
 /// <c>GET /api/v1/admin/suspicious-pairs?limit=&amp;cursor=</c> (T-10.03, SPEC 11), <c>Admin</c> policy. The administrator's list of practitioner-client pairs with MORE
 /// THAN TWO paid bookings and ONLY five-star reviews: Booking supplies the pairs with their counts (internal endpoint), this feature joins them with its reviews.
 /// <list type="bullet">
+/// <item>"Booking" means a PAID one: a payment <c>Succeeded</c> or <c>PartiallyRefunded</c> (defined and tested in Booking's pair counts); a fully refunded or never-paid one does not count.</item>
 /// <item>A review counts while it is live (<c>Published</c> or <c>Held</c>); a <c>Rejected</c> one neither lists a pair nor clears it. A pair with no review is not listed.</item>
 /// <item>Pages are Booking's pages, in its order; the cursor is Booking's, passed through (charset checked). One request reads up to <see cref="MaxScanPages"/> Booking pages and
 /// stops after the first page that has a match, so a response has at most <c>limit</c> items (hard cap <see cref="MaxLimit"/>), possibly none with a <c>nextCursor</c> to go on.</item>

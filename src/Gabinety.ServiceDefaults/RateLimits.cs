@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http;
@@ -60,13 +63,36 @@ public static class RateLimitTable
 
     public const int DefaultPerMinute = 60;
 
-    /// <summary>The user id (<c>sub</c>, or the name identifier JwtBearer may map it to) when signed in, else the address, else "unknown". Prefixed so a user id can never equal an address.</summary>
-    public static string PartitionKey(string group, HttpContext ctx)
+    public const string ClientAddressHeader = "X-Client-Address", TrustedProxyKeyHeader = "X-Edge-Key";
+
+    /// <summary>
+    /// The user id (<c>sub</c>, or the name identifier JwtBearer may map it to) when signed in, else the address, else "unknown". Prefixed so a user id can never equal an address.
+    /// Behind the web server every anonymous visitor arrives from the web machine, so the web app forwards the visitor's address in <see cref="ClientAddressHeader"/> together with
+    /// <see cref="TrustedProxyKeyHeader"/>; the address is used ONLY when <paramref name="trustedProxyKey"/> is configured and the header equals it (constant time) and the value is
+    /// exactly one IP address. Anything else, from anyone, is ignored. That key is NOT the internal key: it opens no route.
+    /// </summary>
+    public static string PartitionKey(string group, HttpContext ctx, string? trustedProxyKey = null)
     {
         var user = (ctx.User.FindFirst("sub") ?? ctx.User.FindFirst(ClaimTypes.NameIdentifier))?.Value;
-        var who = !string.IsNullOrEmpty(user) ? "u:" + user : "a:" + (ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+        var who = !string.IsNullOrEmpty(user) ? "u:" + user : "a:" + (AddressOf(ctx, trustedProxyKey) ?? "unknown");
         return group + "|" + who;
     }
+
+    static string? AddressOf(HttpContext ctx, string? trustedProxyKey)
+    {
+        if (!string.IsNullOrEmpty(trustedProxyKey))
+        {
+            var given = ctx.Request.Headers[TrustedProxyKeyHeader].ToString();
+            var forwarded = ctx.Request.Headers[ClientAddressHeader].ToString();
+            if (given.Length > 0 && forwarded.Length > 0 &&
+                CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(trustedProxyKey), Encoding.UTF8.GetBytes(given)) &&
+                IPAddress.TryParse(forwarded, out var ip) && !forwarded.Contains(','))
+                return Normalise(ip);
+        }
+        return ctx.Connection.RemoteIpAddress is { } remote ? Normalise(remote) : null;
+    }
+
+    static string Normalise(IPAddress ip) => (ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4() : ip).ToString();
 }
 
 /// <summary>

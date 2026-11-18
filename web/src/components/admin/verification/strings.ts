@@ -1,7 +1,7 @@
 // Polish text of the verification queue (SPEC section 5 rule 1). Kept beside the components because i18n/pl.ts belongs to T-07.02;
 // it merges into that catalogue later (listed in the PR).
 export const avl = {
-  nav: { label: "Administracja", verification: "Weryfikacja programistów", disputes: "Spory", ledger: "Księga", reviews: "Opinie" },
+  nav: { label: "Administracja", verification: "Weryfikacja programistów", disputes: "Spory", ledger: "Księga", reviews: "Opinie", suspicious: "Podejrzane pary" },
   title: "Weryfikacja programistów",
   forbidden: "Nie masz dostępu do panelu administracyjnego.",
   unavailable: "Kolejka jest chwilowo niedostępna. Spróbuj ponownie za chwilę.",

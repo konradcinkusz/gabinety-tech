@@ -228,3 +228,45 @@ public class InternalAccessTests
         Assert.IsType<InvalidOperationException>(await Start(new() { ["Internal:Key"] = "k", ["Internal:EnforceKeyStrength"] = "true" }, "Development"));
     }
 }
+
+public class InternalCallerMatchTests
+{
+    static Microsoft.Extensions.Configuration.IConfiguration Cfg(params (string, string?)[] kv) =>
+        new ConfigurationBuilder().AddInMemoryCollection(kv.Select(p => new KeyValuePair<string, string?>(p.Item1, p.Item2))).Build();
+
+    [Fact]
+    public void Caller_names_the_matching_key_and_shared_is_the_single_key()
+    {
+        var c = Cfg(("Internal:Callers:Booking", "bk"), ("Internal:Callers:Reputation", "rp"), ("Internal:Key", "one"), ("Internal:PreviousKey", "old"));
+        Assert.Equal("Booking", InternalKey.Caller(c, "bk"));
+        Assert.Equal("Reputation", InternalKey.Caller(c, "rp"));
+        Assert.Equal("shared", InternalKey.Caller(c, "one"));
+        Assert.Equal("shared", InternalKey.Caller(c, "old"));
+        Assert.Null(InternalKey.Caller(c, "other"));
+        Assert.Null(InternalKey.Caller(c, ""));
+    }
+
+    [Fact]
+    public void A_previous_key_without_a_current_key_never_opens_the_door_but_callers_do()
+    {
+        var c = Cfg(("Internal:PreviousKey", "old"), ("Internal:Callers:Booking", "bk"));
+        Assert.Null(InternalKey.Caller(c, "old"));
+        Assert.Equal("Booking", InternalKey.Caller(c, "bk"));
+    }
+
+    [Fact]
+    public void A_blank_caller_key_never_matches_a_blank_header()
+    {
+        var c = Cfg(("Internal:Callers:Booking", ""));
+        Assert.False(InternalKey.Configured(c));
+        Assert.Null(InternalKey.Caller(c, ""));
+    }
+
+    [Fact]
+    public void A_second_name_gives_a_rotation_overlap()
+    {
+        var c = Cfg(("Internal:Callers:Booking", "old"), ("Internal:Callers:BookingNext", "new"));
+        Assert.Equal("Booking", InternalKey.Caller(c, "old"));
+        Assert.Equal("BookingNext", InternalKey.Caller(c, "new"));
+    }
+}

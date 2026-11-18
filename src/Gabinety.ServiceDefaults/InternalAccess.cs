@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -63,16 +61,6 @@ public static class InternalAccess
     public const int MinKeyLength = 43; // 32 bytes as base64url; 64 hex characters also pass
     const int MinDistinctCharacters = 12;
 
-    /// <summary>The accepted keys of this callee, by caller. <c>Internal:Callers:&lt;Caller&gt;</c> are the per-caller keys; <c>Internal:Key</c> is the single key of the fake profile and tests, named "shared".</summary>
-    internal static IReadOnlyList<(string Caller, string Key)> AcceptedKeys(IConfiguration config)
-    {
-        var list = new List<(string, string)>();
-        foreach (var c in config.GetSection("Internal:Callers").GetChildren())
-            if (!string.IsNullOrEmpty(c.Value)) list.Add((c.Key, c.Value));
-        if (!string.IsNullOrEmpty(config["Internal:Key"])) list.Add(("shared", config["Internal:Key"]!));
-        return list;
-    }
-
     public static bool IsStrong(string key)
     {
         if (key.Length < MinKeyLength) return false;
@@ -88,7 +76,9 @@ public static class InternalAccess
     public static void ValidateKeys(IConfiguration config)
     {
         var named = new List<(string Name, string Key)>();
-        foreach (var (caller, key) in AcceptedKeys(config)) named.Add((caller == "shared" ? "Internal:Key" : $"Internal:Callers:{caller}", key));
+        foreach (var (caller, key) in InternalKey.Callers(config)) named.Add(($"{InternalKey.CallersSection}:{caller}", key));
+        foreach (var n in new[] { InternalKey.CurrentSetting, InternalKey.PreviousSetting })
+            if (!string.IsNullOrEmpty(config[n])) named.Add((n, config[n]!));
         foreach (var c in config.GetSection("Internal:Keys").GetChildren())
             if (!string.IsNullOrEmpty(c.Value)) named.Add(($"Internal:Keys:{c.Key}", c.Value));
 
@@ -120,15 +110,5 @@ public static class InternalAccess
         public Task StoppingAsync(CancellationToken ct) => Task.CompletedTask;
         public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
         public Task StoppedAsync(CancellationToken ct) => Task.CompletedTask;
-    }
-
-    /// <summary>The matching caller (or null), comparing against every accepted key in constant time.</summary>
-    internal static string? Match(IConfiguration config, string given)
-    {
-        var g = Encoding.UTF8.GetBytes(given);
-        string? hit = null;
-        foreach (var (caller, key) in AcceptedKeys(config))
-            if (CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(key), g)) hit ??= caller;
-        return hit;
     }
 }

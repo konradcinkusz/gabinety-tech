@@ -33,8 +33,9 @@ public static class Security
     }
 
     /// <summary>
-    /// X-Internal-Key compared in constant time against the caller keys <c>Internal:Callers:&lt;Caller&gt;</c> (one per caller, the matching caller becomes the <c>caller</c> claim)
-    /// and <c>Internal:Key</c> (the single key of the fake profile). Outside the fake profile and Development the service refuses to start unless every key is strong and distinct (F-03, ADR-0007).
+    /// X-Internal-Key compared in constant time against the per-caller keys <c>Internal:Callers:&lt;Caller&gt;</c> (the matching caller becomes the <c>caller</c> claim), against
+    /// Internal:Key (the single key of the fake profile and tests) and, during a rotation, against Internal:PreviousKey (RUNBOOK 5.3). Blank is the same as absent.
+    /// Outside the fake profile and Development the service refuses to start unless every key is strong and distinct (F-03, ADR-0007).
     /// </summary>
     public static AuthenticationBuilder AddInternalKeyAuthentication(this AuthenticationBuilder auth)
     {
@@ -118,13 +119,50 @@ public static class Security
     {
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var given = Request.Headers["X-Internal-Key"].ToString();
-            if (string.IsNullOrEmpty(given)) return Task.FromResult(AuthenticateResult.NoResult());
-            var caller = InternalAccess.Match(config, given);
+            var given = Request.Headers[InternalKey.HeaderName].ToString();
+            if (!InternalKey.Configured(config) || string.IsNullOrEmpty(given)) return Task.FromResult(AuthenticateResult.NoResult());
+            var caller = InternalKey.Caller(config, given);
             if (caller is null) return Task.FromResult(AuthenticateResult.Fail("bad internal key"));
             var id = new System.Security.Claims.ClaimsIdentity(InternalScheme);
             id.AddClaim(new System.Security.Claims.Claim("caller", caller));
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new System.Security.Claims.ClaimsPrincipal(id), InternalScheme)));
         }
     }
+}
+
+/// <summary>The key check of the internal scheme, shared by every service. A key value is never logged and never put in a message.</summary>
+public static class InternalKey
+{
+    public const string HeaderName = "X-Internal-Key";
+    public const string CurrentSetting = "Internal:Key", PreviousSetting = "Internal:PreviousKey";
+
+    public const string CallersSection = "Internal:Callers";
+    public const string SharedCaller = "shared";
+
+    /// <summary>True when a key is set (Internal:Key or any Internal:Callers:*); without one the scheme authenticates nobody.</summary>
+    public static bool Configured(IConfiguration config) => !string.IsNullOrEmpty(config[CurrentSetting]) || Callers(config).Any();
+
+    /// <summary>The per-caller keys of this callee (F-03): <c>Internal:Callers:&lt;Caller&gt;</c>, blank ones skipped.</summary>
+    public static IEnumerable<(string Caller, string Key)> Callers(IConfiguration config) =>
+        config.GetSection(CallersSection).GetChildren().Where(c => !string.IsNullOrEmpty(c.Value)).Select(c => (c.Key, c.Value!));
+
+    /// <summary>
+    /// The caller whose key <paramref name="given"/> equals ("shared" for Internal:Key and Internal:PreviousKey), else null. Every comparison runs (no short circuit on the first),
+    /// each in constant time; an empty or absent key on either side never matches. A previous key alone never opens the door: it counts only while a current key is set.
+    /// </summary>
+    public static string? Caller(IConfiguration config, string? given)
+    {
+        if (string.IsNullOrEmpty(given) || !Configured(config)) return null;
+        var g = Encoding.UTF8.GetBytes(given);
+        string? hit = null;
+        foreach (var (caller, key) in Callers(config)) if (Equal(key, g)) hit ??= caller;
+        var current = Equal(config[CurrentSetting], g);
+        var previous = !string.IsNullOrEmpty(config[CurrentSetting]) && Equal(config[PreviousSetting], g);
+        return current | previous ? hit ?? SharedCaller : hit;
+    }
+
+    public static bool Matches(IConfiguration config, string? given) => Caller(config, given) is not null;
+
+    static bool Equal(string? expected, byte[] given) =>
+        !string.IsNullOrEmpty(expected) && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), given);
 }

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,8 +42,27 @@ public static class Security
     /// Deny by default (SPEC 11, T-10.12): a route with no <c>RequireAuthorization</c> and no <c>AllowAnonymous</c> needs a signed-in user instead of being public.
     /// A public route must say <c>AllowAnonymous()</c>; docs/operations/ROUTE-AUTH.md and the per-service route test list every route.
     /// </summary>
-    public static AuthorizationBuilder RequireAuthenticatedByDefault(this AuthorizationBuilder auth) =>
-        auth.SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+    public static AuthorizationBuilder RequireAuthenticatedByDefault(this AuthorizationBuilder auth)
+    {
+        auth.Services.AddSingleton<IAuthorizationHandler, AuthenticatedByDefaultHandler>();
+        return auth.SetFallbackPolicy(new AuthorizationPolicyBuilder().AddRequirements(new AuthenticatedByDefaultRequirement()).Build());
+    }
+
+    sealed class AuthenticatedByDefaultRequirement : IAuthorizationRequirement;
+
+    /// <summary>
+    /// "RequireAuthenticatedUser", but only for a request that matched a route. ASP.NET applies a fallback policy to every request, including one that matched nothing (404) or
+    /// matched a path with another method (405); a plain RequireAuthenticatedUser would turn those into 401 and hide that the route is not mapped (CONTRACTS 10.4).
+    /// </summary>
+    sealed class AuthenticatedByDefaultHandler : AuthorizationHandler<AuthenticatedByDefaultRequirement>
+    {
+        protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, AuthenticatedByDefaultRequirement requirement)
+        {
+            var endpoint = context.Resource switch { HttpContext h => h.GetEndpoint(), Endpoint e => e, _ => null };
+            if (endpoint is not RouteEndpoint || context.User.Identity?.IsAuthenticated == true) context.Succeed(requirement);
+            return Task.CompletedTask;
+        }
+    }
 
     public const int DefaultPerMinute = RateLimitTable.DefaultPerMinute;
 

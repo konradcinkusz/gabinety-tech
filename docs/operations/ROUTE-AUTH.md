@@ -76,6 +76,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | GET | `/api/v1/admin/ledger.csv` | Admin | all | |
 | Booking | GET | `/internal/v1/bookings/{id}/reviewability` | Internal | all | caller: Reputation |
 | Booking | DELETE | `/internal/v1/subjects/{userId}` | Internal | all | owner runbook (erasure) |
+| Booking | GET | `/internal/v1/analytics/pair-counts` | Internal | all | caller: Reputation (T-10.03) |
 | Booking | GET | `/internal/v1/test/clock` | Internal | fake | owner / seeder |
 | Booking | POST | `/internal/v1/test/clock` | Internal | fake | owner / seeder |
 | Booking | POST | `/internal/v1/demo/reset` | Internal | fake | owner / seeder |
@@ -94,6 +95,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Reputation | GET | `/api/v1/admin/reviews` | Admin | all | |
 | Reputation | POST | `/api/v1/admin/reviews/{id}/publish` | Admin | all | |
 | Reputation | POST | `/api/v1/admin/reviews/{id}/reject` | Admin | all | |
+| Reputation | GET | `/api/v1/admin/suspicious-pairs` | Admin | all | T-10.03 |
 | Reputation | DELETE | `/internal/v1/subjects/{userId}` | Internal | all | owner runbook (erasure) |
 | Reputation | GET | `/internal/v1/test/clock` | Internal | fake | owner / seeder |
 | Reputation | POST | `/internal/v1/test/clock` | Internal | fake | owner / seeder |

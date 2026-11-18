@@ -28,4 +28,13 @@ public class RouteAuthTests
         var r = await host.CreateClient().GetAsync("/test/forgot-the-policy");
         Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
     }
+
+    [Fact]
+    public async Task The_fallback_does_not_turn_an_unknown_path_or_a_wrong_method_into_401()
+    {
+        using var host = new RouteAuditHost<Program>();
+        var c = host.CreateClient();
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync("/no/such/route")).StatusCode); // not mapped stays 404 (CONTRACTS 10.4: the fake-profile routes are 404 when deployed)
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await c.PostAsync("/health/details", null)).StatusCode);
+    }
 }

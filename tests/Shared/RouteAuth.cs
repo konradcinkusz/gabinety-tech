@@ -83,7 +83,7 @@ public static class RouteTable
             if (a.Policy == "(none)")
                 problems.Add($"UNPROTECTED {a.Key}: no RequireAuthorization(...) or AllowAnonymous(). It is only safe because of the fallback policy. Say what you mean: add RequireAuthorization(\"<policy>\") or, if it is public on purpose, AllowAnonymous(), then add the row to {Doc}.");
             if (!want.TryGetValue(a.Key, out var w))
-                problems.Add($"NEW route {a.Key} is not in {Doc}. Add the row: {a}");
+                problems.Add($"NEW route {a.Key} is not in {Doc}. Add the row (Profile `all` if the route is mapped in the deployed profile, `fake` if only in the fake profile): {a}");
             else if (w.Policy != a.Policy)
                 problems.Add($"CHANGED policy of {a.Key}: table says '{w.Policy}', code says '{a.Policy}'. If intended, update the row in {Doc} (and say why in the PR).");
         }

@@ -8,10 +8,18 @@ Every command below was run on Linux with the .NET SDK 10.0.404 (`global.json` a
 
 The fake profile needs **no Docker, no database, no credentials**: in-memory storage, a mock payment provider, a fake language model, a development identity provider (`tools/Gabinety.DevIdentity`). Everything is synthetic (`demo-` names) and lost on restart.
 
-You need the .NET 10 SDK and pnpm (Node 22).
+You need the .NET 10 SDK and pnpm (Node 22). If `dotnet --version` is not found (a fresh container usually has no SDK), install it for your user, no root needed:
 
 ```bash
-pnpm --dir web install --frozen-lockfile
+curl -sSL -o dotnet-install.sh https://builds.dotnet.microsoft.com/dotnet/scripts/v1/dotnet-install.sh
+bash dotnet-install.sh --channel 10.0 --install-dir "$HOME/.dotnet"     # about 45 s
+export PATH="$HOME/.dotnet:$PATH"; dotnet --version                       # 10.0.404 when this was written
+```
+
+(`ci.dot.net` is blocked in some sandboxes; `builds.dotnet.microsoft.com` is the host to use.) Then start the profile. `dotnet run` stays in the foreground for as long as the profile runs, so use a second terminal for everything below, or send it to the background (`nohup dotnet run ... > /tmp/apphost.log 2>&1 &`):
+
+```bash
+pnpm --dir web install --frozen-lockfile        # about 3 s
 dotnet run --project src/Gabinety.AppHost --launch-profile fake
 ```
 
@@ -54,6 +62,20 @@ Exit code 0 means all ok; 1 means a line starts with `FAIL`. It waits up to `LIM
 Once Directory, Booking, Reputation and DevIdentity are healthy the AppHost starts the `seeder` resource by itself. It fills the system through the services' HTTP APIs: ten practitioners (six approved), four clients, availability, twelve bookings in every state, three reviews (`tools/Gabinety.DemoSeeder/README.md`). While it works it **moves the test clock of Booking** to make bookings complete, then puts it back to 0.
 
 A seed is finished when **all three** hold: no `Gabinety.DemoSeeder` process is running, both clocks answer `offsetMinutes: 0` (section 5), and that stays true for about 10 seconds (the e2e harness uses exactly this test, `tests/e2e/harness/wait-for-profile.cjs`). `check-fake-profile.sh` shows the data is there but does not prove the seeder has stopped. Do not move the clock or book while it runs.
+
+To wait for it in a script (the same test, polled every 5 s; run it after `scripts/check-fake-profile.sh` is green):
+
+```bash
+K=demo-development-internal-key-not-a-secret; stable=0
+until [ $stable -ge 10 ]; do
+  s=$(pgrep -f Gabinety.DemoSeeder | wc -l)
+  a=$(curl -s -H "X-Internal-Key: $K" localhost:5102/internal/v1/test/clock | grep -o '"offsetMinutes":[0-9-]*')
+  b=$(curl -s -H "X-Internal-Key: $K" localhost:5103/internal/v1/test/clock | grep -o '"offsetMinutes":[0-9-]*')
+  if [ "$s" = 0 ] && [ "$a" = '"offsetMinutes":0' ] && [ "$b" = '"offsetMinutes":0' ]; then stable=$((stable+5)); else stable=0; fi; sleep 5
+done; echo seeded
+```
+
+Measured on a cold start (see "Walkthrough record"): about 95 s from `dotnet run` until all services answered and the seeder started, and about 2 min 40 s more until the seeder had finished: roughly **4 min 20 s in all**. `check-fake-profile.sh` was already green while the seeder was still running and the Booking clock was shifted, so do not start a journey on that alone.
 
 Measured: a full `--reset` (remove all `demo-` data, then seed again) against a running profile took **2 min 17 s**. Booking waits for its auto-complete job (it runs every 60 s) to complete three bookings, so expect roughly 2 minutes after the services are healthy, longer on a slow machine (the harness allows up to 8 minutes).
 
@@ -125,10 +147,54 @@ Each journey is an automated Playwright test in `tests/e2e/journeys/` (SPEC 10);
 3. `/rezerwacja/<offer>`: "Opisz problem" (type a few sentences), "Zapłać".
 4. `/checkout/mock/<bookingId>` ("Płatność (tryb demonstracyjny)"): "Symuluj udaną płatność". You land on `/rezerwacja/potwierdzenie/<bookingId>`: "Rezerwacja potwierdzona. Dziękujemy!". Note the booking id in the address.
 5. `/moje/rezerwacje` shows it as "Potwierdzona". As `demo-practitioner-3`, `/moje/rezerwacje?role=practitioner` shows it with the brief.
-6. Pass time (section 5): move the clock past the end of the consultation plus 48 hours (booking time + about 50 hours is enough). Booking's job runs every 60 s; within a minute the booking is completed.
-7. `/moje/opinie/<bookingId>`: choose a rating, "Treść opinii", "Wyślij opinię": "Dziękujemy za opinię". The review is on the public profile. A practitioner shows "Nowy" until three reviews exist, then the average.
+6. Pass time (section 5): move the clock past the end of the consultation plus 48 hours. The offset is counted **from now**, not from the booking: for a consultation that ends in 28 hours you need about 28 + 48 = 76 hours = 4560 minutes (add a margin). Booking's job runs every 60 s; within a minute the booking is completed (`canReview` turns true).
+7. `/moje/opinie/<bookingId>`: choose a rating, "Treść opinii", "Wyślij opinię": "Dziękujemy za opinię". The review is on the public profile (in a browser; the review list is loaded by the page's JavaScript, so it is not in the HTML that `curl` gets, see J3 by curl below). A practitioner shows "Nowy" until three reviews exist, then the average. Set the clock back to 0 afterwards (section 5).
 
 A profile that already has reviews (after running the e2e suite, or the seeded practitioners 1, 2 and 5) will not show "Nowy"; reseed (section 1) or use another practitioner.
+
+#### J3 by curl (no browser)
+
+The same path through the real HTTP surface, as the browser makes it: the web app's `/api/auth/login` sets the session cookies, `/api/proxy/<service>/...` forwards to the services with that cookie. Needs `curl` and `jq`; run it after the seeder has finished (section 1). It was run exactly like this; the ids are looked up, not typed.
+
+```bash
+W=localhost:3000; B=$W/api/proxy/booking/api/v1; R=$W/api/proxy/reputation/api/v1
+K=demo-development-internal-key-not-a-secret
+login() { curl -s -c "$1" -H 'Content-Type: application/json' -d "{\"email\":\"$2@demo.example\",\"password\":\"Demo-Dev-Passw0rd!\"}" $W/api/auth/login; }
+login /tmp/client.jar demo-client                  # {"authenticated":true,"userId":"demo-client",...}; tokens are cookies, never in the body
+
+# 1. browse (no sign-in): the public profile read straight from Directory has the ids
+curl -s localhost:5101/api/v1/practitioners/demo-celina-przykladowska | jq -c '{id,isNew,offer:.offerings[0].id}'
+P=<id from above>; OFF=<offer id>
+curl -s -b /tmp/client.jar "$B/practitioners/$P/slots?offeringId=$OFF&from=$(date +%F)&to=$(date -d '+13 days' +%F)" | jq -c '.slots[0]'
+START=<startUtc of a slot>; END=<its endUtc>
+
+# 2. book: 201 {"bookingId":...,"status":"PendingPayment","checkoutUrl":...}
+ID=$(curl -s -b /tmp/client.jar -H "Idempotency-Key: $(cat /proc/sys/kernel/random/uuid)" -H 'Content-Type: application/json' \
+  -d "{\"offeringId\":\"$OFF\",\"startUtc\":\"$START\",\"brief\":{\"text\":\"Prototyp z modelem językowym.\",\"aiAssisted\":false}}" $B/bookings | jq -r .bookingId)
+
+# 3. pay on the mock: {"outcome":"Applied"}; the booking is then Confirmed / payment Succeeded
+curl -s -b /tmp/client.jar -H 'Content-Type: application/json' -d "{\"bookingId\":\"$ID\",\"outcome\":\"succeeded\"}" $B/payments/simulate
+curl -s -b /tmp/client.jar $B/bookings/$ID | jq -c '{status,payment}'
+login /tmp/p3.jar demo-practitioner-3; curl -s -b /tmp/p3.jar $B/bookings/$ID | jq -c '{status,brief:.brief.text}'   # the practitioner sees it, with the brief
+
+# 4. pass time: minutes from NOW to END + 48 h (+ a margin), on both services
+M=$(( ( $(date -d "$END" +%s) + 48*3600 - $(date +%s) ) / 60 + 60 ))
+for p in 5102 5103; do curl -s -X POST -H "X-Internal-Key: $K" -H 'Content-Type: application/json' -d "{\"offsetMinutes\":$M}" localhost:$p/internal/v1/test/clock; done
+
+# 5. wait for the auto-complete job (took 21 s when run; allow up to about 70 s)
+until curl -s -b /tmp/client.jar $B/bookings/$ID | jq -e '.status=="Completed" and .canReview' >/dev/null; do sleep 5; done
+
+# 6. review: 201 {"reviewId":...,"status":"Published"}
+curl -s -b /tmp/client.jar -H 'Content-Type: application/json' -d "{\"bookingId\":\"$ID\",\"rating\":5,\"text\":\"Rzetelna konsultacja.\"}" $R/reviews
+for p in 5102 5103; do curl -s -X POST -H "X-Internal-Key: $K" -H 'Content-Type: application/json' -d '{"offsetMinutes":0}' localhost:$p/internal/v1/test/clock; done
+
+# 7. the published review (public, no cookie), and the pages
+curl -s $R/practitioners/$P/reviews | jq -c '.items[0]'
+for u in /programisci /gabinet/demo-celina-przykladowska; do curl -s -o /dev/null -w "$u %{http_code}\n" $W$u; done
+curl -s -b /tmp/client.jar -o /dev/null -w "/moje/rezerwacje %{http_code}\n" $W/moje/rezerwacje      # 307 to /logowanie without the cookie
+```
+
+`GET $B/me/bookings` needs `?role=client` or `?role=practitioner` (400 without it).
 
 ### J4 The assistant is down
 1. As `demo-client`, open a booking form (J3 steps 1 to 3) for `demo-dariusz-fikcyjny`.
@@ -173,7 +239,7 @@ done
 # {"offsetMinutes":0,"now":"2026-11-17T22:53:21.2769198+00:00"}
 ```
 
-`offsetMinutes` is the absolute offset, not a step. Without the key the answer is `401`. The booking jobs (auto-complete, payout) run on the shifted time, once a minute: after moving the clock allow up to about 60 seconds. **Set it back to 0 when you are done**, and do not move it while the seeder runs.
+`offsetMinutes` is the absolute offset, not a step. Without the key the answer is `401`. **Offsets are from now.** `offsetMinutes` moves "now"; it does not jump to a booking. To complete a booking that ends at `END`, use (`END` + 48 h − the real now) in minutes. The 2940 minutes above (49 h) only complete a booking that ended a few minutes ago. A first try with 4500 minutes against a consultation ending 28 h ahead left it `Confirmed` (75 h is less than 28 + 48 h plus the time already passed); 5000 completed it within 21 s. The booking jobs (auto-complete, payout) run on the shifted time, once a minute: after moving the clock allow up to about 60 seconds. **Set it back to 0 when you are done**, and do not move it while the seeder runs.
 
 ## 6. Run the tests
 
@@ -226,4 +292,38 @@ Accounts and secrets are not something this repository can create (T-09.01): the
 
 - The default profile, the integration tier and the Docker images: the container used had no Docker daemon. `dotnet test --filter "tier=integration"` failed with `DockerUnavailableException` as expected; `dotnet run ... --launch-profile default` (with the internal key given) printed nothing and was still waiting after 100 s.
 - `scripts/smoke-llm.sh` and the live evals against a real model (spend credits, need owner credentials). Only their refusals were run.
-- Click-through by hand in a browser: the steps in section 3 are taken from the Playwright journeys, which pass (18 of 18), not from a person following this text.
+- Click-through by hand in a browser: the steps in section 3 are taken from the Playwright journeys, which pass (18 of 18), not from a person following this text. The J3 path was later followed on a fresh checkout with `curl` only (see "Walkthrough record"); the clicking itself, the Polish button names and the page rendering in a real browser (including the client-loaded review list on the public profile) were still not done by a person.
+
+## Walkthrough record
+
+Cold-start check of this guide (T-08.06), by a fresh session that followed the guide and read no other source until it had to (the curl calls were then taken from `tests/e2e/harness`, see the first finding).
+
+| | |
+|---|---|
+| Date | 2026-11-18 (container clock 07:45 to 07:58 UTC) |
+| Container | Linux 6.18, 4 cores, 15 GB, Node 22.23.5, pnpm 10.28.0, no .NET SDK at the start, no Docker, no browser used |
+| .NET | none installed; installed 10.0.404 with `dotnet-install.sh --channel 10.0` from `builds.dotnet.microsoft.com` (47 s) |
+| Total | about 13 min wall clock, of which the start-up and seeding took 4 min 18 s and the booking path (book, pay, clock, complete, review) about 90 s |
+
+What ran and what printed:
+
+1. `pnpm --dir web install --frozen-lockfile`: `Done in 3s`.
+2. `dotnet run --project src/Gabinety.AppHost --launch-profile fake` (in the background): printed only NuGet restore lines and a spinner, as the guide says.
+3. `scripts/check-fake-profile.sh`, first run at 99 s: eight `ok` lines (all five `/health`, web, `seeded practitioners: 6 (wanted 6)`, `/programisci`), exit 0, **while the seeder was still running** (a `Gabinety.DemoSeeder` process existed and the Booking clock read `offsetMinutes: 5894`).
+4. The three-part seed-finished test: true at 258 s after launch. **Seeding took about 2 min 40 s** (it started before 95 s and ended at 258 s, including the 10 s of stability).
+5. `/`, `/programisci`, `/gabinet/demo-celina-przykladowska`, `/logowanie`: 200 (the profile has "O mnie", "Nowy", and "Zarezerwuj: Pierwszy prototyp z modelem językowym"). `/moje/rezerwacje` without a cookie: 307 to `/logowanie?redirect=%2Fmoje%2Frezerwacje`.
+6. Sign in as `demo-client` and `demo-practitioner-3` through `/api/auth/login`: 200. Slots read (first free slot the next day 11:00 UTC). Booking: 201 `PendingPayment` with a `checkoutUrl`. `payments/simulate`: `{"outcome":"Applied"}`; the booking `Confirmed`, payment `Succeeded`; the practitioner read it with the brief.
+7. Clock: first 4500 minutes (too little: still `Confirmed`), then 5000: `Completed`, `canReview: true` 21 s later. Review: 201 `Published`. Clock back to 0 on both services. The review list of the practitioner (public, no cookie) shows it. `/moje/rezerwacje` (client) 200 with "Zakończona"; as the practitioner with `?role=practitioner` 200; `/moje/opinie/<id>`, `/checkout/mock/<id>`, `/rezerwacja/potwierdzenie/<id>` 200. `isNew` stays true with one review, as the guide says.
+
+8. After the fixes the "J3 by curl" script was extracted from this file and run unchanged (only the three `<...>` placeholders filled by lookups): every step printed what the comments say, the whole run took 11 s (the offset worked out to 4620 minutes, the booking completed within the first poll), a second review was `Published`. The profile therefore ended with two reviews and still `isNew: true`.
+
+Steps that needed fixing (all in this file):
+
+- **No way to get the .NET SDK** was given although the guide says "You need the .NET 10 SDK" and a fresh container has none: install snippet added to section 1, with the host that works when `ci.dot.net` is blocked.
+- **`dotnet run` blocks the terminal** and the guide did not say to use another terminal or the background: added.
+- **No curl recipe**: the guide describes only clicks (and the acceptance criterion asks for the HTTP surface). The ids, the sign-in (cookie jar through `/api/auth/login`), the proxy prefixes (`/api/proxy/booking`, `/api/proxy/reputation`), the idempotency key, the body shapes and `me/bookings?role=` had to be found in `tests/e2e/harness`. Added "J3 by curl".
+- **Clock offset example misleading**: "booking time + about 50 hours" and the 49 h example suggest the offset is relative to the booking. It is relative to now; my first offset (4500 min) was too small. Explained, with a formula, in J3 step 6, section 5 and the curl recipe.
+- **Seeding wait**: the guide gave the rule but no command and no measured cold-start time; added both. `check-fake-profile.sh` green does not mean seeding is over (already said, now measured).
+- **"The review is on the public profile"** cannot be checked with `curl` on the page (the list is rendered by the browser); after 12 minutes the HTML still read "Nowy na platformie: ... nie ma jeszcze opinii". The review is read from the public API instead; a note was added.
+
+Not done in this walkthrough: any real browser session (clicking, the Polish labels, the review list on the profile as a person sees it); J1, J2, J4 to J7; cancelling, disputes, the administrator pages; posting the review after the clock was already back at 0 (it was posted with the clock still shifted, so its `createdAt` shows the shifted date); the default profile, Docker and the tests of section 6 (not asked for).

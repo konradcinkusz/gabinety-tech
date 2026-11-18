@@ -1,5 +1,9 @@
 using System.Net;
+using Gabinety.Booking.Payments.Abstractions;
 using Gabinety.RouteAudit;
+using Gabinety.ServiceDefaults;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Gabinety.Booking.Tests;
 
@@ -8,9 +12,13 @@ public class RouteAuthTests
 {
     const string Service = "Booking";
 
+    /// <summary>Mock payments refuse to start outside the fake profile (F-01) and no vendor adapter exists yet (T-09.05): a deployed-profile host gets a double named "Acme".</summary>
+    static RouteAuditHost<Program> Host(bool fake, IServiceFeature? extra = null) =>
+        new(fake, extra, fake ? null : s => { s.RemoveAll<IPaymentProvider>(); s.AddSingleton<IPaymentProvider>(new RecordingProvider("Acme")); });
+
     static IReadOnlyList<string> Problems(bool fake)
     {
-        using var host = new RouteAuditHost<Program>(fake);
+        using var host = Host(fake);
         host.CreateClient(); // starts the host so every endpoint is built
         return RouteTable.Diff(RouteTable.Expected(Service), RouteTable.Actual(Service, host.Services, fake ? "fake" : "all"), fake);
     }
@@ -24,7 +32,7 @@ public class RouteAuthTests
     [Fact]
     public async Task A_route_registered_without_a_policy_is_401_not_public()
     {
-        using var host = new RouteAuditHost<Program>(false, new UnprotectedProbe());
+        using var host = Host(false, new UnprotectedProbe());
         var r = await host.CreateClient().GetAsync("/test/forgot-the-policy");
         Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
     }
@@ -32,7 +40,7 @@ public class RouteAuthTests
     [Fact]
     public async Task The_fallback_does_not_turn_an_unknown_path_or_a_wrong_method_into_401()
     {
-        using var host = new RouteAuditHost<Program>();
+        using var host = Host(false);
         var c = host.CreateClient();
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync("/no/such/route")).StatusCode); // not mapped stays 404 (CONTRACTS 10.4: the fake-profile routes are 404 when deployed)
         Assert.Equal(HttpStatusCode.MethodNotAllowed, (await c.PostAsync("/health/details", null)).StatusCode);

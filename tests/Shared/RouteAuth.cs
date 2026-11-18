@@ -95,13 +95,14 @@ public static class RouteTable
 }
 
 /// <summary>A host of the service, optionally in the fake profile and optionally with one extra feature (a deliberately unprotected route).</summary>
-public sealed class RouteAuditHost<TEntry>(bool fake = false, IServiceFeature? extra = null) : WebApplicationFactory<TEntry> where TEntry : class
+public sealed class RouteAuditHost<TEntry>(bool fake = false, IServiceFeature? extra = null, Action<IServiceCollection>? configure = null) : WebApplicationFactory<TEntry> where TEntry : class
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("GABINETY_FAKE", fake ? "1" : "0");
         builder.UseSetting("Llm:Provider", "Fake");
         if (extra is not null) builder.ConfigureServices(s => s.AddSingleton(extra));
+        if (configure is not null) builder.ConfigureServices(configure); // e.g. Booking: a payment provider double for the deployed profile, where Mock refuses to start (F-01)
     }
 }
 

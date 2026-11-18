@@ -50,9 +50,9 @@ public class RouteAuthTests
     [Fact]
     public async Task The_OpenAPI_document_is_served_in_the_fake_profile_and_is_404_when_deployed()
     {
-        using var fake = new RouteAuditHost<Program>(true);
+        using var fake = Host(true);
         Assert.Equal(HttpStatusCode.OK, (await fake.CreateClient().GetAsync("/openapi/v1.json")).StatusCode);
-        using var deployed = new RouteAuditHost<Program>(false);
+        using var deployed = Host(false);
         Assert.Equal(HttpStatusCode.NotFound, (await deployed.CreateClient().GetAsync("/openapi/v1.json")).StatusCode);
     }
 }

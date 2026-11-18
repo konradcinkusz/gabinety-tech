@@ -62,6 +62,81 @@ public class PaymentWebhookTests
         Assert.Empty(await h.Query(db => db.WebhookEvents.Where(x => x.EventId == "evt_demo_2").ToListAsync()));
     }
 
+    /// <summary>The Error entries of the webhook feature: what an alert would be wired to (SPEC 8).</summary>
+    static List<(Microsoft.Extensions.Logging.LogLevel Level, int EventId, string Line)> WebhookErrors(CreateHost h) =>
+        [.. h.Logs.Entries.Where(e => e.Line.StartsWith("Gabinety.Booking.Features.Payments.PaymentWebhookFeature:") && e.Level == Microsoft.Extensions.Logging.LogLevel.Error)];
+
+    [Fact]
+    public async Task A_signature_failure_is_an_Error_alert_with_a_stable_event_id_and_the_provider_event_id_and_still_401()
+    {
+        await using var h = await Host();
+        var (_, pid) = await Pay.CreateBooking(h);
+        var body = Pay.EventJson("evt_demo_sig-1", "PaymentSucceeded", pid);
+        var r = await Pay.Webhook(h.ClientFor(null), body, Pay.Sign(body, "another-secret"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
+        var e = Assert.Single(WebhookErrors(h));
+        Assert.Equal(Features.Payments.PaymentWebhookFeature.SignatureFailedEventId, e.EventId);
+        Assert.Contains("ALERT", e.Line);
+        Assert.Contains("evt_demo_sig-1", e.Line);
+        Assert.DoesNotContain(h.Logs.Entries, x => x.Level == Microsoft.Extensions.Logging.LogLevel.Warning && x.Line.Contains("signature is invalid"));
+    }
+
+    [Theory]
+    [InlineData("""{"eventId":"evt\nforged ALERT line","kind":"PaymentSucceeded"}""")]            // a newline: log forging
+    [InlineData("""{"eventId":"evt_trailing\n","kind":"PaymentSucceeded"}""")]                      // a trailing newline must not pass as "end of string"
+    [InlineData("""{"eventId":"evt demo with spaces","kind":"PaymentSucceeded"}""")]
+    [InlineData("""{"eventId":"<script>alert(1)</script>","kind":"PaymentSucceeded"}""")]
+    [InlineData("""{"eventId":"evt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","kind":"x"}""")] // longer than 64
+    [InlineData("""{"eventId":"","kind":"PaymentSucceeded"}""")]
+    [InlineData("""{"eventId":12345,"kind":"PaymentSucceeded"}""")]                              // not a string
+    [InlineData("""{"kind":"PaymentSucceeded"}""")]
+    [InlineData("""[1,2,3]""")]
+    [InlineData("""not json at all {""")]
+    public async Task An_unsafe_or_unreadable_event_id_is_replaced_by_a_fixed_marker_and_nothing_of_the_body_is_logged(string body)
+    {
+        await using var h = await Host();
+        const string sig = "deadbeef-SIGNATURE-NOT-TO-LOG";
+        var r = await Pay.Webhook(h.ClientFor(null), body, sig);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
+        var e = Assert.Single(WebhookErrors(h));
+        Assert.Equal(Features.Payments.PaymentWebhookFeature.SignatureFailedEventId, e.EventId);
+        Assert.Contains(Features.Payments.PaymentWebhookFeature.NoEventIdMarker, e.Line);
+        Assert.DoesNotContain("forged", e.Line);
+        Assert.DoesNotContain("evt_trailing", e.Line);
+        Assert.DoesNotContain("script", e.Line);
+        Assert.DoesNotContain("AAAAAAAA", e.Line);
+        Assert.DoesNotContain("spaces", e.Line);
+        Assert.DoesNotContain("12345", e.Line);
+        Assert.DoesNotContain("PaymentSucceeded", e.Line);
+        Assert.DoesNotContain("SIGNATURE-NOT-TO-LOG", string.Join('\n', h.Logs.Lines));
+        Assert.DoesNotContain("another-secret", string.Join('\n', h.Logs.Lines));
+        Assert.DoesNotContain(Pay.Secret, string.Join('\n', h.Logs.Lines));
+    }
+
+    [Fact]
+    public async Task Other_fields_of_an_unverified_body_never_reach_a_log()
+    {
+        await using var h = await Host();
+        var body = """{"eventId":"evt_demo_pii","brief":"BRIEF-NIE-DO-LOGU","email":"demo@example.invalid","kind":"PaymentSucceeded"}""";
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Pay.Webhook(h.ClientFor(null), body, Pay.Sign(body, "another-secret"))).StatusCode);
+        var all = string.Join('\n', h.Logs.Lines);
+        Assert.Contains("evt_demo_pii", all);
+        Assert.DoesNotContain("BRIEF-NIE-DO-LOGU", all);
+        Assert.DoesNotContain("demo@example.invalid", all);
+    }
+
+    [Fact]
+    public async Task A_valid_signature_logs_no_signature_alert()
+    {
+        await using var h = await Host();
+        var (_, pid) = await Pay.CreateBooking(h);
+        var body = Pay.EventJson("evt_demo_ok", "PaymentSucceeded", pid);
+        Assert.Equal(HttpStatusCode.OK, (await Pay.Webhook(h.ClientFor(null), body, Pay.Sign(body))).StatusCode);
+        Assert.Empty(WebhookErrors(h));
+    }
+
     [Fact]
     public async Task The_same_event_id_twice_changes_nothing_the_second_time_and_answers_Duplicate()
     {

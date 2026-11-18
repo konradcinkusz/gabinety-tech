@@ -19,6 +19,11 @@ public sealed class PaymentWebhookFeature : IServiceFeature
 {
     public const string SignatureHeader = "X-Payment-Signature";
     public const int MaxBodyBytes = 64 * 1024;
+    /// <summary>Stable id of the Error log line an alert on a signature failure burst is wired to (SPEC 8).</summary>
+    public const int SignatureFailedEventId = 4301;
+    /// <summary>Logged in place of the provider event id when none can be read safely from the unverified body. It cannot match <see cref="SafeEventId"/>.</summary>
+    public const string NoEventIdMarker = "<none>";
+    static readonly System.Text.RegularExpressions.Regex SafeEventId = new(@"\A[A-Za-z0-9_-]{1,64}\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant | System.Text.RegularExpressions.RegexOptions.NonBacktracking);
     public static readonly TimeSpan RetryAfter = TimeSpan.FromSeconds(30);
 
     public void Add(IHostApplicationBuilder builder) => builder.Services.AddScoped<PaymentEventHandler>();
@@ -48,7 +53,8 @@ public sealed class PaymentWebhookFeature : IServiceFeature
         var verified = payments.VerifyWebhook(raw, http.Request.Headers[SignatureHeader].FirstOrDefault());
         if (verified is null)
         {
-            log.LogWarning("Webhook for {Provider} rejected: the signature is invalid", payments.Name);
+            log.LogError(new EventId(SignatureFailedEventId, "PaymentWebhookSignatureFailed"),
+                "ALERT payment webhook signature failure for {Provider}: event {ProviderEventId}", payments.Name, UnverifiedEventId(raw));
             return Problem(ErrorCodes.Unauthenticated, "Unauthenticated", 401);
         }
         return await RunAsync(handler, payments.Name, verified, http, ct);
@@ -91,6 +97,25 @@ public sealed class PaymentWebhookFeature : IServiceFeature
             http.Response.Headers.RetryAfter = ((int)RetryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return Problem(ErrorCodes.DependencyUnavailable, "Dependency unavailable", 503, "A required service is temporarily unavailable.");
         }
+    }
+
+    /// <summary>
+    /// The event id of a body whose signature did NOT verify, so it is attacker-controlled: it is read from a top-level string <c>eventId</c> and returned only when it
+    /// is 1-64 characters of letters, digits, underscore or hyphen (no way to forge a log line or smuggle data). Anything else, and every parse failure, gives
+    /// <see cref="NoEventIdMarker"/>. Nothing else of the body, and not the signature, is ever read into a log.
+    /// </summary>
+    internal static string UnverifiedEventId(byte[] raw)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("eventId", out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String
+                && v.GetString() is { } id && SafeEventId.IsMatch(id))
+                return id;
+        }
+        catch (System.Text.Json.JsonException) { }
+        return NoEventIdMarker;
     }
 
     /// <summary>The Mock provider is the only one that may run without a secret and the only one that may be simulated.</summary>

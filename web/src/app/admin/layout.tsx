@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <>
       <nav aria-label={av("nav.label")}>
         <Link href="/admin/weryfikacja">{av("nav.verification")}</Link> · <Link href="/admin/spory">{av("nav.disputes")}</Link> ·{" "}
-        <Link href="/admin/ksiega">{av("nav.ledger")}</Link> · <Link href="/admin/opinie">{av("nav.reviews")}</Link>
+        <Link href="/admin/ksiega">{av("nav.ledger")}</Link> · <Link href="/admin/opinie">{av("nav.reviews")}</Link> · <Link href="/admin/podejrzane">{av("nav.suspicious")}</Link>
       </nav>
       {children}
     </>

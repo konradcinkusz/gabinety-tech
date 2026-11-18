@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readConfig } from "./index";
+import { publicConfig, readConfig } from "./index";
 
 describe("readConfig", () => {
   it("splits candidate lists and trims", () => {
@@ -23,5 +23,16 @@ describe("readConfig identity", () => {
     const c = readConfig({ Identity__Issuer: "i", Identity__Audience: "a", Identity__PublicUrl: "https://id" });
     expect(c.identity).toEqual({ issuer: "i", audience: "a", publicUrl: "https://id" });
     expect(readConfig({}).identity).toEqual({ issuer: undefined, audience: undefined, publicUrl: undefined });
+  });
+});
+
+describe("readConfig trustedProxyKey", () => {
+  it("is the shared rate-limit key, trimmed, and absent when blank", () => {
+    expect(readConfig({ RateLimit__TrustedProxyKey: " demo-edge " }).trustedProxyKey).toBe("demo-edge");
+    expect(readConfig({ RateLimit__TrustedProxyKey: "  " }).trustedProxyKey).toBeUndefined();
+    expect(readConfig({}).trustedProxyKey).toBeUndefined();
+  });
+  it("never reaches the browser-facing config", () => {
+    expect(JSON.stringify(publicConfig(readConfig({ RateLimit__TrustedProxyKey: "demo-edge" })))).not.toContain("demo-edge");
   });
 });

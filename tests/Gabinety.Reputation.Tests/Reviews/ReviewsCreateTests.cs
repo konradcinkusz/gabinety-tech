@@ -123,10 +123,10 @@ public class ReviewsCreateTests
         string user = Id(); var pract = Guid.NewGuid(); var booking = h.Booking.Add(user, pract);
         var c = h.ClientFor(user);
 
-        var codes = (await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => ReviewsHost.Post(c, booking)))).Select(r => r.StatusCode).ToList();
+        var codes = (await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => ReviewsHost.Post(c, booking)) /* 5: the per-user limit of CONTRACTS 10.2 is 5 an hour */)).Select(r => r.StatusCode).ToList();
 
         Assert.Equal(1, codes.Count(x => x == HttpStatusCode.Created));
-        Assert.Equal(5, codes.Count(x => x == HttpStatusCode.Conflict));
+        Assert.Equal(4, codes.Count(x => x == HttpStatusCode.Conflict));
         Assert.Equal(1, (await h.SummaryOf(pract))!.Count);
     }
 

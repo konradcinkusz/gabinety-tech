@@ -48,7 +48,7 @@ sealed class NotificationHost : IDisposable
     public NotificationDispatcher Dispatcher => Host.Services.GetRequiredService<NotificationDispatcher>();
     public DateTimeOffset Now => Host.Clock.GetUtcNow();
 
-    public NotificationHost(string? dbName = null, Action<CreateHost>? setup = null, Action<IServiceCollection>? services = null)
+    public NotificationHost(string? dbName = null, Action<CreateHost>? setup = null, Action<IServiceCollection>? services = null, bool keepSender = false)
     {
         var name = dbName ?? "notif-" + Guid.NewGuid().ToString("N");
         Host = new CreateHost();
@@ -56,8 +56,7 @@ sealed class NotificationHost : IDisposable
         Host.Configure = s =>
         {
             s.AddDbContext<BookingDbContext>(o => o.UseInMemoryDatabase(name)); // applied after the feature's own configuration, so it wins
-            s.RemoveAll<IEmailSender>();
-            s.AddSingleton<IEmailSender>(Sender);
+            if (!keepSender) { s.RemoveAll<IEmailSender>(); s.AddSingleton<IEmailSender>(Sender); } // keepSender: the one the feature registered
             s.RemoveAll<IContactResolver>();
             s.AddSingleton<IContactResolver>(Contacts);
             services?.Invoke(s);

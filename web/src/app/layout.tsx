@@ -6,6 +6,10 @@ import { Header } from "@/components/layout/Header";
 import styles from "@/components/layout/layout.module.css";
 import { t } from "@/i18n/pl";
 
+// The CSP carries a per-request script nonce (src/proxy.ts), so no page may be prerendered: a static page would
+// ship inline scripts without the nonce and the browser would block them.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: t("site.name"), description: t("site.tagline") };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

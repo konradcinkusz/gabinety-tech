@@ -31,3 +31,6 @@ main:focus { outline: none; }
     transition-duration: 0.01ms !important; scroll-behavior: auto !important;
   }
 }
+
+/* Replaces inline style attributes so the CSP can drop style-src unsafe-inline (T-10.09). */
+.pre-wrap { white-space: pre-wrap; }

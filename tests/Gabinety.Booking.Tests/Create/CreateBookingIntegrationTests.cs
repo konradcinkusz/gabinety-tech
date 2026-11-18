@@ -44,10 +44,11 @@ public class CreateBookingIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Two_different_clients_booking_the_same_slot_at_once_exactly_one_gets_201_and_the_other_409_slot_taken()
     {
-        var a = host.ClientFor("demo-client-a");
-        var b = host.ClientFor("demo-client-b");
         for (var round = 0; round < 10; round++)
         {
+            // A client of its own per round: the fake clock never moves, and one user may book 10 a minute and 30 a day (CONTRACTS 10.2).
+            var a = host.ClientFor($"demo-client-a-r{round}");
+            var b = host.ClientFor($"demo-client-b-r{round}");
             var start = Day(round);
             var rs = await Task.WhenAll(Task.Run(() => CreateHost.Post(a, host.Req(start), CreateHost.Key())), Task.Run(() => CreateHost.Post(b, host.Req(start), CreateHost.Key())));
             var codes = rs.Select(r => r.StatusCode).Order().ToArray();
@@ -62,9 +63,9 @@ public class CreateBookingIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Two_requests_with_the_same_key_at_once_create_one_booking_and_both_answers_carry_the_same_booking_id()
     {
-        var c = host.ClientFor("demo-client-a");
         for (var round = 0; round < 10; round++)
         {
+            var c = host.ClientFor($"demo-client-s-r{round}"); // see above: the rate limit is per user and the clock is fixed
             var start = Day(round + 20);
             var key = CreateHost.Key();
             var rs = await Task.WhenAll(Task.Run(() => CreateHost.Post(c, host.Req(start), key)), Task.Run(() => CreateHost.Post(c, host.Req(start), key)));

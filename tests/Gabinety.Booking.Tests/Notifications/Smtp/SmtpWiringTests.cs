@@ -85,9 +85,9 @@ public class SmtpWiringTests
     public async Task The_log_provider_has_no_email_check_and_an_unknown_provider_still_stops_the_host()
     {
         using (var host = new CreateHost()) Assert.DoesNotContain("email", (await Health(host)).Checks.Keys);
-        using var bad = new CreateHost();
-        bad.Settings["Notifications:Provider"] = "Sendgrid";
-        var ex = Assert.Throws<InvalidOperationException>(() => bad.CreateClient());
+        var builder = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(new Microsoft.Extensions.Hosting.HostApplicationBuilderSettings());
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Notifications:Provider"] = "Sendgrid" });
+        var ex = Assert.Throws<InvalidOperationException>(() => new NotificationsFeature().Add(builder)); // not via WebApplicationFactory: a refused build can surface ObjectDisposedException
         Assert.Contains("Notifications:Provider", ex.Message);
     }
 

@@ -1,4 +1,5 @@
 using Gabinety.Booking.Notifications;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -10,9 +11,10 @@ public class NotificationFeatureTests
     [InlineData("Sendgrid")]
     public void An_unknown_provider_stops_the_host_and_names_the_key(string provider)
     {
-        using var host = new CreateHost();
-        host.Settings["Notifications:Provider"] = provider;
-        var ex = Assert.Throws<InvalidOperationException>(() => host.CreateClient());
+        // Asserted on the feature, not through a WebApplicationFactory: a refused host build can surface ObjectDisposedException instead of this message.
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Notifications:Provider"] = provider });
+        var ex = Assert.Throws<InvalidOperationException>(() => new NotificationsFeature().Add(builder));
         Assert.Contains("Notifications:Provider", ex.Message);
     }
 

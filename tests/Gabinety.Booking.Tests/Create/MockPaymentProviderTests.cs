@@ -2,6 +2,10 @@ using System.Security.Cryptography;
 using System.Text;
 using Gabinety.Booking.Payments.Abstractions;
 using Gabinety.Booking.Payments.Mock;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Gabinety.Booking.Tests;
 
@@ -61,16 +65,25 @@ public class MockPaymentProviderTests
         Assert.Equal(WebhookEventKind.Unknown, new MockPaymentProvider("http://x", Secret).VerifyWebhook(raw, Sign(raw, Secret))!.Kind);
     }
 
-    [Fact]
-    public async Task An_unknown_Payments_Provider_stops_the_host_at_startup_with_a_message_naming_the_key()
+    /// <summary>
+    /// The startup refusal is asserted on the feature itself (no WebApplicationFactory): a factory that refuses to build can surface ObjectDisposedException
+    /// instead of the inner message, so a host-level assertion here would be a race. Host-level "does not start" is covered in MockPaymentsFailClosedTests.
+    /// </summary>
+    [Theory]
+    [InlineData("Stripe")]
+    [InlineData("Acme")]
+    public void An_unknown_Payments_Provider_stops_the_host_at_startup_with_a_message_naming_the_key(string provider)
     {
-        await using var h = new CreateHost();
-        h.Settings["Payments:Provider"] = "Stripe";
-        var e = Assert.ThrowsAny<Exception>(() => h.CreateClient());
-        var all = string.Join(" | ", Chain(e).Select(x => x.Message));
-        Assert.Contains("Payments:Provider", all);
-        await Task.CompletedTask;
-    }
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["GABINETY_FAKE"] = "1", ["Payments:Provider"] = provider });
+        new PaymentsFeature().Add(builder);
+        using var sp = builder.Services.BuildServiceProvider();
 
-    static IEnumerable<Exception> Chain(Exception? e) { for (; e != null; e = e.InnerException) yield return e; }
+        var ex = Assert.Throws<InvalidOperationException>(() => sp.GetRequiredService<IPaymentProvider>());
+        Assert.Contains("Payments:Provider", ex.Message);
+        Assert.Contains(provider, ex.Message);
+        Assert.Contains("adapter", ex.Message);
+        // and the startup filter that makes the host refuse before it listens is registered
+        Assert.Contains(builder.Services, d => d.ServiceType == typeof(IStartupFilter));
+    }
 }

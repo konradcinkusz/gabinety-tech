@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Gabinety.Directory.Tests.Internal;
 
 /// <summary>Directory host with the internal key configured. Tests filter by their own random ids: the in-memory database is shared by name.</summary>
-public sealed class InternalFactory : VerificationFactory
+public class InternalFactory : VerificationFactory
 {
     public const string Key = "demo-internal-key-0001";
 

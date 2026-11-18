@@ -17,7 +17,22 @@ public static class SeederApp
     public static (SeedMode Mode, string[] Remaining) ParseMode(string[] args)
     {
         var mode = args.Contains(ResetOnlyFlag) ? SeedMode.ResetOnly : args.Contains(ResetFlag) ? SeedMode.ResetThenSeed : SeedMode.Seed;
-        return (mode, args.Where(a => a != ResetFlag && a != ResetOnlyFlag).ToArray()); // flags without a value must not reach the command-line provider
+        return (mode, Factor(args.Where(a => a != ResetFlag && a != ResetOnlyFlag).ToArray())); // flags without a value must not reach the command-line provider
+    }
+
+    public const string FactorFlag = "--factor";
+
+    /// <summary><c>--factor 200</c> and <c>--factor=200</c> become the configuration key <c>--Seed:Factor=200</c> (the command-line provider reads that form).</summary>
+    static string[] Factor(string[] args)
+    {
+        var result = new List<string>();
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i] == FactorFlag && i + 1 < args.Length) result.Add("--Seed:Factor=" + args[++i]);
+            else if (args[i].StartsWith(FactorFlag + "=", StringComparison.Ordinal)) result.Add("--Seed:Factor=" + args[i][(FactorFlag.Length + 1)..]);
+            else result.Add(args[i]);
+        }
+        return result.ToArray();
     }
 
     public static async Task<int> Main(string[] args)

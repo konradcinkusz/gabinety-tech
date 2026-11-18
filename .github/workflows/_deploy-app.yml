@@ -1,0 +1,80 @@
+# T-09.03: the steps that deploy ONE app, called by deploy.yml (never run on its own). The app is a row of deploy/estate.conf.
+name: deploy-app
+on:
+  workflow_call:
+    inputs:
+      key:
+        description: App key of deploy/estate.conf (postgres, authservice, directory, booking, reputation, assistant, web)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  deploy:
+    name: deploy ${{ inputs.key }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: staging
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG || 'personal' }}
+      KEY: ${{ inputs.key }}
+      TAG: ${{ github.ref_name }}
+      SHA: ${{ github.sha }}
+      OWNER: ${{ github.repository_owner }}
+      PUBLIC_URL: ${{ inputs.key == 'authservice' && vars.PUBLIC_URL_AUTHSERVICE || inputs.key == 'web' && vars.PUBLIC_URL_WEB || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@1.5
+        with:
+          version: "0.5.12"
+      - name: Read the app's row of deploy/estate.conf
+        id: app
+        run: |
+          read -r key fly kind _ _ _ _ smoke spath < <(awk -v k="$KEY" '$1 == k' deploy/estate.conf)
+          [ "$key" = "$KEY" ] || { echo "no row for $KEY in deploy/estate.conf" >&2; exit 1; }
+          {
+            echo "fly=$fly"; echo "kind=$kind"; echo "smoke=$smoke"; echo "smoke_path=$spath"
+            echo "image=ghcr.io/${OWNER,,}/gabinety-$KEY:sha-$SHA"
+          } >> "$GITHUB_OUTPUT"
+      - name: The config has no placeholder left
+        run: scripts/deploy/check-placeholders.sh "deploy/fly/$KEY.fly.toml"
+      - name: Ensure the Fly app exists (cold estate)
+        run: |
+          if [ "$KEY" = postgres ]; then scripts/deploy/ensure-app.sh "$FLY_APP" pgdata 5 fra; else scripts/deploy/ensure-app.sh "$FLY_APP"; fi
+        env:
+          FLY_APP: ${{ steps.app.outputs.fly }}
+      - name: Stage the secrets (names only are printed; values are masked)
+        run: scripts/deploy/set-secrets.sh "$KEY" "$FLY_APP"
+        env:
+          FLY_APP: ${{ steps.app.outputs.fly }}
+          GH_SECRETS_JSON: ${{ toJSON(secrets) }}
+      - name: Deploy
+        run: |
+          # --ha=false: one machine; a second machine of an app with a volume would be an empty database (FLY-IO-DEPLOYMENT 14).
+          if [ "$KIND" = built ]; then
+            flyctl deploy --app "$FLY_APP" --config "deploy/fly/$KEY.fly.toml" --image "$IMAGE" --ha=false --yes
+          else
+            flyctl deploy --app "$FLY_APP" --config "deploy/fly/$KEY.fly.toml" --ha=false --yes
+          fi
+        env:
+          FLY_APP: ${{ steps.app.outputs.fly }}
+          KIND: ${{ steps.app.outputs.kind }}
+          IMAGE: ${{ steps.app.outputs.image }}
+      - name: Smoke
+        id: smoke
+        run: scripts/deploy/smoke.sh "$KEY" "$FLY_APP" "$SMOKE" "$SMOKE_PATH" | tee "$RUNNER_TEMP/smoke.txt"
+        env:
+          FLY_APP: ${{ steps.app.outputs.fly }}
+          SMOKE: ${{ steps.app.outputs.smoke }}
+          SMOKE_PATH: ${{ steps.app.outputs.smoke_path }}
+      - name: The JWKS has exactly one key (T-09.04)
+        if: ${{ inputs.key == 'authservice' }}
+        run: scripts/assert-jwks-one-key.sh "${PUBLIC_URL:-https://$FLY_APP.fly.dev}"
+        env:
+          FLY_APP: ${{ steps.app.outputs.fly }}
+      - name: Row for the run summary
+        if: ${{ always() }}
+        run: |
+          line="$(grep '^SMOKE ' "$RUNNER_TEMP/smoke.txt" 2>/dev/null | tail -1 || true)"
+          echo "| $KEY | \`$TAG\` | \`${SHA:0:7}\` | ${line:-no smoke result (deploy did not finish)} |" >> "$GITHUB_STEP_SUMMARY"

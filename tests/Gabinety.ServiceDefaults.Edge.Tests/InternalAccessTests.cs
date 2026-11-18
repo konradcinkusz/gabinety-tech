@@ -22,6 +22,9 @@ public class InternalAccessTests
         var b = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
         b.WebHost.UseTestServer();
         foreach (var (k, v) in settings) b.Configuration[k] = v;
+        // F-11: a deployed profile also needs the identity settings; a test that is not about them gets valid ones (set a key, even blank, to take control of it).
+        if (!settings.ContainsKey("Identity:Authority")) b.Configuration["Identity:Authority"] = "https://auth.demo.invalid";
+        if (!settings.ContainsKey("Identity:Audience")) b.Configuration["Identity:Audience"] = "demo-audience";
         b.Services.AddAuthentication().AddInternalKeyAuthentication();
         b.Services.AddInternalKeyValidation();
         b.Services.AddAuthorization(o => o.AddPolicy("internal", p => p.AddAuthenticationSchemes(Security.InternalScheme).RequireAuthenticatedUser()));
@@ -262,6 +265,37 @@ public class InternalAccessTests
     {
         Assert.IsType<InvalidOperationException>(await Start(new() { ["Internal:Key"] = "k", ["Internal:EnforceKeyStrength"] = "true" }, "Development"));
     }
+
+    // ---- F-11: the identity settings are required in a deployed profile ----
+
+    [Theory]
+    [InlineData("Identity:Audience", "")]
+    [InlineData("Identity:Audience", "  ")]
+    [InlineData("Identity:Authority", "")]
+    [InlineData("Identity:Authority", "http://auth.demo.invalid")]
+    [InlineData("Identity:Authority", "auth.demo.invalid")]
+    [InlineData("Identity:Authority", "ftp://auth.demo.invalid")]
+    public async Task A_missing_audience_or_a_non_https_authority_stops_the_start_and_the_message_names_the_setting(string setting, string value)
+    {
+        var ex = await Start(new() { ["Internal:Callers:Booking"] = KeyA, [setting] = value });
+        Assert.IsType<InvalidOperationException>(ex);
+        Assert.Contains(setting, ex!.Message);
+        if (value.Length > 0) Assert.DoesNotContain(value, ex.Message);
+    }
+
+    [Fact]
+    public async Task The_identity_settings_are_not_required_in_the_fake_profile_or_development_but_can_be_forced()
+    {
+        Assert.Null(await Start(new() { ["Identity:Authority"] = "http://localhost:5100", ["Identity:Audience"] = "", ["GABINETY_FAKE"] = "1" }));
+        Assert.Null(await Start(new() { ["Identity:Authority"] = "http://localhost:5100", ["Identity:Audience"] = "" }, "Development"));
+        Assert.IsType<InvalidOperationException>(await Start(new() { ["Identity:Authority"] = "http://localhost:5100", ["Internal:EnforceKeyStrength"] = "true" }, "Development"));
+    }
+
+    [Fact]
+    public async Task An_https_authority_with_an_audience_starts()
+    {
+        Assert.Null(await Start(new() { ["Identity:Authority"] = "https://auth.example.test/", ["Identity:Audience"] = "gabinety" }));
+    }
 }
 
 public class InternalCallerMatchTests
@@ -304,4 +338,25 @@ public class InternalCallerMatchTests
         Assert.Equal("Booking", InternalKey.Caller(c, "old"));
         Assert.Equal("BookingNext", InternalKey.Caller(c, "new"));
     }
+}
+
+/// <summary>F-07: the OpenAPI document is served only in the fake profile (<c>GABINETY_FAKE=1</c>) or when <c>Environment:Kind=Development</c>, never because of <c>ASPNETCORE_ENVIRONMENT</c>.</summary>
+public class OpenApiExposureTests
+{
+    static IConfiguration Config(params (string Key, string Value)[] kv) =>
+        new ConfigurationBuilder().AddInMemoryCollection(kv.Select(p => new KeyValuePair<string, string?>(p.Key, p.Value))).Build();
+
+    [Theory]
+    [InlineData("GABINETY_FAKE", "1", true)]
+    [InlineData("Environment:Kind", "Development", true)]
+    [InlineData("Environment:Kind", "development", true)]
+    [InlineData("GABINETY_FAKE", "0", false)]
+    [InlineData("GABINETY_FAKE", "true", false)]
+    [InlineData("Environment:Kind", "Production", false)]
+    [InlineData("Environment:Kind", "Staging", false)]
+    [InlineData("ASPNETCORE_ENVIRONMENT", "Development", false)]
+    public void Served_only_for_the_non_deployed_profile(string key, string value, bool served) =>
+        Assert.Equal(served, OpenApiExposure.IsServed(Config((key, value))));
+
+    [Fact] public void Not_served_when_nothing_is_configured() => Assert.False(OpenApiExposure.IsServed(Config()));
 }

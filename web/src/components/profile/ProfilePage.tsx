@@ -5,6 +5,7 @@ import type { BadgeKind } from "../../lib/seo/publicApi";
 import type { PractitionerProfile } from "./profileApi";
 import styles from "./profile.module.css";
 import { ReviewsSlot } from "./ReviewsSlot";
+import { safeHttpsUrl } from "./safeUrl";
 import { pf, type ProfileTextKey } from "./strings";
 
 const BADGES: Record<BadgeKind, [ProfileTextKey, ProfileTextKey]> = {
@@ -17,6 +18,7 @@ const dateFmt = new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", mo
 
 /** Server component: everything except the slot lists is in the HTML without scripts. */
 export function ProfilePage({ profile: p, url }: { profile: PractitionerProfile; url: string }) {
+  const portfolio = safeHttpsUrl(p.portfolioUrl);
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(profileJsonLd(p, url)) }} />
@@ -39,9 +41,9 @@ export function ProfilePage({ profile: p, url }: { profile: PractitionerProfile;
           <li>{pf("page.completed", { count: p.completedCount })}</li>
           <li>{pf("page.memberSince", { date: dateFmt.format(new Date(p.memberSince)) })}</li>
         </ul>
-        {(p.portfolioUrl || p.githubLogin) && (
+        {(portfolio || p.githubLogin) && (
           <div className={styles.links}>
-            {p.portfolioUrl && <a href={p.portfolioUrl} rel="noopener nofollow ugc">{pf("page.portfolio")}</a>}
+            {portfolio && <a href={portfolio} rel="noopener nofollow ugc">{pf("page.portfolio")}</a>}
             {p.githubLogin && <a href={`https://github.com/${encodeURIComponent(p.githubLogin)}`} rel="noopener nofollow">{pf("page.github")}</a>}
           </div>
         )}

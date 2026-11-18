@@ -1,16 +1,18 @@
 import type { PractitionerProfile } from "./profileApi";
+import { safeHttpsUrl } from "./safeUrl";
 
 /** SPEC 6.5: aggregateRating only when the review count is at least 3. */
 export const MIN_REVIEWS_FOR_RATING = 3;
 
 export function profileJsonLd(p: PractitionerProfile, url: string): Record<string, unknown> {
+  const portfolio = safeHttpsUrl(p.portfolioUrl);
   const ld: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "ProfessionalService",
     name: p.displayName,
     description: p.headline,
     url,
-    ...(p.portfolioUrl || p.githubLogin ? { sameAs: [p.portfolioUrl, p.githubLogin && `https://github.com/${p.githubLogin}`].filter(Boolean) } : {}),
+    ...(portfolio || p.githubLogin ? { sameAs: [portfolio, p.githubLogin && `https://github.com/${p.githubLogin}`].filter(Boolean) } : {}),
     makesOffer: p.offerings.map((o) => ({
       "@type": "Offer",
       name: o.title,

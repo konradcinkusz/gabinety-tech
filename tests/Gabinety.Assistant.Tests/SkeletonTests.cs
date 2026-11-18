@@ -120,10 +120,6 @@ public class SkeletonHealthTests(SkeletonFactory f) : IClassFixture<SkeletonFact
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.Contains("\"Fake\"", await r.Content.ReadAsStringAsync());
     }
-
-    [Fact]
-    public async Task Openapi_document_is_published() =>
-        Assert.Equal(HttpStatusCode.OK, (await f.CreateClient().GetAsync("/openapi/v1.json")).StatusCode);
 }
 
 public class SkeletonLlmHealthTests

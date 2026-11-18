@@ -156,6 +156,22 @@ public partial class ArchitectureRules
         Assert.All(FreeTextLogExceptions, e => Assert.False(string.IsNullOrWhiteSpace(e.Value), $"exception {e.Key} needs a reason"));
     }
 
+    /// <summary>
+    /// F-04 re-review: the rate limiter keys a signed-in caller by user id only when it runs AFTER authentication (CONTRACTS 10.2). Booking and Reputation prove it by behaviour;
+    /// this holds all four services to the same order, and requires the service to register the limiter at all.
+    /// </summary>
+    [Theory]
+    [InlineData("Directory")] [InlineData("Booking")] [InlineData("Reputation")] [InlineData("Assistant")]
+    public void The_rate_limiter_runs_after_authentication_in_every_service(string service)
+    {
+        var code = CodeScan.Sanitize(File.ReadAllText(Path.Combine(Repo.Root, $"src/Gabinety.{service}/Program.cs")));
+        var auth = code.IndexOf("app.UseAuthentication()", StringComparison.Ordinal);
+        var limiter = code.IndexOf("app.UseRateLimiter()", StringComparison.Ordinal);
+        Assert.True(auth >= 0 && limiter >= 0, $"{service}/Program.cs must call app.UseAuthentication() and app.UseRateLimiter()");
+        Assert.True(auth < limiter, $"{service}/Program.cs: UseRateLimiter runs before UseAuthentication, so every caller is keyed by address (CONTRACTS 10.2)");
+        Assert.Contains("AddRateLimiting(", code);
+    }
+
     [Fact]
     public void Contracts_has_no_package_reference()
     {

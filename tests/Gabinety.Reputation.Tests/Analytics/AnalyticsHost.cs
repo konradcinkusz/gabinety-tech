@@ -66,6 +66,7 @@ sealed class AnalyticsHost : WebApplicationFactory<Program>
     readonly RSA _rsa = RSA.Create(2048);
     public FakePairCounts Booking { get; } = new();
     public AnalyticsLogSink Logs { get; } = new();
+    public Dictionary<string, string?> Settings { get; } = new();
 
     public HttpClient As(string? sub, string? role = null)
     {
@@ -84,6 +85,7 @@ sealed class AnalyticsHost : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Identity:Audience", Audience);
+        foreach (var (k, v) in Settings) builder.UseSetting(k, v);
         builder.ConfigureServices(s =>
         {
             s.RemoveAll<IPairCountsClient>();

@@ -45,4 +45,14 @@ public class RouteAuthTests
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync("/no/such/route")).StatusCode); // not mapped stays 404 (CONTRACTS 10.4: the fake-profile routes are 404 when deployed)
         Assert.Equal(HttpStatusCode.MethodNotAllowed, (await c.PostAsync("/health/details", null)).StatusCode);
     }
+
+    // F-07: the OpenAPI document lists every route, internal and admin ones included, so it is served only in the fake profile (CONTRACTS 0: development and CI).
+    [Fact]
+    public async Task The_OpenAPI_document_is_served_in_the_fake_profile_and_is_404_when_deployed()
+    {
+        using var fake = Host(true);
+        Assert.Equal(HttpStatusCode.OK, (await fake.CreateClient().GetAsync("/openapi/v1.json")).StatusCode);
+        using var deployed = Host(false);
+        Assert.Equal(HttpStatusCode.NotFound, (await deployed.CreateClient().GetAsync("/openapi/v1.json")).StatusCode);
+    }
 }

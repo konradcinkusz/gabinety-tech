@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Gabinety.ServiceDefaults;
@@ -41,7 +42,7 @@ public static class Security
         return auth.AddScheme<AuthenticationSchemeOptions, InternalKeyHandler>(InternalScheme, null);
     }
 
-    public const int DefaultPerMinute = 60;
+    public const int DefaultPerMinute = RateLimitTable.DefaultPerMinute;
 
     /// <summary>
     /// The same limiter with the limit read from <c>RateLimit:PerMinute</c> (env <c>RateLimit__PerMinute</c>); absent or blank means 60. Only the AppHost fake profile raises it,
@@ -56,18 +57,37 @@ public static class Security
         return services.AddRateLimiting(perMinute);
     }
 
-    /// <summary>Sliding window per user id when signed in, else per address (CONTRACTS 10.2). Default: 60 per minute.</summary>
+    /// <summary>
+    /// The rate limits of CONTRACTS 10.2 (see <see cref="RateLimitTable"/>) on the global limiter: per user id when signed in, else per address; refused with 429
+    /// <c>rate_limited</c> and a <c>Retry-After</c>. It runs on <see cref="TimeProvider"/> (registered here as the system clock when nothing else is). The middleware must sit
+    /// AFTER <c>UseAuthentication</c>, or the user id is not yet known and every caller is keyed by address. <paramref name="perMinute"/> is "everything else"; see the table for
+    /// how a larger value scales the others.
+    /// </summary>
     public static IServiceCollection AddRateLimiting(this IServiceCollection services, int perMinute = DefaultPerMinute)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(perMinute);
+        services.TryAddSingleton(TimeProvider.System);
         services.AddRateLimiter(o =>
         {
             o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            o.OnRejected = async (context, ct) =>
+            {
+                var response = context.HttpContext.Response;
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retry))
+                    response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retry.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                response.ContentType = "application/problem+json";
+                await response.WriteAsync("{\"type\":\"urn:gabinety:error:rate_limited\",\"title\":\"Too many requests\",\"status\":429,\"code\":\"rate_limited\"}", ct);
+            };
+        });
+        services.AddOptions<RateLimiterOptions>().Configure<TimeProvider, IConfiguration>((o, time, config) =>
+        {
+            var proxyKey = config["RateLimit:TrustedProxyKey"]; // shared with the web app only; see RateLimitTable.PartitionKey
             o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
-                RateLimitPartition.GetSlidingWindowLimiter(
-                    ctx.User.FindFirst("sub")?.Value ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    _ => new SlidingWindowRateLimiterOptions
-                    { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
+            {
+                var group = RateLimitTable.GroupOf(ctx.Request.Method, ctx.Request.Path);
+                if (group == RateLimitTable.Webhooks) return RateLimitPartition.GetNoLimiter("webhooks");
+                return RateLimitPartition.Get(RateLimitTable.PartitionKey(group, ctx, proxyKey), _ => new WindowedRateLimiter(time, RateLimitTable.RulesOf(group, perMinute)));
+            });
         });
         return services;
     }

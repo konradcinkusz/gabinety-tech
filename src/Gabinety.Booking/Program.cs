@@ -18,8 +18,8 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 app.UsePublicEdgeGuard(PublicEdge.Serves); // F-03: Booking is the one public app; the edge sees only what PublicEdge.Serves allows
 app.UseOriginGuard();
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter(); // after authentication: the limit is per user id when signed in (CONTRACTS 10.2)
 app.UseAuthorization();
 app.MapDefaultEndpoints();
 app.MapFeatures();

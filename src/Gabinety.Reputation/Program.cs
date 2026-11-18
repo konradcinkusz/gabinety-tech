@@ -17,8 +17,8 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 app.UsePublicEdgeGuard(); // F-03: /internal/* is never served through the public edge
 app.UseOriginGuard();
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter(); // after authentication: the limit is per user id when signed in (CONTRACTS 10.2)
 app.UseAuthorization();
 app.MapDefaultEndpoints();
 app.MapFeatures();

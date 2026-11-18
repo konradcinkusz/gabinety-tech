@@ -71,6 +71,11 @@ check "placeholder in a value is refused" bash -c "! '$d/check-placeholders.sh' 
 check "a placeholder in a comment is fine" "$d/check-placeholders.sh" "$tmp/clean.toml"
 check "a missing file is refused" bash -c "! '$d/check-placeholders.sh' '$tmp/none.toml' 2>/dev/null"
 
+# ---------- Booking is not deployed in Mock mode (security review F-01) ----------
+check "no committed fly.toml sets Payments__Provider to Mock" bash -c "! grep -Eiq '^[^#]*Payments__Provider *= *\"mock' '$root'/deploy/fly/*.fly.toml"
+check "while Payments__Provider is a placeholder the Booking deploy is refused" bash -c "
+  if grep -Eq '^[^#]*Payments__Provider *= *\"<' '$root/deploy/fly/booking.fly.toml'; then ! '$d/check-placeholders.sh' '$root/deploy/fly/booking.fly.toml' 2>/dev/null; fi"
+
 # ---------- ensure-app (flyctl stub) ----------
 cat > "$tmp/fly" <<'STUB'
 #!/usr/bin/env bash

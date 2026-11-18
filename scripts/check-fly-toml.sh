@@ -34,6 +34,8 @@ for f in files:
     if hs and hs.get("internal_port") != 8080 and "image" not in b: fail(f, "internal_port must be 8080")
     if hs and "min_machines_running" not in hs: fail(f, "min_machines_running must be stated (SPEC 4.3)")
     if "vm" not in t: fail(f, "[[vm]] size is missing")
+    prov = str(t.get("env", {}).get("Payments__Provider", "")).strip().lower()
+    if prov == "mock": fail(f, "Payments__Provider must not be Mock in a deployed config (security review F-01: Mock is the fake profile's and Booking refuses to start with it)")
     print(f"ok   {f}")
 if len(files) < 7: fail("deploy/fly", f"expected 7 *.fly.toml (SPEC 4.3), found {len(files)}")
 sys.exit(1 if bad else 0)

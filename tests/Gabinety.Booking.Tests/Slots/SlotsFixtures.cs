@@ -37,6 +37,7 @@ sealed class SlotsHost : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseSetting("GABINETY_FAKE", "1"); // Mock payments run only in the fake profile (F-01)
         builder.UseSetting("Backend:Directory", FakeDirectory.BaseUrl);
         builder.ConfigureServices(s =>
         {

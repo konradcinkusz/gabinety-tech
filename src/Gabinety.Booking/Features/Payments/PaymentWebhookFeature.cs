@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Gabinety.Booking.Clients;
+using Gabinety.Booking.Features.Internal.TestClock;
 using Gabinety.Contracts.Booking;
 using Gabinety.Booking.Payments.Abstractions;
 using Gabinety.Booking.Persistence;
@@ -25,7 +26,9 @@ public sealed class PaymentWebhookFeature : IServiceFeature
     public void Map(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/webhooks/payments/{provider}", WebhookAsync).AllowAnonymous();
-        endpoints.MapPost("/api/v1/payments/simulate", SimulateAsync).RequireAuthorization("Authenticated");
+        // The mock checkout's simulate exists only in the fake profile (F-01): a deployed host has no such route, whatever its provider.
+        if (NonDeployedProfile.IsActive(endpoints.ServiceProvider.GetRequiredService<IConfiguration>()))
+            endpoints.MapPost("/api/v1/payments/simulate", SimulateAsync).RequireAuthorization("Authenticated");
     }
 
     static async Task<IResult> WebhookAsync(string provider, HttpContext http, IPaymentProvider payments, IConfiguration config,
@@ -52,7 +55,7 @@ public sealed class PaymentWebhookFeature : IServiceFeature
     }
 
     static async Task<IResult> SimulateAsync(SimulatePaymentRequest? req, IPaymentProvider payments, BookingDbContext db, PaymentEventHandler handler,
-        HttpContext http, CancellationToken ct)
+        ClaimsPrincipal user, HttpContext http, CancellationToken ct)
     {
         if (!IsMock(payments)) return Problem(ErrorCodes.Forbidden, "Forbidden", 403, "Payments are not simulated outside Mock mode.");
         var outcome = req?.Outcome?.ToLowerInvariant();
@@ -62,7 +65,9 @@ public sealed class PaymentWebhookFeature : IServiceFeature
 
         var payment = await db.Payments.AsNoTracking().SingleOrDefaultAsync(p => p.BookingId == req.BookingId, ct);
         var booking = payment is null ? null : await db.Bookings.AsNoTracking().SingleOrDefaultAsync(b => b.Id == req.BookingId, ct);
-        if (payment is null || booking is null) return Problem(ErrorCodes.NotFound, "Not found", 404);
+        // Only the client of the booking drives its mock checkout; anybody else gets the answer of an unknown id (F-01).
+        var sub = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (payment is null || booking is null || sub is null || booking.ClientUserId != sub) return Problem(ErrorCodes.NotFound, "Not found", 404);
 
         var kind = outcome == "succeeded" ? WebhookEventKind.PaymentSucceeded : WebhookEventKind.PaymentFailed;
         var e = new ProviderEvent($"sim_{req.BookingId:N}_{outcome}", kind, payment.ProviderPaymentId, booking.PriceMinor, PaymentEventHandler.Currency);

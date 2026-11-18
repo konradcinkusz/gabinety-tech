@@ -112,7 +112,7 @@ public class PaymentWebhookTests
     {
         await using var h = await Host(secret: false);
         var (id, _) = await Pay.CreateBooking(h);
-        var c = h.ClientFor("demo-anyone");
+        var c = h.ClientFor(Client);
         var r = await Pay.Simulate(c, id, "succeeded");
         Assert.Equal("Applied", await Outcome(r));
         Assert.Equal(BookingStatus.Confirmed, (await Booking(h, id)).Status);
@@ -122,12 +122,12 @@ public class PaymentWebhookTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await Pay.Simulate(h.ClientFor(null), id, "succeeded")).StatusCode);
 
         var (id2, _) = await Pay.CreateBooking(h, "demo-client-2", "2026-11-17T13:00:00Z");
-        Assert.Equal("Applied", await Outcome(await Pay.Simulate(c, id2, "failed")));
+        Assert.Equal("Applied", await Outcome(await Pay.Simulate(h.ClientFor("demo-client-2"), id2, "failed")));
         Assert.Equal(BookingStatus.Expired, (await Booking(h, id2)).Status);
 
         await using var other = await Host(x => x.Configure = s => { s.RemoveAll<Gabinety.Booking.Payments.Abstractions.IPaymentProvider>(); s.AddSingleton<Gabinety.Booking.Payments.Abstractions.IPaymentProvider>(new RecordingProvider("Acme")); }, secret: false);
         var (id3, _) = await Pay.CreateBooking(other);
-        Assert.Equal(HttpStatusCode.Forbidden, (await Pay.Simulate(other.ClientFor("demo-anyone"), id3, "succeeded")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Pay.Simulate(other.ClientFor(Client), id3, "succeeded")).StatusCode);
         Assert.Equal(BookingStatus.PendingPayment, (await Booking(other, id3)).Status);
     }
 

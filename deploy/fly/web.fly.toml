@@ -17,7 +17,7 @@ primary_region = "fra"
   HOSTNAME = "0.0.0.0"
   TZ = "Europe/Warsaw"
   Site__BaseUrl = "https://<web-public-host>"
-  Payments__Provider = "Mock"   # must equal Booking's Payments__Provider (the mock checkout is shown only when Mock); PLACEHOLDER until T-09.05.
+  # No Payments__Provider here, on purpose (security review F-01): the web app shows the mock checkout /checkout/mock/[bookingId] only in the fake profile, never when deployed.
   # Runtime configuration, read per request (FRONTEND-BFF 2). Always-on backends over the private network:
   Backend__Directory = "http://gabinety-directory-staging.internal:8080"
   Backend__Booking = "http://gabinety-booking-staging.internal:8080"

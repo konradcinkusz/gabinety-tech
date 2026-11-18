@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Gabinety.Booking.Clients;
+using Gabinety.Booking.Payments.Abstractions;
 using Gabinety.Booking.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -51,7 +52,8 @@ sealed class CreateHost : WebApplicationFactory<Program>
     public FakeDirectory Directory { get; } = new();
     public ManualClock Clock { get; } = new();
     public LogSink Logs { get; } = new();
-    public Dictionary<string, string?> Settings { get; } = new();
+    /// <summary>Starts in the fake profile (<c>GABINETY_FAKE=1</c>), the only one that may run the Mock payment provider (F-01); a test of a deployed profile calls <see cref="AsDeployed"/>.</summary>
+    public Dictionary<string, string?> Settings { get; } = new() { ["GABINETY_FAKE"] = "1" };
 
     public Guid Practitioner { get; } = Guid.NewGuid();
     public Guid Offering { get; } = Guid.NewGuid();
@@ -63,6 +65,18 @@ sealed class CreateHost : WebApplicationFactory<Program>
     public bool Active = true;
     public string? MeetingUrl;
     public Action<IServiceCollection>? Configure;
+
+    /// <summary>
+    /// A deployed profile (not fake, optionally an <c>Environment:Kind</c>). Mock cannot run there and no vendor adapter exists yet (T-09.05), so the host is given a
+    /// recording stand-in named "Acme" over the registered provider; tests of the guard itself do not use this.
+    /// </summary>
+    public CreateHost AsDeployed(string? kind = null)
+    {
+        Settings["GABINETY_FAKE"] = "0";
+        if (kind is not null) Settings["Environment:Kind"] = kind;
+        Configure += s => { s.RemoveAll<IPaymentProvider>(); s.AddSingleton<IPaymentProvider>(new RecordingProvider("Acme")); };
+        return this;
+    }
 
     public CreateHost()
     {

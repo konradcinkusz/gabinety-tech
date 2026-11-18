@@ -97,11 +97,11 @@ function Row({ r, mode }: { r: AdminReview; mode: ReviewStatus }) {
             )}
           </dd>
           <dt>{mv("fact.text")}</dt>
-          <dd style={{ whiteSpace: "pre-wrap" }}>{r.text ?? ""}</dd>
+          <dd className="pre-wrap">{r.text ?? ""}</dd>
           {r.moderationNote ? (
             <>
               <dt>{mv("fact.note")}</dt>
-              <dd style={{ whiteSpace: "pre-wrap" }}>{r.moderationNote}</dd>
+              <dd className="pre-wrap">{r.moderationNote}</dd>
             </>
           ) : null}
           {r.moderatedBy ? (

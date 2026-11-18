@@ -151,11 +151,11 @@ function Row({ d, mode }: { d: AdminDispute; mode: DisputeStatus }) {
             </>
           ) : null}
           <dt>{dv("fact.text")}</dt>
-          <dd style={{ whiteSpace: "pre-wrap" }}>{d.text ?? ""}</dd>
+          <dd className="pre-wrap">{d.text ?? ""}</dd>
           {mode === "resolved" && d.note ? (
             <>
               <dt>{dv("fact.note")}</dt>
-              <dd style={{ whiteSpace: "pre-wrap" }}>{d.note}</dd>
+              <dd className="pre-wrap">{d.note}</dd>
             </>
           ) : null}
         </dl>

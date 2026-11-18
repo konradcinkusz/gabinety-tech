@@ -46,7 +46,7 @@ export function PractitionerDetail({ detail: d, events }: { detail: AdminPractit
           {d.statusReason ? (<><dt>{av("fact.reason")}</dt><dd>{d.statusReason}</dd></>) : null}
         </dl>
         <h3>{av("fact.bio")}</h3>
-        <p style={{ whiteSpace: "pre-wrap" }}>{d.bio}</p>
+        <p className="pre-wrap">{d.bio}</p>
       </Card>
       <section aria-labelledby="timeline-title">
         <h2 id="timeline-title">{av("timeline.title")}</h2>

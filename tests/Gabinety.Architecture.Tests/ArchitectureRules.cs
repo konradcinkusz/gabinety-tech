@@ -68,6 +68,28 @@ public partial class ArchitectureRules
         Assert.True(v.Count == 0, $"Gabinety.Llm exposes {Sdk}* types: {string.Join("; ", v)}");
     }
 
+    /// <summary>The standard-SMTP client (T-09.06) is a vendor like any other (P11): one project, one namespace, nothing of it public.</summary>
+    static readonly string[] SmtpVendor = ["MailKit", "MimeKit", "BouncyCastle"];
+
+    [Fact]
+    public void Only_the_Booking_SMTP_adapter_uses_MailKit_and_exposes_none_of_it()
+    {
+        var offenders = Repo.Projects().Where(p => p.PackageRefs.Any(r => r is "MailKit" or "MimeKit") && p.Name != "Gabinety.Booking").Select(p => p.File).ToList();
+        Assert.True(offenders.Count == 0, $"only src/Gabinety.Booking may reference MailKit, but also: {string.Join(", ", offenders)}");
+
+        var adapter = Path.Combine(Repo.Root, "src", "Gabinety.Booking", "Notifications", "Smtp") + Path.DirectorySeparatorChar;
+        var users = Repo.Files("src", "*.cs").Concat(Repo.Files("tools", "*.cs"))
+            .Where(f => !f.StartsWith(adapter) && UsingMailKit().IsMatch(File.ReadAllText(f))).Select(Repo.Rel).ToList();
+        Assert.True(users.Count == 0, $"'using MailKit/MimeKit' outside src/Gabinety.Booking/Notifications/Smtp: {string.Join(", ", users)}");
+        Assert.Contains(Repo.Files("src", "*.cs"), f => f.StartsWith(adapter) && UsingMailKit().IsMatch(File.ReadAllText(f))); // the rule is looking at the right place
+
+        var leaks = PublicSurface.VendorLeaks(typeof(Gabinety.Booking.Notifications.IEmailSender).Assembly, SmtpVendor);
+        Assert.True(leaks.Count == 0, $"Gabinety.Booking exposes MailKit/MimeKit types: {string.Join("; ", leaks)}");
+    }
+
+    [GeneratedRegex(@"\busing\s+(static\s+)?(\w+\s*=\s*)?(MailKit|MimeKit)\b")]
+    private static partial Regex UsingMailKit();
+
     [Fact]
     public void Project_references_follow_SPEC_3_2()
     {
@@ -147,8 +169,12 @@ public partial class ArchitectureRules
 /// <summary>Reflection over every public type and member, including generic arguments, base types and interfaces.</summary>
 static class PublicSurface
 {
-    public static List<string> CopilotLeaks(Assembly asm)
+    public static List<string> CopilotLeaks(Assembly asm) => VendorLeaks(asm, "GitHub.Copilot");
+
+    /// <summary>Public (or protected) members of <paramref name="asm"/> whose types come from an assembly named <paramref name="prefixes"/>*.</summary>
+    public static List<string> VendorLeaks(Assembly asm, params string[] prefixes)
     {
+        bool Leaks(Type t) => PublicSurface.Leaks(t, prefixes);
         var found = new List<string>();
         const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
         foreach (var t in asm.GetTypes().Where(IsExposed))
@@ -187,10 +213,11 @@ static class PublicSurface
     static bool IsExposed(Type t) => t.IsPublic || (t.IsNestedPublic && IsExposed(t.DeclaringType!)) || (t.IsNestedFamily && IsExposed(t.DeclaringType!));
 
     /// <summary>True if the type, its element, or any generic argument belongs to an assembly named GitHub.Copilot*.</summary>
-    static bool Leaks(Type t)
+    static bool Leaks(Type t, string[] prefixes)
     {
-        if (t.HasElementType) return Leaks(t.GetElementType()!);
-        if (t.IsGenericType && t.GetGenericArguments().Any(Leaks)) return true;
-        return t.Assembly.GetName().Name?.StartsWith("GitHub.Copilot", StringComparison.Ordinal) == true;
+        if (t.HasElementType) return Leaks(t.GetElementType()!, prefixes);
+        if (t.IsGenericType && t.GetGenericArguments().Any(a => Leaks(a, prefixes))) return true;
+        var name = t.Assembly.GetName().Name;
+        return name is not null && prefixes.Any(p => name.StartsWith(p, StringComparison.Ordinal));
     }
 }

@@ -8,7 +8,6 @@ public class NotificationFeatureTests
 {
     [Theory]
     [InlineData("Sendgrid")]
-    [InlineData("Smtp")] // listed in CONTRACTS 10.3 but its sender is a later task: it must not silently fall back to Log
     public void An_unknown_provider_stops_the_host_and_names_the_key(string provider)
     {
         using var host = new CreateHost();

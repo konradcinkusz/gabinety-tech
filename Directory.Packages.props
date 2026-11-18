@@ -20,6 +20,8 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.15" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
+    <!-- Booking e-mail adapter (T-09.06): standard SMTP client, MIT, confined to Notifications/Smtp -->
+    <PackageVersion Include="MailKit" Version="4.18.2" />
     <!-- AppHost -->
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.6.5" />

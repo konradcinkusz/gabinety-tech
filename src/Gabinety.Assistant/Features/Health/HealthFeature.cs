@@ -26,7 +26,7 @@ public sealed class HealthFeature : IServiceFeature
                 status = report.Status.ToString(),
                 checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString() }),
             });
-        });
+        }).AllowAnonymous();
 }
 
 /// <summary>Healthy on InMemory, or when migrations are Done and the connection works; Degraded otherwise.</summary>

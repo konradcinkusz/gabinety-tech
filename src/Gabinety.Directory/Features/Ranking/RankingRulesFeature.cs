@@ -23,5 +23,5 @@ public sealed class RankingRulesFeature : IServiceFeature
                 new RankingWeights(RankingRules.WeightRating, RankingRules.WeightReliability, RankingRules.WeightAvailability, RankingRules.WeightCompleteness),
                 new RankingConstants(RankingRules.M, RankingRules.Mu, RankingRules.MinReviewsToShowRating, RankingRules.SlotsForFullAvailability)),
                 "public, max-age=3600");
-        });
+        }).AllowAnonymous();
 }

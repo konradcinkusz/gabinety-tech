@@ -4,6 +4,7 @@ using System.Text.Encodings.Web;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
@@ -38,6 +39,11 @@ public static class Security
     /// </summary>
     public static AuthenticationBuilder AddInternalKeyAuthentication(this AuthenticationBuilder auth) =>
         auth.AddScheme<AuthenticationSchemeOptions, InternalKeyHandler>(InternalScheme, null);
+
+    /// <summary>Deny by default (SPEC 11, T-10.12; routes: docs/operations/ROUTE-AUTH.md): a matched route with no policy needs a signed-in user. A request that matched no route stays 404/405 (the fallback also sees those).</summary>
+    public static AuthorizationBuilder RequireAuthenticatedByDefault(this AuthorizationBuilder auth) =>
+        auth.SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAssertion(c =>
+            c.Resource is not HttpContext h || h.GetEndpoint() is not Microsoft.AspNetCore.Routing.RouteEndpoint || c.User.Identity?.IsAuthenticated == true).Build());
 
     public const int DefaultPerMinute = RateLimitTable.DefaultPerMinute;
 

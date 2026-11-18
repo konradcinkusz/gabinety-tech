@@ -17,6 +17,7 @@ jobs:
           global-json-file: global.json
       - run: scripts/check-solution-projects.sh
       - run: scripts/check-fly-toml.sh # T-09.02: deploy/fly/*.fly.toml parse, name existing Dockerfiles, checks match HEALTHCHECK
+      - run: scripts/check-private-topology.sh # F-03 / T-10.10: private apps stay private, web uses .internal/.flycast
       - run: dotnet build -warnaserror
       - run: dotnet test --no-build --filter "tier!=integration"
   web:

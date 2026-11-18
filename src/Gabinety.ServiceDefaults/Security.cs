@@ -31,9 +31,15 @@ public static class Security
         return services;
     }
 
-    /// <summary>X-Internal-Key compared in constant time against Internal:Key (ADR-0007).</summary>
-    public static AuthenticationBuilder AddInternalKeyAuthentication(this AuthenticationBuilder auth) =>
-        auth.AddScheme<AuthenticationSchemeOptions, InternalKeyHandler>(InternalScheme, null);
+    /// <summary>
+    /// X-Internal-Key compared in constant time against the caller keys <c>Internal:Callers:&lt;Caller&gt;</c> (one per caller, the matching caller becomes the <c>caller</c> claim)
+    /// and <c>Internal:Key</c> (the single key of the fake profile). Outside the fake profile and Development the service refuses to start unless every key is strong and distinct (F-03, ADR-0007).
+    /// </summary>
+    public static AuthenticationBuilder AddInternalKeyAuthentication(this AuthenticationBuilder auth)
+    {
+        auth.Services.AddHostedService<InternalAccess.KeyValidationService>();
+        return auth.AddScheme<AuthenticationSchemeOptions, InternalKeyHandler>(InternalScheme, null);
+    }
 
     public const int DefaultPerMinute = 60;
 
@@ -92,12 +98,12 @@ public static class Security
     {
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var expected = config["Internal:Key"];
             var given = Request.Headers["X-Internal-Key"].ToString();
-            if (string.IsNullOrEmpty(expected) || string.IsNullOrEmpty(given)) return Task.FromResult(AuthenticateResult.NoResult());
-            var ok = CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(given));
-            if (!ok) return Task.FromResult(AuthenticateResult.Fail("bad internal key"));
+            if (string.IsNullOrEmpty(given)) return Task.FromResult(AuthenticateResult.NoResult());
+            var caller = InternalAccess.Match(config, given);
+            if (caller is null) return Task.FromResult(AuthenticateResult.Fail("bad internal key"));
             var id = new System.Security.Claims.ClaimsIdentity(InternalScheme);
+            id.AddClaim(new System.Security.Claims.Claim("caller", caller));
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new System.Security.Claims.ClaimsPrincipal(id), InternalScheme)));
         }
     }

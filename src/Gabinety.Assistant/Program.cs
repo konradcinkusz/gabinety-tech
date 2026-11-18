@@ -21,6 +21,7 @@ builder.Services.AddAuthorizationBuilder()
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+app.UsePublicEdgeGuard(); // F-03: /internal/* is never served through the public edge
 app.UseOriginGuard();
 app.UseRateLimiter();
 app.UseAuthentication();

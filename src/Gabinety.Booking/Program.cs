@@ -1,3 +1,4 @@
+using Gabinety.Booking;
 using Gabinety.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,7 @@ builder.Services.AddAuthorizationBuilder()
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+app.UsePublicEdgeGuard(PublicEdge.Serves); // F-03: Booking is the one public app; the edge sees only what PublicEdge.Serves allows
 app.UseOriginGuard();
 app.UseRateLimiter();
 app.UseAuthentication();

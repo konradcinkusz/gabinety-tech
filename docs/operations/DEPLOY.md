@@ -27,7 +27,8 @@ GitHub: repository → Settings → Environments → **`staging`**. Use no requi
 | secret | `FLY_API_TOKEN` | a Fly token that may create apps and deploy in the organisation (`fly tokens create org`) |
 | secret | `POSTGRES_PASSWORD` | the database superuser; also inside every connection string (generate with `openssl rand -base64 33`; no `;` or `"`) |
 | secret | `AUTH_JWT_PRIVATE_KEY_PEM` | authservice signing key, from `scripts/gen-authservice-key.sh` (only authservice holds it) |
-| secret | `INTERNAL_KEY_DIRECTORY`, `INTERNAL_KEY_BOOKING`, `INTERNAL_KEY_ASSISTANT`, `INTERNAL_KEY_REPUTATION` | the callee keys of ADR-0007; each caller receives the keys of the callees it calls |
+| secret | `INTERNAL_KEY_BOOKING_TO_DIRECTORY`, `INTERNAL_KEY_REPUTATION_TO_DIRECTORY`, `INTERNAL_KEY_REPUTATION_TO_BOOKING`, `INTERNAL_KEY_REPUTATION_TO_ASSISTANT` | one internal key per caller and callee pair (ADR-0007, F-03): each at least 43 characters, all different, `openssl rand -base64 33`; the services refuse to start otherwise |
+| secret, optional | `INTERNAL_KEY_OWNER_DIRECTORY`, `INTERNAL_KEY_OWNER_BOOKING`, `INTERNAL_KEY_OWNER_REPUTATION`, `INTERNAL_KEY_OWNER_ASSISTANT` | the owner's own caller key for the RUNBOOK 8 erasure hooks |
 | secret, optional | `AUTH_GITHUB_CLIENT_ID`, `AUTH_GITHUB_CLIENT_SECRET` | GitHub sign-in (set both or neither) |
 | secret, optional | `PAYMENTS_WEBHOOK_SECRET` | `Payments__WebhookSecret` of Booking (T-09.05 adds the provider API key) |
 | variable, optional | `IMAGE_REGISTRY` | the image registry: `ghcr.io` (default) or `registry.fly.io`; see the owner decision in section 4 |
@@ -37,6 +38,8 @@ GitHub: repository → Settings → Environments → **`staging`**. Use no requi
 The mapping from these names to Fly secret names is `deploy/secrets.map` (SPEC 11: each service sees only its own). A missing *required* secret fails that app's deploy naming the GitHub secret (never a value); a missing *optional* one is skipped and the feature degrades (P8). The provider, e-mail and model keys of T-09.05 to T-09.07 are added to the map by those tasks.
 
 Also before the first tag: the `<...-host>` placeholders of `deploy/fly/authservice.fly.toml` are filled (the workflow refuses to deploy a config that still has one), and the registry decision of section 4 is taken.
+
+Network (F-03): `deploy/estate.conf` marks each app public, private or flycast. A private or flycast app is deployed with `--no-public-ips` and the job then runs `scripts/deploy/assert-no-public-ip.sh`, which fails when the app has any public address. Booking is public but its code serves the public edge only the webhook, `/alive` and `/api/v1/*` (not admin); `/internal/*` is 404 from the edge.
 
 Secrets are set with `fly secrets set --stage` and take effect with the deploy that follows in the same job. Values are registered with `::add-mask::` before use, the scripts never run with `set -x`, and a value is never written to the log or the summary. **A secret changed in GitHub is not a change in git**: it does not select an app; re-run the failed run's jobs, or push a new tag that touches the app.
 

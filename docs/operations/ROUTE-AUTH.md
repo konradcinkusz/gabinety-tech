@@ -64,7 +64,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | GET | `/openapi/v1.json` | Anonymous | all | F-07 |
 | Booking | GET | `/api/v1/practitioners/{practitionerId}/slots` | Anonymous | all | public read |
 | Booking | POST | `/webhooks/payments/{provider}` | Anonymous | all | guarded by the provider signature |
-| Booking | POST | `/api/v1/payments/simulate` | Authenticated | all | Mock provider only (F-01) |
+| Booking | POST | `/api/v1/payments/simulate` | Authenticated | fake | Mock provider only, and only the booking's client (F-01, T-10.08); not mapped when deployed |
 | Booking | GET | `/api/v1/me/availability` | Authenticated | all | |
 | Booking | PUT | `/api/v1/me/availability` | Authenticated | all | |
 | Booking | POST | `/api/v1/bookings` | Authenticated | all | |

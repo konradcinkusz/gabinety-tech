@@ -11,7 +11,7 @@ public class PublicEdgeTests
 
     static CreateHost NewHost()
     {
-        var h = new CreateHost();
+        var h = new CreateHost().AsDeployed(); // the edge guard is a deployed-profile rule; Mock cannot run there (F-01), so the host gets the provider double "Acme"
         h.Settings["Internal:Key"] = Key;
         return h;
     }
@@ -54,7 +54,7 @@ public class PublicEdgeTests
     {
         await using var h = NewHost();
         // 404 from the guard would be the failure; the handlers answer anything else (401 for no token, 4xx for a bad body, ...).
-        Assert.NotEqual(HttpStatusCode.NotFound, (await Send(h, HttpMethod.Post, "/webhooks/payments/mock", edge: true, body: "{}")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.NotFound, (await Send(h, HttpMethod.Post, "/webhooks/payments/acme", edge: true, body: "{}")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Send(h, HttpMethod.Get, "/alive", edge: true)).StatusCode);
         Assert.NotEqual(HttpStatusCode.NotFound, (await Send(h, HttpMethod.Get, $"/api/v1/practitioners/{Guid.NewGuid()}/slots", edge: true)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await Send(h, HttpMethod.Get, "/api/v1/me/bookings", edge: true)).StatusCode);

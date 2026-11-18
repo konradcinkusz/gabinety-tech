@@ -22,14 +22,17 @@ primary_region = "fra"
   Identity__Audience = "gabinety"
   Backend__Directory = "http://gabinety-directory-staging.internal:8080"
   Site__BaseUrl = "https://<web-public-host>"
-  Payments__Provider = "Mock"        # PLACEHOLDER until T-09.05 names the provider; Mock refuses nothing and moves no money.
+  # Payments__Provider is a PLACEHOLDER on purpose (security review F-01): Mock is the fake profile's and the host REFUSES TO START with Mock, with no value, or with a vendor that
+  # has no adapter. The workflow also refuses to deploy a config that still has a placeholder (scripts/deploy/check-placeholders.sh), so Booking cannot be deployed until
+  # T-09.05 builds the provider adapter and replaces this value with its name (docs/operations/DEPLOY.md section 5).
+  Payments__Provider = "<payments-provider-T-09-05>"
   Notifications__Provider = "Log"    # PLACEHOLDER until T-09.06 provides a sender.
   # Billing__FirstConsultationFeeBps is the owner's constant (CONTRACTS 9, D-17): not set here, the code default applies.
 # Secrets (NOT here), set once with `fly secrets set --app gabinety-booking-staging`:
 #   ConnectionStrings__bookingdb
 #   Internal__Callers__Reputation, Internal__Keys__Directory   (one key per caller and callee, never shared; F-03)
 #   optional Internal__Callers__Owner
-#   Payments__WebhookSecret   (required when Payments__Provider is not Mock)
+#   Payments__WebhookSecret   (required: with no secret every webhook of a non-Mock provider is rejected with 401)
 #   Notifications__Smtp__* (only with T-09.06; names defined there)
 
 [http_service]

@@ -216,6 +216,7 @@ public class SlotsConstraintIntegrationTests : IAsyncLifetime
         var offering = Guid.NewGuid();
         await using var host = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
+            b.UseSetting("GABINETY_FAKE", "1"); // Mock payments need the fake profile (F-01)
             b.UseSetting("Database:Provider", "PostgreSQL");
             b.UseSetting("ConnectionStrings:bookingdb", cs);
             b.ConfigureServices(s =>

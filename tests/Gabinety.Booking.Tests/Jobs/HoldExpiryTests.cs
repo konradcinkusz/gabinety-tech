@@ -83,7 +83,7 @@ public class HoldExpiryTests : IDisposable
     {
         await h.WorkWeek();
         var (id, _) = await Pay.CreateBooking(h);
-        Assert.Equal(HttpStatusCode.OK, (await Pay.Simulate(h.ClientFor("demo-anyone"), id, "succeeded")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Pay.Simulate(h.ClientFor("demo-client-1"), id, "succeeded")).StatusCode);
         Assert.Equal(BookingStatus.Confirmed, await Hold.StatusOf(h, id));
         h.Clock.Advance(Hold10 + TimeSpan.FromMinutes(1));
 
@@ -133,7 +133,7 @@ public class HoldExpiryTests : IDisposable
         Assert.Equal(1, await Hold.Job(h).ExpireDueAsync(h.Clock.GetUtcNow(), default));
         Assert.Equal(PaymentStatus.Created, (await Life.PaymentOf(h, id)).Status);
 
-        var late = await Pay.Simulate(h.ClientFor("demo-anyone"), id, "succeeded");
+        var late = await Pay.Simulate(h.ClientFor("demo-client-1"), id, "succeeded");
 
         Assert.Equal(HttpStatusCode.OK, late.StatusCode);
         Assert.Equal(BookingStatus.Expired, await Hold.StatusOf(h, id));

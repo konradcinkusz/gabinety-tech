@@ -7,11 +7,15 @@ export function briefProblem(text: string): "short" | "long" | null {
   return n < BRIEF_MIN ? "short" : n > BRIEF_MAX ? "long" : null;
 }
 
-/** SPEC 6.5: the mock checkout exists only in the fake profile or when the provider is Mock. Unknown means no. */
+/**
+ * SPEC 6.5: the mock checkout exists only in the fake profile (`GABINETY_FAKE=1` or `Environment__Kind=Development`, as on the backends) and only while the provider is
+ * Mock or not set. Outside the fake profile it is off whatever `Payments__Provider` says (security review F-01: the Booking host refuses Mock there as well). Unknown means no.
+ */
 export function isMockPayments(env: Record<string, string | undefined> = process.env): boolean {
+  const fake = env["GABINETY_FAKE"] === "1" || env["Environment__Kind"]?.trim().toLowerCase() === "development";
+  if (!fake) return false;
   const provider = env["Payments__Provider"]?.trim();
-  if (provider) return provider.toLowerCase() === "mock";
-  return env["GABINETY_FAKE"] === "1";
+  return !provider || provider.toLowerCase() === "mock";
 }
 
 /** Where to send the browser after a booking is created: a page of this site, or an https vendor page. Anything else is refused. */

@@ -14,7 +14,7 @@ public class SkeletonMigrationStateTests
     [Fact]
     public async Task On_in_memory_the_migration_service_is_a_no_op_and_the_state_becomes_Done()
     {
-        using var f = new WebApplicationFactory<Program>();
+        using var f = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("GABINETY_FAKE", "1")); // Mock payments need the fake profile (F-01)
         f.CreateClient();
         var state = f.Services.GetRequiredService<MigrationState>();
         await state.WaitForCompletionAsync(TimeSpan.FromSeconds(30));
@@ -48,6 +48,7 @@ public class SkeletonMigrationIntegrationTests
 
     static WebApplicationFactory<Program> Host(string cs) => new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
     {
+        b.UseSetting("GABINETY_FAKE", "1"); // Mock payments need the fake profile (F-01)
         b.UseSetting("Database:Provider", "PostgreSQL");
         b.UseSetting("ConnectionStrings:bookingdb", cs);
     });

@@ -37,10 +37,9 @@ public class ClockApiTests
     [InlineData("Staging")]
     public async Task Outside_the_fake_profile_both_endpoints_are_not_mapped(string kind)
     {
-        await using var h = new CreateHost();
+        await using var h = new CreateHost().AsDeployed(kind);
         h.Settings["Internal:Key"] = InternalKey;
-        h.Settings["Environment:Kind"] = kind;
-        h.Configure = s => s.AddTestClock(); // even a leaked registration must not make the route appear
+        h.Configure += s => s.AddTestClock(); // even a leaked registration must not make the route appear
         Assert.Equal(HttpStatusCode.NotFound, (await SetOffset(h, 60)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await PostRaw(h, "/internal/v1/demo/reset", "{}")).StatusCode);
     }
@@ -48,7 +47,7 @@ public class ClockApiTests
     [Fact]
     public async Task With_no_profile_settings_at_all_both_endpoints_are_not_mapped()
     {
-        await using var h = new CreateHost();
+        await using var h = new CreateHost().AsDeployed();
         h.Settings["Internal:Key"] = InternalKey;
         Assert.Equal(HttpStatusCode.NotFound, (await SetOffset(h, 60)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await PostRaw(h, "/internal/v1/demo/reset", "{}")).StatusCode);
@@ -57,7 +56,7 @@ public class ClockApiTests
     [Fact]
     public async Task Fake_flag_other_than_1_does_not_map_the_endpoints()
     {
-        await using var h = new CreateHost();
+        await using var h = new CreateHost().AsDeployed();
         h.Settings["Internal:Key"] = InternalKey;
         h.Settings["GABINETY_FAKE"] = "0";
         Assert.Equal(HttpStatusCode.NotFound, (await SetOffset(h, 60)).StatusCode);
@@ -66,10 +65,9 @@ public class ClockApiTests
     [Fact]
     public async Task Environment_kind_Development_maps_the_endpoints()
     {
-        await using var h = new CreateHost();
+        await using var h = new CreateHost().AsDeployed("Development"); // Environment:Kind alone, with GABINETY_FAKE=0
         h.Settings["Internal:Key"] = InternalKey;
-        h.Settings["Environment:Kind"] = "Development";
-        h.Configure = s => s.AddTestClock();
+        h.Configure += s => s.AddTestClock();
         Assert.Equal(HttpStatusCode.OK, (await SetOffset(h, 60)).StatusCode);
     }
 
@@ -126,10 +124,9 @@ public class ClockApiTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await GetClock(h, null)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await GetClock(h, "wrong-key")).StatusCode);
 
-        await using var prod = new CreateHost();
+        await using var prod = new CreateHost().AsDeployed("Production");
         prod.Settings["Internal:Key"] = InternalKey;
-        prod.Settings["Environment:Kind"] = "Production";
-        prod.Configure = s => s.AddTestClock();
+        prod.Configure += s => s.AddTestClock();
         Assert.Equal(HttpStatusCode.NotFound, (await GetClock(prod)).StatusCode);
     }
 

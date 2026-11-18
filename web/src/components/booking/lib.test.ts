@@ -11,13 +11,23 @@ describe("brief validation (20 to 2000 after trimming)", () => {
   });
 });
 
-describe("Mock payments gate (SPEC 6.5: fake and mock only)", () => {
-  it("is on only for Payments__Provider=Mock or the fake profile", () => {
-    expect(isMockPayments({ Payments__Provider: "Mock" })).toBe(true);
-    expect(isMockPayments({ Payments__Provider: "mock" })).toBe(true);
+describe("Mock payments gate (SPEC 6.5: fake profile only, security review F-01)", () => {
+  it("is on only in the fake profile, with the provider Mock or not set", () => {
     expect(isMockPayments({ GABINETY_FAKE: "1" })).toBe(true);
-    expect(isMockPayments({ Payments__Provider: "Stripe" })).toBe(false);
-    expect(isMockPayments({ Payments__Provider: "Stripe", GABINETY_FAKE: "1" })).toBe(false);
+    expect(isMockPayments({ GABINETY_FAKE: "1", Payments__Provider: "Mock" })).toBe(true);
+    expect(isMockPayments({ GABINETY_FAKE: "1", Payments__Provider: "mock" })).toBe(true);
+    expect(isMockPayments({ Environment__Kind: "Development", Payments__Provider: "Mock" })).toBe(true);
+    expect(isMockPayments({ Environment__Kind: "development" })).toBe(true);
+  });
+  it("is off when the provider is anything else, even in the fake profile", () => {
+    expect(isMockPayments({ GABINETY_FAKE: "1", Payments__Provider: "Stripe" })).toBe(false);
+    expect(isMockPayments({ Environment__Kind: "Development", Payments__Provider: "Stripe" })).toBe(false);
+  });
+  it("is off outside the fake profile, whatever the provider says (a deployed web app must not show the mock checkout)", () => {
+    expect(isMockPayments({ Payments__Provider: "Mock" })).toBe(false);
+    expect(isMockPayments({ Payments__Provider: "mock", GABINETY_FAKE: "0" })).toBe(false);
+    expect(isMockPayments({ Payments__Provider: "Mock", Environment__Kind: "Production" })).toBe(false);
+    expect(isMockPayments({ Environment__Kind: "Staging" })).toBe(false);
     expect(isMockPayments({})).toBe(false);
   });
 });

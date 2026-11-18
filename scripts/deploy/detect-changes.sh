@@ -38,7 +38,7 @@ touches() {
 }
 
 shared_paths=""
-while read -r key fly kind dockerfile context shared paths _ _; do
+while read -r key fly kind dockerfile context shared paths _ _ _; do
   case "$key" in ''|'#'*) continue;; shared) shared_paths="$paths"; continue;; esac
   reason=""
   if [ -n "$all_reason" ]; then reason="$all_reason"
@@ -51,7 +51,7 @@ while read -r key fly kind dockerfile context shared paths _ _; do
   if [ -n "$out" ]; then
     echo "$key=$sel" >> "$out"
     if [ "$sel" = true ] && [ "$kind" = built ]; then
-      jq -nc --arg key "$key" --arg dockerfile "$dockerfile" --arg context "$context" '{key:$key,dockerfile:$dockerfile,context:$context}'
+      jq -nc --arg key "$key" --arg fly "$fly" --arg dockerfile "$dockerfile" --arg context "$context" '{key:$key,fly_app:$fly,dockerfile:$dockerfile,context:$context}'
     fi >> "$files.matrix"
   fi
 done < "$estate"

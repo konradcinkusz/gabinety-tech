@@ -22,6 +22,7 @@ jobs:
       TAG: ${{ github.ref_name }}
       SHA: ${{ github.sha }}
       OWNER: ${{ github.repository_owner }}
+      IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY || 'ghcr.io' }}
       PUBLIC_URL: ${{ inputs.key == 'authservice' && vars.PUBLIC_URL_AUTHSERVICE || inputs.key == 'web' && vars.PUBLIC_URL_WEB || '' }}
     steps:
       - uses: actions/checkout@v4
@@ -31,11 +32,11 @@ jobs:
       - name: Read the app's row of deploy/estate.conf
         id: app
         run: |
-          read -r key fly kind _ _ _ _ smoke spath < <(awk -v k="$KEY" '$1 == k' deploy/estate.conf)
+          read -r key fly kind _ _ _ _ smoke spath network < <(awk -v k="$KEY" '$1 == k' deploy/estate.conf)
           [ "$key" = "$KEY" ] || { echo "no row for $KEY in deploy/estate.conf" >&2; exit 1; }
           {
-            echo "fly=$fly"; echo "kind=$kind"; echo "smoke=$smoke"; echo "smoke_path=$spath"
-            echo "image=ghcr.io/${OWNER,,}/gabinety-$KEY:sha-$SHA"
+            echo "fly=$fly"; echo "kind=$kind"; echo "smoke=$smoke"; echo "smoke_path=$spath"; echo "network=$network"
+            echo "image=$(scripts/deploy/image-ref.sh "$IMAGE_REGISTRY" "$OWNER" "$KEY" "$fly"):sha-$SHA"
           } >> "$GITHUB_OUTPUT"
       - name: The config has no placeholder left
         run: scripts/deploy/check-placeholders.sh "deploy/fly/$KEY.fly.toml"
@@ -52,15 +53,21 @@ jobs:
       - name: Deploy
         run: |
           # --ha=false: one machine; a second machine of an app with a volume would be an empty database (FLY-IO-DEPLOYMENT 14).
-          if [ "$KIND" = built ]; then
-            flyctl deploy --app "$FLY_APP" --config "deploy/fly/$KEY.fly.toml" --image "$IMAGE" --ha=false --yes
-          else
-            flyctl deploy --app "$FLY_APP" --config "deploy/fly/$KEY.fly.toml" --ha=false --yes
-          fi
+          args=(--app "$FLY_APP" --config "deploy/fly/$KEY.fly.toml" --ha=false --yes)
+          [ "$KIND" = built ] && args+=(--image "$IMAGE")
+          # Apps without a public listener (network private or flycast in deploy/estate.conf) get no public IP (COST.md, the fly.toml comments).
+          [ "$NETWORK" != public ] && args+=(--no-public-ips)
+          flyctl deploy "${args[@]}"
         env:
           FLY_APP: ${{ steps.app.outputs.fly }}
           KIND: ${{ steps.app.outputs.kind }}
           IMAGE: ${{ steps.app.outputs.image }}
+          NETWORK: ${{ steps.app.outputs.network }}
+      - name: Private IPv6 for the .flycast name (once; idempotent)
+        if: ${{ steps.app.outputs.network == 'flycast' }}
+        run: scripts/deploy/ensure-private-ip.sh "$FLY_APP"
+        env:
+          FLY_APP: ${{ steps.app.outputs.fly }}
       - name: Smoke
         id: smoke
         run: scripts/deploy/smoke.sh "$KEY" "$FLY_APP" "$SMOKE" "$SMOKE_PATH" | tee "$RUNNER_TEMP/smoke.txt"

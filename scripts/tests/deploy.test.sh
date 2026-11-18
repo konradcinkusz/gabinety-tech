@@ -20,7 +20,7 @@ nosel() { grep -qx "$1=false" "$tmp/out"; }
 
 run_detect $'src/Gabinety.Booking/Foo.cs\n' "$all" v1
 check "booking change selects booking only" bash -c "$(declare -f sel nosel); tmp=$tmp; sel booking && nosel directory && nosel web && nosel postgres && nosel authservice && nosel reputation && nosel assistant"
-check "build_matrix holds only selected built apps" grep -qx 'build_matrix=\[{"key":"booking","dockerfile":"src/Gabinety.Booking/Dockerfile","context":"."}\]' "$tmp/out"
+check "build_matrix holds only selected built apps" grep -qx 'build_matrix=\[{"key":"booking","fly_app":"gabinety-booking-staging","dockerfile":"src/Gabinety.Booking/Dockerfile","context":"."}\]' "$tmp/out"
 run_detect $'Directory.Packages.props\n' "$all" v1
 check "shared path selects every dotnet app, not web/postgres/authservice" bash -c "$(declare -f sel nosel); tmp=$tmp; for a in directory booking reputation assistant; do sel \$a || exit 1; done; for a in web postgres authservice; do nosel \$a || exit 1; done"
 run_detect $'src/Gabinety.Contracts/X.cs\nsrc/Gabinety.ServiceDefaults/Y.cs\n' "$all" v1
@@ -90,6 +90,51 @@ check "ensure-app leaves an existing app alone" bash -c "! grep -q 'apps create'
 check "ensure-app creates a missing volume" grep -qx 'volumes create pgdata --app gabinety-postgres-staging --region fra --size 5 --yes' "$tmp/log"
 : > "$tmp/log"; STUB_APPS='[{"name":"gabinety-postgres-staging"}]' STUB_VOLS='[{"name":"pgdata"}]' "$d/ensure-app.sh" gabinety-postgres-staging pgdata > /dev/null
 check "ensure-app keeps an existing volume" bash -c "! grep -q 'volumes create' '$tmp/log'"
+
+
+# ---------- estate.conf consistency with deploy/fly ----------
+check "every app of estate.conf has deploy/fly/<key>.fly.toml naming its Fly app" bash -c "
+  while read -r key fly rest; do case \"\$key\" in ''|'#'*|shared) continue;; esac
+    f='$root/deploy/fly/'\$key'.fly.toml'; [ -f \"\$f\" ] || { echo \"missing \$f\"; exit 1; }
+    grep -q \"^app = \\\"\$fly\\\"\" \"\$f\" || { echo \"\$f does not name \$fly\"; exit 1; }
+  done < '$root/deploy/estate.conf'"
+check "every deploy/fly/*.fly.toml is an app of estate.conf" bash -c "
+  for f in '$root'/deploy/fly/*.fly.toml; do k=\$(basename \"\$f\" .fly.toml); grep -Eq \"^\$k +\" '$root/deploy/estate.conf' || { echo \"\$k not in estate.conf\"; exit 1; }; done"
+check "network is public, private or flycast for every app, Assistant is flycast" bash -c "
+  awk '!/^#/ && NF && \$1 != \"shared\" {print \$1, \$NF}' '$root/deploy/estate.conf' | grep -Evq ' (public|private|flycast)\$' && exit 1
+  awk '\$1 == \"assistant\" {print \$NF}' '$root/deploy/estate.conf' | grep -qx flycast"
+
+# ---------- base-ref: a failed run must not hide an app from the next tag ----------
+b="$tmp/brepo"; git init -q -b main "$b"
+(cd "$b" && git config user.email t@t && git config user.name t && mkdir -p web src/Gabinety.Booking && echo a > web/a && echo a > src/Gabinety.Booking/a && git add -A && git commit -qm one && git tag v1 && git tag deployed/staging
+  echo b >> src/Gabinety.Booking/a && git add -A && git commit -qm two && git tag v2          # run of v2 FAILED: the marker stays on v1
+  echo b >> web/a && git add -A && git commit -qm three && git tag v3)
+check "base-ref is the marker when it exists" bash -c "cd '$b' && [ \"\$('$d/base-ref.sh' v3 2>/dev/null)\" = deployed/staging ]"
+check "base-ref falls back to the previous release tag without a marker" bash -c "cd '$b' && git tag -d deployed/staging >/dev/null && [ \"\$('$d/base-ref.sh' v3 2>/dev/null)\" = v2 ]; git tag deployed/staging v1"
+check "base-ref prints nothing on the first tag" bash -c "cd '$g' && [ -z \"\$('$d/base-ref.sh' v1 2>/dev/null)\" ]"
+: > "$tmp/out"; (cd "$b" && "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head v3 --base "$("$d/base-ref.sh" v3 2>/dev/null)" --github-output "$tmp/out" > "$tmp/table")
+check "after a failed previous run both its app (booking) and the new one (web) are selected" bash -c "$(declare -f sel nosel); tmp=$tmp; sel booking && sel web && nosel directory"
+: > "$tmp/out"; (cd "$b" && "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head v3 --base v2 --github-output "$tmp/out" > "$tmp/table")
+check "the old behaviour (previous tag as base) would have hidden booking" bash -c "$(declare -f sel nosel); tmp=$tmp; sel web && nosel booking"
+(cd "$b" && git tag -f deployed/staging v3 >/dev/null)
+: > "$tmp/out"; (cd "$b" && "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head v3 --base "$("$d/base-ref.sh" v3 2>/dev/null)" --github-output "$tmp/out" > "$tmp/table")
+check "after a successful run (marker moved) nothing is selected again" bash -c "$(declare -f nosel); tmp=$tmp; nosel booking && nosel web"
+
+# ---------- image-ref: the registry switch ----------
+check "ghcr.io, owner lower-cased" bash -c "[ \"\$('$d/image-ref.sh' ghcr.io KonradCinkusz booking gabinety-booking-staging)\" = ghcr.io/konradcinkusz/gabinety-booking ]"
+check "registry.fly.io uses the Fly app" bash -c "[ \"\$('$d/image-ref.sh' registry.fly.io o booking gabinety-booking-staging)\" = registry.fly.io/gabinety-booking-staging ]"
+
+# ---------- ensure-private-ip (flyctl stub) ----------
+cat > "$tmp/fly" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >> "$STUB_LOG"
+[ "$1 $2" = "ips list" ] && echo "${STUB_IPS:-[]}"
+exit 0
+STUB
+: > "$tmp/log"; STUB_IPS='[{"Type":"v4"}]' "$d/ensure-private-ip.sh" gabinety-assistant-staging > /dev/null
+check "a private IPv6 is allocated when missing" grep -qx 'ips allocate-v6 --private --app gabinety-assistant-staging' "$tmp/log"
+: > "$tmp/log"; STUB_IPS='[{"Type":"private_v6"}]' "$d/ensure-private-ip.sh" gabinety-assistant-staging > /dev/null
+check "an existing private IPv6 is kept" bash -c "! grep -q allocate '$tmp/log'"
 
 # ---------- set-secrets ----------
 export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"s3cr3tpw","INTERNAL_KEY_DIRECTORY":"dirkey","FLY_API_TOKEN":"tok","AUTH_JWT_PRIVATE_KEY_PEM":"-----BEGIN PRIVATE KEY-----\nLINE2\n-----END PRIVATE KEY-----"}'

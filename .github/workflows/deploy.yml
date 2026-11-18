@@ -57,22 +57,27 @@ jobs:
         id: detect
         run: |
           flyctl apps list --json | jq -r '.[] | (.Name // .name)' > "$RUNNER_TEMP/existing-apps.txt"
-          base="$(git describe --tags --abbrev=0 --match 'v*' "$GITHUB_SHA^" 2>/dev/null || true)"
-          echo "previous tag: ${base:-none}"
+          # Diff against the last fully successful deploy (the marker tag), the previous release tag only as the fallback.
+          base="$(scripts/deploy/base-ref.sh "$GITHUB_SHA")"
           scripts/deploy/detect-changes.sh --estate deploy/estate.conf --existing-apps "$RUNNER_TEMP/existing-apps.txt" \
             --head "$GITHUB_SHA" ${base:+--base "$base"} --github-output "$GITHUB_OUTPUT" | tee -a "$GITHUB_STEP_SUMMARY"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-  # 3. Build once, push to GHCR with immutable tags (the release tag and the commit), deploy by the commit tag. Never "latest".
+  # 3. Build once, push to the registry (GHCR by default) with immutable tags (the release tag and the commit), deploy by the commit tag. Never "latest".
   build:
     needs: detect-changes
     if: needs.detect-changes.outputs.build_matrix != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # The environment gives the build FLY_API_TOKEN and variables; it is needed for IMAGE_REGISTRY=registry.fly.io and to read IMAGE_REGISTRY.
+    environment: staging
     permissions:
       contents: read
       packages: write
+    env:
+      # ONE switch for the registry: a repository or environment variable, default ghcr.io. registry.fly.io is the private alternative (docs/operations/DEPLOY.md).
+      IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY || 'ghcr.io' }}
     strategy:
       fail-fast: false
       matrix:
@@ -80,17 +85,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - name: Registry login (ghcr.io with the workflow token)
+        if: ${{ env.IMAGE_REGISTRY == 'ghcr.io' }}
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Image name (lower case, as GHCR requires)
+      - name: The Fly app must exist before its registry repository does (cold estate)
+        if: ${{ env.IMAGE_REGISTRY == 'registry.fly.io' }}
+        uses: superfly/flyctl-actions/setup-flyctl@1.5
+        with:
+          version: ${{ env.FLYCTL_VERSION }}
+      - name: Registry login (registry.fly.io with the Fly token)
+        if: ${{ env.IMAGE_REGISTRY == 'registry.fly.io' }}
+        run: |
+          scripts/deploy/ensure-app.sh "$FLY_APP"
+          printf '%s' "$FLY_API_TOKEN" | docker login registry.fly.io --username x --password-stdin
+        env:
+          FLY_APP: ${{ matrix.fly_app }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_ORG: ${{ vars.FLY_ORG || 'personal' }}
+      - name: Unsupported registry
+        if: ${{ env.IMAGE_REGISTRY != 'ghcr.io' && env.IMAGE_REGISTRY != 'registry.fly.io' }}
+        run: echo "IMAGE_REGISTRY=$IMAGE_REGISTRY is not supported (ghcr.io or registry.fly.io)" >&2; exit 1
+      - name: Image name
         id: image
-        run: echo "name=ghcr.io/${OWNER,,}/gabinety-$KEY" >> "$GITHUB_OUTPUT"
+        run: echo "name=$(scripts/deploy/image-ref.sh "$IMAGE_REGISTRY" "$OWNER" "$KEY" "$FLY_APP")" >> "$GITHUB_OUTPUT"
         env:
           OWNER: ${{ github.repository_owner }}
           KEY: ${{ matrix.key }}
+          FLY_APP: ${{ matrix.fly_app }}
       - uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
@@ -183,3 +208,19 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
           NEEDS_JSON: ${{ toJSON(needs) }}
+
+  # 6. Only now, when the WHOLE run succeeded (every selected app deployed and healthy), move the marker the next run diffs against. A failed or cancelled run
+  # leaves it where it was, so no app can drop out of the next run's selection. The only job with contents: write.
+  mark-deployed:
+    needs: [summary]
+    if: ${{ needs.summary.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move deployed/staging to this commit
+        run: |
+          git tag -f deployed/staging "$GITHUB_SHA"
+          git push --force origin refs/tags/deployed/staging

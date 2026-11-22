@@ -8,7 +8,7 @@ const PHONE = { width: 390, height: 844 };
 const PROFILE = "/gabinet/demo-celina-przykladowska";
 
 const ROUTES: Record<string, string[]> = {
-  visitor: ["/", "/programisci", "/programisci/audyt-kodu", PROFILE, "/jak-to-dziala", "/zasady-rankingu", "/cennik", "/regulamin", "/polityka-prywatnosci", "/logowanie", "/rejestracja", "/rejestracja/sprawdz-skrzynke"],
+  visitor: ["/", "/programisci", "/programisci/audyt-kodu", PROFILE, "/jak-to-dziala", "/zasady-rankingu", "/cennik", "/regulamin", "/polityka-prywatnosci", "/pomoc", "/logowanie", "/rejestracja", "/rejestracja/sprawdz-skrzynke"],
   "demo-client": ["/konto", "/moje/rezerwacje"],
   "demo-practitioner-3": ["/gabinet-programisty", "/gabinet-programisty/profil", "/gabinet-programisty/oferty", "/gabinet-programisty/dostepnosc", "/gabinet-programisty/platnosci", "/moje/rezerwacje?role=practitioner"],
   "demo-admin": ["/admin/weryfikacja", "/admin/spory", "/admin/ksiega", "/admin/opinie", "/admin/podejrzane"],

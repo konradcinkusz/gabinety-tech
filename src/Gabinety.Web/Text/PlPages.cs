@@ -126,6 +126,31 @@ public static class PlPages
         public const string Example2Caption = "Podział ceny konsultacji {0}", FindLink = "Zobacz programistów i ich ceny";
     }
 
+    public static class Help
+    {
+        public const string MetaTitle = "Pomoc | Gabinety Tech", MetaDescription = "Odpowiedzi o rezerwacjach, płatnościach, zwrotach, sporach, opiniach i koncie w Gabinety Tech.";
+        public const string Title = "Pomoc", Intro = "Najczęstsze pytania o rezerwacje, płatności i konto. Stawki podaje Cennik, terminy Jak to działa, a pełne zasady Regulamin.";
+        public const string Link = "Pomoc", BookingTitle = "Rezerwacja i płatność", CancelTitle = "Anulowanie i zwroty", DisputeTitle = "Spory", ReviewTitle = "Opinie", AccountTitle = "Konto i dane", ProgrammerTitle = "Dla programistów";
+        public const string BookHowQ = "Jak zarezerwować konsultację?", BookHowA = "Wybierz problem i technologię na liście programistów albo wyszukaj po słowie. Sprawdź profil, wybierz wolny termin i opisz problem. Opis widzi tylko programista.";
+        public const string PayWhenQ = "Kiedy płacę?", PayWhenA = "Z góry, przy rezerwacji. Termin jest zarezerwowany dopiero po potwierdzeniu płatności.";
+        public const string PriceQ = "Ile płacę?", PriceA = "Płacisz cenę z oferty programisty, bez dodatkowych opłat. Zasady prowizji opisuje";
+        public const string CancelQ = "Jak anulować rezerwację?", CancelA = "Rezerwację anulujesz w jej szczegółach, na liście Moje rezerwacje.";
+        public const string RefundQ = "Kiedy przysługuje zwrot?", RefundA = "Anulowanie z odpowiednim wyprzedzeniem daje pełny zwrot, a późniejsze go nie daje. Dokładne terminy podaje";
+        public const string PartialQ = "Co przy częściowym zwrocie?", PartialA = "Prowizja jest liczona od kwoty, która zostaje, a po pełnym zwrocie prowizji nie ma. Szczegóły w";
+        public const string DisputeQ = "Kiedy mogę zgłosić spór?", DisputeA = "Gdy konsultacja się nie odbyła albo przebiegła inaczej, niż ustalono. Zgłoś go w określonym czasie od zakończenia konsultacji; termin podaje";
+        public const string DisputeWhoQ = "Kto rozstrzyga spór?", DisputeWhoA = "Administrator serwisu. Zasady opisuje";
+        public const string ReviewQ = "Kiedy mogę wystawić opinię?", ReviewA = "Po zakończeniu konsultacji. Opinię dodajesz w Moich opiniach.";
+        public const string RankingQ = "Jak ustawiona jest lista programistów?", RankingA = "Kolejność opisują";
+        public const string RegisterQ = "Jak założyć konto?", RegisterA = "Zarejestruj się przez formularz rejestracji. Potem możesz rezerwować konsultacje albo zostać programistą.";
+        public const string DataQ = "Gdzie są moje dane?", DataA = "Dane konta są w Koncie. Zasady, jak je przetwarzamy, opisuje";
+        public const string ExportQ = "Czy mogę pobrać swoje dane?", ExportA = "Tak. Eksport danych jest w Koncie.";
+        public const string BecomeQ = "Jak zostać programistą?", BecomeA = "Załóż konto, uzupełnij profil i ofertę, a potem ustaw dostępność. Administrator sprawdza profil. Po zatwierdzeniu pojawiasz się na liście.";
+        public const string PayoutQ = "Kiedy dostanę wypłatę?", PayoutA = "Po zakończeniu konsultacji, o ile nikt nie zgłosił sporu. Termin podaje";
+        public const string FeeQ = "Jaka jest prowizja platformy?", FeeA = "Zasady opisuje";
+        public const string NoAnswer = "Nie znalazłeś odpowiedzi?", WriteToUs = "Napisz do nas.";
+        public const string PricingLink = "Cennik", HowLink = "Jak to działa", TermsLink = "Regulamin", RankingLink = "Zasady rankingu", PrivacyLink = "Polityka prywatności", AccountLink = "Koncie", ReviewsLink = "Moich opiniach";
+    }
+
     public static class Legal
     {
         public const string TermsMetaTitle = "Regulamin | Gabinety Tech", TermsMetaDescription = "Regulamin serwisu Gabinety Tech.", TermsTitle = "Regulamin";

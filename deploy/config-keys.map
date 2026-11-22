@@ -91,3 +91,4 @@ web-blazor    RateLimit:TrustedProxyKey                optional    secrets.map
 web-blazor    Environment:Kind                         fake-only
 web-blazor    GABINETY_FAKE                            fake-only
 web-blazor    Payments:Provider                        fake-only   the mock checkout page exists only in the fake profile
+web-blazor    Support:Email                            optional    the help page's contact address (/pomoc); absent: no address is shown

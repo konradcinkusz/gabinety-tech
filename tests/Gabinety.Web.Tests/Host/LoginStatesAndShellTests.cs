@@ -387,8 +387,8 @@ public class ShellTests
         var footer = page.One("footer")!;
         Assert.Equal(["Produkt", "Dla programistów", "Prawne"], footer.QuerySelectorAll(".site-footer__title").Select(t => t.TextContent));
         Assert.Equal(3, footer.QuerySelectorAll("nav").Length);
-        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik", "/zasady-rankingu", "/rejestracja", "/regulamin", "/polityka-prywatnosci"], footer.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
-        Assert.Equal(["Programiści", "Jak to działa", "Cennik", "Zasady rankingu", "Zostań programistą", "Regulamin", "Polityka prywatności"], footer.QuerySelectorAll("a").Select(a => a.TextContent));
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik", "/zasady-rankingu", "/pomoc", "/rejestracja", "/regulamin", "/polityka-prywatnosci"], footer.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["Programiści", "Jak to działa", "Cennik", "Zasady rankingu", "Pomoc", "Zostań programistą", "Regulamin", "Polityka prywatności"], footer.QuerySelectorAll("a").Select(a => a.TextContent));
         Assert.Matches(@"© \d{4} Gabinety Tech", footer.TextContent);
     }
 

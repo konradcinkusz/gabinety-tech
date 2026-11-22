@@ -21,7 +21,8 @@ public sealed record InternalPractitionerNameDto(Guid PractitionerId, string Dis
 /// <summary>GET /internal/v1/practitioners/{userId}/contact: the e-mail snapshot only. Personal data; the caller (Booking) must not log it.</summary>
 public sealed record InternalContactDto(string Email);
 public sealed record ReputationPush(int RatingCount, decimal RatingAvg, long Version);
-public sealed record BookingStatsPush(int CompletedCount, int PractitionerCancelCount, int NoShowUpheldCount, int OpenSlots14d, long Version);
+/// <summary><see cref="NextFreeSlotUtc"/> is optional (wave 3): omitted, or sent as null, means the practitioner has no free slot, and clears the stored value.</summary>
+public sealed record BookingStatsPush(int CompletedCount, int PractitionerCancelCount, int NoShowUpheldCount, int OpenSlots14d, long Version, DateTimeOffset? NextFreeSlotUtc = null);
 
 /// <summary>
 /// /internal/v1/... (CONTRACTS 3.6, ADR-0007) behind the "Internal" policy (X-Internal-Key). The two PUTs are monotonic: a version not greater than the stored
@@ -113,6 +114,7 @@ public sealed class InternalFeature : IServiceFeature
 
         p.CompletedCount = body.CompletedCount; p.PractitionerCancelCount = body.PractitionerCancelCount; p.NoShowUpheldCount = body.NoShowUpheldCount;
         p.OpenSlots14d = body.OpenSlots14d; p.StatsVersion = body.Version;
+        p.NextFreeSlotUtc = body.NextFreeSlotUtc?.ToUniversalTime(); // a push without the field clears it (CONTRACTS 3.6); Npgsql stores only UTC offsets
         // open slots are one of the completeness inputs (CONTRACTS 3.5), so the checklist is recomputed before the ranking uses it
         p.ProfileCompleteness = ProfileCompleteness.Compute(p.Headline.Length > 0, p.Bio.Length >= 200, await facts.ActiveOfferingCountAsync(p.Id, ct) > 0,
             p.GithubLinked, p.PortfolioUrl is not null, p.NipValid, p.OpenSlots14d > 0);
@@ -140,7 +142,7 @@ public sealed class InternalFeature : IServiceFeature
 
         p.DisplayName = ErasedName; p.Headline = ""; p.Bio = "";
         p.GithubLogin = null; p.GithubLinked = false; p.Nip = null; p.NipValid = false; p.PortfolioUrl = null; p.MeetingUrlDefault = null; p.StatusReason = null;
-        p.GithubChallengeCode = null; p.GithubChallengeLogin = null; p.GithubChallengeExpiresAt = null; p.ContactEmail = null;
+        p.GithubChallengeCode = null; p.GithubChallengeLogin = null; p.GithubChallengeExpiresAt = null; p.ContactEmail = null; p.NextFreeSlotUtc = null;
         p.Status = PractitionerStatus.Suspended;
         p.UserId = "erased-" + Guid.NewGuid().ToString("n");
         p.Slug = "removed-" + Guid.NewGuid().ToString("n")[..16];

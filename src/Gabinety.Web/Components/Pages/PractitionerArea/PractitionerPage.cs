@@ -24,7 +24,7 @@ public abstract class PractitionerPage : ComponentBase
     protected PractitionerPrivateDto? Profile { get; private set; }
 
     /// <summary>The failure that stopped the page from loading (a service that is down), shown as an alert in place of the content.</summary>
-    protected ApiFailure? LoadFailure { get; private set; }
+    protected ApiFailure? LoadFailure { get; set; }
 
     /// <summary>Goes to <paramref name="path"/>, with a flash key when there is one. Call it as the last thing a handler does.</summary>
     protected void Done(string path, string? flash = null) => Navigation.NavigateTo(flash is null ? path : $"{path}?{FlashKey.Parameter}={flash}");

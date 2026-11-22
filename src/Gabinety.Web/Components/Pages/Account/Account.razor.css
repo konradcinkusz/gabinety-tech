@@ -1,0 +1,8 @@
+/* The account page (UX-033, audit C-7): every section is a card at form width; deletion is a collapsed danger zone. Tokens only: the colour test reads this file. */
+.account > .card { max-width: var(--form-width); }
+.account > .account__zone { border-color: var(--color-danger); }
+.consent__why { display: block; margin-top: var(--space-1); }
+.account__danger { margin-top: var(--space-4); }
+.account__danger > summary { display: inline-flex; align-items: center; min-height: var(--tap); cursor: pointer; list-style: none; }
+.account__danger > summary::-webkit-details-marker { display: none; }
+.account__danger[open] > summary { margin-bottom: var(--space-4); }

@@ -196,16 +196,18 @@ public static class Pl
     public static class Account
     {
         public const string Title = "Konto", MetaTitle = "Konto | Gabinety Tech", Email = "Adres e-mail";
-        public const string Verified = "Adres e-mail potwierdzony", NotVerified = "Adres e-mail niepotwierdzony. Sprawdź skrzynkę i kliknij link z wiadomości.";
+        public const string Verified = "Adres e-mail potwierdzony", NotVerified = "Adres e-mail niepotwierdzony", NotVerifiedHint = "Sprawdź skrzynkę i kliknij link z wiadomości.";
         public const string Consents = "Zgody";
         public const string TermsAccepted = "Regulamin: zaakceptowany", TermsPending = "Regulamin: wymaga ponownej akceptacji";
         public const string PrivacyAccepted = "Polityka prywatności: zaakceptowana", PrivacyPending = "Polityka prywatności: wymaga ponownej akceptacji";
+        public const string TermsPendingExplanation = "Zaktualizowaliśmy regulamin. Zaakceptuj nową wersję, aby potwierdzić zgodę na aktualne warunki.";
+        public const string PrivacyPendingExplanation = "Zaktualizowaliśmy politykę prywatności. Zaakceptuj nową wersję, aby potwierdzić zgodę na aktualne zasady przetwarzania danych.";
         public const string VersionTitle = "Wersja dokumentu: {0}";
         public const string AcceptCurrent = "Zaakceptuj aktualne wersje";
         public const string Data = "Twoje dane", Export = "Pobierz moje dane (JSON)", SignOut = "Wyloguj się";
         public const string DeleteTitle = "Usunięcie konta";
         public const string DeleteBody = "Konto zostanie usunięte, a dane po okresie przechowywania zanonimizowane. Tej operacji nie da się cofnąć.";
-        public const string DeleteConfirm = "Rozumiem i chcę usunąć konto", DeletePassword = "Hasło (potwierdzenie)", DeleteSubmit = "Usuń konto";
+        public const string DeleteConfirm = "Rozumiem i chcę usunąć konto", DeletePassword = "Hasło (potwierdzenie)", DeleteSubmit = "Usuń konto", DeleteOpen = "Usuń konto";
         public const string DeleteFailed = "Nie udało się usunąć konta. Sprawdź hasło i spróbuj ponownie.";
         public const string DeleteConfirmRequired = "Zaznacz potwierdzenie, aby usunąć konto.";
         public const string DeletePasswordRequired = "Podaj hasło, aby potwierdzić usunięcie konta.";

@@ -81,6 +81,10 @@ public static class PlPractitioner
         public const string PublicTitle = "Twój profil jest publiczny", PublicBody = "Klienci mogą go znaleźć i zarezerwować konsultację.", ViewPublic = "Zobacz profil publiczny", CopyLink = "Skopiuj link", Copied = "Skopiowano";
         public const string UpcomingTitle = "Nadchodzące konsultacje", UpcomingEmpty = "Nie masz jeszcze zaplanowanych konsultacji.", UpcomingFailed = "Nie możemy teraz pokazać konsultacji.";
         public const string Details = "Szczegóły", AllBookings = "Wszystkie rezerwacje";
+        public const string EarningsTitle = "Zarobki w tym miesiącu", EarningsTitleOther = "Zarobki", EarningsPeriod = "Okres: {0} – {1}";
+        public const string EarningsPaidOut = "Wypłacone", EarningsPending = "Oczekujące na wypłatę", EarningsDisputed = "W sporze", EarningsFees = "Opłaty platformy";
+        public const string EarningsCount = "Rezerwacje w okresie: {0}", EarningsFailed = "Nie możemy teraz pokazać zarobków.", EarningsCalendar = "Zobacz konsultacje w kalendarzu";
+        public const string EarningsMonths = "Wybór miesiąca", EarningsPrev = "Poprzedni miesiąc", EarningsNext = "Następny miesiąc", EarningsCurrent = "Bieżący miesiąc";
     }
 
     public static class Checklist

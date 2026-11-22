@@ -26,6 +26,10 @@ public sealed class PractitionerWorld
     public bool BookingDown { get; set; }
     public bool BookingsFail { get; set; }
     public List<BookingViewDto> Bookings { get; } = [];
+    /// <summary>What <c>GET /api/v1/me/earnings</c> answers for the month asked: paid out, pending, in dispute, fees (grosz) and the count.</summary>
+    public EarningsFigures Earnings { get; set; } = new(123456, 4950, 18000, 3750, 7);
+    public bool EarningsFail { get; set; }
+    public sealed record EarningsFigures(long PaidOut, long Pending, long Disputed, long Fees, int Count);
     public string OnboardingUrl { get; set; } = "https://connect.stripe.com/setup/e/acct_test/abc";
     public int OnboardingCalls { get; private set; }
 
@@ -204,6 +208,19 @@ public sealed class PractitionerWorld
         {
             if (BookingsFail) return Problem(HttpStatusCode.ServiceUnavailable, "dependency_unavailable");
             return FakeBackend.Json(new PageDto<BookingViewDto>(Bookings, null));
+        }
+        if (path == "/api/v1/me/earnings" && r.Method == HttpMethod.Get)
+        {
+            if (Profile is null) return Problem(HttpStatusCode.Forbidden, "forbidden");
+            if (EarningsFail) return Problem(HttpStatusCode.ServiceUnavailable, "dependency_unavailable");
+            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(r.RequestUri!.Query);
+            string Day(string key, string fallback) => query.TryGetValue(key, out var v) ? v.ToString() : fallback; // the service's default: the current month (the fake has one fixed month)
+            return FakeBackend.Json(new
+            {
+                from = Day("from", "2026-11-01"), to = Day("to", "2026-11-30"),
+                paidOut = new { amountMinor = Earnings.PaidOut, currency = "PLN" }, pending = new { amountMinor = Earnings.Pending, currency = "PLN" },
+                disputed = new { amountMinor = Earnings.Disputed, currency = "PLN" }, fees = new { amountMinor = Earnings.Fees, currency = "PLN" }, count = Earnings.Count,
+            });
         }
         if (path == "/api/v1/me/payments/account")
         {

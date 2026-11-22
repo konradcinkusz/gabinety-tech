@@ -1,0 +1,49 @@
+@using System.Globalization
+@using Gabinety.Web.Api
+@* The earnings card of the approved dashboard (T-11.17). Presentational: the page asks the service and passes the answer in, so the card holds no client. A failure is a soft callout inside
+   the card; the rest of the dashboard does not depend on it. *@
+<section class="card stack section" aria-labelledby="earnings-title" data-testid="earnings">
+    <h2 id="earnings-title">@(IsCurrent ? PlPractitioner.Dashboard.EarningsTitle : PlPractitioner.Dashboard.EarningsTitleOther)</h2>
+    <nav class="cluster" aria-label="@PlPractitioner.Dashboard.EarningsMonths">
+        <a href="@Href(Month.AddMonths(-1))" rel="prev">@PlPractitioner.Dashboard.EarningsPrev</a>
+        @if (!IsCurrent)
+        {
+            <a href="@PractitionerPaths.Home">@PlPractitioner.Dashboard.EarningsCurrent</a>
+        }
+        @if (Month.AddMonths(1) <= EarningsMonth.FirstOf(Today))
+        {
+            <a href="@Href(Month.AddMonths(1))" rel="next">@PlPractitioner.Dashboard.EarningsNext</a>
+        }
+    </nav>
+    @if (Failed)
+    {
+        <div class="callout callout--warning" role="status" data-testid="earnings-failed">
+            <p>@PlPractitioner.Dashboard.EarningsFailed <a href="@PractitionerPaths.Home">@PlPractitioner.Common.Retry</a></p>
+        </div>
+    }
+    else if (Figures is { } f)
+    {
+        <p class="muted" data-testid="earnings-period">@EarningsMonth.Period(f.From, f.To)</p>
+        <dl class="dl" data-testid="earnings-figures">
+            <dt>@PlPractitioner.Dashboard.EarningsPaidOut</dt><dd class="num" data-testid="earnings-paid-out">@EarningsMonth.Amount(f.PaidOut)</dd>
+            <dt>@PlPractitioner.Dashboard.EarningsPending</dt><dd class="num" data-testid="earnings-pending">@EarningsMonth.Amount(f.Pending)</dd>
+            <dt>@PlPractitioner.Dashboard.EarningsDisputed</dt><dd class="num" data-testid="earnings-disputed">@EarningsMonth.Amount(f.Disputed)</dd>
+            <dt>@PlPractitioner.Dashboard.EarningsFees</dt><dd class="num" data-testid="earnings-fees">@EarningsMonth.Amount(f.Fees)</dd>
+        </dl>
+        <p class="muted">@string.Format(CultureInfo.InvariantCulture, PlPractitioner.Dashboard.EarningsCount, f.Count)</p>
+    }
+    <p><a href="@PractitionerPaths.Bookings">@PlPractitioner.Dashboard.EarningsCalendar</a></p>
+</section>
+
+@code {
+    /// <summary>The first day of the month shown.</summary>
+    [Parameter, EditorRequired] public DateOnly Month { get; set; }
+    /// <summary>Today in Warsaw: decides whether the month is the current one and whether a next month exists.</summary>
+    [Parameter, EditorRequired] public DateOnly Today { get; set; }
+    [Parameter] public EarningsDto? Figures { get; set; }
+    [Parameter] public bool Failed { get; set; }
+
+    bool IsCurrent => Month == EarningsMonth.FirstOf(Today);
+
+    static string Href(DateOnly first) => PractitionerPaths.Home + "?" + EarningsMonth.Parameter + "=" + EarningsMonth.Key(first);
+}

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Gabinety.Web.Auth;
 
 namespace Gabinety.Web.Api;
@@ -51,6 +52,15 @@ public sealed class PractitionerSchedulingClient(HttpClient http, VisitorAddress
 
     public async Task<ApiResult<AvailabilityDto>> SaveAvailabilityAsync(AvailabilityDto body, CancellationToken ct = default) =>
         await WriteAsync<AvailabilityDto>(HttpMethod.Put, "/api/v1/me/availability", await tokens.AccessTokenAsync(ct), body, ct);
+
+    /// <summary>The practitioner's earnings (CONTRACTS 4.2). Both dates are Warsaw days, inclusive; without them the service answers the current Warsaw month. 403 means the account is not a practitioner.</summary>
+    public Task<ApiResult<EarningsDto>> EarningsAsync(DateOnly? from, DateOnly? to, CancellationToken ct = default)
+    {
+        var parts = new List<string>();
+        if (from is { } f) parts.Add("from=" + f.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        if (to is { } t) parts.Add("to=" + t.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        return Get<EarningsDto>("/api/v1/me/earnings" + (parts.Count == 0 ? "" : "?" + string.Join('&', parts)), ct);
+    }
 
     /// <summary>404 means the payment provider has no connected accounts (the mock of the fake profile): nothing to set up.</summary>
     public Task<ApiResult<PaymentAccountDto>> PaymentAccountAsync(CancellationToken ct = default) => Get<PaymentAccountDto>("/api/v1/me/payments/account", ct);

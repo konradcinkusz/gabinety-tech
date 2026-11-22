@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @layout PractitionerLayout
 @using Gabinety.Web.Components.Pages.Bookings
+@using Gabinety.Web.Components.Pages.Shared
 @inherits PractitionerPage
 @inject PractitionerSchedulingClient Scheduling
 @inject BookingClient Bookings
@@ -65,6 +66,8 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
             </div>
         </section>
         @if (_next is { } next) {<p data-testid="next-step">@PlPractitioner.Dashboard.NextLabel: <a href="@next.Href">@next.Title</a>. <span class="muted">@next.Text</span></p>}
+
+        <EarningsCard Month="_month" Today="_today" Figures="_earnings" Failed="_earningsFailed" />
 
         <section class="section stack" aria-labelledby="upcoming-title" data-testid="upcoming">
             <h2 id="upcoming-title">@PlPractitioner.Dashboard.UpcomingTitle</h2>
@@ -178,6 +181,12 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
     IReadOnlyList<OfferingPrivateDto> _offers = [];
     IReadOnlyList<BookingViewDto> _upcoming = [];
     bool _upcomingFailed;
+    DateOnly _today, _month;
+    EarningsDto? _earnings;
+    bool _earningsFailed;
+
+    /// <summary>The month the earnings card shows: <c>?miesiac=yyyy-MM</c>; absent or unusable, the current Warsaw month (decided by the service).</summary>
+    [SupplyParameterFromQuery(Name = EarningsMonth.Parameter)] public string? MonthParam { get; set; }
 
     string PublicPath => "/gabinet/" + Uri.EscapeDataString(Profile!.Slug);
 
@@ -198,11 +207,22 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
         var availability = Scheduling.AvailabilityAsync();
         var account = Scheduling.PaymentAccountAsync();
         Task<ApiResult<PageDto<BookingViewDto>>>? bookings = Profile!.Status == "Approved" ? Bookings.MyBookingsAsync(BookingClient.PractitionerRole, null, null) : null;
-        await Task.WhenAll(offers, availability, account, (Task?)bookings ?? Task.CompletedTask);
+        _today = PlFormat.TodayWarsaw(Clock.GetUtcNow());
+        var asked = EarningsMonth.Parse(MonthParam, _today);
+        _month = asked ?? EarningsMonth.FirstOf(_today);
+        DateOnly? from = null, to = null;
+        if (asked is { } first) (from, to) = EarningsMonth.Range(first);
+        Task<ApiResult<EarningsDto>>? earnings = Profile!.Status == "Approved" ? Scheduling.EarningsAsync(from, to) : null;
+        await Task.WhenAll(offers, availability, account, (Task?)bookings ?? Task.CompletedTask, (Task?)earnings ?? Task.CompletedTask);
         if (bookings is not null) // the region fails soft: the rest of the dashboard is already known
         {
             _upcomingFailed = !bookings.Result.IsOk;
             _upcoming = bookings.Result.IsOk ? [.. MyBookingsSchedule.Split(bookings.Result.Value!.Items, Clock.GetUtcNow()).Upcoming.Take(5)] : [];
+        }
+        if (earnings is not null) // soft as well: a failed card is a callout, and the page goes on
+        {
+            _earningsFailed = !earnings.Result.IsOk;
+            _earnings = earnings.Result.IsOk ? earnings.Result.Value : null;
         }
         _offers = offers.Result.IsOk ? offers.Result.Value! : [];
         _payments = NextSteps.PaymentsOf(account.Result);

@@ -15,8 +15,9 @@ public static class BookingsText
     {
         public const string When = "Termin", Duration = "Czas trwania", Minutes = "{0} min", Zone = "Godziny w czasie polskim (Europe/Warsaw).", Status = "Status", Price = "Cena", Payment = "Płatność";
         public const string Refunded = "Zwrócono: {0}", Fee = "Prowizja", Payout = "Wypłata dla programisty";
-        public const string Brief = "Opis problemu (klient)", BriefOwn = "Twój opis problemu", Meeting = "Link do spotkania";
+        public const string Brief = "Opis problemu (klient)", BriefOwn = "Twój opis problemu", Join = "Dołącz do spotkania";
         public const string MeetingHint = "Otwórz go w terminie konsultacji.";
+        public const string CompletedLine = "Konsultacja się odbyła.", RefundLine = "Zwrot za tę rezerwację: {0}.", NoRefundLine = "Rezerwacja anulowana mniej niż 24 godziny przed terminem: bez zwrotu.", Rebook = "Zarezerwuj ponownie";
     }
 
     public static class Payment

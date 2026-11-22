@@ -10,6 +10,11 @@
     <meta property="og:url" content="@Url" />
     <meta property="og:type" content="@Type" />
     <meta property="og:locale" content="pl_PL" />
+    <meta property="og:image" content="@ImageUrl" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Gabinety Tech" />
+    <meta name="twitter:card" content="summary_large_image" />
     @ChildContent
 </HeadContent>
 
@@ -24,4 +29,6 @@
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     string Url => Site.SiteBaseUrl + (Path == "/" ? "/" : Path);
+    /// <summary>The default social image (wwwroot/og-image.png), absolute so that crawlers resolve it from any page.</summary>
+    string ImageUrl => Site.SiteBaseUrl + "/og-image.png";
 }

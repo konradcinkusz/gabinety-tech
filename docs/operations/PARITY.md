@@ -12,7 +12,7 @@ owners; the script is authoritative, and the CI step prints its output on every 
 `not ported yet: <route> (owner <branch>; docs/operations/PARITY.md)`; the probe is live, so the skip disappears when the page lands. The cutover gate runs the journeys with
 `PARITY_STRICT=1`, which makes any such skip a failure. The Next routes under `/api/` (the BFF) have no counterpart by design (exempt: ADR-0010 decision 4).
 
-Status as of this table's last update; **owners update the row in the PR that ports the page** (and run `node scripts/check-parity.mjs` to see the truth).
+Status as of the merge of #133 (auth) and #132 (public pages); **owners update the row in the PR that ports the page** (and run `node scripts/check-parity.mjs` to see the truth).
 
 | Next route | Blazor route | Owner branch | J-hooks | Status |
 |---|---|---|---|---|
@@ -24,34 +24,33 @@ Status as of this table's last update; **owners update the row in the PR that po
 | `/admin/spory` | - | port/admin | J6 | not ported |
 | `/admin/weryfikacja` | - | port/admin | J2 | not ported |
 | `/admin/weryfikacja/[id]` | - | port/admin | J2 | not ported |
-| `/cennik` | - | port/public | - | not ported |
+| `/cennik` | `/cennik` | port/public | - | ported |
 | `/checkout/mock/[bookingId]` | - | port/booking | J3, J4 | not ported |
 | `/gabinet-programisty` | - | port/practitioner | J2 | not ported |
 | `/gabinet-programisty/dostepnosc` | - | port/practitioner | - | not ported |
 | `/gabinet-programisty/oferty` | - | port/practitioner | J2 | not ported |
 | `/gabinet-programisty/profil` | - | port/practitioner | J2 | not ported |
-| `/gabinet/[slug]` | - | port/public | J1, J2, J3, J4 | not ported |
-| `/jak-to-dziala` | - | port/public | - | not ported |
-| `/konto` | - | port/auth | - | not ported |
-| `/konto/export` | - | port/auth | - | not ported |
+| `/gabinet/[slug]` | `/gabinet/{Slug}` | port/public | J1, J2, J3, J4 | ported |
+| `/jak-to-dziala` | `/jak-to-dziala` | port/public | - | ported |
+| `/konto` | `/konto` | port/auth | - | ported |
+| `/konto/export` | `/konto/export` | port/auth | - | ported |
 | `/logowanie` | `/logowanie` | port/auth | all (sign-in form) | ported |
 | `/moje/opinie` | - | port/booking | - | not ported |
 | `/moje/opinie/[bookingId]` | - | port/booking | J3 | not ported |
 | `/moje/rezerwacje` | `/moje/rezerwacje` | port/booking | J3, smoke | ported |
 | `/moje/rezerwacje/[id]` | - | port/booking | J3, J5, J6 | not ported |
 | `/oauth/callback` | `/oauth/callback` | port/auth | - | ported |
-| `/polityka-prywatnosci` | - | port/public | - | not ported |
+| `/polityka-prywatnosci` | `/polityka-prywatnosci` | port/public | - | ported |
 | `/programisci` | `/programisci` | port/public | J1, J2, smoke | ported |
 | `/programisci/[problem]` | `/programisci/{Problem}` | port/public | J1 | ported |
 | `/programisci/[problem]/[tech]` | `/programisci/{Problem}/{Tech}` | port/public | - | ported |
-| `/regulamin` | - | port/public | - | not ported |
-| `/rejestracja` | - | port/auth | J2 | not ported |
+| `/regulamin` | `/regulamin` | port/public | - | ported |
+| `/rejestracja` | `/rejestracja` | port/auth | J2 | ported |
 | `/rezerwacja/[offeringId]` | - | port/booking | J3, J4 | not ported |
 | `/rezerwacja/potwierdzenie/[bookingId]` | - | port/booking | - | not ported |
-| `/robots.txt` | - | port/public | - | not ported |
-| `/sitemap.xml` | - | port/public | - | not ported |
-| `/zasady-rankingu` | - | port/public | - | not ported |
+| `/robots.txt` | `/robots.txt` | port/public | - | ported |
+| `/sitemap.xml` | `/sitemap.xml` | port/public | - | ported |
+| `/zasady-rankingu` | `/zasady-rankingu` | port/public | - | ported |
 
 Not routes, but parity all the same (cutover preconditions of ADR-0010): the stateless session cookie (deploys must not sign users out), the five-minute output cache of public pages,
-password rules on registration, and the J7 Blazor variant (a foreign `Origin` refused with `403 cross_site_request` against `/logowanie`; owner `port/auth`). J7 is skipped on the Blazor host
-until that variant lands; `OriginGuardHostTests` pin the guard in-process meanwhile.
+password rules on registration, (done: the J7 Blazor variant, `j7-foreign-origin.blazor.spec.ts`, runs on the Blazor host and the Next variant on Next; `OriginGuardHostTests` pin the guard in-process as well).

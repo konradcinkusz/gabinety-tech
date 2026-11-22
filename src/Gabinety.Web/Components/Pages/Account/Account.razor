@@ -3,21 +3,27 @@
 @inject AccountClient Accounts
 @inject SignInService SignIn
 @inject NavigationManager Navigation
-@* Static server rendering: plain forms with antiforgery, no JavaScript needed. The page always renders its h1, the e-mail of the session and the sign-out link, whatever the identity service says (F-09). *@
+@* Static server rendering: plain forms with antiforgery, no JavaScript needed. The page always renders its h1, the e-mail of the session and the sign-out link, whatever the identity service says (F-09). Deletion sits in a native details element: it opens without JavaScript, and it opens again when a post fails so the message is seen. *@
 
 <PageTitle>@Pl.Account.MetaTitle</PageTitle>
 <HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
 <h1>@Pl.Account.Title</h1>
 
-<div class="stack">
+<div class="stack account">
     <section class="card" aria-labelledby="account-email-label">
         <dl class="dl">
             <dt id="account-email-label">@Pl.Account.Email</dt>
-            <dd data-testid="account-email">@SessionEmail</dd>
+            <dd class="cluster">
+                <span data-testid="account-email">@SessionEmail</span>
+                @if (_account is { } a)
+                {
+                    <span class="badge @(a.EmailConfirmed ? "badge--success" : "badge--warning")" data-testid="account-email-state">@(a.EmailConfirmed ? Pl.Account.Verified : Pl.Account.NotVerified)</span>
+                }
+            </dd>
         </dl>
-        @if (_account is { } a)
+        @if (_account is { EmailConfirmed: false })
         {
-            <Alert Variant="@(a.EmailConfirmed ? AlertVariant.Success : AlertVariant.Warning)" TestId="account-email-state">@(a.EmailConfirmed ? Pl.Account.Verified : Pl.Account.NotVerified)</Alert>
+            <p class="muted">@Pl.Account.NotVerifiedHint</p>
         }
     </section>
 
@@ -30,8 +36,20 @@
         <section class="card" aria-labelledby="account-consents">
             <h2 id="account-consents">@Pl.Account.Consents</h2>
             <ul class="stack stack--tight" data-testid="consents">
-                <li title="@string.Format(Pl.Account.VersionTitle, _account.Terms.Version)">@(_account.Terms.Accepted ? Pl.Account.TermsAccepted : Pl.Account.TermsPending)</li>
-                <li title="@string.Format(Pl.Account.VersionTitle, _account.Privacy.Version)">@(_account.Privacy.Accepted ? Pl.Account.PrivacyAccepted : Pl.Account.PrivacyPending)</li>
+                <li title="@string.Format(Pl.Account.VersionTitle, _account.Terms.Version)">
+                    <span>@(_account.Terms.Accepted ? Pl.Account.TermsAccepted : Pl.Account.TermsPending)</span>
+                    @if (!_account.Terms.Accepted)
+                    {
+                        <span class="muted consent__why">@Pl.Account.TermsPendingExplanation</span>
+                    }
+                </li>
+                <li title="@string.Format(Pl.Account.VersionTitle, _account.Privacy.Version)">
+                    <span>@(_account.Privacy.Accepted ? Pl.Account.PrivacyAccepted : Pl.Account.PrivacyPending)</span>
+                    @if (!_account.Privacy.Accepted)
+                    {
+                        <span class="muted consent__why">@Pl.Account.PrivacyPendingExplanation</span>
+                    }
+                </li>
             </ul>
             @if (_account.ConsentPending)
             {
@@ -47,21 +65,24 @@
             <a class="btn btn--secondary" href="/konto/export" download>@Pl.Account.Export</a>
         </section>
 
-        <section class="card" aria-labelledby="account-delete">
+        <section class="card account__zone" aria-labelledby="account-delete">
             <h2 id="account-delete">@Pl.Account.DeleteTitle</h2>
             <p>@Pl.Account.DeleteBody</p>
-            @if (_deleteMessage is not null) { <Alert Variant="AlertVariant.Danger" TestId="delete-error">@_deleteMessage</Alert> }
-            <EditForm Model="Delete!" FormName="delete-account" OnSubmit="DeleteAsync" class="form stack" novalidate>
-                @if (_account.HasPassword)
-                {
-                    <div class="field">
-                        <label for="delete-password">@Pl.Account.DeletePassword</label>
-                        <InputText id="delete-password" type="password" @bind-Value="Delete!.Password" autocomplete="current-password" />
-                    </div>
-                }
-                <label class="option"><InputCheckbox id="delete-confirm" @bind-Value="Delete!.Confirm" /> @Pl.Account.DeleteConfirm</label>
-                <div><button class="btn btn--danger" type="submit">@Pl.Account.DeleteSubmit</button></div>
-            </EditForm>
+            <details class="account__danger" open="@(_deleteMessage is not null)">
+                <summary class="btn btn--ghost-danger">@Pl.Account.DeleteOpen</summary>
+                @if (_deleteMessage is not null) { <Alert Variant="AlertVariant.Danger" TestId="delete-error">@_deleteMessage</Alert> }
+                <EditForm Model="Delete!" FormName="delete-account" OnSubmit="DeleteAsync" class="form stack" novalidate>
+                    @if (_account.HasPassword)
+                    {
+                        <div class="field">
+                            <label for="delete-password">@Pl.Account.DeletePassword</label>
+                            <InputText id="delete-password" type="password" @bind-Value="Delete!.Password" autocomplete="current-password" />
+                        </div>
+                    }
+                    <label class="option"><InputCheckbox id="delete-confirm" @bind-Value="Delete!.Confirm" /> @Pl.Account.DeleteConfirm</label>
+                    <div><button class="btn btn--danger" type="submit">@Pl.Account.DeleteSubmit</button></div>
+                </EditForm>
+            </details>
         </section>
     }
 

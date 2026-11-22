@@ -43,8 +43,10 @@ public class AccountPageTests
         Assert.Equal("demo-client@demo.example", page.TextOf("[data-testid=account-email]"));
         Assert.Contains("niepotwierdzony", page.TextOf("[data-testid=account-email-state]"));
         var consents = page.All("[data-testid=consents] li");
-        Assert.Equal("Regulamin: wymaga ponownej akceptacji", consents[0].TextContent);
-        Assert.Equal("Polityka prywatności: zaakceptowana", consents[1].TextContent);
+        Assert.Equal("Regulamin: wymaga ponownej akceptacji", consents[0].QuerySelector("span")!.TextContent);
+        Assert.Contains("Zaktualizowaliśmy regulamin.", consents[0].TextContent); // a pending consent says why, in plain Polish
+        Assert.Equal("Polityka prywatności: zaakceptowana", consents[1].QuerySelector("span")!.TextContent);
+        Assert.DoesNotContain("Zaktualizowaliśmy", consents[1].TextContent); // an accepted one needs no explanation
         Assert.DoesNotContain("2026-01-01", page.Text); // F-07 spirit: no document versions as text
         Assert.Equal("Wersja dokumentu: 2026-01-01", consents[0].GetAttribute("title")); // a pending consent shows the REQUIRED version, in a title
         Assert.Equal("/konto/export", page.One("a[href='/konto/export']")!.GetAttribute("href"));
@@ -52,6 +54,55 @@ public class AccountPageTests
         Assert.DoesNotContain("SECRET", page.Html);
         Assert.DoesNotContain("eyJ", page.Html);
         Assert.All(web.Identity.Backend.Requests.Where(r => r.PathAndQuery is "/api/v1/auth/me" or "/api/v1/auth/consents"), r => Assert.StartsWith("Bearer eyJ", r.Authorization));
+    }
+
+    [Fact]
+    public async Task The_e_mail_state_is_a_badge_next_to_the_address_not_a_full_width_callout()
+    {
+        var (web, browser) = await SignedIn();
+        await using var __ = web;
+        var verified = await browser.GetAsync("/konto");
+        var badge = verified.One("[data-testid=account-email-state]")!;
+        Assert.Equal("span", badge.TagName.ToLowerInvariant());
+        Assert.Contains("badge badge--success", badge.GetAttribute("class"));
+        Assert.Equal("Adres e-mail potwierdzony", badge.TextContent.Trim());
+        Assert.Equal(verified.One("[data-testid=account-email]")!.ParentElement, badge.ParentElement); // the same line as the address
+        Assert.Null(verified.One(".callout--success")); // the old full-width green callout is gone
+        Assert.Null(verified.One(".account > .card > p.muted")); // no hint for a confirmed address
+
+        web.Identity.EmailConfirmed = false;
+        var unverified = await browser.GetAsync("/konto");
+        Assert.Contains("badge--warning", unverified.One("[data-testid=account-email-state]")!.GetAttribute("class"));
+        Assert.Contains("Sprawdź skrzynkę", unverified.TextOf(".account > .card > p.muted"));
+    }
+
+    [Fact]
+    public async Task The_deletion_is_a_collapsed_details_with_the_existing_form_and_no_script()
+    {
+        var (web, browser) = await SignedIn();
+        await using var __ = web;
+        var page = await browser.GetAsync("/konto");
+        var details = page.One("details.account__danger")!;
+        Assert.Null(details.GetAttribute("open")); // collapsed by default
+        Assert.Equal("Usuń konto", page.TextOf("details.account__danger > summary"));
+        var form = page.One("details.account__danger form[method=post]")!; // the form is inside the details, so it works without script
+        Assert.NotNull(form.QuerySelector("input[name='__RequestVerificationToken']")); // antiforgery is still on the form
+        Assert.NotNull(form.QuerySelector("input[name='Delete.Confirm']"));
+        Assert.NotNull(form.QuerySelector("input[name='Delete.Password']"));
+        Assert.NotNull(form.QuerySelector("button[type=submit]"));
+        Assert.Equal("Usuń konto", form.QuerySelector("button[type=submit]")!.TextContent.Trim());
+        Assert.Single(page.All("h1"));
+        Assert.Empty(page.All("form details")); // no nested forms
+    }
+
+    [Fact]
+    public async Task A_failed_deletion_reopens_the_details_so_the_message_is_seen()
+    {
+        var (web, browser) = await SignedIn();
+        await using var __ = web;
+        var page = await browser.PostFormAsync("/konto", Delete("", true));
+        Assert.NotNull(page.One("details.account__danger[open]"));
+        Assert.Equal("Podaj hasło, aby potwierdzić usunięcie konta.", page.TextOf("details[open] [data-testid=delete-error]"));
     }
 
     [Fact]

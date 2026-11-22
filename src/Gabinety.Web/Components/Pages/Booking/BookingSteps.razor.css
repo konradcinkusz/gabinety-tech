@@ -1,0 +1,17 @@
+.booking-steps { margin-block: var(--space-4); }
+.booking-steps__list { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.booking-steps__item { display: flex; align-items: center; gap: var(--space-2); flex: 1 1 0; min-width: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+.booking-steps__item::after { content: ""; flex: 1 1 auto; height: 2px; min-width: var(--space-3); background: var(--color-border); }
+.booking-steps__item:last-child { flex: 0 0 auto; }
+.booking-steps__item:last-child::after { display: none; }
+.booking-steps__mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 1.75rem; height: 1.75rem; border-radius: var(--radius-pill); border: 2px solid var(--color-border-strong); font-weight: 600; font-variant-numeric: tabular-nums; }
+.booking-steps__name { white-space: nowrap; }
+.booking-steps__item--done { color: var(--color-success); }
+.booking-steps__item--done .booking-steps__mark { background: var(--color-success-soft); border-color: var(--color-success); }
+.booking-steps__item--done::after { background: var(--color-success); }
+.booking-steps__item--current { color: var(--color-text); font-weight: 600; }
+.booking-steps__item--current .booking-steps__mark { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-contrast); }
+/* On a phone only the current step keeps its name; the numbers carry the rest (the full list stays in the markup for a screen reader). */
+@media (max-width: 39.99rem) {
+    .booking-steps__item:not(.booking-steps__item--current) .booking-steps__name { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); }
+}

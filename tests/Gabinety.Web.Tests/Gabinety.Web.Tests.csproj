@@ -10,6 +10,8 @@
     <ProjectReference Include="../../src/Gabinety.Web/Gabinety.Web.csproj" />
     <!-- The one place a test project references both sides: the round trip that proves the web DTO copies still match the contracts (ContractCopiesTests). -->
     <ProjectReference Include="../../src/Gabinety.Contracts/Gabinety.Contracts.csproj" />
+    <!-- Only to pin the web host's mirror of the full-refund window to the owner's constant (FreeCancellationTests); the host itself never references Billing. -->
+    <ProjectReference Include="../../src/Gabinety.Billing/Gabinety.Billing.csproj" />
   </ItemGroup>
   <ItemGroup><Compile Include="../Shared/RouteAuth.cs" Link="RouteAuth.cs" /></ItemGroup>
 </Project>

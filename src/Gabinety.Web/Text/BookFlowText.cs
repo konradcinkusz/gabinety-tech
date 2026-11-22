@@ -16,8 +16,20 @@ public static class BookFlowText
         public const string Title = "Podsumowanie", Offering = "Konsultacja", Practitioner = "Programista", When = "Termin", Duration = "Czas trwania", Minutes = "{0} min", Price = "Do zapłaty";
         public const string Zone = "Godziny w czasie polskim (Europe/Warsaw).";
         public const string Hold = "Termin jest wstrzymany na 10 minut od kliknięcia „Zapłać”.";
+        public const string ChangeTime = "Zmień termin";
+        /// <summary>The free-cancellation line (UX-020, finding 6): the deadline is the start minus the full-refund window; {0} is "poniedziałek, 7 grudnia, 12:00".</summary>
+        public const string FreeUntil = "Bezpłatne anulowanie do {0}.";
+        /// <summary>Shown instead when the deadline has already passed; {0} is the window in hours.</summary>
+        public const string NoFreeCancel = "Do konsultacji zostało mniej niż {0} godz.: rezygnacja nie da już zwrotu.";
         public const string Meeting = "Link do spotkania";
         public const string MeetingHint = "Otwórz go w terminie konsultacji.";
+    }
+
+    /// <summary>The four steps of the booking (<c>BookingSteps</c>); the checkout and the confirmation show the same list with another current step.</summary>
+    public static class Steps
+    {
+        public const string Label = "Kroki rezerwacji", Done = "(ukończony)";
+        public static readonly string[] Names = ["Termin", "Opis", "Płatność", "Gotowe"];
     }
 
     public static class Brief
@@ -45,7 +57,7 @@ public static class BookFlowText
     {
         public const string Ask = "Pomóż mi opisać problem", Note = "Propozycja to tylko podpowiedź: możesz ją zmienić i nic nie zostanie dodane bez Twojego kliknięcia.";
         public const string NeedsText = "Najpierw opisz problem w co najmniej 20 znakach, wtedy asystent będzie mógł pomóc.";
-        public const string Proposal = "Propozycja opisu (możesz ją edytować)", Questions = "Warto jeszcze opisać:", Category = "Sugerowana kategoria: {0}";
+        public const string Proposal = "Propozycja opisu (możesz ją edytować)", Questions = "Warto jeszcze opisać", Title = "Propozycja asystenta", Category = "Sugerowana kategoria: {0}", CategoryLabel = "Sugerowana kategoria:";
         public const string Apply = "Dodaj propozycję do opisu", Applied = "Propozycja została dodana do opisu.";
         public const string Unavailable = "Asystent jest chwilowo niedostępny. Opisz problem samodzielnie i zarezerwuj termin.";
         public const string RateLimited = "Zbyt wiele próśb do asystenta. Spróbuj za chwilę albo opisz problem samodzielnie.";

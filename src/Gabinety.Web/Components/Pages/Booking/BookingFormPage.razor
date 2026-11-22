@@ -5,6 +5,7 @@
 @inject BriefAssistantClient Assistant
 @inject NavigationManager Navigation
 @inject Gabinety.Web.Hosting.WebOptions Site
+@inject TimeProvider Clock
 @* Static server rendering with plain form posts and antiforgery (ADR-0010: interactivity only where it is needed). Three buttons post the one form: ask the assistant, apply its proposal, pay. A form post
    cannot be lost to a circuit that is not connected yet, which is the failure a typed brief would otherwise meet (DESIGN-CONTRACT 9.7). The brief is user free text: it is never logged. *@
 
@@ -26,11 +27,16 @@ else if (_unavailable)
 }
 else if (_offering is not null)
 {
+    <BookingSteps Current="1" />
     <div class="booking-layout">
         <div class="booking-layout__summary">
             <ConsultationSummary Offering="@_offering.Title" Party="@BookingFormat.Name(_practitionerName)" When="@BookingFormat.When(_start, _start.AddMinutes(_offering.DurationMinutes))"
-                                 Minutes="_offering.DurationMinutes" PriceMinor="_offering.Price.AmountMinor">
-                <div class="callout callout--info">@BookFlowText.Summary.Hold</div>
+                                 Minutes="_offering.DurationMinutes" PriceMinor="_offering.Price.AmountMinor"
+                                 ChangeTimeHref="@ChangeTimeHref">
+                <div class="callout callout--info stack stack--tight">
+                    <p>@BookFlowText.Summary.Hold</p>
+                    <p>@FreeCancellation.Line(_start, Clock.GetUtcNow())</p>
+                </div>
             </ConsultationSummary>
         </div>
         <form method="post" @onsubmit="SubmitAsync" @formname="booking" class="form booking-layout__form" novalidate>
@@ -50,13 +56,16 @@ else if (_offering is not null)
                 @if (_assistApplied) {<div class="callout callout--success">@BookFlowText.Assist.Applied</div>}
                 @if (_suggestion is { } s)
                 {
-                    <div class="stack stack--tight" data-testid="proposal">
+                    <div class="assist__proposal card stack" data-testid="proposal">
+                        <h2 class="assist__title">@BookFlowText.Assist.Title</h2>
+                        <p class="assist__category">@BookFlowText.Assist.CategoryLabel <span class="badge badge--info">@(_categoryName ?? s.ProblemSlug)</span></p>
                         <CounterTextArea Id="proposal" Name="Model.Proposal" Label="@BookFlowText.Assist.Proposal" Value="@Model!.Proposal" Rows="4" />
-                        <p class="field__hint">@string.Format(BookFlowText.Assist.Category, _categoryName ?? s.ProblemSlug)</p>
                         @if (s.ClarifyingQuestions.Count > 0)
                         {
-                            <p class="field__hint">@BookFlowText.Assist.Questions</p>
-                            <ul class="stack stack--tight">@foreach (var q in s.ClarifyingQuestions) {<li>@q</li>}</ul>
+                            <div class="stack stack--tight">
+                                <h3 class="assist__questions-title">@BookFlowText.Assist.Questions</h3>
+                                <ul class="assist__questions stack stack--tight">@foreach (var q in s.ClarifyingQuestions) {<li>@q</li>}</ul>
+                            </div>
                         }
                         <div><button type="submit" name="Model.Intent" value="@BookingFormModel.Apply" class="btn btn--secondary" formnovalidate>@BookFlowText.Assist.Apply</button></div>
                     </div>
@@ -85,6 +94,8 @@ else if (_offering is not null)
     [SupplyParameterFromQuery(Name = "gabinet")] public string? SlugParam { get; set; }
     [SupplyParameterFromForm(FormName = "booking")] BookingFormModel? Model { get; set; }
 
+    /// <summary>Back to the offer in the profile's picker; the slug is known whenever the summary is shown.</summary>
+    string? ChangeTimeHref => _slug is null || _offering is null ? null : "/gabinet/" + Uri.EscapeDataString(_slug) + "#oferta-" + _offering.Id;
     string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
     OfferingDto? _offering;
     string? _practitionerName, _slug, _categoryName, _assistNote, _briefError, _attemptKey, _attemptFingerprint;

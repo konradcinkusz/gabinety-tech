@@ -72,7 +72,7 @@ public class DocumentHeadTests
     }
 
     [Fact]
-    public async Task The_manifest_is_the_web_app_manifest_of_the_site_and_each_of_its_icons_exists_at_the_size_it_declares()
+    public async Task The_manifest_is_the_web_app_manifest_of_the_site_and_each_of_its_icons_is_a_file_in_wwwroot()
     {
         await using var web = Backends();
         var manifest = await web.NewBrowser().GetAsync("/site.webmanifest");

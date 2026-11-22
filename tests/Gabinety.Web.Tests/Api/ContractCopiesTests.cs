@@ -47,14 +47,17 @@ public class ContractCopiesTests
         }
     }
 
-    static void RoundTrip<TCopy>(object real, JsonSerializerOptions? wire = null, Action<TCopy>? check = null)
+    static void RoundTrip<TCopy>(object real, JsonSerializerOptions? wire = null, Action<TCopy>? check = null, params string[] notYetInContract)
     {
         var json = JsonSerializer.Serialize(real, real.GetType(), wire ?? Services);
         var copy = JsonSerializer.Deserialize<TCopy>(json, W.ApiClient.Json)!;
         Assert.NotNull(copy);
         check?.Invoke(copy);
         using var realDoc = JsonDocument.Parse(json);
-        using var copyDoc = JsonDocument.Parse(JsonSerializer.Serialize(copy, W.ApiClient.Json));
+        // a field the web copy reads before the service sends it (see the DTO's remarks) is left out of the comparison, and only that one
+        var copyJson = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(copy, W.ApiClient.Json))!;
+        foreach (var name in notYetInContract) copyJson.AsObject().Remove(name);
+        using var copyDoc = JsonDocument.Parse(copyJson.ToJsonString());
         AssertSubset(copyDoc.RootElement, realDoc.RootElement);
     }
 
@@ -119,4 +122,61 @@ public class ContractCopiesTests
             Assert.Equal(At, c.StartUtc);
         });
     }
+    // ---- the booking flow and the client area
+
+    static readonly JsonSerializerOptions Plain = new(JsonSerializerDefaults.Web);
+
+    [Fact]
+    public void The_booking_detail_with_every_field_the_pages_read()
+    {
+        var real = new BookingView(Id, BookingStatus.Confirmed, "powód", At, At.AddHours(1), 60, "Audyt", new MoneyDto(25000), new PractitionerRef(Id, "Anna", "demo-anna"), new ClientRef("demo-client"),
+            new BriefDto("Opis problemu demo, syntetyczny.", "audyt-kodu", true), "https://meet.example/x", At.AddMinutes(10), new PaymentView(PaymentStatus.PartiallyRefunded, new MoneyDto(9000)), new MoneyDto(3750), new MoneyDto(21250),
+            true, false, true, false, new CancelOutcomeDto(CancelOutcomeKind.Partial, new MoneyDto(9000)));
+        RoundTrip<W.BookingDetailDto>(real, Plain, c =>
+        {
+            Assert.Equal(("Confirmed", "PartiallyRefunded", 9000L), (c.Status, c.Payment.Status, c.Payment.Refunded.AmountMinor));
+            Assert.Equal((true, false, true, false), (c.CanCancel, c.CanDispute, c.CanReportNoShow, c.CanReview));
+            Assert.Equal(("audyt-kodu", true, "https://meet.example/x"), (c.Brief!.ProblemSlug, c.Brief.AiAssisted, c.MeetingUrl));
+            Assert.Equal((3750L, 21250L, At.AddMinutes(10)), (c.Fee!.AmountMinor, c.Payout!.AmountMinor, c.HoldExpiresAt));
+            Assert.Equal(("Anna", "demo-anna", "demo-client"), (c.Practitioner.DisplayName, c.Practitioner.Slug, c.Client!.DisplayName));
+            Assert.Equal(("partial", 9000L), (c.CancelOutcome!.Outcome, c.CancelOutcome.Refund.AmountMinor)); // F-11: the wire name is snake_case
+        });
+    }
+
+    [Fact]
+    public void The_booking_detail_without_the_optional_parts_has_no_cancel_outcome()
+    {
+        var real = new BookingView(Id, BookingStatus.PendingPayment, null, At, At.AddHours(1), 30, "Audyt", new MoneyDto(25000), new PractitionerRef(Id, "Anna", "demo-anna"), null, null, null, null,
+            new PaymentView(PaymentStatus.Created, new MoneyDto(0)), null, null, false, false, false, false);
+        RoundTrip<W.BookingDetailDto>(real, Plain, c => { Assert.Null(c.Client); Assert.Null(c.Brief); Assert.Null(c.MeetingUrl); Assert.Null(c.Fee); Assert.Null(c.CancelOutcome); });
+    }
+
+    [Fact]
+    public void The_create_response_carries_the_checkout_url_of_the_mock_or_of_the_provider() =>
+        RoundTrip<W.CreateBookingResponseDto>(new CreateBookingResponse(Id, BookingStatus.PendingPayment, At, "https://checkout.stripe.com/c/pay/cs_test_1"), Plain,
+            c => Assert.Equal(("PendingPayment", "https://checkout.stripe.com/c/pay/cs_test_1", At), (c.Status, c.CheckoutUrl, c.HoldExpiresAt)));
+
+    [Fact]
+    public void The_create_request_is_what_the_service_binds_the_instant_with_a_Z()
+    {
+        var copy = new W.CreateBookingRequestDto(Id, new DateTimeOffset(2026, 12, 8, 12, 0, 0, TimeSpan.FromHours(1)), new W.BriefDto("Opis problemu demo, syntetyczny.", "audyt-kodu", true));
+        var json = JsonSerializer.Serialize(copy, W.ApiClient.Json);
+        var real = JsonSerializer.Deserialize<CreateBookingRequest>(json, Plain)!; // the service's own record reads what the web writes
+        Assert.Equal((Id, new DateTimeOffset(2026, 12, 8, 11, 0, 0, TimeSpan.Zero), "audyt-kodu", true), (real.OfferingId, real.StartUtc, real.Brief.ProblemSlug, real.Brief.AiAssisted));
+        Assert.Contains("\"startUtc\":\"2026-12-08T11:00:00Z\"", json);
+    }
+
+    [Fact]
+    public void The_brief_suggestion_of_the_assistant() =>
+        RoundTrip<W.BriefSuggestionDto>(new Gabinety.Contracts.Assistant.BriefSuggestion("audyt-kodu", ["dotnet"], "Streszczenie", ["Jaki budżet?"], 60, Gabinety.Contracts.Assistant.Confidence.High, "fake", "v1"),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web) { Converters = { new SnakeCaseLowerEnumConverter() } }, c => Assert.Equal(("audyt-kodu", "Streszczenie", "high"), (c.ProblemSlug, c.Summary, c.Confidence)));
+
+    [Theory]
+    [InlineData(Gabinety.Contracts.Reputation.ReviewStatus.Published)] [InlineData(Gabinety.Contracts.Reputation.ReviewStatus.Held)]
+    public void The_created_review_status_is_the_wire_name_the_page_compares(Gabinety.Contracts.Reputation.ReviewStatus status) =>
+        RoundTrip<W.CreateReviewResponseDto>(new Gabinety.Contracts.Reputation.CreateReviewResponse(Id, status), Plain, c => Assert.Equal(status.ToString(), c.Status));
+
+    [Fact]
+    public void Who_am_I() =>
+        RoundTrip<W.MeDto>(new MeDto("user-1", Id, PractitionerStatus.Approved, false, true), Plain, c => Assert.Equal((Id, "Approved", true), (c.PractitionerId, c.PractitionerStatus, c.IsModerator)));
 }

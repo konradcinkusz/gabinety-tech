@@ -18,8 +18,8 @@ public sealed partial class DirectoryClient
         GetAsync<AdminVerificationEventsDto>($"/api/v1/admin/practitioners/{id}/verification-events", token, ct);
 
     /// <summary><c>approve</c> and <c>reinstate</c> carry no body; <c>reject</c> and <c>suspend</c> carry the reason (10 to 500 characters, trimmed here: CONTRACTS 3.4).</summary>
-    public Task<ApiResult<Done>> AdminPractitionerActionAsync(string? token, Guid id, string action, string? reason, CancellationToken ct = default) =>
-        PostAsync($"/api/v1/admin/practitioners/{id}/{action}", token, reason is null ? null : new { reason = reason.Trim() }, ct);
+    public Task<ApiResult<Unit>> AdminPractitionerActionAsync(string? token, Guid id, string action, string? reason, CancellationToken ct = default) =>
+        PostAsync<Unit>($"/api/v1/admin/practitioners/{id}/{action}", reason is null ? null : new { reason = reason.Trim() }, token, ct);
 
     internal static string Query(params (string Name, string? Value)[] parts) =>
         parts.Where(p => !string.IsNullOrEmpty(p.Value)).ToList() is { Count: > 0 } kept ? "?" + string.Join('&', kept.Select(p => $"{p.Name}={Uri.EscapeDataString(p.Value!)}")) : "";
@@ -35,8 +35,8 @@ public sealed partial class BookingClient
         GetAsync<AdminBookingDto>($"/api/v1/bookings/{id}", token, ct);
 
     /// <summary><c>resolution</c> is <c>release | refund_full | refund_partial</c>; <c>refundMinor</c> only for a partial refund (grosz, strictly between 0 and the price).</summary>
-    public Task<ApiResult<Done>> AdminResolveAsync(string? token, Guid bookingId, string resolution, long? refundMinor, string note, CancellationToken ct = default) =>
-        PostAsync($"/api/v1/admin/bookings/{bookingId}/resolve", token, new { resolution, refundMinor, note = note.Trim() }, ct);
+    public Task<ApiResult<Unit>> AdminResolveAsync(string? token, Guid bookingId, string resolution, long? refundMinor, string note, CancellationToken ct = default) =>
+        PostAsync<Unit>($"/api/v1/admin/bookings/{bookingId}/resolve", new { resolution, refundMinor, note = note.Trim() }, token, ct);
 
     /// <summary>The ledger export as a stream (<c>GET /api/v1/admin/ledger.csv</c>): days are UTC days, both ends inclusive, at most 366 days. The caller disposes the stream.</summary>
     public Task<(ApiStream? Stream, ApiFailure? Failure)> AdminLedgerCsvAsync(string? token, string from, string to, CancellationToken ct = default) =>
@@ -79,11 +79,11 @@ public sealed partial class ReputationClient
     public Task<ApiResult<PageDto<AdminReviewDto>>> AdminReviewsAsync(string? token, string status, string? cursor, int limit, CancellationToken ct = default) =>
         GetAsync<PageDto<AdminReviewDto>>("/api/v1/admin/reviews" + DirectoryClient.Query(("status", status), ("limit", limit.ToString(CultureInfo.InvariantCulture)), ("cursor", cursor)), token, ct);
 
-    public Task<ApiResult<Done>> AdminPublishReviewAsync(string? token, Guid id, CancellationToken ct = default) => PostAsync($"/api/v1/admin/reviews/{id}/publish", token, null, ct);
+    public Task<ApiResult<Unit>> AdminPublishReviewAsync(string? token, Guid id, CancellationToken ct = default) => PostAsync<Unit>($"/api/v1/admin/reviews/{id}/publish", null, token, ct);
 
     /// <summary>The reason is 10 to 500 characters after trimming (ADR-0012 decision 2).</summary>
-    public Task<ApiResult<Done>> AdminRejectReviewAsync(string? token, Guid id, string reason, CancellationToken ct = default) =>
-        PostAsync($"/api/v1/admin/reviews/{id}/reject", token, new { reason = reason.Trim() }, ct);
+    public Task<ApiResult<Unit>> AdminRejectReviewAsync(string? token, Guid id, string reason, CancellationToken ct = default) =>
+        PostAsync<Unit>($"/api/v1/admin/reviews/{id}/reject", new { reason = reason.Trim() }, token, ct);
 
     public Task<ApiResult<PageDto<SuspiciousPairDto>>> AdminSuspiciousPairsAsync(string? token, string? cursor, int limit, CancellationToken ct = default) =>
         GetAsync<PageDto<SuspiciousPairDto>>("/api/v1/admin/suspicious-pairs" + DirectoryClient.Query(("limit", limit.ToString(CultureInfo.InvariantCulture)), ("cursor", cursor)), token, ct);

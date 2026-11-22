@@ -80,6 +80,39 @@ for a suspension, reason `practitioner_suspended`, notification `Cancelled` to t
 
 **Consequences.** Visitors have separate buckets (tested against the real image). To verify on the first deploy: Fly's edge overwrites a client-sent `Fly-Client-IP`. Not changed: a `429` on refresh still ends the session in the web. Proof and details: `docs/operations/AUTH.md` section 9, finding 4.
 
+## 6. Booking flow and client area in the Blazor host (branch `port/booking`, 2026-11-22)
+
+**Scope.** `/rezerwacja/{offeringId}`, `/checkout/mock/{bookingId}`, `/rezerwacja/potwierdzenie/{bookingId}`, `/bookings/{bookingId}` (new, see c), `/moje/rezerwacje`, `/moje/rezerwacje/{id}`, `/moje/opinie`, `/moje/opinie/{bookingId}`.
+Decisions taken by the implementer, all revisable:
+
+a. **Plain form posts with antiforgery, no circuit, except one clock.** Every action of these pages (ask the assistant, apply its proposal, pay, simulate a payment, cancel, dispute, report a no-show, review, reply) is a
+   form post handled by the page; the role of `/moje/rezerwacje` is a tab (a link), the status filter a GET form, "more" a link with the cursor; a cancel or dispute opens by a GET form's button (`?action=`) and a result is a
+   redirect carrying a fixed key (`?done=`, `?sent=`, `?replied=`), so a reload never repeats a write and nothing from a query string is rendered. Reason: DESIGN-CONTRACT 9.7 (an input typed before a circuit connects is lost)
+   and ADR-0010 (a circuit only where needed). The one interactive piece is `HoldTimer` (`@rendermode` on that component in `MockCheckout.razor`): the checkout's countdown. `MyBookings` is no longer interactive: the foundation's
+   tests that pinned it are rewritten. **Cost:** the character counters count what the server received (after a post), not live; the assistant needs a post and a page load, not a fetch.
+b. **The create answer's field is `checkoutUrl`** (CONTRACTS 4.2, `CreateBookingResponse`), not `paymentUrl`. The page follows it generically (`CheckoutTarget`): a path of this site (the mock checkout) or an absolute `https`
+   URL (Stripe Checkout); `//host`, `http` on another host, `javascript:`, user-info and control characters are refused. `practitioner_payments_not_ready` (422) has its own Polish message.
+c. **Stripe's return page.** The Booking service gives Stripe Checkout `{Site__BaseUrl}/bookings/{id}` (`CheckoutRequest.SuccessUrl`, `docs/operations/PAYMENTS-GO-LIVE.md` step 4). That route exists in neither frontend, so the
+   Blazor host answers it with a redirect to the confirmation, which says "Czekamy na potwierdzenie płatności." and reloads itself every 5 s (meta refresh) while the hold lasts. **Owner checklist (service side, not configuration):**
+   `CreateBookingFeature` builds the URL as `{Site__BaseUrl}/bookings/{id}` in code (also used as Stripe's `cancel_url`); pointing it at `/rezerwacja/potwierdzenie/{id}` is a one-line change in the Booking service, after which the extra route can go.
+d. **The mock checkout gate is copied, not asked.** No backend endpoint says "the mock provider is on". `WebOptions.MockPayments` applies the rule the Booking service uses for its `simulate` route (`GABINETY_FAKE=1` or
+   `Environment:Kind=Development`) and the provider rule of the Next.js app (`Payments:Provider` unset or `Mock`): anywhere else the page is a 404 before any backend is asked, and the service refuses the simulation anyway (403).
+   If the service ever exposes its provider (for example on `GET /api/v1/payments/provider`), switch to it. The web app has no `Payments__Provider` in `deploy/fly/web.fly.toml`, on purpose (F-01): not changed.
+e. **`cancelOutcome` (F-11), consumed since #130.** `BookingDetailDto.CancelOutcome` is `{ outcome: full_refund|partial|no_refund, refund: Money }`, present only while `canCancel`. The dialog says the amount the
+   service computed ("Otrzymasz zwrot 180,00 zł.") **and keeps the general rule below it**, so journey J5 (which reads "co najmniej 24 godziny, zwrot wynosi 100% ceny" and "mniej niż 24 godziny, brak zwrotu" in the dialog)
+   passes either way; without the field only the general rule shows. The page never computes it. Tests: `BookingFlowModelTests.With_a_cancel_outcome_*`, `BookingDetailTests.*outcome*`, `ContractCopiesTests`.
+f. **Party names (F-03).** The pages read `practitioner.displayName` and `client.displayName` of the booking and leave the row out when it is empty: no "Programista: Programista", no leading separator
+   (`BookingFormat.MetaLine`). Nothing to change when the backend starts filling them.
+g. **Per-request budgets (SPEC 5.1).** All clients share one resilience configuration (the kernel registers one handler with one options name), so a per-client timeout is not possible. The options now carry a
+   `TimeoutGenerator` that reads `RequestContext.Timeout` from the request: the booking write asks for 12 s (the payment provider call is 10 s) and the assistant brief for 35 s; everything else keeps 5 s, and a write is never retried.
+   `ClientAreaClientTests.Through_the_real_pipeline_*` proves it against the real handler chain (5.5 s answer: the write with a budget succeeds, the one without is cut).
+h. **Authenticated pages answer 200 with a `role="alert"` block** when a backend is down (as the foundation's `MyBookings` did), not 503: they are `noindex`, and a status adds nothing for a signed-in user.
+i. **The cancel confirmation is a `<dialog open role="alertdialog">` in the markup, not a modal.** A modal needs `showModal()` (script). It has the title as its accessible name, the safe button ("Nie anuluj") beside the
+   danger one, and `autofocus` on its title; it has **no focus trap and no Esc** (DESIGN-CONTRACT 5.11 and 7.10 are not met until a script is allowed). Same for the no-show dialog.
+j. **Status filter** lists the ten states and "Wszystkie", not only those the user has (the list is paged, so the page cannot know them): P-BKS-1 stays open on that point.
+k. **`app.css`** gets one additive block of the shared classes these pages use (`.form`, `.field__*`, `.btn--secondary|ghost|danger|ghost-danger`, `.badge--info|warning|danger|neutral`, `.dl`, `.tabs`, `.dialog`, `.sr-only`),
+   written with the foundation's token names. The contract's full sheet replaces the block when it lands.
+
 ## 6. UI-audit backend defects: party names, cancel outcome, dispute window, auth stand-in (2026-11-22)
 
 Branch `auto/audit-backend`; source: `docs/ui/UI-AUDIT.md` section 6 (F-02, F-03, F-11, F-13). The frontend items are fixed in the Blazor port.
@@ -168,3 +201,13 @@ for the 5 s of the read profile; the body is not time-limited here.
 joined links (`SegmentedLinks`), badges for every status family with the label always present (G-8). Dates are `24 lis 2026, 13:00` in Europe/Warsaw; ids are never the primary text.
 **Tokens:** the admin stylesheet uses the foundation's token names (`--color-*`, `--text-*`), the ones that exist today; the design contract's names differ (`--surface`, `--fs-*`), so the session that swaps `tokens.css`
 must map `AdminLayout.razor.css` too (one file). Polish text is in `Text/Admin/PlAdmin.cs`; `SourceRulesTests` now allows Polish under `Text/` (it allowed only `Text/Pl.cs`).
+## 6. J3 flake: the review-to-Directory push waited for a 60 s timer (branch `fix/j3-flake`, 2026-11-22)
+
+**Symptom.** J3 failed about one run in three with `the third review reaches the Directory  Expected: 3  Received: 0` (PRs #124 and #132; they passed on rerun).
+
+**Root cause.** Reputation pushes a rating summary to the Directory only from `SummaryPushHostedService`, a `PeriodicTimer` of 60 s on the real timer (`OffsetTimeProvider` hands timers to the system provider, so the harness's clock jumps do not move it). A review committed just after a tick therefore reaches the Directory up to a whole interval later, and J3 waited exactly 60 s (`expect.poll` timeout 60 000 ms): the wait budget equalled the period, with no room for the push call itself. It was one in three, not rare, because the suite's timing is nearly the same every run (the AppHost starts, the seeder finishes, J1 and J2 run, J3 books and completes), so the third review kept landing within seconds of the same point of the timer's grid. In the failed job the poll window opened at about 10:48:36 and the timer's grid, set by Reputation's start at about 10:44:36, has a tick at :36 of each minute.
+Ruled out by reading the code: the version ordering (Reputation's version is a per-practitioner counter, the seeder's baseline 1 only swallows the first review's push, and the third review's version is higher than anything stored), the `StatsPushJob` (it pushes booking stats, not the rating, and its timestamp version is a separate column), the seeder (it pushes version 1 once, before the tests), the clock offset (not read by the job's timer), a lease or lock (none; the job has an in-process gate only), and the review being created before the booking is Completed (the create call checks Booking's reviewability and answered Published). The CI log carries no service output, so the grid argument is an inference from timestamps and the code, not an observation of the job; the fix removes the dependency on the grid, which is what makes the test deterministic.
+
+**Decision.** Fix the product, not the test: a published review now signals the push loop (`SummaryPushSignal`, a coalescing one-slot channel), which runs a cycle at once; the 60 s timer stays as the safety net (an unpushed summary, a Directory outage, a restart). The test's budget was not raised and nothing retries or sleeps. The lag a reviewer's rating takes to appear on the profile drops from 0 to 60 s to the length of one HTTP call. Only the create path signals; DemoReset and the reply path change no rating the Directory shows, and the timer still carries any other change.
+
+**Proof.** `SummaryPushPromptnessTests`: a published review is pushed with no tick (the host's clock is manual and the real timer is 60 s); fails when the `Notify()` call is removed (mutation run, the push list stays empty); a Held review pushes nothing.

@@ -1,0 +1,2 @@
+.booking-summary h2 { margin-bottom: var(--space-3); }
+.booking-summary__total { font-size: var(--text-lg); font-weight: 700; }

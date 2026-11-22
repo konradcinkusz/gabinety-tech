@@ -134,7 +134,7 @@
         await DecideAsync(id, () => Api.RejectReview(id, _reason), "admin-review-rejected");
     }
 
-    async Task DecideAsync(Guid id, Func<Task<ApiResult<Done>>> call, string flash)
+    async Task DecideAsync(Guid id, Func<Task<ApiResult<Unit>>> call, string flash)
     {
         var result = await call();
         if (result.IsOk) { Navigation.NavigateTo(AdminQuery.Url("/admin/opinie", ("status", _status), ("flash", flash))); return; }

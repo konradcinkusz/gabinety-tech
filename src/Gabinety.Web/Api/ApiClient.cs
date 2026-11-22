@@ -14,8 +14,9 @@ public abstract class ApiClient(HttpClient http, VisitorAddressAccessor visitor)
 
     protected Task<ApiResult<T>> GetAsync<T>(string path, string? accessToken, CancellationToken ct) => SendAsync<T>(HttpMethod.Get, path, accessToken, ct);
 
-    /// <summary>A state-changing call (never retried by the resilience handler: POST). A success needs no body: <see cref="Done"/>. <paramref name="body"/> null sends none.</summary>
-    protected Task<ApiResult<Done>> PostAsync(string path, string? accessToken, object? body, CancellationToken ct) => SendAsync<Done>(HttpMethod.Post, path, accessToken, ct, body);
+    /// <summary>A write (never retried by the resilience handler: SPEC 5 rule 8). <paramref name="body"/> is serialized with the services' options; <paramref name="timeout"/> lifts the attempt budget for the calls SPEC 5.1 gives more time.</summary>
+    protected Task<ApiResult<T>> PostAsync<T>(string path, object? body, string? accessToken, CancellationToken ct, IReadOnlyDictionary<string, string>? headers = null, TimeSpan? timeout = null) =>
+        SendAsync<T>(HttpMethod.Post, path, accessToken, ct, body, headers, timeout);
 
     /// <summary>
     /// A response that is passed on as a stream (a CSV export): the headers are read, the body is NOT buffered. The caller owns the result and disposes it (which ends the backend call).
@@ -33,7 +34,8 @@ public abstract class ApiClient(HttpClient http, VisitorAddressAccessor visitor)
             response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
             if (!response.IsSuccessStatusCode)
             {
-                var failure = new ApiFailure((int)response.StatusCode, await CodeOf(response, ct));
+                var (code, _) = await FailureOf(response, ct);
+                var failure = new ApiFailure((int)response.StatusCode, code);
                 response.Dispose();
                 return (null, failure);
             }
@@ -50,18 +52,20 @@ public abstract class ApiClient(HttpClient http, VisitorAddressAccessor visitor)
         }
     }
 
-    async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, string? accessToken, CancellationToken ct, object? body = null)
+    async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, string? accessToken, CancellationToken ct, object? body = null, IReadOnlyDictionary<string, string>? headers = null, TimeSpan? timeout = null)
     {
         using var request = new HttpRequestMessage(method, path);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         if (body is not null) request.Content = JsonContent.Create(body, body.GetType(), options: Json);
+        foreach (var (name, value) in headers ?? new Dictionary<string, string>()) request.Headers.TryAddWithoutValidation(name, value);
+        if (timeout is { } budget) request.Options.Set(RequestContext.Timeout, budget);
         if (!string.IsNullOrEmpty(accessToken)) request.Options.Set(RequestContext.AccessToken, accessToken);
         if (visitor.Current is { } address) request.Options.Set(RequestContext.VisitorAddress, address);
         try
         {
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseContentRead, ct);
-            if (!response.IsSuccessStatusCode) return ApiResult<T>.Fail((int)response.StatusCode, await CodeOf(response, ct));
-            if (typeof(T) == typeof(Done)) return ApiResult<T>.Ok((T)(object)Done.Value);
+            if (!response.IsSuccessStatusCode) { var (code, fields) = await FailureOf(response, ct); return ApiResult<T>.Fail((int)response.StatusCode, code, fields); }
+            if (typeof(T) == typeof(Unit)) return ApiResult<T>.Ok((T)(object)Unit.Value);
             var value = await response.Content.ReadFromJsonAsync<T>(Json, ct);
             return value is null ? ApiResult<T>.Fail((int)response.StatusCode, ApiFailure.InvalidResponse) : ApiResult<T>.Ok(value);
         }
@@ -76,27 +80,30 @@ public abstract class ApiClient(HttpClient http, VisitorAddressAccessor visitor)
         }
     }
 
-    /// <summary>The <c>code</c> of an RFC 9457 body (CONTRACTS 0), else <c>http_&lt;status&gt;</c>. A title, a detail or any other text of the server is never used.</summary>
-    static async Task<string> CodeOf(HttpResponseMessage response, CancellationToken ct)
+    /// <summary>
+    /// The <c>code</c> of an RFC 9457 body (CONTRACTS 0), else <c>http_&lt;status&gt;</c>, and the NAMES of the keys of <c>errors</c> (field names only, at most 8, each 1-64 letters, digits, dots or underscores).
+    /// A title, a detail or any message of the server is never used: they are English and may echo the input.
+    /// </summary>
+    static async Task<(string Code, IReadOnlyList<string>? Fields)> FailureOf(HttpResponseMessage response, CancellationToken ct)
     {
         var fallback = $"http_{(int)response.StatusCode}";
         try
         {
             using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-            return doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.String
-                && c.GetString() is { Length: > 0 and <= 64 } code && code.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_') ? code : fallback;
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return (fallback, null);
+            var code = root.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.String
+                && c.GetString() is { Length: > 0 and <= 64 } text && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_') ? text : fallback;
+            var fields = root.TryGetProperty("errors", out var e) && e.ValueKind == JsonValueKind.Object
+                ? e.EnumerateObject().Select(p => p.Name).Where(n => n.Length is > 0 and <= 64 && n.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '_' or '.')).Take(8).ToList()
+                : null;
+            return (code, fields);
         }
         catch (Exception) when (!ct.IsCancellationRequested)
         {
-            return fallback;
+            return (fallback, null);
         }
     }
-}
-
-/// <summary>The success of a call whose answer has no content (204) or whose content the page does not read.</summary>
-public sealed record Done
-{
-    public static Done Value { get; } = new();
 }
 
 /// <summary>A backend response body being passed on: disposing it releases the connection, which also ends a transfer the client has abandoned.</summary>

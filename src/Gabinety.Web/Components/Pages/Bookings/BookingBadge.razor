@@ -1,0 +1,6 @@
+@* One component for every state badge of the client area (DESIGN-CONTRACT 5.7): the label is a real text node, the colour only repeats it. *@
+<span class="@Badge.CssClass">@Badge.Label</span>
+
+@code {
+    [Parameter, EditorRequired] public Badge Badge { get; set; } = default!;
+}

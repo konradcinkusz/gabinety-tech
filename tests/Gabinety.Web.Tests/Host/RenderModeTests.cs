@@ -9,7 +9,10 @@ namespace Gabinety.Web.Tests.Pipeline;
 public partial class RenderModeTests
 {
     /// <summary>The pages that run a circuit. A page joins this list by a decision (ADR-0010), not by a stray directive: anonymous public pages never do.</summary>
-    static readonly string[] InteractivePages = ["Components/Pages/Bookings/MyBookings.razor"];
+    static readonly string[] InteractivePages = [];
+
+    /// <summary>A page that is static and hosts ONE interactive component (a render mode on the component, not on the page): the checkout, whose clock ticks while its form posts stay plain.</summary>
+    static readonly string[] PagesWithAnInteractivePart = ["Components/Pages/Booking/MockCheckout.razor"];
 
     [GeneratedRegex(@"@rendermode\b")]
     private static partial Regex RenderModeDirective();
@@ -30,7 +33,9 @@ public partial class RenderModeTests
     public void Only_the_listed_pages_set_a_render_mode_and_each_sets_InteractiveServer()
     {
         var withMode = Repo.WebFiles("*.razor").Where(f => RenderModeDirective().IsMatch(StripComments(File.ReadAllText(f)))).Select(Repo.Rel).ToList();
-        Assert.Equal(InteractivePages, withMode);
+        Assert.Equal([.. InteractivePages, .. PagesWithAnInteractivePart], withMode);
+        foreach (var page in PagesWithAnInteractivePart) Assert.Matches(@"<HoldTimer @rendermode=""InteractiveServer""", Repo.Read(page.Split('/'))); // on the one component, never on the page itself
+        foreach (var page in PagesWithAnInteractivePart) Assert.DoesNotMatch(@"(?m)^@rendermode", Repo.Read(page.Split('/')));
         foreach (var page in InteractivePages) Assert.Matches(@"(?m)^@rendermode InteractiveServer\s*$", Repo.Read(page.Split('/')));
     }
 
@@ -62,7 +67,7 @@ public partial class RenderModeTests
     }
 
     [Fact]
-    public async Task The_home_and_the_list_are_static_and_the_interactive_page_starts_a_circuit_and_is_still_prerendered()
+    public async Task The_home_the_list_and_the_client_area_are_static_and_start_no_circuit()
     {
         await using var web = new WebFactory();
         web.Directory.Respond = r => r.RequestUri!.AbsolutePath switch
@@ -82,9 +87,9 @@ public partial class RenderModeTests
         }
 
         await SignIn.As(web, browser);
+        // The client area is static too: no circuit for a list of bookings, and its HTML is complete.
         var mine = await browser.GetAsync("/moje/rezerwacje");
-        Assert.Contains("<!--Blazor:{", mine.Html);
-        Assert.Contains("\"type\":\"server\"", mine.Html); // an interactive server root component
-        Assert.Equal("Konsultacja z prerenderu", mine.TextOf("[data-testid=booking-row] h2")); // and its HTML is already there before the circuit connects
+        Assert.DoesNotContain("<!--Blazor:", mine.Html);
+        Assert.Equal("Konsultacja z prerenderu", mine.TextOf("[data-testid=booking-row] h2"));
     }
 }

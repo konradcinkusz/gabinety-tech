@@ -27,11 +27,16 @@ public sealed class WebOptions
     /// <summary><c>Backend:&lt;Name&gt;</c>: an ordered, comma separated candidate list of base addresses per backend. They become service-discovery endpoints (see <see cref="ServiceConfiguration"/>).</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>> Backends { get; init; } = new Dictionary<string, IReadOnlyList<string>>();
 
+    /// <summary>
+    /// <c>Payments:Provider</c> is the mock (or unset) in a FAKE profile (<c>GABINETY_FAKE=1</c> or <c>Environment:Kind=Development</c>): the one rule the Booking service uses for its simulate route (F-01), copied, so the mock
+    /// checkout page of this host exists exactly when the service would accept the simulated payment. Anywhere else, and for any other provider, it is off: unknown means no (fail closed).
+    /// </summary>
+    public bool MockPayments { get; init; }
+
     public bool SecureCookies => SiteBaseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
     public static WebOptions From(IConfiguration config)
     {
-        static string? Opt(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();
         var backends = new Dictionary<string, IReadOnlyList<string>>();
         foreach (var name in BackendNames)
         {
@@ -46,6 +51,7 @@ public sealed class WebOptions
             IdentityIssuer = Opt(config["Identity:Issuer"]),
             IdentityAudience = Opt(config["Identity:Audience"]),
             IdentityPublicUrl = Opt(config["Identity:PublicUrl"])?.TrimEnd('/'),
+            MockPayments = IsMockPayments(config),
             Backends = backends,
         };
     }
@@ -61,6 +67,15 @@ public sealed class WebOptions
             for (var i = 0; i < candidates.Count; i++)
                 yield return new($"Services:{name}:{new Uri(candidates[i]).Scheme}:{i}", candidates[i]);
     }
+
+    public static bool IsMockPayments(IConfiguration config)
+    {
+        var fake = config["GABINETY_FAKE"] == "1" || string.Equals(Opt(config["Environment:Kind"]), "Development", StringComparison.OrdinalIgnoreCase);
+        var provider = Opt(config["Payments:Provider"]);
+        return fake && (provider is null || provider.Equals("Mock", StringComparison.OrdinalIgnoreCase));
+    }
+
+    static string? Opt(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();
 
     /// <summary>One IP address, nothing else (the shape the services accept in X-Client-Address).</summary>
     public static bool IsAddress(string? value) => value is { Length: > 0 and <= 45 } && IPAddress.TryParse(value, out _) && !value.Contains(',');

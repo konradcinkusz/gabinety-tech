@@ -18,14 +18,14 @@ public sealed class AdminApi(DirectoryClient directory, BookingClient booking, R
         With(t => directory.AdminPractitionersAsync(t, status, cursor, limit, ct), ct);
     public Task<ApiResult<AdminPractitionerDetailDto>> Practitioner(Guid id, CancellationToken ct = default) => With(t => directory.AdminPractitionerAsync(t, id, ct), ct);
     public Task<ApiResult<AdminVerificationEventsDto>> VerificationEvents(Guid id, CancellationToken ct = default) => With(t => directory.AdminVerificationEventsAsync(t, id, ct), ct);
-    public Task<ApiResult<Done>> PractitionerAction(Guid id, string action, string? reason, CancellationToken ct = default) =>
+    public Task<ApiResult<Unit>> PractitionerAction(Guid id, string action, string? reason, CancellationToken ct = default) =>
         With(t => directory.AdminPractitionerActionAsync(t, id, action, reason, ct), ct);
 
     // ---- disputes and the ledger (Booking)
     public Task<ApiResult<PageDto<AdminDisputeDto>>> Disputes(string status, string? cursor, int limit, CancellationToken ct = default) =>
         With(t => booking.AdminDisputesAsync(t, status, cursor, limit, ct), ct);
     public Task<ApiResult<AdminBookingDto>> Booking(Guid id, CancellationToken ct = default) => With(t => booking.AdminBookingAsync(t, id, ct), ct);
-    public Task<ApiResult<Done>> Resolve(Guid bookingId, string resolution, long? refundMinor, string note, CancellationToken ct = default) =>
+    public Task<ApiResult<Unit>> Resolve(Guid bookingId, string resolution, long? refundMinor, string note, CancellationToken ct = default) =>
         With(t => booking.AdminResolveAsync(t, bookingId, resolution, refundMinor, note, ct), ct);
     public Task<ApiResult<LedgerPreviewDto>> LedgerPreview(string from, string to, int max, CancellationToken ct = default) =>
         With(t => booking.AdminLedgerPreviewAsync(t, from, to, max, ct), ct);
@@ -37,8 +37,8 @@ public sealed class AdminApi(DirectoryClient directory, BookingClient booking, R
     // ---- reviews and suspicious pairs (Reputation)
     public Task<ApiResult<PageDto<AdminReviewDto>>> Reviews(string status, string? cursor, int limit, CancellationToken ct = default) =>
         With(t => reputation.AdminReviewsAsync(t, status, cursor, limit, ct), ct);
-    public Task<ApiResult<Done>> PublishReview(Guid id, CancellationToken ct = default) => With(t => reputation.AdminPublishReviewAsync(t, id, ct), ct);
-    public Task<ApiResult<Done>> RejectReview(Guid id, string reason, CancellationToken ct = default) => With(t => reputation.AdminRejectReviewAsync(t, id, reason, ct), ct);
+    public Task<ApiResult<Unit>> PublishReview(Guid id, CancellationToken ct = default) => With(t => reputation.AdminPublishReviewAsync(t, id, ct), ct);
+    public Task<ApiResult<Unit>> RejectReview(Guid id, string reason, CancellationToken ct = default) => With(t => reputation.AdminRejectReviewAsync(t, id, reason, ct), ct);
     public Task<ApiResult<PageDto<SuspiciousPairDto>>> SuspiciousPairs(string? cursor, int limit, CancellationToken ct = default) =>
         With(t => reputation.AdminSuspiciousPairsAsync(t, cursor, limit, ct), ct);
 

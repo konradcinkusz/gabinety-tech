@@ -1,0 +1,13 @@
+@* A failed action, next to the form that sent it: our words by code, with the way out when the state changed under the user. *@
+@if (Failure is not null)
+{
+    <div class="callout callout--danger" role="alert" data-testid="action-error">
+        <p>@ActionFailure.Text(Failure)</p>
+        @if (ActionFailure.OffersRefresh(Failure)) {<a class="btn btn--secondary" href="@Href">@BookingsText.Errors.Refresh</a>}
+    </div>
+}
+
+@code {
+    [Parameter] public ApiFailure? Failure { get; set; }
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+}

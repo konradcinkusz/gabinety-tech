@@ -20,7 +20,6 @@ public sealed record AdminDisputeDto(Guid BookingId, string ClientUserId, string
 /// <summary>The part of <c>BookingView</c> (CONTRACTS 4.4) a dispute card shows: what was booked, for how much, the payment. The party names are empty until Directory can look them up (the booking feature says so).</summary>
 public sealed record AdminBookingDto(Guid Id, string Status, DateTimeOffset StartUtc, string OfferingTitle, MoneyDto Price, PractitionerRefDto Practitioner, ClientRefDto? Client, PaymentViewDto Payment);
 
-public sealed record PaymentViewDto(string Status, MoneyDto Refunded);
 
 public sealed record AdminReviewDto(Guid Id, Guid PractitionerId, int Rating, string? Text, string Status, IReadOnlyList<string>? HoldReasons, string? TriageFlag, string? TriageModelId,
     DateTimeOffset? CreatedAt, DateTimeOffset? PublishedAt, string? ModeratedBy, string? ModerationNote);

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Polly;
 using Microsoft.Extensions.Http.Resilience;
 
 namespace Gabinety.Web.Api;
@@ -20,7 +21,10 @@ public static class ApiResilience
         Add<DirectoryClient>(services, Backend.Directory);
         Add<BookingClient>(services, Backend.Booking);
         Add<ReputationClient>(services, Backend.Reputation);
-        Add<AssistantClient>(services, Backend.Assistant); // status reads only; the 35 s brief call (SPEC 5.1) gets its own timeout when the booking flow is ported
+        Add<AssistantClient>(services, Backend.Assistant); // status read (5 s) and the brief suggestion, which asks for its 35 s per request (SPEC 5.1)
+        Add<BriefAssistantClient>(services, Backend.Assistant);   // the brief suggestion (35 s)
+        Add<ReviewsClient>(services, Backend.Reputation);         // write a review, reply
+        Add<MeClient>(services, Backend.Directory);               // who am I
         Add<Auth.IdentityClient>(services, Backend.Auth);
         services.AddScoped<AdminApi>();      // the admin pages' calls with the administrator's own bearer (Api/Admin)
         Add<AccountClient>(services, Backend.Auth); // the signed-in user's own account calls (me, consents, export, delete)
@@ -30,15 +34,23 @@ public static class ApiResilience
         services.ConfigureAll<HttpStandardResilienceOptions>(o =>
         {
             o.AttemptTimeout.Timeout = ReadTimeout;
+            o.AttemptTimeout.TimeoutGenerator = args => ValueTask.FromResult(Budget(args.Context, ReadTimeout));
             o.Retry.MaxRetryAttempts = 1;
             o.Retry.DisableForUnsafeHttpMethods();
             o.Retry.ShouldRetryAfterHeader = true;
             o.Retry.MaxDelay = MaxRetryWait;
             o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(15);
+            o.TotalRequestTimeout.TimeoutGenerator = args => ValueTask.FromResult(Budget(args.Context, TimeSpan.FromSeconds(15)) is var b && b > ReadTimeout ? b + TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(15));
             o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(30);
         });
         return services;
     }
+
+    /// <summary>The budget a request asked for through <see cref="RequestContext.Timeout"/> (SPEC 5.1: the booking write 10 s, the assistant 35 s), else <paramref name="fallback"/>. It can only be raised for a write: a retry stays off for unsafe methods.</summary>
+    static TimeSpan Budget(ResilienceContext context, TimeSpan fallback) =>
+        context.GetRequestMessage() is { } request && request.Options.TryGetValue(RequestContext.Timeout, out var budget) && budget > TimeSpan.Zero && budget <= MaxBudget ? budget : fallback;
+
+    public static readonly TimeSpan MaxBudget = TimeSpan.FromSeconds(40);
 
     static void Add<TClient>(IServiceCollection services, string name) where TClient : class =>
         services.AddHttpClient<TClient>(name, c => c.BaseAddress = new Uri(Backend.BaseAddress(name))).AddHttpMessageHandler<BackendHeadersHandler>();

@@ -18,6 +18,8 @@ public sealed class FakeBackend : HttpMessageHandler
     public Func<HttpRequestMessage, HttpResponseMessage> Respond { get; set; } = _ => new HttpResponseMessage(HttpStatusCode.NotFound);
     public IReadOnlyList<Recorded> Requests { get { lock (_requests) return [.. _requests]; } }
     public int Calls => Requests.Count;
+    /// <summary>How long the backend takes before it answers, honouring cancellation (a timeout of the client's pipeline ends the wait).</summary>
+    public TimeSpan Delay { get; set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -25,6 +27,7 @@ public sealed class FakeBackend : HttpMessageHandler
         var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
         lock (_requests)
             _requests.Add(new Recorded(request.Method, request.RequestUri!.PathAndQuery, One("Authorization"), One("X-Client-Address"), One("X-Edge-Key"), body));
+        if (Delay > TimeSpan.Zero) await Task.Delay(Delay, cancellationToken);
         return Respond(request);
     }
 

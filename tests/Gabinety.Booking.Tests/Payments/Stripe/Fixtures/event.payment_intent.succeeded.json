@@ -1,0 +1,22 @@
+{
+ "id": "evt_1Qx0Pi",
+ "object": "event",
+ "api_version": "2026-11-18.endive",
+ "created": 1790000000,
+ "data": {
+  "object": {
+   "id": "pi_3Qx0demo",
+   "object": "payment_intent",
+   "amount": 10000,
+   "currency": "pln",
+   "status": "succeeded"
+  }
+ },
+ "livemode": false,
+ "pending_webhooks": 1,
+ "request": {
+  "id": null,
+  "idempotency_key": null
+ },
+ "type": "payment_intent.succeeded"
+}

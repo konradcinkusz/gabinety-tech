@@ -298,6 +298,44 @@ namespace Gabinety.Booking.Persistence.Migrations
                     b.ToTable("ledger_entries", (string)null);
                 });
 
+            modelBuilder.Entity("Gabinety.Booking.Features.Payments.PaymentAccount", b =>
+                {
+                    b.Property<Guid>("PractitionerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("practitioner_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderAccountId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_account_id");
+
+                    b.Property<bool>("Ready")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ready");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("PractitionerId");
+
+                    b.HasIndex("ProviderAccountId")
+                        .IsUnique();
+
+                    b.ToTable("practitioner_payment_accounts", (string)null);
+                });
+
             modelBuilder.Entity("Gabinety.Booking.Features.Payments.WebhookEvent", b =>
                 {
                     b.Property<string>("Provider")
@@ -335,6 +373,12 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("amount_minor");
 
+                    b.Property<int>("AttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempt_count");
+
                     b.Property<Guid>("BookingId")
                         .HasColumnType("uuid")
                         .HasColumnName("booking_id");
@@ -342,6 +386,10 @@ namespace Gabinety.Booking.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
 
                     b.Property<Guid>("PractitionerId")
                         .HasColumnType("uuid")

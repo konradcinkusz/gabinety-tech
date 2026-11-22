@@ -51,39 +51,62 @@ public sealed class MockPaymentProvider(string siteBaseUrl, string? webhookSecre
 }
 
 /// <summary>
-/// Registers the provider named by <c>Payments:Provider</c> (security review F-01: Mock is fail-closed). Only <c>Mock</c> exists, and it is the fake profile's:
-/// <c>GABINETY_FAKE=1</c> or <c>Environment:Kind=Development</c> (<see cref="NonDeployedProfile"/>, the same guard as the clock and reset endpoints).
+/// Registers the provider named by <c>Payments:Provider</c> (security review F-01: Mock is fail-closed).
 /// <list type="bullet">
-/// <item>Fake profile: <c>Mock</c> or no value is the Mock provider.</item>
+/// <item>Fake profile: <c>Mock</c> or no value is the Mock provider (<see cref="NonDeployedProfile"/>: <c>GABINETY_FAKE=1</c> or <c>Environment:Kind=Development</c>, the same guard as the clock and reset endpoints).</item>
 /// <item>Any other profile: <c>Mock</c> or no value stops the host at startup. There is no default outside the fake profile.</item>
-/// <item>Any other value (a vendor): stops the host at startup in every profile until that vendor's adapter is registered (T-09.05, not built yet).</item>
+/// <item><c>Stripe</c> (T-09.05, ADR proposal 0011): the Stripe adapter, in every profile, when <c>Payments:Stripe:SecretKey</c> and <c>Payments:Stripe:WebhookSecret</c> are set; with either missing the host stops at startup.</item>
+/// <item>Any other value: stops the host at startup, naming no vendor adapter.</item>
 /// </list>
 /// The refusal is raised when the host builds its pipeline, before it listens; a test of an unrelated concern in a deployed profile replaces <see cref="IPaymentProvider"/>
 /// with its own double, which then never reaches this factory.
 /// </summary>
 public sealed class PaymentsFeature : IServiceFeature
 {
+    public const string StripeSecretKeyKey = "Payments:Stripe:SecretKey", StripeWebhookSecretKey = "Payments:Stripe:WebhookSecret";
+
     public void Add(IHostApplicationBuilder builder)
     {
         var provider = builder.Configuration["Payments:Provider"];
-        var problem = Problem(provider, NonDeployedProfile.IsActive(builder.Configuration));
+        var problem = Problem(provider, NonDeployedProfile.IsActive(builder.Configuration), builder.Configuration);
+        var stripe = problem is null && string.Equals(provider, "Stripe", StringComparison.OrdinalIgnoreCase);
+        if (stripe) builder.Services.AddHttpClient(StripeHttpClient, c =>
+        {
+            c.BaseAddress = new Uri(builder.Configuration["Payments:Stripe:ApiBase"] is { Length: > 0 } b ? b : "https://api.stripe.com");
+            c.Timeout = TimeSpan.FromSeconds(15); // the callers' own 10 s budget (SPEC 5.1) normally cancels first
+        });
         builder.Services.AddSingleton<IPaymentProvider>(sp =>
         {
             if (problem is not null) throw new InvalidOperationException(problem);
             var config = sp.GetRequiredService<IConfiguration>();
+            if (stripe)
+                return new Stripe.StripePaymentProvider(new Stripe.StripeApi(sp.GetRequiredService<IHttpClientFactory>().CreateClient(StripeHttpClient), config[StripeSecretKeyKey]!),
+                    config[StripeWebhookSecretKey]!, sp.GetRequiredService<TimeProvider>());
             return new MockPaymentProvider(SiteUrl.From(config), config["Payments:WebhookSecret"]);
         });
         if (problem is not null) builder.Services.AddSingleton<IStartupFilter, ResolveProviderAtStartup>(); // refuse before the first request, and before the server listens
     }
 
+    const string StripeHttpClient = "stripe";
+
     /// <summary>The reason the configuration is refused, or null. Never includes a configured value other than the provider name, never a secret.</summary>
-    public static string? Problem(string? provider, bool nonDeployed)
+    public static string? Problem(string? provider, bool nonDeployed, IConfiguration? config = null)
     {
         if (string.IsNullOrWhiteSpace(provider) || string.Equals(provider, "Mock", StringComparison.OrdinalIgnoreCase))
             return nonDeployed ? null
                 : "Payments:Provider is 'Mock' or not set, and Mock payments run only in the fake profile (GABINETY_FAKE=1 or Environment:Kind=Development): " +
-                  "anyone could mark a booking paid. Set Payments:Provider to the real provider; its adapter is T-09.05 and is not built yet, so Booking cannot be deployed until then.";
-        return $"Payments:Provider '{provider}' has no adapter registered: the only provider is Mock (fake profile only). A vendor adapter is T-09.05 and is not built yet.";
+                  "anyone could mark a booking paid. Set Payments:Provider to the real provider (Stripe, T-09.05) with its secrets, docs/operations/PAYMENTS-GO-LIVE.md.";
+        if (string.Equals(provider, "Stripe", StringComparison.OrdinalIgnoreCase))
+        {
+            var key = config?[StripeSecretKeyKey];
+            var hook = config?[StripeWebhookSecretKey];
+            if (string.IsNullOrWhiteSpace(key) || !(key.StartsWith("sk_", StringComparison.Ordinal) || key.StartsWith("rk_", StringComparison.Ordinal)))
+                return "Payments:Provider is 'Stripe' but Payments:Stripe:SecretKey (secret Payments__Stripe__SecretKey) is not set or is not a Stripe secret or restricted key (sk_ or rk_).";
+            if (string.IsNullOrWhiteSpace(hook) || !hook.StartsWith("whsec_", StringComparison.Ordinal))
+                return "Payments:Provider is 'Stripe' but Payments:Stripe:WebhookSecret (secret Payments__Stripe__WebhookSecret) is not set or is not a Stripe webhook signing secret (whsec_): every webhook would be rejected.";
+            return null;
+        }
+        return $"Payments:Provider '{provider}' has no adapter registered: the providers are Mock (fake profile only) and Stripe.";
     }
 
     public void Map(IEndpointRouteBuilder endpoints) { }

@@ -160,10 +160,13 @@ check "values are masked" has "$out" "::add-mask::Host=gabinety-postgres-staging
 check "a value is never printed outside ::add-mask::" bash -c "! printf '%s\n' \"\$1\" | grep -v '^::add-mask::' | grep -q -e s3cr3tpw -e dirkey" _ "$out"
 out="$("$d/set-secrets.sh" booking gabinety-booking-staging --map "$root/deploy/secrets.map" 2>&1)"; rc=$?
 check "a missing required secret fails and names it, not its value" bash -c "[ $rc = 1 ]" && check "the failure names INTERNAL_KEY_REPUTATION_TO_BOOKING" has "$out" "INTERNAL_KEY_REPUTATION_TO_BOOKING"
-export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_REPUTATION_TO_BOOKING":"rb","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"bd"}'
+export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_REPUTATION_TO_BOOKING":"rb","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"bd","PAYMENTS_STRIPE_SECRET_KEY":"sk_test_x","PAYMENTS_STRIPE_WEBHOOK_SECRET":"whsec_x"}'
 : > "$tmp/log"; out="$("$d/set-secrets.sh" booking gabinety-booking-staging --map "$root/deploy/secrets.map" 2>&1)"
-check "an optional secret that is unset is skipped" has "$out" "skip Payments__WebhookSecret"
-check "booking stages three secrets" has "$out" "staging 3 secret(s)"
+check "an optional secret that is unset is skipped" has "$out" "skip Internal__Callers__Owner"
+check "booking stages five secrets, the two Stripe ones among them" has "$out" "staging 5 secret(s)"
+export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_REPUTATION_TO_BOOKING":"rb","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"bd"}'
+out="$("$d/set-secrets.sh" booking gabinety-booking-staging --map "$root/deploy/secrets.map" 2>&1)"; rc=$?
+check "booking without the Stripe secrets fails the deploy and names them" bash -c "[ $rc = 1 ]" && check "the failure names PAYMENTS_STRIPE_SECRET_KEY" has "$out" "PAYMENTS_STRIPE_SECRET_KEY" && check "the failure names PAYMENTS_STRIPE_WEBHOOK_SECRET" has "$out" "PAYMENTS_STRIPE_WEBHOOK_SECRET"
 check "no mapped secret is a single shared callee key" bash -c "! grep -E '^[a-z]+ +Internal__Key +' '$root/deploy/secrets.map'"
 check "every INTERNAL_KEY_ secret of the map is used once per name pair (no key shared between callers)" bash -c "grep -oE '\$\{INTERNAL_KEY_[A-Z_]+\}' '$root/deploy/secrets.map' | sort | uniq -c | awk '\$1 > 2 {bad=1} END {exit bad}'"
 export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","AUTH_JWT_PRIVATE_KEY_PEM":"-----BEGIN X-----\nBODYLINE\n-----END X-----"}'

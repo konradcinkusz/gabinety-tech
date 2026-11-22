@@ -11,4 +11,5 @@
     <ProjectReference Include="../../src/Gabinety.Booking/Gabinety.Booking.csproj" />
   </ItemGroup>
   <ItemGroup><Compile Include="../Shared/RouteAuth.cs" Link="RouteAuth.cs" /></ItemGroup>
+  <ItemGroup><None Include="Payments/Stripe/Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>

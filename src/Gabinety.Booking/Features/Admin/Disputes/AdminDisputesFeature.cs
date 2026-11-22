@@ -140,6 +140,7 @@ public sealed class AdminDisputesFeature : IServiceFeature
                 // dispute_resolution = refund_full and dispute_kind = practitioner_no_show. Nothing extra is written here for it.
                 c.Booking.DisputeResolution = resolution;
                 c.Booking.ResolvedAt = now;
+                c.Booking.PayoutDueAt = now; // the dispute is over: a resolved booking is paid out at once (ADR proposal 0011); the payout job also falls back to resolved_at for older rows
                 c.Booking.StatusReason = note;
                 // Recorded here, before the hooks run, so a hook (the fee on the kept amount, T-04.08c) reads payment.RefundedMinor already set.
                 // With a provider that confirms later (not the Mock) nothing is recorded now: the RefundSucceeded webhook records it, and the fee for

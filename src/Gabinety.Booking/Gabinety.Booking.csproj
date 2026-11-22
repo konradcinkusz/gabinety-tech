@@ -12,4 +12,7 @@
     <ProjectReference Include="../Gabinety.Billing/Gabinety.Billing.csproj" />
     <ProjectReference Include="../Gabinety.Scheduling/Gabinety.Scheduling.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gabinety.Booking.Tests" />
+  </ItemGroup>
 </Project>

@@ -1,0 +1,29 @@
+{
+ "id": "evt_1Qx0RefundFailed",
+ "object": "event",
+ "api_version": "2026-11-18.endive",
+ "created": 1790000000,
+ "data": {
+  "object": {
+   "id": "re_3Qx0demo",
+   "object": "refund",
+   "amount": 10000,
+   "charge": "ch_3Qx0demo",
+   "created": 1790000100,
+   "currency": "pln",
+   "payment_intent": "pi_3Qx0demo",
+   "reason": null,
+   "status": "failed",
+   "metadata": {
+    "provider_payment_id": "cs_test_a1B2c3D4e5F6g7H8"
+   }
+  }
+ },
+ "livemode": false,
+ "pending_webhooks": 1,
+ "request": {
+  "id": null,
+  "idempotency_key": null
+ },
+ "type": "refund.failed"
+}

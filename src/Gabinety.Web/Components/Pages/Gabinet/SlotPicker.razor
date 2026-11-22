@@ -13,19 +13,44 @@
     }
     else
     {
-        <ul class="slot-days" aria-label="@PlPages.Slots.PickDay">
-            @foreach (var d in Slots.Days)
-            {
-                <li><a class="chip" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, d.Date)" aria-current="@(d.Date == _selected.Date ? "true" : null)">@PlFormat.DayHeading(d.Date)</a></li>
-            }
-        </ul>
-        <section aria-label="@string.Format(PlPages.Slots.Times, PlFormat.DayHeading(_selected.Date))">
-            <ul class="slot-times">
-                @foreach (var s in _selected.Slots)
+        @if (SlotPickerModel.NearestLabel(Slots.Days, Today) is { } nearest)
+        {
+            <p class="slot-nearest" data-testid="slots-nearest">@string.Format(PlPages.Slots.Nearest, nearest)</p>
+        }
+        @if (_hasPages)
+        {
+            <div class="slot-weeks">
+                @if (_prevDay is { } pd)
                 {
-                    <li><a class="chip slot" href="@SlotPickerModel.BookingHref(Offering.Id, s.StartUtc, Slug)">@PlFormat.Time(s.StartUtc)</a></li>
+                    <a class="btn btn--ghost" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, pd)">@PlPages.Slots.PrevWeek</a>
+                }
+                @if (_nextDay is { } nd)
+                {
+                    <a class="btn btn--ghost slot-weeks__next" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, nd)">@PlPages.Slots.NextWeek</a>
+                }
+            </div>
+        }
+        <div class="slot-strip">
+            <ul class="slot-days" aria-label="@PlPages.Slots.PickDay">
+                @foreach (var d in _page)
+                {
+                    <li><a class="chip slot-day" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, d.Date)" aria-label="@PlFormat.DayHeading(d.Date)" aria-current="@(d.Date == _selected.Date ? "true" : null)"><span class="slot-day__week" aria-hidden="true">@SlotDayFormat.ShortWeekday(d.Date)</span><span class="slot-day__date" aria-hidden="true">@SlotDayFormat.ShortDate(d.Date)</span></a></li>
                 }
             </ul>
+        </div>
+        <section aria-label="@string.Format(PlPages.Slots.Times, PlFormat.DayHeading(_selected.Date))" class="slot-parts">
+            @foreach (var (part, slots) in SlotPickerModel.GroupByPartOfDay(_selected.Slots))
+            {
+                <div class="slot-part">
+                    <h4 class="slot-part__title">@PartTitle(part)</h4>
+                    <ul class="slot-times">
+                        @foreach (var s in slots)
+                        {
+                            <li><a class="chip slot" href="@SlotPickerModel.BookingHref(Offering.Id, s.StartUtc, Slug)">@PlFormat.Time(s.StartUtc)</a></li>
+                        }
+                    </ul>
+                </div>
+            }
         </section>
         @MoreLink
         <p class="muted">@PlPages.Slots.TimeZone</p>
@@ -42,11 +67,29 @@
     [Parameter] public DateOnly Today { get; set; }
 
     DayGroup? _selected;
+    IReadOnlyList<DayGroup> _page = [];
+    DateOnly? _prevDay, _nextDay;
+    bool _hasPages;
 
-    protected override void OnParametersSet() => _selected = SlotPickerModel.Selected(Slots.Days, SelectedDay);
+    protected override void OnParametersSet()
+    {
+        _selected = SlotPickerModel.Selected(Slots.Days, SelectedDay);
+        if (_selected is null) return;
+        _page = SlotPickerModel.Page(Slots.Days, _selected.Date, out var index);
+        _prevDay = SlotPickerModel.NeighbourPageDay(Slots.Days, index, -1);
+        _nextDay = SlotPickerModel.NeighbourPageDay(Slots.Days, index, 1);
+        _hasPages = Slots.Days.Count > SlotPickerModel.PageDays;
+    }
+
+    static string PartTitle(SlotPickerModel.TimeOfDay part) => part switch
+    {
+        SlotPickerModel.TimeOfDay.Morning => PlPages.Slots.Morning,
+        SlotPickerModel.TimeOfDay.Afternoon => PlPages.Slots.Afternoon,
+        _ => PlPages.Slots.Evening,
+    };
 
     RenderFragment MoreLink => @<text>@if (Windows < SlotPickerModel.MaxWindows && SlotPickerModel.Window(Today, Windows) is not null)
     {
-        <a class="btn" href="@SlotPickerModel.PickerHref(Slug, Windows + 1, Offering.Id, _selected?.Date)">@PlPages.Slots.More</a>
+        <a class="btn btn--ghost" href="@SlotPickerModel.PickerHref(Slug, Windows + 1, Offering.Id, _selected?.Date)">@PlPages.Slots.More</a>
     }</text>;
 }

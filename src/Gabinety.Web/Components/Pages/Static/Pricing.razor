@@ -22,19 +22,32 @@
     </section>
     <section class="section" aria-labelledby="pricing-example">
         <h2 id="pricing-example">@PlPages.Pricing.ExampleTitle</h2>
-        <ScrollTable Caption="@PlPages.Pricing.ExampleCaption">
+        <ScrollTable Caption="@PlPages.Pricing.ExampleCaption" TableClass="table--cards">
             <thead><tr><th scope="col">@PlPages.Pricing.ColItem</th><th scope="col" class="num">@PlPages.Pricing.ColAmount</th></tr></thead>
             <tbody>
-                <tr><th scope="row">@PlPages.Pricing.Price</th><td class="num">@Money.Pln(Fee.ExamplePriceMinor)</td></tr>
-                <tr><th scope="row">@PlPages.Pricing.FeeRow</th><td class="num">@Money.Pln(_fee)</td></tr>
-                <tr><th scope="row">@PlPages.Pricing.Payout</th><td class="num">@Money.Pln(Fee.ExamplePriceMinor - _fee)</td></tr>
+                <tr><th scope="row">@PlPages.Pricing.Price</th><td class="num" data-label="@PlPages.Pricing.ColAmount">@Money.Pln(Fee.ExamplePriceMinor)</td></tr>
+                <tr><th scope="row">@PlPages.Pricing.FeeRow</th><td class="num" data-label="@PlPages.Pricing.ColAmount">@Money.Pln(_fee)</td></tr>
+                <tr><th scope="row">@PlPages.Pricing.Payout</th><td class="num" data-label="@PlPages.Pricing.ColAmount">@Money.Pln(Fee.ExamplePriceMinor - _fee)</td></tr>
             </tbody>
         </ScrollTable>
     </section>
+    <section class="section" aria-labelledby="pricing-example-2">
+        <h2 id="pricing-example-2">@PlPages.Pricing.Example2Title</h2>
+        <p>@PlPages.Pricing.Example2Intro</p>
+        <ScrollTable Caption="@string.Format(PlPages.Pricing.Example2Caption, Money.Pln(Fee.SecondExamplePriceMinor))" TableClass="table--cards">
+            <thead><tr><th scope="col">@PlPages.Pricing.ColItem</th><th scope="col" class="num">@PlPages.Pricing.ColAmount</th></tr></thead>
+            <tbody>
+                <tr><th scope="row">@PlPages.Pricing.Price</th><td class="num" data-label="@PlPages.Pricing.ColAmount">@Money.Pln(Fee.SecondExamplePriceMinor)</td></tr>
+                <tr><th scope="row">@PlPages.Pricing.FeeRow</th><td class="num" data-label="@PlPages.Pricing.ColAmount">@Money.Pln(_fee2)</td></tr>
+                <tr><th scope="row">@PlPages.Pricing.Payout</th><td class="num" data-label="@PlPages.Pricing.ColAmount">@Money.Pln(Fee.SecondExamplePriceMinor - _fee2)</td></tr>
+            </tbody>
+        </ScrollTable>
+    </section>
+    <p class="section"><a class="btn btn--secondary" href="/programisci">@PlPages.Pricing.FindLink</a></p>
 </div>
 
 @code {
-    long _fee;
+    long _fee, _fee2;
     string Rate = "";
 
     // The rate is runtime configuration under the key the Billing service reads (never baked in); a bad value falls back to the default.
@@ -42,6 +55,7 @@
     {
         var bps = Fee.BpsFrom(Config[Fee.ConfigKey]);
         _fee = Fee.For(Fee.ExamplePriceMinor, bps);
+        _fee2 = Fee.For(Fee.SecondExamplePriceMinor, bps);
         Rate = PlFormat.Number(bps / 100.0, 2) + "%";
     }
 }

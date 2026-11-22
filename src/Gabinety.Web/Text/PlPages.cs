@@ -81,6 +81,7 @@ public static class PlPages
         public const string P2 = "Administrator sprawdza profil. Po zatwierdzeniu pojawiasz się na liście.";
         public const string P3 = "Wypłata następuje 48 godzin po zakończeniu konsultacji, o ile nikt nie zgłosił sporu.";
         public const string SeeAlso = "Zobacz też";
+        public const string CtaTitle = "Gotowy, żeby zacząć?", CtaBody = "Wybierz zweryfikowanego programistę i wolny termin. Płacisz z góry, a termin jest zarezerwowany po potwierdzeniu płatności.", Cta = "Zobacz programistów";
     }
 
     public static class Ranking
@@ -121,6 +122,8 @@ public static class PlPages
         public const string ExampleTitle = "Przykład", ExampleCaption = "Podział ceny pierwszej konsultacji", ColItem = "Pozycja", ColAmount = "Kwota";
         public const string Price = "Cena konsultacji", FeeRow = "Prowizja platformy", Payout = "Dla programisty";
         public const string RefundNote = "Po pełnym zwrocie prowizji nie ma. Przy częściowym zwrocie liczymy ją od kwoty, która zostaje.";
+        public const string Example2Title = "Drugi przykład", Example2Intro = "Ta sama zasada dla tańszej konsultacji: prowizja liczona od ceny i zaokrąglana do pełnego grosza.";
+        public const string Example2Caption = "Podział ceny konsultacji {0}", FindLink = "Zobacz programistów i ich ceny";
     }
 
     public static class Legal

@@ -4,36 +4,41 @@
 
 <PageMeta Title="@PlPages.How.MetaTitle" Description="@PlPages.How.MetaDescription" Path="/jak-to-dziala" />
 
-<div class="prose">
+<div class="prose how">
     <header class="page-header">
         <h1>@PlPages.How.Title</h1>
         <p class="lead">@PlPages.How.Intro</p>
     </header>
-    <section class="section" aria-labelledby="how-client">
+    <section class="section card" aria-labelledby="how-client">
         <h2 id="how-client">@PlPages.How.ClientTitle</h2>
-        <ol>
-            <li>@PlPages.How.C1</li>
-            <li>@PlPages.How.C2</li>
-            <li>@PlPages.How.C3</li>
-            <li>@PlPages.How.C4</li>
-            <li>@PlPages.How.C5</li>
+        <ol class="steps">
+            <li class="step">@PlPages.How.C1</li>
+            <li class="step">@PlPages.How.C2</li>
+            <li class="step">@PlPages.How.C3</li>
+            <li class="step">@PlPages.How.C4</li>
+            <li class="step">@PlPages.How.C5</li>
         </ol>
     </section>
-    <section class="section" aria-labelledby="how-pay">
+    <section class="section card" aria-labelledby="how-pay">
         <h2 id="how-pay">@PlPages.How.PaymentTitle</h2>
-        <ul>
+        <ul class="rules">
             <li>@PlPages.How.Pay1</li>
             <li>@PlPages.How.Pay2</li>
             <li>@PlPages.How.Pay3</li>
         </ul>
     </section>
-    <section class="section" aria-labelledby="how-practitioner">
+    <section class="section card" aria-labelledby="how-practitioner">
         <h2 id="how-practitioner">@PlPages.How.PractitionerTitle</h2>
-        <ol>
-            <li>@PlPages.How.P1</li>
-            <li>@PlPages.How.P2</li>
-            <li>@PlPages.How.P3</li>
+        <ol class="steps">
+            <li class="step">@PlPages.How.P1</li>
+            <li class="step">@PlPages.How.P2</li>
+            <li class="step">@PlPages.How.P3</li>
         </ol>
     </section>
-    <p>@PlPages.How.SeeAlso: <a href="/zasady-rankingu">@PlPages.HomeExtra.RulesLink</a> · <a href="/cennik">@PlPages.HomeExtra.PricingLink</a></p>
+    <section class="section how__cta" aria-labelledby="how-cta">
+        <h2 id="how-cta">@PlPages.How.CtaTitle</h2>
+        <p>@PlPages.How.CtaBody</p>
+        <p><a class="btn btn--primary" href="/programisci">@PlPages.How.Cta</a></p>
+    </section>
+    <p class="muted">@PlPages.How.SeeAlso: <a href="/zasady-rankingu">@PlPages.HomeExtra.RulesLink</a> · <a href="/cennik">@PlPages.HomeExtra.PricingLink</a></p>
 </div>

@@ -210,12 +210,14 @@ public class StaticPagesTests
         await using var web = PublicSupport.Host();
         var page = await web.NewBrowser().GetAsync("/cennik");
         Assert.Contains("Prowizja platformy to 15% ceny", page.Text);
-        var cells = page.All("tbody td").Select(c => c.TextContent.Replace(' ', ' '));
+        var cells = page.All("section[aria-labelledby=pricing-example] tbody td").Select(c => c.TextContent.Replace(' ', ' '));
+        Assert.Equal(["120,00 zł", "18,00 zł", "102,00 zł"], page.All("section[aria-labelledby=pricing-example-2] tbody td").Select(c => c.TextContent.Replace('\u00A0', ' ')));  // 15% of 12 000 gr = 1 800 gr
         Assert.Equal(["250,00 zł", "37,50 zł", "212,50 zł"], cells);
         await using var ten = PublicSupport.Host(); ten.With("Billing:FirstConsultationFeeBps", "1000");
         var other = await ten.NewBrowser().GetAsync("/cennik");
         Assert.Contains("Prowizja platformy to 10% ceny", other.Text);
-        Assert.Equal(["250,00 zł", "25,00 zł", "225,00 zł"], other.All("tbody td").Select(c => c.TextContent.Replace(' ', ' ')));
+        Assert.Equal(["250,00 zł", "25,00 zł", "225,00 zł"], other.All("section[aria-labelledby=pricing-example] tbody td").Select(c => c.TextContent.Replace(' ', ' ')));
+        Assert.Equal(["120,00 zł", "12,00 zł", "108,00 zł"], other.All("section[aria-labelledby=pricing-example-2] tbody td").Select(c => c.TextContent.Replace('\u00A0', ' ')));
     }
 
     [Fact]

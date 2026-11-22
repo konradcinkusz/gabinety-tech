@@ -102,6 +102,10 @@ public sealed record CreateReviewResponseDto(Guid ReviewId, string Status);
 
 public sealed record MeDto(string UserId, Guid? PractitionerId, string? PractitionerStatus, bool IsAdmin, bool IsModerator);
 
+/// <summary>One switch of <c>/api/v1/me/notification-preferences</c> (CONTRACTS 4.2): <c>Kind</c> is <c>Reminder24h</c>, <c>Reminder1h</c> or <c>ReviewRequest</c>. The transactional kinds are never listed.</summary>
+public sealed record NotificationPreferenceDto(string Kind, bool Enabled);
+public sealed record NotificationPreferencesDto(IReadOnlyList<NotificationPreferenceDto> Items);
+
 // ---- the practitioner's own area (CONTRACTS 3.3, 3.5, 4.2; docs/operations/PAYMENTS-GO-LIVE.md)
 
 /// <summary><c>GET /api/v1/me/practitioner</c>; <c>Status</c> is <c>Draft | Submitted | Approved | Rejected | Suspended</c>.</summary>

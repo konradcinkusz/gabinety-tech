@@ -210,4 +210,9 @@ public class ContractCopiesTests
     [Fact]
     public void Who_am_I() =>
         RoundTrip<W.MeDto>(new MeDto("user-1", Id, PractitionerStatus.Approved, false, true), Plain, c => Assert.Equal((Id, "Approved", true), (c.PractitionerId, c.PractitionerStatus, c.IsModerator)));
+
+    [Fact]
+    public void The_notification_preferences_are_the_three_switches_by_kind() =>
+        RoundTrip<W.NotificationPreferencesDto>(new NotificationPreferencesDto([new NotificationPreferenceDto("Reminder24h", false), new NotificationPreferenceDto("Reminder1h", true), new NotificationPreferenceDto("ReviewRequest", true)]), Plain,
+            c => Assert.Equal([("Reminder24h", false), ("Reminder1h", true), ("ReviewRequest", true)], c.Items.Select(i => (i.Kind, i.Enabled))));
 }

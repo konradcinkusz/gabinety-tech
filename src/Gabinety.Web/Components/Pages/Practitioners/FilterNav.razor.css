@@ -21,8 +21,16 @@
 .filters__group .link-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
 .filters__group .link-list .chip { min-height: var(--tap); padding-inline: var(--space-2); }
 
+/* The folded panel must look like a control on the phone: a marker that turns when it is open. */
+.filters > summary::after { content: "\25be"; margin-left: var(--space-2); transition: transform 120ms ease; }
+.filters[open] > summary::after { transform: rotate(180deg); }
+
 @media (min-width: 52rem) {
   .filters > summary { pointer-events: none; }
+  .filters > summary::after { content: none; }
+  /* In a 16 rem sidebar four price columns are about 40 px each and the labels wrap: from here a joined row is a stack of full-width options, like the problem list. */
+  .filters__group .segmented { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .filters__group .segmented .chip { border-left-width: 1px; border-radius: var(--radius-md); justify-content: flex-start; }
   .filters:not([open]) > :not(summary) { display: block; } /* block, not grid: a grid made the nav as wide as its widest chip (368 px in a 256 px column) and the panel slid under the results */
   .filters__group .link-list { flex-direction: column; flex-wrap: nowrap; gap: var(--space-1); }
   .filters__group .link-list .chip { width: 100%; justify-content: flex-start; border-radius: var(--radius-md); }

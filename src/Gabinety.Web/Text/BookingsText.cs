@@ -20,6 +20,19 @@ public static class BookingsText
         public const string CompletedLine = "Konsultacja się odbyła.", RefundLine = "Zwrot za tę rezerwację: {0}.", NoRefundLine = "Rezerwacja anulowana mniej niż 24 godziny przed terminem: bez zwrotu.", Rebook = "Zarezerwuj ponownie";
     }
 
+    public static class Reschedule
+    {
+        public const string MetaTitle = "Zmiana terminu | Gabinety Tech", Title = "Zmień termin", Action = "Zmień termin", Back = "Wróć do rezerwacji";
+        public const string Current = "Obecny termin", Pick = "Wybierz nowy termin", Invalid = "Wybierz termin z listy.";
+        /// <summary>The rule of CONTRACTS 4.2 and 9.2 as the page states it: the money is not part of a move.</summary>
+        public const string Policy = "Zmianę terminu możesz zrobić raz, najpóźniej 24 godziny przed rozpoczęciem konsultacji. Zmiana nie zmienia płatności ani zasad zwrotu.";
+        public const string Refused = "Tej rezerwacji nie można już przełożyć: zmiana terminu jest możliwa tylko raz i najpóźniej 24 godziny przed rozpoczęciem konsultacji.";
+        public const string SlotTaken = "Ten termin został właśnie zajęty. Wybierz inny.", SlotUnavailable = "Tego terminu nie ma już w ofercie. Wybierz inny.";
+        public const string NoOffering = "Nie udało się ustalić oferty tej konsultacji. Spróbuj ponownie za chwilę.";
+        public const string NoSlotsFree = "Brak wolnych terminów w wybranym okresie.";
+        public const string Done = "Termin został zmieniony.";
+    }
+
     public static class Payment
     {
         public const string Created = "Płatność rozpoczęta", Succeeded = "Opłacona", Failed = "Płatność nieudana", Refunded = "Zwrócona w całości", PartiallyRefunded = "Zwrócona częściowo", Unknown = "Stan płatności nieznany";

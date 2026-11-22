@@ -1,10 +1,11 @@
 @* The slot picker of one offer (P-PROF-1, pattern 5.4): a strip of the days that have free times, then the times of ONE day; every control is a link, so it works without JavaScript and a
-   slot leads to /rezerwacja/{offer}?start=...&gabinet=... exactly as the Next.js page does. *@
+   slot leads to /rezerwacja/{offer}?start=...&gabinet=... exactly as the Next.js page does.
+   With RescheduleBookingId (the reschedule page) the times are submit buttons named Model.StartUtc, for the form the page wraps the picker in; the days and "more" stay links, to the reschedule page. *@
 <div class="slot-picker" aria-live="polite">
     @if (!Slots.Available)
     {
         <Alert Variant="AlertVariant.Warning" TestId="slots-unavailable">@PlPages.Slots.Unavailable</Alert>
-        <a class="btn" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, SelectedDay)">@PlPages.Slots.Retry</a>
+        <a class="btn" href="@PickerLink(Windows, SelectedDay)">@PlPages.Slots.Retry</a>
     }
     else if (_selected is null)
     {
@@ -22,11 +23,11 @@
             <div class="slot-weeks">
                 @if (_prevDay is { } pd)
                 {
-                    <a class="btn btn--ghost" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, pd)">@PlPages.Slots.PrevWeek</a>
+                    <a class="btn btn--ghost" href="@PickerLink(Windows, pd)">@PlPages.Slots.PrevWeek</a>
                 }
                 @if (_nextDay is { } nd)
                 {
-                    <a class="btn btn--ghost slot-weeks__next" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, nd)">@PlPages.Slots.NextWeek</a>
+                    <a class="btn btn--ghost slot-weeks__next" href="@PickerLink(Windows, nd)">@PlPages.Slots.NextWeek</a>
                 }
             </div>
         }
@@ -34,7 +35,7 @@
             <ul class="slot-days" aria-label="@PlPages.Slots.PickDay">
                 @foreach (var d in _page)
                 {
-                    <li><a class="chip slot-day" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, d.Date)" aria-label="@PlFormat.DayHeading(d.Date)" aria-current="@(d.Date == _selected.Date ? "true" : null)"><span class="slot-day__week" aria-hidden="true">@SlotDayFormat.ShortWeekday(d.Date)</span><span class="slot-day__date" aria-hidden="true">@SlotDayFormat.ShortDate(d.Date)</span></a></li>
+                    <li><a class="chip slot-day" href="@PickerLink(Windows, d.Date)" aria-label="@PlFormat.DayHeading(d.Date)" aria-current="@(d.Date == _selected.Date ? "true" : null)"><span class="slot-day__week" aria-hidden="true">@SlotDayFormat.ShortWeekday(d.Date)</span><span class="slot-day__date" aria-hidden="true">@SlotDayFormat.ShortDate(d.Date)</span></a></li>
                 }
             </ul>
         </div>
@@ -46,7 +47,14 @@
                     <ul class="slot-times">
                         @foreach (var s in slots)
                         {
-                            <li><a class="chip slot" href="@SlotPickerModel.BookingHref(Offering.Id, s.StartUtc, Slug)" data-utc="@s.StartUtc.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture)">@PlFormat.Time(s.StartUtc)</a></li>
+                            @if (RescheduleBookingId is null)
+                            {
+                                <li><a class="chip slot" href="@SlotPickerModel.BookingHref(Offering.Id, s.StartUtc, Slug)" data-utc="@SlotPickerModel.UtcText(s.StartUtc)">@PlFormat.Time(s.StartUtc)</a></li>
+                            }
+                            else
+                            {
+                                <li><button type="submit" class="chip slot" name="Model.StartUtc" value="@SlotPickerModel.UtcText(s.StartUtc)" data-utc="@SlotPickerModel.UtcText(s.StartUtc)">@PlFormat.Time(s.StartUtc)</button></li>
+                            }
                         }
                     </ul>
                 </div>
@@ -67,6 +75,8 @@
     [Parameter] public int Windows { get; set; } = 1;
     [Parameter] public DateOnly? SelectedDay { get; set; }
     [Parameter] public DateOnly Today { get; set; }
+    /// <summary>Set by the reschedule page: each time is a submit button of the page's form (the new start) instead of a link to the booking flow.</summary>
+    [Parameter] public Guid? RescheduleBookingId { get; set; }
 
     DayGroup? _selected;
     IReadOnlyList<DayGroup> _page = [];
@@ -90,8 +100,13 @@
         _ => PlPages.Slots.Evening,
     };
 
+    /// <summary>The picker's own links: the profile's offer anchor, or the reschedule page in its mode.</summary>
+    string PickerLink(int windows, DateOnly? day) => RescheduleBookingId is { } id
+        ? SlotPickerModel.ReschedulePickerHref(id, windows, day)
+        : SlotPickerModel.PickerHref(Slug, windows, Offering.Id, day);
+
     RenderFragment MoreLink => @<text>@if (Windows < SlotPickerModel.MaxWindows && SlotPickerModel.Window(Today, Windows) is not null)
     {
-        <a class="btn btn--ghost" href="@SlotPickerModel.PickerHref(Slug, Windows + 1, Offering.Id, _selected?.Date)">@PlPages.Slots.More</a>
+        <a class="btn btn--ghost" href="@PickerLink(Windows + 1, _selected?.Date)">@PlPages.Slots.More</a>
     }</text>;
 }

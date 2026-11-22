@@ -135,6 +135,7 @@ else if (_booking is { } b)
             <div class="form-actions">
                 @if (b.CanReview && b.Status != "Completed") {<a class="btn btn--primary" href="@($"/moje/opinie/{b.Id}")">@BookingsText.Review</a>}
                 @if (_role == BookingClient.ClientRole && BookingFormat.RebookHref(b.Status, b.Practitioner.Slug) is { } rebook) {<a class="btn btn--secondary" href="@rebook">@BookingsText.Detail.Rebook</a>}
+                @if (b.CanReschedule) {<a class="btn btn--ghost" href="@($"/moje/rezerwacje/{b.Id}/zmien-termin")">@BookingsText.Reschedule.Action</a>}
                 @if (b.CanCancel || b.CanDispute || b.CanReportNoShow)
                 {
                     @* a GET form: the buttons open the action without a script and without a state change (a link would not be a button) *@
@@ -186,6 +187,7 @@ else if (_booking is { } b)
         "cancelled" => BookingsText.Cancel.Done,
         "disputed" => BookingsText.Dispute.Done,
         "noshow" => BookingsText.NoShow.Done,
+        "rescheduled" => BookingsText.Reschedule.Done,
         _ => null,
     };
 

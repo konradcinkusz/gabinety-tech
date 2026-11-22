@@ -27,7 +27,7 @@ public sealed class CancelFeature : IServiceFeature
         endpoints.MapPost("/api/v1/bookings/{id:guid}/cancel", CancelAsync).RequireAuthorization("Authenticated");
 
     static async Task<IResult> CancelAsync(Guid id, CancelRequest? body, ClaimsPrincipal user, BookingDbContext db, BookingTransitions transitions,
-        RefundCoordinator refunds, TimeProvider time, CancellationToken ct)
+        RefundCoordinator refunds, PartyNamesLookup names, TimeProvider time, CancellationToken ct)
     {
         var sub = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (sub is null) return Results.Unauthorized();
@@ -43,12 +43,11 @@ public sealed class CancelFeature : IServiceFeature
         if (string.IsNullOrEmpty(reason)) reason = null;
 
         var byClient = booking.ClientUserId == sub;
-        var trigger = byClient ? BookingTrigger.ClientCancels : BookingTrigger.PractitionerCancels;
+        var trigger = CancelPlanner.TriggerFor(byClient);
         var now = time.GetUtcNow();
-        // The practitioner may cancel any time before the end; the state table cannot see that (BookingStateMachine).
-        Func<BookingEntity, bool> precondition = b => byClient || now < b.EndUtc;
+        Func<BookingEntity, bool> precondition = b => CancelPlanner.TimeRuleAllows(b, byClient, now);
 
-        var plan = Plan(booking, trigger, now, precondition);
+        var plan = CancelPlanner.Plan(booking, byClient, now); // the same call that builds `cancelOutcome` in the booking view
         if (plan is null) return PaymentWebhookFeature.Problem(ErrorCodes.InvalidTransition, "Invalid transition", 409);
 
         RefundTicket? ticket = null;
@@ -73,17 +72,7 @@ public sealed class CancelFeature : IServiceFeature
                 if (ticket is not null) RefundCoordinator.Record(c, ticket);
             },
         }, ct);
-        return result.ToErrorResult() ?? Results.Ok(BookingViewFeature.ToView(result.Booking!, result.Payment, sub, admin: false));
-    }
-
-    /// <summary>What the cancel will do, from the unlocked read: null when the state table or the time rule refuses it, else the refund (grosz, 0 for none) and its reason.</summary>
-    static (long Refund, RefundReason Reason)? Plan(BookingEntity b, BookingTrigger trigger, DateTimeOffset now, Func<BookingEntity, bool> precondition)
-    {
-        if (!BookingStateMachine.Next(b.Status, trigger, b.StartUtc, now).Allowed || !precondition(b)) return null;
-        var money = trigger == BookingTrigger.PractitionerCancels ? MoneyEvent.PractitionerCancelled : RefundPolicy.ForClientCancellation(b.StartUtc, now);
-        if (money == MoneyEvent.ClientCancelledLate) return (0, RefundReason.ClientCancelledEarly);
-        var refund = RefundPolicy.Settle(money, Money.Pln(b.PriceMinor), rateBps: 0, pairAlreadyCharged: true).Refund.Minor;
-        return (refund, money == MoneyEvent.PractitionerCancelled ? RefundReason.PractitionerCancelled : RefundReason.ClientCancelledEarly);
+        return result.ToErrorResult() ?? Results.Ok(BookingViewFeature.ToView(result.Booking!, result.Payment, sub, admin: false, names: (await names.ForAsync([result.Booking!], ct))[result.Booking!.Id]));
     }
 
     static IResult Unavailable() =>

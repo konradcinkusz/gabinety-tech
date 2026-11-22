@@ -14,8 +14,9 @@ export type BookingDetailView = {
   durationMinutes: number;
   offeringTitle: string;
   price: Money;
-  /** `displayName` and `slug` come empty until a lookup exists. */
+  /** Directory's display name and slug; "Programista" with an empty slug when Directory did not answer, "Usunięty użytkownik" once erased (ADR-0012 section 6). */
   practitioner: { id: string; displayName?: string | null; slug?: string | null };
+  /** For the practitioner, once the booking was confirmed: "Klient" and an initial ("Klient D."), or "Usunięty użytkownik". Never an e-mail. */
   client?: { displayName?: string | null } | null;
   brief?: { text: string; problemSlug?: string | null; aiAssisted: boolean } | null;
   meetingUrl?: string | null;
@@ -27,7 +28,10 @@ export type BookingDetailView = {
   canDispute: boolean;
   canReportNoShow: boolean;
   canReview: boolean;
+  /** What cancelling does for the viewer right now; present only when `canCancel` (same code as the cancel itself). `refund` is grosz returned to the client. */
+  cancelOutcome?: CancelOutcome | null;
 };
+export type CancelOutcome = { outcome: "full_refund" | "partial" | "no_refund"; refund: Money };
 export type BookingPage = { items: BookingDetailView[]; nextCursor?: string | null };
 export type DisputeKind = "not_as_described" | "practitioner_no_show" | "other";
 

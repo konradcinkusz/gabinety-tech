@@ -243,14 +243,14 @@ public class MyBookingsApiTests
     }
 
     [Fact]
-    public async Task Party_names_stay_empty_and_null_until_Directory_can_answer()
+    public async Task Directorys_name_and_slug_are_shown_and_a_row_without_a_snapshot_reads_Klient()
     {
         await using var h = Host();
         var w = Who.New();
         var id = await Seed(h, w, TimeSpan.FromDays(1));
         var v = await (await h.ClientFor(w.Practitioner).GetAsync($"/api/v1/bookings/{id}")).Body();
-        Assert.Equal("", v.GetProperty("practitioner").GetProperty("displayName").GetString());
-        Assert.Equal("", v.GetProperty("practitioner").GetProperty("slug").GetString());
-        Assert.False(v.TryGetProperty("client", out var c) && c.ValueKind == JsonValueKind.Object);
+        Assert.Equal("Demo Practitioner", v.GetProperty("practitioner").GetProperty("displayName").GetString());
+        Assert.Equal("demo-practitioner", v.GetProperty("practitioner").GetProperty("slug").GetString());
+        Assert.Equal("Klient", v.GetProperty("client").GetProperty("displayName").GetString()); // no snapshot on the seeded row
     }
 }

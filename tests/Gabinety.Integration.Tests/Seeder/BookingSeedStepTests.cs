@@ -104,6 +104,16 @@ public class BookingSeedStepTests(BookingSeedFixture fx) : IClassFixture<Booking
     }
 
     [Fact]
+    public async Task Demo_client_has_a_Completed_booking_inside_its_dispute_window_and_the_API_says_so()
+    {
+        var mine = await _w.AllClientBookings();   // demo-client is the first client
+        var disputable = mine.Where(b => b.GetProperty("status").GetString() == "Completed" && b.GetProperty("canDispute").GetBoolean()).ToList();
+        Assert.NotEmpty(disputable);
+        foreach (var b in disputable) // "inside the window" is measured against the service clock, not this machine's
+            Assert.True(_w.Booking.Now < b.GetProperty("startUtc").GetDateTimeOffset() + TimeSpan.FromHours(72));
+    }
+
+    [Fact]
     public void The_clock_is_back_at_its_baseline()
     {
         Assert.Equal(0, _w.Booking.ClockOffsetMinutes);

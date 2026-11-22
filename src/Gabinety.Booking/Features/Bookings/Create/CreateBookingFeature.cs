@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Gabinety.Billing;
 using Gabinety.Booking.Clients;
+using Gabinety.Booking.Features.Payments;
 using Gabinety.Booking.Features.Slots;
 using Gabinety.Booking.Notifications;
 using Gabinety.Booking.Payments.Abstractions;
@@ -43,6 +44,7 @@ public sealed class CreateBookingFeature : IServiceFeature
     {
         var sub = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (sub is null) return Results.Unauthorized();
+        var clientName = PartyNamesLookup.ClientSnapshot(user.FindFirst(ClaimTypes.Name)?.Value ?? user.FindFirst("name")?.Value);
 
         // 1. header and body
         if (!Guid.TryParse(http.Request.Headers[IdempotencyHeader].ToString(), out var key))
@@ -109,7 +111,8 @@ public sealed class CreateBookingFeature : IServiceFeature
                 var body = JsonSerializer.Serialize(response, Json);
                 db.Bookings.Add(new BookingEntity
                 {
-                    Id = bookingId, ClientUserId = sub, ClientEmail = UserEmail.From(user), PractitionerId = offering.PractitionerId, PractitionerUserId = offering.PractitionerUserId,
+                    Id = bookingId, ClientUserId = sub, ClientEmail = UserEmail.From(user), ClientDisplayName = clientName,
+                    PractitionerId = offering.PractitionerId, PractitionerUserId = offering.PractitionerUserId,
                     OfferingId = offering.OfferingId, OfferingTitle = offering.Title, DurationMinutes = (short)offering.DurationMinutes,
                     PriceMinor = offering.Price.AmountMinor, StartUtc = startUtc, EndUtc = startUtc + duration, Status = BookingStateMachine.Create(),
                     BriefText = text, BriefProblemSlug = req.Brief.ProblemSlug, BriefAiAssisted = req.Brief.AiAssisted,

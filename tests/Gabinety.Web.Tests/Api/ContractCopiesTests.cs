@@ -113,7 +113,7 @@ public class ContractCopiesTests
     {
         var real = new BookingView(Id, BookingStatus.Confirmed, "powód", At, At.AddHours(1), 60, "Audyt", new MoneyDto(25000), new PractitionerRef(Id, "Anna", "demo-anna"), new ClientRef("demo-client"),
             new BriefDto("Opis problemu demo, syntetyczny.", "audyt-kodu", true), "https://meet.example/x", At.AddMinutes(10), new PaymentView(PaymentStatus.PartiallyRefunded, new MoneyDto(9000)), new MoneyDto(3750), new MoneyDto(21250),
-            true, false, true, false);
+            true, false, true, false, new CancelOutcomeDto(CancelOutcomeKind.Partial, new MoneyDto(9000)));
         RoundTrip<W.BookingDetailDto>(real, Plain, c =>
         {
             Assert.Equal(("Confirmed", "PartiallyRefunded", 9000L), (c.Status, c.Payment.Status, c.Payment.Refunded.AmountMinor));
@@ -121,21 +121,16 @@ public class ContractCopiesTests
             Assert.Equal(("audyt-kodu", true, "https://meet.example/x"), (c.Brief!.ProblemSlug, c.Brief.AiAssisted, c.MeetingUrl));
             Assert.Equal((3750L, 21250L, At.AddMinutes(10)), (c.Fee!.AmountMinor, c.Payout!.AmountMinor, c.HoldExpiresAt));
             Assert.Equal(("Anna", "demo-anna", "demo-client"), (c.Practitioner.DisplayName, c.Practitioner.Slug, c.Client!.DisplayName));
-            Assert.Null(c.CancelOutcome); // not in the contract yet: absent reads as null (F-11)
-        }, notYetInContract: "cancelOutcome");
+            Assert.Equal(("partial", 9000L), (c.CancelOutcome!.Outcome, c.CancelOutcome.Refund.AmountMinor)); // F-11: the wire name is snake_case
+        });
     }
 
     [Fact]
-    public void The_booking_detail_without_the_optional_parts_and_with_a_cancel_outcome_the_service_may_add()
+    public void The_booking_detail_without_the_optional_parts_has_no_cancel_outcome()
     {
         var real = new BookingView(Id, BookingStatus.PendingPayment, null, At, At.AddHours(1), 30, "Audyt", new MoneyDto(25000), new PractitionerRef(Id, "Anna", "demo-anna"), null, null, null, null,
             new PaymentView(PaymentStatus.Created, new MoneyDto(0)), null, null, false, false, false, false);
-        RoundTrip<W.BookingDetailDto>(real, Plain, c => { Assert.Null(c.Client); Assert.Null(c.Brief); Assert.Null(c.MeetingUrl); Assert.Null(c.Fee); }, notYetInContract: "cancelOutcome");
-
-        // the field the Booking service will add, whatever its final shape: the copy keeps the JSON and the page reads it (CancelOutcome tests)
-        var json = JsonSerializer.Serialize(real, Plain).TrimEnd('}') + ",\"cancelOutcome\":{\"refundMinor\":25000,\"hoursBeforeStart\":30}}";
-        var copy = JsonSerializer.Deserialize<W.BookingDetailDto>(json, W.ApiClient.Json)!;
-        Assert.Equal(25000, copy.CancelOutcome!.Value.GetProperty("refundMinor").GetInt64());
+        RoundTrip<W.BookingDetailDto>(real, Plain, c => { Assert.Null(c.Client); Assert.Null(c.Brief); Assert.Null(c.MeetingUrl); Assert.Null(c.Fee); Assert.Null(c.CancelOutcome); });
     }
 
     [Fact]

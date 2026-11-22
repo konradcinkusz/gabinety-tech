@@ -158,8 +158,8 @@ public class BookingFlowModelTests
 
     // ---- what cancelling means (F-11)
 
-    static JsonElement? Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
     static readonly MoneyDto Price = new(18000, "PLN");
+    static CancelOutcomeDto Outcome(string kind, long refund) => new(kind, new MoneyDto(refund, "PLN"));
 
     [Fact]
     public void Without_a_cancel_outcome_the_dialog_says_the_general_rule_and_computes_nothing()
@@ -170,11 +170,10 @@ public class BookingFlowModelTests
     }
 
     [Theory]
-    [InlineData("""{"refundMinor":18000}""", 18000)] [InlineData("""{"refund":{"amountMinor":18000,"currency":"PLN"}}""", 18000)] [InlineData("""{"refundAmount":{"amountMinor":0}}""", 0)]
-    [InlineData("""{"refundMinor":9000,"hoursBeforeStart":30}""", 9000)] [InlineData("\"FullRefund\"", 18000)] [InlineData("\"NoRefund\"", 0)]
-    public void With_a_cancel_outcome_the_dialog_switches_to_it_whatever_the_shape_of_the_field(string json, long refund)
+    [InlineData("full_refund", 18000)] [InlineData("partial", 9000)] [InlineData("no_refund", 0)]
+    public void With_a_cancel_outcome_the_dialog_says_the_amount_the_service_computed(string kind, long refund)
     {
-        var o = CancelOutcome.From(Json(json), Price)!;
+        var o = CancelOutcome.From(Outcome(kind, refund), Price)!;
         Assert.Equal(refund, o.RefundMinor);
         var sentence = CancelOutcome.Sentence(o, "client");
         Assert.NotEqual(BookingsText.Cancel.ClientRule, sentence);
@@ -184,13 +183,13 @@ public class BookingFlowModelTests
     }
 
     [Theory]
-    [InlineData("""{"refundMinor":-1}""")] [InlineData("""{"refundMinor":18001}""")] [InlineData("""{"refundMinor":"x"}""")] [InlineData("\"Maybe\"")] [InlineData("12")] [InlineData("null")] [InlineData("{}")]
-    public void A_cancel_outcome_that_makes_no_sense_is_ignored_and_the_general_rule_stays(string json) => Assert.Null(CancelOutcome.From(Json(json), Price));
+    [InlineData(-1)] [InlineData(18001)]
+    public void A_refund_outside_zero_to_the_price_is_not_believed_and_the_general_rule_stays(long refund) => Assert.Null(CancelOutcome.From(Outcome("partial", refund), Price));
 
     [Fact]
-    public void A_practitioner_is_told_the_client_is_refunded_in_full_and_that_they_are_not_paid()
+    public void A_practitioner_is_told_the_client_is_refunded_and_that_they_are_not_paid()
     {
-        var o = CancelOutcome.From(Json("""{"refundMinor":18000}"""), Price);
+        var o = CancelOutcome.From(Outcome("full_refund", 18000), Price);
         Assert.Equal("Klient dostanie zwrot 180,00\u00a0zł, a Ty nie otrzymasz wypłaty za tę konsultację.", CancelOutcome.Sentence(o, "practitioner"));
     }
 

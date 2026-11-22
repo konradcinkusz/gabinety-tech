@@ -67,6 +67,27 @@ public class InternalLookupTests(InternalFactory f) : IClassFixture<InternalFact
     public async Task By_user_of_a_non_practitioner_is_404() =>
         Assert.Equal(HttpStatusCode.NotFound, (await f.Internal().GetAsync($"/internal/v1/practitioners/by-user/demo-{Guid.NewGuid():n}")).StatusCode);
 
+    [Fact]
+    public async Task Names_returns_id_display_name_and_slug_and_nothing_else()
+    {
+        var p = await f.Seed(PractitionerStatus.Approved);
+        var r = await f.Internal().GetAsync($"/internal/v1/practitioners/{p.Id}");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var body = System.Text.Json.JsonDocument.Parse(await r.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(["displayName", "practitionerId", "slug"], body.EnumerateObject().Select(x => x.Name).Order().ToArray());
+        Assert.Equal(p.Id, body.GetProperty("practitionerId").GetGuid());
+        Assert.Equal(p.DisplayName, body.GetProperty("displayName").GetString());
+        Assert.Equal(p.Slug, body.GetProperty("slug").GetString());
+    }
+
+    [Fact]
+    public async Task Names_of_an_unknown_practitioner_is_404() =>
+        Assert.Equal(HttpStatusCode.NotFound, (await f.Internal().GetAsync($"/internal/v1/practitioners/{Guid.NewGuid()}")).StatusCode);
+
+    [Fact]
+    public async Task Names_without_the_internal_key_is_401() =>
+        Assert.Equal(HttpStatusCode.Unauthorized, (await f.CreateClient().GetAsync($"/internal/v1/practitioners/{Guid.NewGuid()}")).StatusCode);
+
     // The shapes Booking's DirectoryClient reads (src/Gabinety.Booking/Clients/DirectoryClient.cs).
     sealed record OfferingLookup(Guid OfferingId, Guid PractitionerId, string PractitionerUserId, PractitionerStatus PractitionerStatus,
         string Title, int DurationMinutes, MoneyDto Price, string? MeetingUrl, bool IsActive);

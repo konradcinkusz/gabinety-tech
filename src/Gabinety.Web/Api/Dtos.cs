@@ -78,13 +78,14 @@ public sealed record CreateBookingResponseDto(Guid BookingId, string Status, Dat
 public sealed record PaymentViewDto(string Status, MoneyDto Refunded);
 
 /// <summary>
-/// <c>BookingView</c> (CONTRACTS 4.4) as the detail, the checkout and the confirmation read it. <c>CancelOutcome</c> is the outcome the cancellation of THIS booking would have (F-11); the
-/// Booking service adds it to the detail read, until then it is absent and the page says the general rule. It is kept as the raw JSON so a shape this copy does not know yet does not fail the page:
-/// <see cref="Gabinety.Web.Components.Pages.Bookings.CancelOutcome"/> reads it.
+/// <c>BookingView</c> (CONTRACTS 4.4) as the detail, the checkout and the confirmation read it.
 /// </summary>
 public sealed record BookingDetailDto(Guid Id, string Status, string? StatusReason, DateTimeOffset StartUtc, DateTimeOffset EndUtc, int DurationMinutes, string OfferingTitle, MoneyDto Price,
     PractitionerRefDto Practitioner, ClientRefDto? Client, BriefDto? Brief, string? MeetingUrl, DateTimeOffset? HoldExpiresAt, PaymentViewDto Payment, MoneyDto? Fee, MoneyDto? Payout,
-    bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview, System.Text.Json.JsonElement? CancelOutcome = null);
+    bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview, CancelOutcomeDto? CancelOutcome = null);
+
+/// <summary><c>cancelOutcome</c> (CONTRACTS 4.4, 9.2): what cancelling would do for the viewer right now, computed by the service on its clock. Present only when <c>canCancel</c>. <c>Outcome</c> is <c>full_refund</c>, <c>partial</c> or <c>no_refund</c>; <c>Refund</c> is what the client gets back.</summary>
+public sealed record CancelOutcomeDto(string Outcome, MoneyDto Refund);
 
 /// <summary><c>POST /api/v1/assistant/brief</c> (CONTRACTS 6). Only a suggestion: it is shown, never applied by itself.</summary>
 public sealed record BriefSuggestionDto(string ProblemSlug, IReadOnlyList<string> TechSlugs, string Summary, IReadOnlyList<string> ClarifyingQuestions, int SuggestedDurationMinutes, string Confidence);

@@ -39,6 +39,13 @@ public sealed record DisputeRequest(DisputeKind Kind, [property: Required, Strin
 public sealed record ResolveRequest(Resolution Resolution, long? RefundMinor, [property: Required, StringLength(500, MinimumLength = 10)] string Note);
 public sealed record SimulatePaymentRequest(Guid BookingId, string Outcome);
 
+/// <summary>What cancelling would do for the viewer right now (CONTRACTS 4.4, 9.2). <c>partial</c> is part of the vocabulary; today's rules give only the other two.</summary>
+[JsonConverter(typeof(Gabinety.Contracts.Common.SnakeCaseLowerEnumConverter))]
+public enum CancelOutcomeKind { FullRefund, Partial, NoRefund }
+
+/// <summary><c>cancelOutcome</c> of a <see cref="BookingView"/>: present only when <c>canCancel</c> is true; <c>refund</c> is the amount returned to the client, in grosz.</summary>
+public sealed record CancelOutcomeDto(CancelOutcomeKind Outcome, MoneyDto Refund);
+
 public sealed record PractitionerRef(Guid Id, string DisplayName, string Slug);
 public sealed record ClientRef(string DisplayName);
 public sealed record PaymentView(PaymentStatus Status, MoneyDto Refunded);
@@ -46,7 +53,7 @@ public sealed record PaymentView(PaymentStatus Status, MoneyDto Refunded);
 public sealed record BookingView(Guid Id, BookingStatus Status, string? StatusReason, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantConverter))] DateTimeOffset StartUtc, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantConverter))] DateTimeOffset EndUtc,
     int DurationMinutes, string OfferingTitle, MoneyDto Price, PractitionerRef Practitioner, ClientRef? Client, BriefDto? Brief,
     string? MeetingUrl, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantNullableConverter))] DateTimeOffset? HoldExpiresAt, PaymentView Payment, MoneyDto? Fee, MoneyDto? Payout,
-    bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview);
+    bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview, CancelOutcomeDto? CancelOutcome = null);
 
 public sealed record ReviewabilityDto(bool Reviewable, string ClientUserId, Guid PractitionerId, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantNullableConverter))] DateTimeOffset? CompletedAt);
 

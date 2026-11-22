@@ -209,21 +209,21 @@ public class BookingDetailTests
     [Fact]
     public async Task When_the_service_sends_the_outcome_of_this_booking_the_dialog_says_it_and_keeps_the_rule_F11()
     {
-        await using var full = await Open(Detail(cancel: true, outcome: Json("""{"refundMinor":25000}""")));
+        await using var full = await Open(Detail(cancel: true, outcome: new CancelOutcomeDto("full_refund", new MoneyDto(25000, "PLN"))));
         var dialog = (await full.Browser.GetAsync(Client + "&action=cancel")).One("dialog")!;
         Assert.Contains("Otrzymasz zwrot 250,00 zł.", dialog.TextContent);
         Assert.Contains("co najmniej 24 godziny, zwrot wynosi 100% ceny", dialog.TextContent); // J5 reads this too: both worlds pass
 
-        await using var none = await Open(Detail(cancel: true, outcome: Json("""{"refundMinor":0}""")));
+        await using var none = await Open(Detail(cancel: true, outcome: new CancelOutcomeDto("no_refund", new MoneyDto(0, "PLN"))));
         var late = (await none.Browser.GetAsync(Client + "&action=cancel")).One("dialog")!;
         Assert.Contains("nie otrzymasz zwrotu", late.TextContent);
         Assert.DoesNotContain("Otrzymasz zwrot 250", late.TextContent);
     }
 
     [Fact]
-    public async Task A_cancel_outcome_of_a_shape_the_page_does_not_know_falls_back_to_the_general_rule()
+    public async Task Without_the_field_the_dialog_says_only_the_general_rule()
     {
-        await using var f = await Open(Detail(cancel: true, outcome: Json("""{"something":"else"}""")));
+        await using var f = await Open(Detail(cancel: true, outcome: null));
         var dialog = (await f.Browser.GetAsync(Client + "&action=cancel")).One("dialog")!;
         Assert.Contains("Zwrot zależy od terminu", dialog.TextContent);
         Assert.DoesNotContain(dialog.QuerySelectorAll("strong"), s => s.TextContent.StartsWith("Otrzymasz"));

@@ -26,6 +26,39 @@ public class ProfileHostTests
     }
 
     [Fact]
+    public async Task The_nip_field_takes_digits_and_exactly_one_label_on_the_page_contains_opis()
+    {
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => w.HaveProfile());
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty/profil");
+        var nip = page.One("#nip")!;
+        Assert.Equal(("numeric", "10", "off"), (nip.GetAttribute("inputmode"), nip.GetAttribute("maxlength"), nip.GetAttribute("autocomplete")));
+        // J2 / contract 9.5: getByLabel("Opis") is a substring match over every label on the page, not only the form's
+        Assert.Equal(["Opis (o mnie)"], page.All("label").Select(l => l.TextContent.Trim()).Where(t => t.Contains("opis", StringComparison.OrdinalIgnoreCase)).ToList());
+    }
+
+    [Fact]
+    public async Task The_preview_beside_the_form_shows_the_saved_name_headline_and_first_lines_of_the_bio()
+    {
+        var (web, browser, world) = await PractitionerBrowsers.SignedIn(w =>
+        {
+            w.HaveProfile();
+            w.Profile = w.Profile! with { Headline = "Zapisany nagłówek", Bio = "Pierwsza linia.\nDruga linia.\nTrzecia linia.\nCzwarta linia." };
+        });
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty/profil");
+        var preview = page.One(".profile-preview")!;
+        Assert.Equal("Podgląd profilu", preview.QuerySelector("#profile-preview-title")!.TextContent);
+        Assert.Equal("Demo Programista", preview.QuerySelector(".profile-preview__name")!.TextContent);
+        Assert.Equal("Zapisany nagłówek", preview.QuerySelector(".profile-preview__headline")!.TextContent);
+        Assert.Contains("Trzecia linia.", preview.QuerySelector(".profile-preview__bio")!.TextContent);
+        Assert.Empty(preview.QuerySelectorAll("h1, h2, h3")); // paragraphs, not headings: the page keeps one h1 and its heading order
+        Assert.Null(page.One("form .profile-preview")); // beside the form, not inside it
+        Assert.Equal("grid-2", page.One("form")!.ParentElement!.ClassName);
+        Assert.NotNull(world.Profile);
+    }
+
+    [Fact]
     public async Task Saving_sends_the_trimmed_fields_omits_empty_optional_ones_and_redirects_with_the_flash()
     {
         var (web, browser, world) = await PractitionerBrowsers.SignedIn(w => w.HaveProfile());

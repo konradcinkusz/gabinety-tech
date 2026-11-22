@@ -173,7 +173,7 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/rezerwacja/potwierdzenie/{BookingId}` | Authenticated | all | confirmation |
 | Web | PAGE | `/checkout/mock/{BookingId}` | Authenticated | all | mock checkout: answers 404 unless the fake profile runs the mock provider (`WebOptions.MockPayments`); the clock alone is interactive |
 | Web | PAGE | `/bookings/{BookingId}` | Authenticated | all | where the payment provider returns the browser (Stripe Checkout success URL): redirects to the confirmation |
-| Web | PAGE | `/konto` | Authenticated | all | account: e-mail, consents, data export link, account deletion (static rendering, forms with antiforgery) |
+| Web | PAGE | `/konto` | Authenticated | all | account: e-mail, consents, data export link, password change (T-11.08: a form of this page, the session is reissued in the same response; no section for an account without a password), account deletion (static rendering, forms with antiforgery) |
 | Web | GET | `/konto/export` | Authenticated | all | the user's data as a no-store JSON attachment (the identity service's export, passed through) |
 | Web | PAGE | `/gabinet-programisty` | Authenticated | all | practitioner dashboard and onboarding, static server rendering; any signed-in account may become a practitioner (ADR-0012, "Practitioner area") |
 | Web | PAGE | `/gabinet-programisty/profil` | Authenticated | all | practitioner profile form |

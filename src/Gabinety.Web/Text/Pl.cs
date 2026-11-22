@@ -257,5 +257,9 @@ public static class Pl
         public const string DeleteUnavailable = "Usuwanie konta jest chwilowo niedostępne. Spróbuj ponownie za chwilę.";
         public const string AcceptFailed = "Nie udało się zapisać zgód. Spróbuj ponownie za chwilę.";
         public const string Unavailable = "Dane konta są chwilowo niedostępne. Spróbuj ponownie za chwilę.";
+        public const string ChangeTitle = "Zmień hasło", CurrentPassword = "Obecne hasło", NewPassword = "Nowe hasło", ChangeConfirmation = "Powtórz nowe hasło";
+        public const string CurrentRequired = "Podaj obecne hasło.", CurrentWrong = "Obecne hasło jest nieprawidłowe.", NewRejected = "Nowe hasło nie spełnia wymagań. Wybierz inne hasło.";
+        public const string Changed = "Hasło zostało zmienione. Pozostałe sesje zostały zakończone.", ChangedSignedOutFlash = "Hasło zostało zmienione. Zaloguj się nowym hasłem.";
+        public const string ChangeRateLimited = "Zbyt wiele prób. Spróbuj ponownie za minutę.", ChangeUnavailable = "Nie udało się teraz zmienić hasła. Spróbuj ponownie za chwilę.";
     }
 }

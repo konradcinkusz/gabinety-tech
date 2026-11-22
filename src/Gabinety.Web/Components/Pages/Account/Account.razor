@@ -65,6 +65,37 @@
             <a class="btn btn--secondary" href="/konto/export" download>@Pl.Account.Export</a>
         </section>
 
+        @if (_account.HasPassword)
+        {
+            <section class="card" aria-labelledby="account-password">
+                <h2 id="account-password">@Pl.Account.ChangeTitle</h2>
+                <FormSummary Problems="_changeProblems" />
+                @if (_changed) { <p class="callout callout--success" data-testid="password-changed">@Pl.Account.Changed</p> }
+                @if (_changeMessage is not null) { <Alert Variant="AlertVariant.Danger" TestId="change-error">@_changeMessage</Alert> }
+                <EditForm Model="Change!" FormName="change-password" OnSubmit="ChangePasswordAsync" class="form stack" novalidate>
+                    <div class="field @Invalid(ChangePasswordForm.CurrentId)">
+                        <label class="field__label" for="@ChangePasswordForm.CurrentId">@Pl.Account.CurrentPassword</label>
+                        <input id="@ChangePasswordForm.CurrentId" name="Change.CurrentPassword" class="field__control" type="password" autocomplete="current-password"
+                               aria-invalid="@AriaInvalid(ChangePasswordForm.CurrentId)" aria-describedby="@Describe(ChangePasswordForm.CurrentId)" />
+                        <FieldError FieldId="@ChangePasswordForm.CurrentId" Problem="_changeProblems.For(ChangePasswordForm.CurrentId)" />
+                    </div>
+                    <div class="field @Invalid(ChangePasswordForm.NewId)">
+                        <label class="field__label" for="@ChangePasswordForm.NewId">@Pl.Account.NewPassword</label>
+                        <input id="@ChangePasswordForm.NewId" name="Change.NewPassword" class="field__control" type="password" autocomplete="new-password"
+                               aria-invalid="@AriaInvalid(ChangePasswordForm.NewId)" aria-describedby="@Describe(ChangePasswordForm.NewId)" />
+                        <FieldError FieldId="@ChangePasswordForm.NewId" Problem="_changeProblems.For(ChangePasswordForm.NewId)" />
+                    </div>
+                    <div class="field @Invalid(ChangePasswordForm.ConfirmationId)">
+                        <label class="field__label" for="@ChangePasswordForm.ConfirmationId">@Pl.Account.ChangeConfirmation</label>
+                        <input id="@ChangePasswordForm.ConfirmationId" name="Change.Confirmation" class="field__control" type="password" autocomplete="new-password"
+                               aria-invalid="@AriaInvalid(ChangePasswordForm.ConfirmationId)" aria-describedby="@Describe(ChangePasswordForm.ConfirmationId)" />
+                        <FieldError FieldId="@ChangePasswordForm.ConfirmationId" Problem="_changeProblems.For(ChangePasswordForm.ConfirmationId)" />
+                    </div>
+                    <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.Account.ChangeTitle</button></div>
+                </EditForm>
+            </section>
+        }
+
         <section class="card account__zone" aria-labelledby="account-delete">
             <h2 id="account-delete">@Pl.Account.DeleteTitle</h2>
             <p>@Pl.Account.DeleteBody</p>
@@ -94,10 +125,14 @@
 
     [SupplyParameterFromForm(FormName = "delete-account")] DeleteAccountForm? Delete { get; set; }
     [SupplyParameterFromForm(FormName = "accept-consents")] AcceptConsentsForm? Accept { get; set; }
+    [SupplyParameterFromForm(FormName = "change-password")] ChangePasswordForm? Change { get; set; }
 
     AccountDto? _account;
     string? _deleteMessage;
     bool _acceptFailed;
+    FormProblems _changeProblems = new();
+    string? _changeMessage;
+    bool _changed;
 
     /// <summary>The e-mail of the session (the cookie's claim): shown even when the identity service cannot be asked.</summary>
     string? SessionEmail => HttpContext.User.FindFirst("email")?.Value;
@@ -106,6 +141,7 @@
     {
         Delete ??= new();
         Accept ??= new();
+        Change ??= new();
         var result = await Accounts.LoadAsync(ct: HttpContext.RequestAborted);
         if (result.IsOk) _account = result.Value;
         else if (result.Failure!.IsUnauthenticated) Navigation.NavigateTo(ReturnTarget.LoginUrl("/konto"), forceLoad: true);
@@ -116,6 +152,35 @@
         if (await Accounts.AcceptCurrentConsentsAsync(ct: HttpContext.RequestAborted)) { Navigation.NavigateTo("/konto"); return; }
         _acceptFailed = true;
     }
+
+    /// <summary>The change: every problem of the form first (nothing is sent while one is open). A refusal marks the field at fault alone; no password is rendered back, so every password input comes back empty.</summary>
+    async Task ChangePasswordAsync()
+    {
+        var form = Change!;
+        _changed = false;
+        _changeMessage = null;
+        _changeProblems = form.Validate();
+        if (_changeProblems.Any) return;
+        switch (await SignIn.ChangePasswordAsync(HttpContext, form.CurrentPassword!, form.NewPassword!, HttpContext.RequestAborted))
+        {
+            case ChangeOutcome.Changed:
+                Change = new ChangePasswordForm(); // the typed passwords are not kept once they are accepted
+                _changed = true;
+                return;
+            case ChangeOutcome.ChangedSignedOut:
+                Navigation.NavigateTo($"{ReturnTarget.LoginPath}?{FlashKey.Parameter}={FlashKey.PasswordChanged}");
+                return;
+            case ChangeOutcome.CurrentPasswordWrong: _changeProblems.Add(ChangePasswordForm.CurrentId, Pl.Account.CurrentWrong); return;
+            case ChangeOutcome.PasswordRejected: _changeProblems.Add(ChangePasswordForm.NewId, Pl.Account.NewRejected); return;
+            case ChangeOutcome.Unauthenticated: Navigation.NavigateTo(ReturnTarget.LoginUrl("/konto"), forceLoad: true); return;
+            case ChangeOutcome.RateLimited: _changeMessage = Pl.Account.ChangeRateLimited; return;
+            default: _changeMessage = Pl.Account.ChangeUnavailable; return;
+        }
+    }
+
+    string Invalid(string id) => _changeProblems.For(id) is null ? "" : "field--invalid";
+    string? AriaInvalid(string id) => _changeProblems.For(id) is null ? null : "true";
+    string? Describe(string id) => _changeProblems.For(id) is null ? null : id + "-error";
 
     async Task DeleteAsync()
     {

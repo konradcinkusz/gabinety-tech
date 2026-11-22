@@ -1,0 +1,52 @@
+@* The slot picker of one offer (P-PROF-1, pattern 5.4): a strip of the days that have free times, then the times of ONE day; every control is a link, so it works without JavaScript and a
+   slot leads to /rezerwacja/{offer}?start=...&gabinet=... exactly as the Next.js page does. *@
+<div class="slot-picker" aria-live="polite">
+    @if (!Slots.Available)
+    {
+        <Alert Variant="AlertVariant.Warning" TestId="slots-unavailable">@PlPages.Slots.Unavailable</Alert>
+        <a class="btn" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, SelectedDay)">@PlPages.Slots.Retry</a>
+    }
+    else if (_selected is null)
+    {
+        <p class="muted" data-testid="slots-empty">@string.Format(PlPages.Slots.Empty, Windows * SlotPickerModel.WindowDays)</p>
+        @MoreLink
+    }
+    else
+    {
+        <ul class="slot-days" aria-label="@PlPages.Slots.PickDay">
+            @foreach (var d in Slots.Days)
+            {
+                <li><a class="chip" href="@SlotPickerModel.PickerHref(Slug, Windows, Offering.Id, d.Date)" aria-current="@(d.Date == _selected.Date ? "true" : null)">@PlFormat.DayHeading(d.Date)</a></li>
+            }
+        </ul>
+        <section aria-label="@string.Format(PlPages.Slots.Times, PlFormat.DayHeading(_selected.Date))">
+            <ul class="slot-times">
+                @foreach (var s in _selected.Slots)
+                {
+                    <li><a class="chip slot" href="@SlotPickerModel.BookingHref(Offering.Id, s.StartUtc, Slug)">@PlFormat.Time(s.StartUtc)</a></li>
+                }
+            </ul>
+        </section>
+        @MoreLink
+        <p class="muted">@PlPages.Slots.TimeZone</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Slug { get; set; } = "";
+    [Parameter, EditorRequired] public OfferingDto Offering { get; set; } = default!;
+    [Parameter, EditorRequired] public OfferSlots Slots { get; set; } = default!;
+    /// <summary>How many 14-day windows were read (the "more days" link asks for one more).</summary>
+    [Parameter] public int Windows { get; set; } = 1;
+    [Parameter] public DateOnly? SelectedDay { get; set; }
+    [Parameter] public DateOnly Today { get; set; }
+
+    DayGroup? _selected;
+
+    protected override void OnParametersSet() => _selected = SlotPickerModel.Selected(Slots.Days, SelectedDay);
+
+    RenderFragment MoreLink => @<text>@if (Windows < SlotPickerModel.MaxWindows && SlotPickerModel.Window(Today, Windows) is not null)
+    {
+        <a class="btn" href="@SlotPickerModel.PickerHref(Slug, Windows + 1, Offering.Id, _selected?.Date)">@PlPages.Slots.More</a>
+    }</text>;
+}

@@ -93,7 +93,8 @@ public class SecurityHeadersTests
             Assert.DoesNotMatch(@"<style\b", razor);
             Assert.DoesNotMatch(@"\sstyle\s*=", razor); // an inline style attribute is blocked by style-src 'self'
             Assert.DoesNotMatch(@"\son[a-z]+\s*=\s*""", razor.Replace("@onclick", "").Replace("@onchange", "")); // no inline event handler attribute
-            if (Repo.Rel(f) != "Components/App.razor") Assert.DoesNotMatch(@"<script\b", razor);
+            // A JSON-LD block is data, not code: the browser never executes it and script-src does not apply (the profile page needs one, journey J1). Any other script is refused.
+            if (Repo.Rel(f) != "Components/App.razor") Assert.DoesNotMatch(@"<script\b(?![^>]*type=""application/ld\+json"")", razor);
         }
     }
 }

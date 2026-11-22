@@ -21,7 +21,26 @@ public sealed record PageDto<T>(IReadOnlyList<T> Items, string? NextCursor);
 
 public sealed record SitemapCategoryDto(string Path, int PractitionerCount, bool Indexable);
 
-public sealed record SitemapDto(IReadOnlyList<SitemapCategoryDto> Categories);
+public sealed record SitemapPractitionerDto(string Slug, DateTimeOffset LastModified);
+
+/// <summary><c>Practitioners</c> is optional so a caller that only needs the categories (the list pages) is unaffected by it.</summary>
+public sealed record SitemapDto(IReadOnlyList<SitemapCategoryDto> Categories, IReadOnlyList<SitemapPractitionerDto>? Practitioners = null);
+
+public sealed record OfferingDto(Guid Id, string Title, string Description, int DurationMinutes, MoneyDto Price, string ProblemSlug, IReadOnlyList<string> TechSlugs);
+
+/// <summary>The public profile (CONTRACTS 3.2): the card's fields and the extras side by side (flat on the wire).</summary>
+public sealed record PractitionerProfileDto(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin, IReadOnlyList<string> Badges, RatingDto? Rating, bool IsNew,
+    MoneyDto FromPrice, string Bio, string? PortfolioUrl, IReadOnlyList<OfferingDto> Offerings, int CompletedCount, DateTimeOffset MemberSince);
+
+public sealed record RankingWeightsDto(double Rating, double Reliability, double Availability, double Completeness);
+
+public sealed record RankingConstantsDto(int M, double Mu, int MinReviewsToShowRating, int SlotsForFullAvailability);
+
+public sealed record RankingRulesDto(string Version, DateTimeOffset EffectiveFrom, RankingWeightsDto Weights, RankingConstantsDto Constants);
+
+public sealed record SlotDto(DateTimeOffset StartUtc, DateTimeOffset EndUtc);
+
+public sealed record SlotsDto(IReadOnlyList<SlotDto> Slots);
 
 public sealed record PractitionerRefDto(Guid Id, string DisplayName, string Slug);
 

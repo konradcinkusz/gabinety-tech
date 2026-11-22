@@ -1,0 +1,32 @@
+@* A legal document: the owner's text as blocks, a contents list for the headings (P-STAT-2), a notice while the text is a draft. Everything is written as encoded text. *@
+<div class="prose">
+    <header class="page-header">
+        <h1>@Title</h1>
+        <p class="cluster muted"><span>@string.Format(PlPages.Legal.Version, Doc.Version)</span><span>@string.Format(PlPages.Legal.Date, PlFormat.NumericDate(Doc.Date))</span></p>
+        @if (Doc.Draft) {<Alert Variant="AlertVariant.Warning" TestId="draft-notice">@PlPages.Legal.DraftNotice</Alert>}
+    </header>
+    @if (Doc.Headings.Any())
+    {
+        <nav aria-label="@PlPages.Legal.Contents" class="contents">
+            <h2 class="contents__title">@PlPages.Legal.Contents</h2>
+            <ol>@foreach (var h in Doc.Headings) {<li><a href="#@h.Id">@h.Text</a></li>}</ol>
+        </nav>
+    }
+    @foreach (var b in Doc.Blocks)
+    {
+        switch (b.Kind)
+        {
+            case BlockKind.Heading when b.Level == 2: <h2 id="@b.Id">@b.Text</h2> break;
+            case BlockKind.Heading when b.Level == 3: <h3 id="@b.Id">@b.Text</h3> break;
+            case BlockKind.Heading: <h4 id="@b.Id">@b.Text</h4> break;
+            case BlockKind.Paragraph: <p>@b.Text</p> break;
+            case BlockKind.BulletList: <ul>@foreach (var t in b.Items!) {<li>@t</li>}</ul> break;
+            default: <ol>@foreach (var t in b.Items!) {<li>@t</li>}</ol> break;
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public LegalDoc Doc { get; set; } = default!;
+}

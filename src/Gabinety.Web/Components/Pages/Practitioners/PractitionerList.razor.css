@@ -1,3 +1,6 @@
 .list-layout { display: grid; gap: var(--space-5); grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 52rem) { .list-layout { grid-template-columns: 16rem minmax(0, 1fr); align-items: start; } }
 .results { display: grid; gap: var(--space-4); }
+.breadcrumb { margin-bottom: var(--space-3); font-size: var(--text-sm); }
+.breadcrumb li + li::before { content: "/"; margin-right: var(--space-2); color: var(--color-text-muted); }
+.empty-state { display: grid; gap: var(--space-3); justify-items: start; }

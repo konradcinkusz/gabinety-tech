@@ -109,7 +109,7 @@ else if (_loaded)
                         <label class="option chip"><input type="checkbox" name="techs" value="@t.Slug" checked="@_f.Techs.Contains(t.Slug)" /> @t.NamePl</label>
                     }
                 </div>
-                @if (Error("techSlugs") is { } techError) {<p class="field__error" id="techSlugs-error"><span class="visually-hidden">@PlPractitioner.Common.ErrorWord </span>@techError</p>}
+                @if (Error("techSlugs") is { } techError) {<p class="field__error" id="techSlugs-error"><span class="visually-hidden">@($"{PlPractitioner.Common.ErrorWord} ")</span>@techError</p>}
             </fieldset>
             <FormField Id="meetingUrl" Label="@PlPractitioner.Offers.Meeting" Hint="@PlPractitioner.Offers.MeetingHint" Error="@Error("meetingUrl")" Optional="true">
                 <input id="@context.Id" name="meetingUrl" type="url" inputmode="url" maxlength="300" value="@_f.Meeting" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />

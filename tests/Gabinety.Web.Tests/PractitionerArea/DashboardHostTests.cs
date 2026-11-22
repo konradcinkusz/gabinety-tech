@@ -67,7 +67,7 @@ public class DashboardHostTests
         Assert.Equal("true", input.GetAttribute("aria-invalid"));
         Assert.Contains("displayName-error", input.GetAttribute("aria-describedby"));
         Assert.Contains("Nazwa ma mieć od 2 do 80 znaków", response.TextOf("#displayName-error"));
-        Assert.StartsWith("Błąd:", response.TextOf("#displayName-error")); // the hidden word that tells a screen reader what this is
+        Assert.StartsWith("Błąd: ", response.TextOf("#displayName-error")); // the hidden word that tells a screen reader what this is
     }
 
     [Fact]

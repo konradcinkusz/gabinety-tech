@@ -5,7 +5,7 @@
     @if (Hint is not null) {<p class="field__hint" id="@HintId">@Hint</p>}
     @ChildContent(new FieldContext(Id, DescribedBy, HasError))
     @if (Max is { } max) {<p class="field__counter" aria-hidden="true">@string.Format(PlPractitioner.Common.Counter, Length, max)</p>}
-    @if (HasError) {<p class="field__error" id="@ErrorId"><span class="visually-hidden">@PlPractitioner.Common.ErrorWord </span>@Error</p>}
+    @if (HasError) {<p class="field__error" id="@ErrorId"><span class="visually-hidden">@($"{PlPractitioner.Common.ErrorWord} ")</span>@Error</p>}
 </div>
 
 @code {

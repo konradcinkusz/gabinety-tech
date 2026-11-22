@@ -62,6 +62,7 @@ public class OffersHostTests
         Assert.Equal(HttpStatusCode.OK, five.Status);
         Assert.Equal(posts, web.Directory.Requests.Count(r => r.Method == HttpMethod.Post)); // nothing sent
         Assert.Contains("najwyżej 4", five.TextOf("#techSlugs-error"));
+        Assert.StartsWith("Błąd: ", five.One("#techSlugs-error")!.TextContent); // the hidden word is separated from the message
         Assert.Equal(5, five.All("input[type=checkbox]:checked").Count); // what the user ticked stays ticked
     }
 

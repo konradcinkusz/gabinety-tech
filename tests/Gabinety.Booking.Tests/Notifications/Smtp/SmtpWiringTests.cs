@@ -92,6 +92,26 @@ public class SmtpWiringTests
     }
 
     [Fact]
+    public async Task The_log_provider_in_a_deployed_profile_warns_once_at_startup_and_health_reports_email_Degraded_never_claiming_delivery()
+    {
+        using var host = new CreateHost().AsDeployed(); // not fake, Notifications:Provider unset = Log
+        Assert.IsType<LogEmailSender>(host.Services.GetRequiredService<IEmailSender>());
+        var (status, checks, _) = await Health(host);
+        Assert.Equal("Degraded", checks["email"]);
+        Assert.Equal("Degraded", status);
+        Assert.Equal(1, host.Logs.Lines.Count(l => l.Contains("Dependency email is Degraded") && l.Contains("Notifications:Provider is Log") && l.Contains("NOT delivered")));
+        Assert.Equal(System.Net.HttpStatusCode.OK, (await host.CreateClient().GetAsync("/health")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_log_provider_in_the_fake_profile_stays_quiet()
+    {
+        using var host = new CreateHost();
+        Assert.DoesNotContain("email", (await Health(host)).Checks.Keys);
+        Assert.DoesNotContain(host.Logs.Lines, l => l.Contains("Dependency email"));
+    }
+
+    [Fact]
     public async Task The_degraded_log_sender_still_lets_the_job_run_and_logs_no_address()
     {
         using var t = new NotificationHost(setup: h => Smtp(h, null), keepSender: true);

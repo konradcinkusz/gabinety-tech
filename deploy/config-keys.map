@@ -1,0 +1,93 @@
+# Configuration keys of the deployed estate and where each one comes from (scripts/check-config-coverage.sh, run by CI deploy-checks and scripts/tests/deploy.test.sh).
+# Colon form (the code's spelling); the environment variable is the same with ":" replaced by "__".
+#
+# app   key   need   note
+# need: required  = the host (or its feature) does not work without it: it MUST have a source, an uncommented [env] line of deploy/fly/<app>.fly.toml or a row for the app in deploy/secrets.map
+#       optional  = the code has a default or degrades visibly (P8); a source is not demanded, the key is only recorded so that a NEW key read by the code is noticed
+#       fake-only = read only by the fake or developer profile; it must NOT have a source in a deployed estate
+# app "*" = every app below; "backends" = the four backend services (directory, booking, reputation, assistant: the keys read by ServiceDefaults and ServiceDefaults.Edge).
+# The scan: every key the code of an app reads (Configuration["A:B"], GetConnectionString("x"), GetValue<T>("A:B")) must be listed here, so a new key cannot arrive unclassified.
+# Keys read as a section (Internal:Callers:<Caller>, Internal:Keys:<Callee>) are listed one row per caller or callee: their evidence is the section name.
+# authservice is a pinned third-party image (its own config is in its fly.toml and secrets.map rows) (not scanned); the Next.js app is gone (cutover, ADR-0010).
+
+backends      Identity:Authority                       required    the JWT issuer every service validates against (CONTRACTS 10.2)
+backends      Identity:Audience                        optional    default "gabinety"; named in every toml anyway
+backends      Environment:Kind                         fake-only   Development enables /internal/v1/test and demo endpoints (CONTRACTS 10.4): never set when deployed
+backends      Internal:EdgeHeaders                     optional
+backends      Internal:EnforceKeyStrength              optional
+backends      Internal:RejectPublicEdge                optional    F-03 code guard; the Assistant sets it false on purpose (flycast)
+backends      RateLimit:PerMinute                      optional
+backends      RateLimit:TrustedProxyKey                optional    one value on web-blazor and every backend (secrets.map)
+backends      Database:Provider                        required    PostgreSQL when deployed
+backends      GABINETY_FAKE                            fake-only   the fake profile switch
+
+*             OTEL_EXPORTER_OTLP_ENDPOINT              optional    telemetry export, off when unset
+
+directory     ConnectionStrings:directorydb            required
+directory     Internal:Callers:Booking                 required
+directory     Internal:Callers:Reputation              required
+directory     Internal:Callers:Owner                   optional
+directory     Internal:Keys:Booking                    required    Directory asks Booking to cancel a suspended practitioner's bookings (ADR-0012)
+directory     Backend:Booking                          required
+directory     Directory:Price:MaxMinor                 optional    the owner's constants (CONTRACTS 9): code defaults
+directory     Directory:Price:MinMinor                 optional
+directory     Ranking:EffectiveFrom                    optional
+
+booking       ConnectionStrings:bookingdb              required
+booking       Internal:Callers:Reputation              required
+booking       Internal:Callers:Directory               required
+booking       Internal:Callers:Owner                   optional
+booking       Internal:Keys:Directory                  required
+booking       Backend:Directory                        required    practitioner contact and offerings
+booking       Site:BaseUrl                             required    links in e-mails and the Stripe return URLs
+booking       Payments:Provider                        required    Stripe when deployed (Mock only in the fake profile, F-01)
+booking       Payments:Stripe:SecretKey                required    secret
+booking       Payments:Stripe:WebhookSecret            required    secret
+booking       Payments:Stripe:ApiBase                  optional    tests only
+booking       Payments:WebhookSecret                   fake-only   the Mock provider's
+booking       Notifications:Provider                   optional    Log by default; Smtp only when the host and the sender are configured (deploy/secrets.map, EMAIL.md)
+booking       Notifications:Smtp:Host                  optional    absent: the log sender, a startup warning and email: Degraded
+booking       Notifications:Smtp:FromAddress           optional
+booking       Notifications:Smtp:Port                  optional
+booking       Notifications:Smtp:TlsMode               optional
+booking       Notifications:Smtp:User                  optional
+booking       Notifications:Smtp:Password              optional    secret
+booking       Jobs:IntervalSeconds                     optional
+
+reputation    ConnectionStrings:reputationdb           required
+reputation    Internal:Callers:Owner                   optional
+reputation    Internal:Keys:Directory                  required
+reputation    Internal:Keys:Booking                    required
+reputation    Internal:Keys:Assistant                  required
+reputation    Backend:Directory                        required
+reputation    Backend:Booking                          required
+reputation    Backend:Assistant                        required
+
+assistant     ConnectionStrings:assistantdb            required
+assistant     Internal:Callers:Reputation              required
+assistant     Internal:Callers:Owner                   optional
+assistant     Backend:Directory                        required    the public taxonomy read
+assistant     Llm:Provider                             required    Copilot when deployed: without credentials the gateway reports NotAuthenticated or Unavailable and the Assistant answers "unavailable" (P8)
+assistant     Assistant:Model                          optional
+assistant     Llm:CustomModels:0:Id                       optional    bring your own key: all of Llm__CustomModels__0__* are staged together or not at all (deploy/secrets.map, COPILOT-SDK 6)
+assistant     Llm:CustomModels:0:Model                    optional
+assistant     Llm:CustomModels:0:BaseUrl                  optional
+assistant     Llm:CustomModels:0:ProviderType             optional
+assistant     Llm:CustomModels:0:WireApi                  optional
+assistant     Llm:CustomModels:0:ApiKey                   optional
+assistant     Copilot:GitHubToken                      optional    only after the owner records the terms decision (A-04)
+
+web-blazor    Site:BaseUrl                             required    the origin guard allows exactly this origin
+web-blazor    Backend:Directory                        required
+web-blazor    Backend:Booking                          required
+web-blazor    Backend:Reputation                       required
+web-blazor    Backend:Assistant                        required
+web-blazor    Backend:Auth                             required
+web-blazor    Identity:Issuer                          required
+web-blazor    Identity:PublicUrl                       required
+web-blazor    DataProtection:KeysPath                  required    on the webdata volume
+web-blazor    Identity:Audience                        optional
+web-blazor    RateLimit:TrustedProxyKey                optional    secrets.map
+web-blazor    Environment:Kind                         fake-only
+web-blazor    GABINETY_FAKE                            fake-only
+web-blazor    Payments:Provider                        fake-only   the mock checkout page exists only in the fake profile

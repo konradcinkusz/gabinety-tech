@@ -196,6 +196,48 @@ check "every line of a multi-line secret is masked" has "$out" "::add-mask::BODY
 check "dry run does not call flyctl" bash -c "! grep -q 'authservice' '$tmp/log' || [ \"\$(grep -c 'gabinety-authservice-staging' '$tmp/log')\" = 0 ]"
 check "an app without rows has nothing to do" bash -c "'$d/set-secrets.sh' web gabinety-web-staging --map '$root/deploy/secrets.map' | grep -q 'no secrets for web'"
 
+# ---------- e-mail and model rows (production configuration): all-or-nothing groups ----------
+base='"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_REPUTATION_TO_ASSISTANT":"ra","INTERNAL_KEY_REPUTATION_TO_BOOKING":"rb","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"bd","INTERNAL_KEY_DIRECTORY_TO_BOOKING":"db","PAYMENTS_STRIPE_SECRET_KEY":"sk_test_x","PAYMENTS_STRIPE_WEBHOOK_SECRET":"whsec_x"'
+stage() { GH_SECRETS_JSON="{$base${2:+,$2}}" "$d/set-secrets.sh" "$1" "gabinety-$1-staging" --map "$root/deploy/secrets.map" --dry-run 2>&1; }
+out="$(stage booking '')"
+check "no e-mail secrets: Notifications__Provider is NOT staged (the code default Log applies)" bash -c "! grep -q 'staging .*Notifications__Provider' <<< \"\$1\" && grep -q 'skip Notifications__Provider: gated' <<< \"\$1\"" _ "$out"
+out="$(stage booking '"NOTIFICATIONS_SMTP_HOST":"smtp.demo.invalid"')"
+check "a host without a sender does not switch the provider to Smtp" bash -c "! grep -E 'staging [0-9]+ secret.*Notifications__Provider' <<< \"\$1\"" _ "$out"
+out="$(stage booking '"NOTIFICATIONS_SMTP_FROM":"x@demo.invalid"')"
+check "a sender without a host does not switch the provider to Smtp" bash -c "! grep -E 'staging [0-9]+ secret.*Notifications__Provider' <<< \"\$1\"" _ "$out"
+out="$(stage booking '"NOTIFICATIONS_SMTP_HOST":"smtp.demo.invalid","NOTIFICATIONS_SMTP_FROM":"x@demo.invalid","NOTIFICATIONS_SMTP_PORT":"465","NOTIFICATIONS_SMTP_TLS_MODE":"Implicit","NOTIFICATIONS_SMTP_USER":"u","NOTIFICATIONS_SMTP_PASSWORD":"demo-pw-Z9"')"
+check "host and sender set: the provider is staged as Smtp with the whole group" bash -c "grep -Eq 'staging [0-9]+ secret.*Notifications__Provider.*Notifications__Smtp__Host.*Notifications__Smtp__FromAddress.*Notifications__Smtp__Port.*Notifications__Smtp__TlsMode.*Notifications__Smtp__User.*Notifications__Smtp__Password' <<< \"\$1\"" _ "$out"
+check "the SMTP password is masked and never printed outside ::add-mask::" bash -c "grep -q '^::add-mask::demo-pw-Z9\$' <<< \"\$1\" && ! grep -v '^::add-mask::' <<< \"\$1\" | grep -q demo-pw-Z9" _ "$out"
+check "the gate names are not part of the staged value" bash -c "grep -q '^::add-mask::Smtp\$' <<< \"\$1\"" _ "$out"
+check "booking.fly.toml does not set Notifications__Provider (a staged secret and an [env] line must not compete)" bash -c "! grep -Eq '^[^#]*Notifications__Provider' '$root/deploy/fly/booking.fly.toml'"
+check "no fly.toml of a deployed app sets a Fake or Mock provider" bash -c "! grep -Eiq '^[^#]*(Llm__Provider|Notifications__Provider) *= *\"(fake|mock)' '$root'/deploy/fly/*.fly.toml"
+out="$(stage assistant '')"
+check "no model secrets: no custom model entry and no Copilot token are staged (the Assistant stays 'unavailable')" bash -c "! grep -Eq 'staging [0-9]+ secret.*(Llm__CustomModels|Copilot__GitHubToken)' <<< \"\$1\"" _ "$out"
+out="$(stage assistant '"LLM_CUSTOM_API_KEY":"demo-key-Q7"')"
+check "an API key alone does not stage a half custom model (the host would refuse to start)" bash -c "! grep -Eq 'staging [0-9]+ secret.*Llm__CustomModels' <<< \"\$1\"" _ "$out"
+out="$(stage assistant '"LLM_CUSTOM_ENDPOINT":"https://llm.demo.invalid/v1","LLM_CUSTOM_MODEL":"demo-model","LLM_CUSTOM_API_KEY":"demo-key-Q7","COPILOT_GITHUB_TOKEN":"demo-tok"')"
+check "endpoint and model set: Id, Model, BaseUrl and ApiKey of entry 0 are staged, with the Copilot token" bash -c "grep -Eq 'staging [0-9]+ secret.*Llm__CustomModels__0__Id.*Llm__CustomModels__0__Model.*Llm__CustomModels__0__BaseUrl.*Llm__CustomModels__0__ApiKey.*Copilot__GitHubToken' <<< \"\$1\"" _ "$out"
+check "the model API key is masked" bash -c "grep -q '^::add-mask::demo-key-Q7\$' <<< \"\$1\" && ! grep -v '^::add-mask::' <<< \"\$1\" | grep -q demo-key-Q7" _ "$out"
+check "every Llm__ and Notifications__ name of secrets.map is a key the code binds (config-keys.map)" bash -c "
+  for n in \$(awk '!/^#/ && NF && (\$2 ~ /^Llm__|^Notifications__|^Copilot__/) {print \$2}' '$root/deploy/secrets.map'); do
+    k=\${n//__/:}; k=\$(sed -E 's/:[0-9]+:/:0:/' <<< \"\$k\"); grep -Eq \"^(booking|assistant) +\$k +\" '$root/deploy/config-keys.map' || { echo \"\$n not in config-keys.map\"; exit 1; }; done"
+
+# ---------- config coverage: every required key of a deployed app has a source (scripts/check-config-coverage.sh) ----------
+cc="$root/scripts/check-config-coverage.sh"
+check "config coverage passes on the repository" "$cc"
+mkdir -p "$tmp/cc/scripts"; cp -r "$root/deploy" "$tmp/cc/deploy"; ln -s "$root/src" "$tmp/cc/src"
+check "config coverage: a required key without a source fails and names it" bash -c "
+  sed -i '/^ *Site__BaseUrl/d' '$tmp/cc/deploy/fly/booking.fly.toml'; out=\$('$cc' --root '$tmp/cc' 2>&1); rc=\$?; [ \$rc = 1 ] && grep -q 'booking: required key Site:BaseUrl has no source' <<< \"\$out\""
+rm -rf "$tmp/cc/deploy"; cp -r "$root/deploy" "$tmp/cc/deploy"
+check "config coverage: a key the code reads that nobody classified fails" bash -c "
+  sed -i '/^booking  *Site:BaseUrl /d' '$tmp/cc/deploy/config-keys.map'; out=\$('$cc' --root '$tmp/cc' 2>&1); rc=\$?; [ \$rc = 1 ] && grep -q 'booking: the code reads Site:BaseUrl but' <<< \"\$out\""
+rm -rf "$tmp/cc/deploy"; cp -r "$root/deploy" "$tmp/cc/deploy"
+check "config coverage: a required secret row removed from secrets.map fails (Stripe key)" bash -c "
+  sed -i '/^booking  *Payments__Stripe__SecretKey/d' '$tmp/cc/deploy/secrets.map'; out=\$('$cc' --root '$tmp/cc' 2>&1); rc=\$?; [ \$rc = 1 ] && grep -q 'Payments:Stripe:SecretKey has no source' <<< \"\$out\""
+rm -rf "$tmp/cc/deploy"; cp -r "$root/deploy" "$tmp/cc/deploy"
+check "config coverage: a fake-only key set in a deployed toml fails" bash -c "
+  sed -i 's/^\\[env\\]/[env]\n  GABINETY_FAKE = \"1\"/' '$tmp/cc/deploy/fly/booking.fly.toml'; out=\$('$cc' --root '$tmp/cc' 2>&1); rc=\$?; [ \$rc = 1 ] && grep -q 'GABINETY_FAKE' <<< \"\$out\""
+
 # ---------- smoke (flyctl and curl stubs) ----------
 cat > "$tmp/fly" <<'STUB'
 #!/usr/bin/env bash

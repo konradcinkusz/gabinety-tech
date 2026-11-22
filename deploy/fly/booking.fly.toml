@@ -24,14 +24,15 @@ primary_region = "fra"
   Site__BaseUrl = "https://<web-public-host>"
   # Stripe (T-09.05, ADR proposal 0011). The host refuses to start without both Stripe secrets below, and the deploy refuses to run without them (deploy/secrets.map: required).
   Payments__Provider = "Stripe"
-  Notifications__Provider = "Log"    # PLACEHOLDER until T-09.06 provides a sender.
+  # Notifications__Provider is NOT set here on purpose: the code default is Log and the deploy stages Smtp (a secret) only when NOTIFICATIONS_SMTP_HOST and NOTIFICATIONS_SMTP_FROM
+  # are set (deploy/secrets.map). Log outside the fake profile is announced at startup and as email: Degraded in /health/details; it never claims delivery.
   # Billing__FirstConsultationFeeBps is the owner's constant (CONTRACTS 9, D-17): not set here, the code default applies.
 # Secrets (NOT here), set once with `fly secrets set --app gabinety-booking-staging`:
 #   ConnectionStrings__bookingdb
 #   Internal__Callers__Reputation, Internal__Callers__Directory, Internal__Keys__Directory   (one key per caller and callee, never shared; F-03)
 #   optional Internal__Callers__Owner
 #   Payments__Stripe__SecretKey, Payments__Stripe__WebhookSecret   (required: GitHub secrets PAYMENTS_STRIPE_SECRET_KEY and PAYMENTS_STRIPE_WEBHOOK_SECRET; docs/operations/PAYMENTS-GO-LIVE.md)
-#   Notifications__Smtp__* (only with T-09.06; names defined there)
+#   optional Notifications__Provider (staged as Smtp only with host and sender), Notifications__Smtp__Host/FromAddress/Port/TlsMode/User/Password   (docs/operations/EMAIL.md)
 
 [http_service]
   internal_port = 8080

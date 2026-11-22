@@ -1,5 +1,6 @@
 @* Decorative: the name is the text of the link beside it, so the initials are hidden from assistive technology. The colour is chosen from the name, always the same for the same name. *@
-<span class="avatar avatar--@Size.ToString().ToLowerInvariant() avatar--@Tone(Name)" aria-hidden="true">@Letters(Name)</span>
+@* With a Slug the picture (the verified GitHub avatar, ADR-0013) is laid OVER the initials: when /avatar/{slug} answers 404 the browser shows no image and the initials stay visible (no script). *@
+<span class="avatar avatar--@Size.ToString().ToLowerInvariant() avatar--@Tone(Name)" aria-hidden="true">@Letters(Name)@if (!string.IsNullOrEmpty(Slug)){<img class="avatar__image" src="@($"/avatar/{Uri.EscapeDataString(Slug)}")" alt="" width="@Pixels" height="@Pixels" loading="lazy" />}</span>
 
 @code {
     public enum AvatarSize { Small, Medium, Large }
@@ -8,6 +9,11 @@
 
     [Parameter, EditorRequired] public string Name { get; set; } = "";
     [Parameter] public AvatarSize Size { get; set; } = AvatarSize.Medium;
+
+    /// <summary>The slug of a practitioner whose GitHub account is verified; leave empty when there is no <c>githubLogin</c>, so no image is requested.</summary>
+    [Parameter] public string? Slug { get; set; }
+
+    int Pixels => Size switch { AvatarSize.Small => 36, AvatarSize.Large => 72, _ => 48 };
 
     /// <summary>The first letters of the first two words, uppercase: <c>Anna Demowska</c> is <c>AD</c>, <c>Jan</c> is <c>J</c>.</summary>
     public static string Letters(string name)

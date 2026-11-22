@@ -77,6 +77,10 @@ public static class PlPractitioner
         public const string PaymentsBannerTitle = "Płatności nie są jeszcze gotowe";
         public const string PaymentsBannerBody = "Bez gotowego konta płatności nie możesz przyjmować rezerwacji: klienci nie zapłacą, a Ty nie dostaniesz wypłaty.";
         public const string PaymentsBannerLink = "Skonfiguruj płatności";
+        public const string ProgressAria = "Postęp uzupełniania profilu";
+        public const string PublicTitle = "Twój profil jest publiczny", PublicBody = "Klienci mogą go znaleźć i zarezerwować konsultację.", ViewPublic = "Zobacz profil publiczny", CopyLink = "Skopiuj link", Copied = "Skopiowano";
+        public const string UpcomingTitle = "Nadchodzące konsultacje", UpcomingEmpty = "Nie masz jeszcze zaplanowanych konsultacji.", UpcomingFailed = "Nie możemy teraz pokazać konsultacji.";
+        public const string Details = "Szczegóły", AllBookings = "Wszystkie rezerwacje";
     }
 
     public static class Checklist

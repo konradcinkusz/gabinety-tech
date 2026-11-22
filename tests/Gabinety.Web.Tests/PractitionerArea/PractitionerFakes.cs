@@ -24,6 +24,8 @@ public sealed class PractitionerWorld
     public bool GithubBioHasCode { get; set; }
     public bool DirectoryDown { get; set; }
     public bool BookingDown { get; set; }
+    public bool BookingsFail { get; set; }
+    public List<BookingViewDto> Bookings { get; } = [];
     public string OnboardingUrl { get; set; } = "https://connect.stripe.com/setup/e/acct_test/abc";
     public int OnboardingCalls { get; private set; }
 
@@ -197,6 +199,11 @@ public sealed class PractitionerWorld
             Rules.Clear(); Rules.AddRange(rules);
             Exceptions.Clear(); Exceptions.AddRange((b["exceptions"] as JsonArray ?? []).Select(x => x!["dateLocal"]!.GetValue<string>()));
             return FakeBackend.Json(Availability());
+        }
+        if (path == "/api/v1/me/bookings" && r.Method == HttpMethod.Get)
+        {
+            if (BookingsFail) return Problem(HttpStatusCode.ServiceUnavailable, "dependency_unavailable");
+            return FakeBackend.Json(new PageDto<BookingViewDto>(Bookings, null));
         }
         if (path == "/api/v1/me/payments/account")
         {

@@ -30,6 +30,10 @@ public sealed record AvailabilityRuleDto(int IsoWeekday, string StartLocal, stri
 public sealed record AvailabilityExceptionDto(DateOnly DateLocal);
 public sealed record AvailabilityDto(IReadOnlyList<AvailabilityRuleDto> Rules, IReadOnlyList<AvailabilityExceptionDto> Exceptions);
 
+/// <summary>One switch of <c>/api/v1/me/notification-preferences</c> (CONTRACTS 4.2). <c>Kind</c> is <c>Reminder24h</c>, <c>Reminder1h</c> or <c>ReviewRequest</c>; the transactional kinds are never listed.</summary>
+public sealed record NotificationPreferenceDto(string Kind, bool Enabled);
+public sealed record NotificationPreferencesDto(IReadOnlyList<NotificationPreferenceDto> Items);
+
 public sealed record BriefDto([property: Required, StringLength(2000, MinimumLength = 20)] string Text, string? ProblemSlug, bool AiAssisted);
 public sealed record CreateBookingRequest(Guid OfferingId, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantConverter))] DateTimeOffset StartUtc, BriefDto Brief);
 public sealed record CreateBookingResponse(Guid BookingId, BookingStatus Status, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantConverter))] DateTimeOffset HoldExpiresAt, string CheckoutUrl);

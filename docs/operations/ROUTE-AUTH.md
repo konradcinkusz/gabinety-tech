@@ -76,6 +76,8 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | GET | `/api/v1/bookings/{id}` | Authenticated | all | |
 | Booking | GET | `/api/v1/me/bookings` | Authenticated | all | |
 | Booking | POST | `/api/v1/bookings/{id}/cancel` | Authenticated | all | |
+| Booking | GET | `/api/v1/me/notification-preferences` | Authenticated | all | the caller's own rows only; T-11.12 |
+| Booking | PUT | `/api/v1/me/notification-preferences` | Authenticated | all | the caller's own rows only; a transactional kind is 400; T-11.12 |
 | Booking | POST | `/api/v1/bookings/{id}/reschedule` | Authenticated | all | client of the booking only (practitioner 403, stranger 404) |
 | Booking | POST | `/api/v1/bookings/{id}/dispute` | Authenticated | all | |
 | Booking | POST | `/api/v1/bookings/{id}/report-client-no-show` | Authenticated | all | |

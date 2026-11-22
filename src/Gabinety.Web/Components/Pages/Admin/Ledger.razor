@@ -1,0 +1,101 @@
+@page "/admin/ksiega"
+@using Gabinety.Web.Hosting
+@inject AdminApi Api
+@inject TimeProvider Time
+@* The ledger (P-ADM-4): a period (quick choices as links, two dates and a primary button), then the summary, the download, and the first entries as a table. The CSV is the whole period and is streamed by /admin/ksiega/csv;
+   this page reads only the first rows. Time comes from the TimeProvider. *@
+
+<PageTitle>@PlAdmin.Ledger.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<section class="admin-section">
+    <h1>@PlAdmin.Ledger.Title</h1>
+    <p class="admin-lead">@PlAdmin.Ledger.Intro</p>
+
+    <SegmentedLinks Label="@PlAdmin.Ledger.PresetLabel" Items="Presets" />
+
+    <form method="get" action="/admin/ksiega" aria-label="@PlAdmin.Ledger.FilterLabel" class="admin-form admin-form--dates">
+        <div class="cluster">
+            <div class="field">
+                <label for="ledger-from">@PlAdmin.Ledger.From</label>
+                <input id="ledger-from" type="date" name="from" value="@_range.From" required />
+            </div>
+            <div class="field">
+                <label for="ledger-to">@PlAdmin.Ledger.To</label>
+                <input id="ledger-to" type="date" name="to" value="@_range.To" required />
+            </div>
+            <button type="submit" class="btn btn--primary">@PlAdmin.Ledger.Show</button>
+        </div>
+    </form>
+
+    @if (_range.Problem != PeriodProblem.None)
+    {
+        <Alert Variant="AlertVariant.Danger" TestId="ledger-period-problem">@(_range.Problem switch { PeriodProblem.Order => PlAdmin.Ledger.ProblemOrder, PeriodProblem.Range => PlAdmin.Ledger.ProblemRange, _ => PlAdmin.Ledger.ProblemFormat })</Alert>
+    }
+    else
+    {
+        <p>@string.Format(PlAdmin.Ledger.Summary, _range.From, _range.To)</p>
+        <p class="admin-actions"><a class="btn" href="@CsvHref" download>@PlAdmin.Ledger.Download</a></p>
+        @if (_failure is { } failure)
+        {
+            <FailureAlert Failure="failure" Unavailable="@(failure.Status == 400 ? PlAdmin.Ledger.Validation : PlAdmin.Ledger.Unavailable)" />
+        }
+        else if (_preview is { Rows.Count: 0 })
+        {
+            <p class="empty-state">@PlAdmin.Ledger.Empty</p>
+        }
+        else if (_preview is not null)
+        {
+            <p class="muted">@(_preview.HasMore ? string.Format(PlAdmin.Ledger.Showing, _preview.Rows.Count) : string.Format(PlAdmin.Ledger.ShowingAll, _preview.Rows.Count))</p>
+            <div class="table-wrap" role="region" aria-label="@PlAdmin.Ledger.TableLabel" tabindex="0">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">@PlAdmin.Ledger.ColDate</th>
+                            <th scope="col">@PlAdmin.Ledger.ColKind</th>
+                            <th scope="col">@PlAdmin.Ledger.ColBooking</th>
+                            <th scope="col" class="num">@PlAdmin.Ledger.ColAmount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _preview.Rows)
+                        {
+                            <tr>
+                                <td data-label="@PlAdmin.Ledger.ColDate"><time datetime="@row.CreatedAt.ToString("O")">@AdminFormat.When(row.CreatedAt)</time></td>
+                                <td data-label="@PlAdmin.Ledger.ColKind">@AdminFormat.LedgerKind(row.Kind)</td>
+                                <td data-label="@PlAdmin.Ledger.ColBooking"><span class="admin-ref" title="@row.BookingId">@AdminFormat.ShortRef(row.BookingId)</span></td>
+                                <td data-label="@PlAdmin.Ledger.ColAmount" class="num">@AdminFormat.Pln(row.AmountMinor)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    public const int PreviewRows = 50;
+
+    [SupplyParameterFromQuery(Name = "from")] public string? FromParam { get; set; }
+    [SupplyParameterFromQuery(Name = "to")] public string? ToParam { get; set; }
+
+    LedgerRange _range = new("", "", PeriodProblem.Format);
+    DateTimeOffset _now;
+    LedgerPreviewDto? _preview;
+    ApiFailure? _failure;
+
+    string CsvHref => AdminQuery.Url(AdminEndpoints.LedgerCsvPath, ("from", _range.From), ("to", _range.To));
+
+    IReadOnlyList<SegmentedLinks.Item> Presets =>
+    [.. LedgerPeriod.Presets(_now).Select(p => new SegmentedLinks.Item(p.Id switch { LedgerPeriod.LastMonth => PlAdmin.Ledger.LastMonth, LedgerPeriod.ThisYear => PlAdmin.Ledger.ThisYear, _ => PlAdmin.Ledger.ThisMonth },
+        AdminQuery.Url("/admin/ksiega", ("from", p.From), ("to", p.To)), p.From == _range.From && p.To == _range.To))];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _now = Time.GetUtcNow();
+        _range = LedgerPeriod.Of(FromParam, ToParam, _now);
+        if (_range.Problem != PeriodProblem.None) return;
+        var result = await Api.LedgerPreview(_range.From, _range.To, PreviewRows);
+        (_preview, _failure) = (result.Value, result.Failure);
+    }
+}

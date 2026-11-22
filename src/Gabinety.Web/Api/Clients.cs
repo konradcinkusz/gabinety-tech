@@ -7,7 +7,7 @@ namespace Gabinety.Web.Api;
 public sealed record PractitionerQuery(string? Problem = null, string? Tech = null, string? Q = null, int? Duration = null, long? MaxPriceMinor = null, string? Cursor = null);
 
 /// <summary>Directory, public reads only (SPEC 5.1: 5 s, once, GET only: see <see cref="ApiResilience"/>).</summary>
-public sealed class DirectoryClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
+public sealed partial class DirectoryClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
 {
     public Task<ApiResult<TaxonomyDto>> TaxonomyAsync(CancellationToken ct = default) => GetAsync<TaxonomyDto>("/api/v1/taxonomy", null, ct);
 
@@ -51,7 +51,7 @@ public sealed partial class BookingClient(HttpClient http, VisitorAddressAccesso
 }
 
 /// <summary>Reputation, public reads.</summary>
-public sealed class ReputationClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
+public sealed partial class ReputationClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
 {
     public Task<ApiResult<PageDto<ReviewDto>>> ReviewsAsync(Guid practitionerId, string? cursor = null, CancellationToken ct = default) =>
         GetAsync<PageDto<ReviewDto>>($"/api/v1/practitioners/{practitionerId}/reviews" + (string.IsNullOrEmpty(cursor) ? "" : "?cursor=" + Uri.EscapeDataString(cursor)), null, ct);

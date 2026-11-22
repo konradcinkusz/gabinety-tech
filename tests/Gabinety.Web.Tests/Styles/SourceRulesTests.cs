@@ -11,13 +11,13 @@ public partial class SourceRulesTests
         Regex.Replace(razor ? Regex.Replace(source, @"@\*.*?\*@|<!--.*?-->", "", RegexOptions.Singleline) : source, @"(?m)^\s*//.*$|/\*.*?\*/|(?<=\s)//[^\n]*$", "", RegexOptions.Singleline);
 
     [Fact]
-    public void User_facing_Polish_text_is_in_one_place_Pl_cs_and_nowhere_else()
+    public void User_facing_Polish_text_is_under_Text_and_nowhere_else()
     {
         // SPEC 5 rule 1: no Polish string literal in a component or a class outside the one file of the surface.
         var offenders = Repo.WebFiles("*.razor").Concat(Repo.WebFiles("*.cs")).Where(f => !Repo.Rel(f).StartsWith("Text/", StringComparison.Ordinal))
             .SelectMany(f => WithoutComments(File.ReadAllText(f), f.EndsWith(".razor")).Split('\n').Select((line, i) => (f, i, line)).Where(t => Polish().IsMatch(t.line)).Select(t => $"{Repo.Rel(t.f)}:{t.i + 1}"))
             .ToList();
-        Assert.True(offenders.Count == 0, "Polish text outside Text/Pl.cs: " + string.Join(", ", offenders));
+        Assert.True(offenders.Count == 0, "Polish text outside Text/: " + string.Join(", ", offenders));
         Assert.Contains("Przejdź do treści", Repo.Read("Text", "Pl.cs")); // the rule looks at the right file
     }
 

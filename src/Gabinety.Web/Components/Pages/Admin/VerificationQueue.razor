@@ -1,0 +1,177 @@
+@page "/admin/weryfikacja"
+@inject AdminApi Api
+@inject NavigationManager Navigation
+@* Static server rendering, no circuit: every action is an antiforgery-protected form POST handled here (UI-AUDIT P-ADM-1/2, F-10; the services stay the boundary). The queue is a list whose rows read like table rows (J2 addresses a
+   row as a listitem with the practitioner's name as a link): name, checks as badges, dates, then the actions with a gap. Approve is one click; reject and suspend open a step with the reason (10 to 500) and the consequence. *@
+
+<PageTitle>@PlAdmin.Verification.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<section class="admin-section">
+    <h1>@PlAdmin.Verification.Title</h1>
+    <p class="admin-lead">@PlAdmin.Shell.VerificationLead</p>
+    <SegmentedLinks Label="@PlAdmin.Verification.FilterLabel" Items="Filters" />
+
+    @if (_notice is not null) {<Alert Variant="AlertVariant.Warning">@_notice</Alert>}
+    @if (_failure is { } failure)
+    {
+        <FailureAlert Failure="failure" Unavailable="@PlAdmin.Verification.Unavailable" />
+    }
+    else if (_items.Count == 0)
+    {
+        <p class="empty-state">@PlAdmin.Verification.Empty</p>
+    }
+    else
+    {
+        <ul class="admin-list" aria-label="@PlAdmin.Verification.Title">
+            @foreach (var row in _items)
+            {
+                var id = row.Id;
+                var when = row.SubmittedAt ?? row.CreatedAt;
+                <li class="card" data-testid="verification-row">
+                    <div class="admin-row__head">
+                        <h2 class="admin-row__title"><a href="/admin/weryfikacja/@id">@row.DisplayName</a></h2>
+                        <AdminBadge Kind="AdminFormat.PractitionerStatusKind(row.Status)">@AdminFormat.PractitionerStatus(row.Status)</AdminBadge>
+                    </div>
+                    <p class="admin-row__sub">@row.Headline</p>
+                    <dl class="admin-facts admin-facts--inline">
+                        <div>
+                            <dt>@PlAdmin.Verification.Github</dt>
+                            <dd>
+                                @if (row.GithubLinked && AdminFormat.IsGithubLogin(row.GithubLogin))
+                                {
+                                    <a href="https://github.com/@Uri.EscapeDataString(row.GithubLogin!)" rel="noopener noreferrer" target="_blank">@row.GithubLogin</a>
+                                }
+                                else
+                                {
+                                    @(row.GithubLinked ? PlAdmin.Verification.GithubLinked : PlAdmin.Verification.GithubNot)
+                                }
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>@PlAdmin.Verification.Nip</dt>
+                            <dd><AdminBadge Kind="@(row.NipValid ? BadgeKind.Success : BadgeKind.Neutral)">@(row.NipValid ? PlAdmin.Verification.NipValid : PlAdmin.Verification.NipInvalid)</AdminBadge></dd>
+                        </div>
+                        <div>
+                            <dt>@(row.SubmittedAt is null ? PlAdmin.Verification.Created : PlAdmin.Verification.Submitted)</dt>
+                            <dd><time datetime="@when.ToString("O")">@AdminFormat.When(when)</time></dd>
+                        </div>
+                        @if (!string.IsNullOrEmpty(row.StatusReason))
+                        {
+                            <div>
+                                <dt>@PlAdmin.Verification.Reason</dt>
+                                <dd class="admin-pre">@row.StatusReason</dd>
+                            </div>
+                        }
+                    </dl>
+                    @if (_messages.TryGetValue(id, out var message))
+                    {
+                        <Alert Variant="message.Variant">@message.Text</Alert>
+                    }
+                    @if (IsOpen(row) && _open is { } open)
+                    {
+                        <ReasonForm FormName="@PostedForm.Name(open.Verb, id)" OnSubmit="() => ReasonAsync(id, open.Verb)"
+                                    Label="@PlAdmin.Verification.ReasonLabel" Hint="@PlAdmin.Verification.ReasonHint" Value="@_reason" Error="@_reasonError"
+                                    Warning="@(open.Verb == VerificationRules.Reject ? PlAdmin.Verification.RejectWarning : PlAdmin.Verification.SuspendWarning)"
+                                    ConfirmText="@(open.Verb == VerificationRules.Reject ? PlAdmin.Verification.ConfirmReject : PlAdmin.Verification.ConfirmSuspend)" CancelHref="@ListUrl()" />
+                    }
+                    else
+                    {
+                        <div class="admin-actions">
+                            @foreach (var verb in VerificationRules.Allowed(row.Status))
+                            {
+                                if (VerificationRules.NeedsReason(verb))
+                                {
+                                    <RevealButton Action="/admin/weryfikacja" Name="@(verb == VerificationRules.Reject ? "odrzuc" : "zawies")" Value="@id.ToString("D")" Keep="Kept" Class="btn btn--ghost-danger">@(verb == VerificationRules.Reject ? PlAdmin.Verification.Reject : PlAdmin.Verification.Suspend)</RevealButton>
+                                }
+                                else
+                                {
+                                    <form method="post" @formname="@PostedForm.Name(verb, id)" @onsubmit="() => DirectAsync(id, verb)">
+                                        <AntiforgeryToken />
+                                        <button type="submit" class="btn btn--primary">@(verb == VerificationRules.Approve ? PlAdmin.Verification.Approve : PlAdmin.Verification.Reinstate)</button>
+                                    </form>
+                                }
+                            }
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+        @if (_next is not null)
+        {
+            <p class="admin-more"><a class="btn" href="@ListUrl(cursor: _next)">@PlAdmin.Verification.Next</a></p>
+        }
+    }
+    <StaleFormGuard Rendered="RenderedForms" OnStale="StaleAsync" />
+</section>
+
+@code {
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "status")] public string? StatusParam { get; set; }
+    [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+    [SupplyParameterFromQuery(Name = "odrzuc")] public string? RejectParam { get; set; }
+    [SupplyParameterFromQuery(Name = "zawies")] public string? SuspendParam { get; set; }
+
+    readonly List<AdminPractitionerRowDto> _items = [];
+    readonly Dictionary<Guid, (AlertVariant Variant, string Text)> _messages = [];
+    string _status = "Submitted";
+    string? _cursor, _next, _reason, _reasonError, _notice;
+    (string Verb, Guid Id)? _open;
+    ApiFailure? _failure;
+
+    IReadOnlyList<SegmentedLinks.Item> Filters => [.. VerificationRules.QueueStatuses.Select(s => new SegmentedLinks.Item(PlAdmin.Verification.Filters[s], AdminQuery.Url("/admin/weryfikacja", ("status", s)), s == _status))];
+    IEnumerable<KeyValuePair<string, string>> Kept => _cursor is null ? [new("status", _status)] : [new("status", _status), new("cursor", _cursor)];
+    string ListUrl(string? cursor = null) => AdminQuery.Url("/admin/weryfikacja", ("status", _status), ("cursor", cursor ?? _cursor));
+    bool IsOpen(AdminPractitionerRowDto row) => _open is { } open && open.Id == row.Id && VerificationRules.Allowed(row.Status).Contains(open.Verb);
+
+    /// <summary>The forms this page renders: the reason form of the open row, the direct forms (approve, reinstate) of the others.</summary>
+    IReadOnlyCollection<string> RenderedForms =>
+        [.. _items.SelectMany(r => IsOpen(r) ? [PostedForm.Name(_open!.Value.Verb, r.Id)] : VerificationRules.Allowed(r.Status).Where(v => !VerificationRules.NeedsReason(v)).Select(v => PostedForm.Name(v, r.Id)))];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _status = VerificationRules.Status(StatusParam);
+        _cursor = AdminQuery.Cursor(CursorParam);
+        _open = Guid.TryParse(RejectParam, out var rejecting) ? (VerificationRules.Reject, rejecting) : Guid.TryParse(SuspendParam, out var suspending) ? (VerificationRules.Suspend, suspending) : null;
+        await LoadAsync();
+    }
+
+    async Task LoadAsync()
+    {
+        var result = await Api.Practitioners(_status, _cursor, VerificationRules.PageSize);
+        _items.Clear();
+        (_failure, _next) = (result.Failure, result.Value?.NextCursor);
+        if (result.IsOk) _items.AddRange(result.Value!.Items);
+    }
+
+    /// <summary>Approve and reinstate: one click, no text, no reason.</summary>
+    Task DirectAsync(Guid id, string verb) => ActAsync(id, verb, null);
+
+    async Task ReasonAsync(Guid id, string verb)
+    {
+        _reason = HttpContext.Request.Form["reason"].ToString();
+        if (!TextRule.IsValid(_reason)) { _reasonError = PlAdmin.Verification.ReasonInvalid; return; } // the form stays open with what was typed
+        await ActAsync(id, verb, _reason);
+    }
+
+    async Task ActAsync(Guid id, string verb, string? reason)
+    {
+        var result = await Api.PractitionerAction(id, verb, reason);
+        if (result.IsOk)
+        {
+            Navigation.NavigateTo(AdminQuery.Url("/admin/weryfikacja", ("status", _status), ("flash", "admin-" + verb switch { "approve" => "approved", "reject" => "rejected", "suspend" => "suspended", _ => "reinstated" })));
+            return;
+        }
+        var f = result.Failure!;
+        _open = null;
+        if (AdminFailure.IsConflict(f)) { _notice = PlAdmin.Verification.StateChanged; await LoadAsync(); } // somebody else decided first: the row is probably gone, so the message is the page's
+        else if (verb == VerificationRules.Suspend && f.Status == 503) { _messages[id] = (AlertVariant.Danger, PlAdmin.Verification.SuspendedButBookings); await LoadAsync(); } // saved, but the future bookings are not all cancelled yet
+        else _messages[id] = (AlertVariant.Danger, AdminFailure.Text(f));
+    }
+
+    async Task StaleAsync()
+    {
+        await LoadAsync();
+        _open = null;
+        _notice = PlAdmin.Common.StaleForm;
+    }
+}

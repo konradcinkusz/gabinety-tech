@@ -1,0 +1,16 @@
+@* The status switch of a page (contract 5.9: the choice inside a page): links that keep the choice in the URL, so the view is shareable and works without JavaScript. aria-current marks the current one. *@
+<nav aria-label="@Label" class="admin-segmented">
+    <ul>
+        @foreach (var item in Items)
+        {
+            <li><a href="@item.Href" aria-current="@(item.Current ? "page" : null)">@item.Text</a></li>
+        }
+    </ul>
+</nav>
+
+@code {
+    public sealed record Item(string Text, string Href, bool Current);
+
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public IReadOnlyList<Item> Items { get; set; } = [];
+}

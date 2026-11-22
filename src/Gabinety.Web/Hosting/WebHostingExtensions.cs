@@ -52,7 +52,7 @@ public static class WebHostingExtensions
         if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/Error", createScopeForErrors: true);
         app.UseSecurityHeaders(options); // sets headers when the response starts and never answers by itself, so every response, a refusal included, carries them
         app.UseBrowserOriginGuard(); // before everything that acts: a foreign Origin never reaches the circuit, antiforgery or authentication
-        app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+        app.UseStatusCodePagesWithReExecute("/not-found", "?status={0}", createScopeForStatusCodePages: true); // the status rides along: the page says "Brak dostępu" for 403
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseAntiforgery();
@@ -69,6 +69,7 @@ public static class WebHostingExtensions
         assets.AllowAnonymous();
         assets.MapStaticAssets();
         app.MapOAuth();
+        app.MapAdminEndpoints(); // the ledger download (a stream, not a page)
         app.MapAccountEndpoints(); // /konto/export
 
         app.MapSeoEndpoints(); // sitemap.xml, robots.txt

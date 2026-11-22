@@ -3,6 +3,7 @@ using Gabinety.Contracts.Assistant;
 using Gabinety.Contracts.Common;
 using Gabinety.Contracts.Reputation;
 using Gabinety.Reputation.Clients;
+using Gabinety.Reputation.Jobs.SummaryPush;
 using Gabinety.Reputation.Features.Reviews.Summary;
 using Gabinety.Reputation.Persistence;
 using Gabinety.Reputation.Rules;
@@ -30,7 +31,7 @@ public sealed class CreateReviewFeature : IServiceFeature
         endpoints.MapPost("/api/v1/reviews", HandleAsync).RequireAuthorization("Authenticated");
 
     static async Task<IResult> HandleAsync(CreateReviewRequest? req, ClaimsPrincipal user, ReputationDbContext db, IBookingClient booking,
-        IAssistantClient assistant, PublicationDecider decider, TimeProvider time, ILogger<CreateReviewFeature> log, CancellationToken ct)
+        IAssistantClient assistant, PublicationDecider decider, SummaryPushSignal pushSignal, TimeProvider time, ILogger<CreateReviewFeature> log, CancellationToken ct)
     {
         var sub = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (sub is null) return Results.Unauthorized();
@@ -92,6 +93,7 @@ public sealed class CreateReviewFeature : IServiceFeature
             return Problem(ErrorCodes.AlreadyReviewed, "Already reviewed", 409); // the unique index on booking_id decides a race
         }
 
+        if (status == ReviewStatus.Published) pushSignal.Notify(); // the summary changed and is committed: push it now, not at the next tick
         log.LogInformation("Review {ReviewId} created for practitioner {PractitionerId} as {Status} (triage {TriageFlag})", review.Id, review.PractitionerId, status, review.TriageFlag);
         return Results.Json(new CreateReviewResponse(review.Id, status), statusCode: 201);
     }

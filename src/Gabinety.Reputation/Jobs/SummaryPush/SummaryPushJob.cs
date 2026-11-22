@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Gabinety.Reputation.Persistence;
 using Gabinety.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
@@ -86,8 +87,23 @@ public sealed class SummaryPushJob(IServiceScopeFactory scopes, IDirectoryReputa
     }
 }
 
-/// <summary>Runs the job every 60 s (CONTRACTS 5.3). The first cycle runs one interval after start.</summary>
-public sealed class SummaryPushHostedService(SummaryPushJob job, TimeProvider time, ILogger<SummaryPushHostedService> log) : BackgroundService
+/// <summary>
+/// Tells the push loop that a rating summary changed, so it pushes now instead of at the next 60 s tick. Without it the lag from a review to the Directory
+/// is anywhere from 0 to 60 s plus the retries, decided by where the review falls on the timer's grid; a review committed just after a tick waits a whole
+/// interval. Signals coalesce (one pending is enough: a cycle pushes every due summary) and a missed one costs nothing, the timer is still the safety net.
+/// </summary>
+public sealed class SummaryPushSignal
+{
+    readonly Channel<bool> _channel = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
+
+    /// <summary>Call after the change is committed (a cycle started earlier would not see it).</summary>
+    public void Notify() => _channel.Writer.TryWrite(true);
+
+    internal async Task WaitAsync(CancellationToken ct) => await _channel.Reader.ReadAsync(ct);
+}
+
+/// <summary>Runs the job every 60 s (CONTRACTS 5.3), and at once when <see cref="SummaryPushSignal"/> fires. The first timed cycle runs one interval after start.</summary>
+public sealed class SummaryPushHostedService(SummaryPushJob job, SummaryPushSignal signal, TimeProvider time, ILogger<SummaryPushHostedService> log) : BackgroundService
 {
     public static readonly TimeSpan Interval = TimeSpan.FromSeconds(60);
 
@@ -96,8 +112,21 @@ public sealed class SummaryPushHostedService(SummaryPushJob job, TimeProvider ti
         using var timer = new PeriodicTimer(Interval, time);
         try
         {
-            while (await timer.WaitForNextTickAsync(stoppingToken))
+            var tick = timer.WaitForNextTickAsync(stoppingToken).AsTask(); // one wait at a time on the timer; it is renewed only after it completes
+            var nudge = signal.WaitAsync(stoppingToken);
+            while (true)
             {
+                var done = await Task.WhenAny(tick, nudge);
+                if (done == tick)
+                {
+                    if (!await tick) break;
+                    tick = timer.WaitForNextTickAsync(stoppingToken).AsTask();
+                }
+                else
+                {
+                    await nudge;
+                    nudge = signal.WaitAsync(stoppingToken);
+                }
                 try { await job.RunOnceAsync(stoppingToken); }
                 catch (Exception ex) when (ex is not OperationCanceledException) { log.LogError("SummaryPush cycle failed: {ExceptionType}", ex.GetType().Name); }
             }
@@ -111,6 +140,7 @@ public sealed class SummaryPushFeature : IServiceFeature
     public void Add(IHostApplicationBuilder builder)
     {
         builder.Services.AddDirectoryReputationClient();
+        builder.Services.AddSingleton<SummaryPushSignal>();
         builder.Services.AddSingleton<SummaryPushJob>();
         builder.Services.AddHostedService<SummaryPushHostedService>();
     }

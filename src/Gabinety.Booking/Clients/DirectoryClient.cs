@@ -18,6 +18,9 @@ public sealed record DirectoryPractitionerName(Guid PractitionerId, string Displ
 /// <summary>GET /internal/v1/practitioners/{userId}/contact: the practitioner's e-mail, a snapshot of the token they last used on their profile. Personal data: never logged.</summary>
 public sealed record DirectoryContact(string? Email);
 
+/// <summary>GET /internal/v1/practitioners/{id}/contract (ADR proposal 0013): who a collaboration proposal goes to, and whether it may be sent.</summary>
+public sealed record DirectoryContractTarget(Guid PractitionerId, string PractitionerUserId, PractitionerStatus Status, string DisplayName, string Slug, bool AcceptsProposals);
+
 /// <summary>Directory did not answer in budget (connection failure, timeout or 5xx after the retry). The message never carries the URL or the key.</summary>
 public sealed class DirectoryUnavailableException(Exception? inner = null) : Exception("Directory is unavailable.", inner);
 
@@ -31,6 +34,8 @@ public interface IDirectoryClient
     Task<DirectoryPractitionerName?> GetPractitionerNameAsync(Guid practitionerId, CancellationToken ct);
     /// <summary>The e-mail snapshot of a practitioner's user. Null when Directory answers 404 (unknown user, or no address held yet).</summary>
     Task<DirectoryContact?> GetPractitionerContactAsync(string userId, CancellationToken ct);
+    /// <summary>The target of a collaboration proposal (ADR proposal 0013). Null when the practitioner is unknown (404).</summary>
+    Task<DirectoryContractTarget?> GetContractTargetAsync(Guid practitionerId, CancellationToken ct);
     /// <summary>One probe of /alive, no retry; false on any failure or non-200.</summary>
     Task<bool> IsAliveAsync(CancellationToken ct);
 }
@@ -54,6 +59,9 @@ public sealed class DirectoryClient(HttpClient http, string? internalKey, TimeSp
         GetAsync<DirectoryPractitionerName>($"internal/v1/practitioners/{practitionerId}", ct);
     public Task<DirectoryContact?> GetPractitionerContactAsync(string userId, CancellationToken ct) =>
         GetAsync<DirectoryContact>($"internal/v1/practitioners/{Uri.EscapeDataString(userId)}/contact", ct);
+
+    public Task<DirectoryContractTarget?> GetContractTargetAsync(Guid practitionerId, CancellationToken ct) =>
+        GetAsync<DirectoryContractTarget>($"internal/v1/practitioners/{practitionerId}/contract", ct);
 
     public async Task<bool> IsAliveAsync(CancellationToken ct)
     {

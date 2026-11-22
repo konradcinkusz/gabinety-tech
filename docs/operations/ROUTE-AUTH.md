@@ -85,6 +85,13 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | POST | `/api/v1/admin/bookings/{id}/resolve` | Admin | all | |
 | Booking | GET | `/api/v1/admin/ledger.csv` | Admin | all | |
 | Booking | GET | `/internal/v1/bookings/{id}/reviewability` | Internal | all | caller: Reputation |
+| Booking | POST | `/api/v1/proposals` | Authenticated | all | ADR proposal 0013 (T-13.02): a client sends a collaboration proposal; `Idempotency-Key` required; limited to 5 per hour and 20 per day per user |
+| Booking | GET | `/api/v1/proposals/{id}` | Authenticated | all | a party of the proposal; anyone else gets 404; the counterpart's e-mail only once Accepted |
+| Booking | GET | `/api/v1/me/proposals` | Authenticated | all | `role=client\|practitioner`, optional `state=open\|closed`, cursor paging |
+| Booking | POST | `/api/v1/proposals/{id}/accept` | Authenticated | all | the party whose turn it is; the round seen is in the body |
+| Booking | POST | `/api/v1/proposals/{id}/counter` | Authenticated | all | the party whose turn it is; new terms and an optional note |
+| Booking | POST | `/api/v1/proposals/{id}/reject` | Authenticated | all | the party whose turn it is |
+| Booking | POST | `/api/v1/proposals/{id}/withdraw` | Authenticated | all | the client only, while the proposal is open |
 | Booking | POST | `/internal/v1/practitioners/{id}/cancel-future-bookings` | Internal | all | caller: Directory (suspension and erasure, ADR-0012); idempotent |
 | Booking | DELETE | `/internal/v1/subjects/{userId}` | Internal | all | owner runbook (erasure) |
 | Booking | GET | `/internal/v1/analytics/pair-counts` | Internal | all | caller: Reputation (T-10.03) |

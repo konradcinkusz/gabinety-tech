@@ -60,7 +60,7 @@ public sealed class NotificationDispatcher(IServiceScopeFactory scopes, TimeProv
         var n = await db.Notifications.SingleOrDefaultAsync(x => x.Id == id, ct);
         if (n is null || n.SentAt != null || n.Attempts >= MaxAttempts || n.DueAt > now) return false;
 
-        var booking = await db.Bookings.AsNoTracking().Where(b => b.Id == n.BookingId)
+        var booking = n.ProposalId is not null ? null : await db.Bookings.AsNoTracking().Where(b => b.Id == n.BookingId)
             .Select(b => new { b.StartUtc, b.PractitionerUserId, b.ClientEmail }).SingleOrDefaultAsync(ct);
         if (booking is not null && IsReminder(n.Kind) && booking.StartUtc <= now)
         {
@@ -76,15 +76,32 @@ public sealed class NotificationDispatcher(IServiceScopeFactory scopes, TimeProv
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return false; } // another dispatcher claimed it first, or it was cancelled meanwhile
 
-        if (booking is null) return Failed(n, "the booking does not exist");
+        var site = SiteUrl.From(sp.GetRequiredService<IConfiguration>());
+        if (n.ProposalId is { } proposalId)
+        {
+            // ADR proposal 0013: the same claim, address lookup and delivery as a booking row; only the facts and the template differ.
+            var proposal = await db.Proposals.AsNoTracking().Where(p => p.Id == proposalId).Select(p => new { p.PractitionerUserId, p.ClientEmail }).SingleOrDefaultAsync(ct);
+            if (proposal is null) return Failed(n, "the proposal does not exist");
+            var toPractitioner = n.ToUserId == proposal.PractitionerUserId;
+            return await DeliverAsync(sp, db, n, new ContactLookup(n.ToUserId, toPractitioner, proposal.ClientEmail),
+                () => NotificationTemplates.RenderProposal(n.Kind, site, proposalId, toPractitioner), ct);
+        }
+        if (booking is null || n.BookingId is not { } bookingId) return Failed(n, "the booking does not exist");
 
         var forPractitioner = n.ToUserId == booking.PractitionerUserId;
+        return await DeliverAsync(sp, db, n, new ContactLookup(n.ToUserId, forPractitioner, booking.ClientEmail),
+            () => NotificationTemplates.Render(n.Kind, site, bookingId, booking.StartUtc, forPractitioner), ct);
+    }
+
+    /// <summary>Finds the address, renders and sends; marks the row sent. A failure at any step is a failed attempt (the row was already claimed).</summary>
+    async Task<bool> DeliverAsync(IServiceProvider sp, BookingDbContext db, Notification n, ContactLookup recipient, Func<RenderedEmail> render, CancellationToken ct)
+    {
         string? address;
-        try { address = await sp.GetRequiredService<IContactResolver>().ResolveAddressAsync(new ContactLookup(n.ToUserId, forPractitioner, booking.ClientEmail), ct); }
+        try { address = await sp.GetRequiredService<IContactResolver>().ResolveAddressAsync(recipient, ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { return Failed(n, "the address lookup failed: " + ex.GetType().Name); }
         if (string.IsNullOrWhiteSpace(address)) return Failed(n, "the user has no address");
 
-        var mail = NotificationTemplates.Render(n.Kind, SiteUrl.From(sp.GetRequiredService<IConfiguration>()), n.BookingId, booking.StartUtc, forPractitioner);
+        var mail = render();
         try { await sp.GetRequiredService<IEmailSender>().SendAsync(new EmailMessage(address, n.ToUserId, n.Kind, mail.Subject, mail.Text, mail.Html), ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { return Failed(n, "the sender failed: " + ex.GetType().Name); }
 

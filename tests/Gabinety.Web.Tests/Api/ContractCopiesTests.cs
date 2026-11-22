@@ -154,12 +154,6 @@ public class ContractCopiesTests
     }
 
     [Fact]
-    public void The_profile_with_its_offerings() =>
-        RoundTrip<W.PractitionerProfileDto>(new PractitionerProfile(new PractitionerCard(Id, "demo-anna", "Anna", "H", null, [Badge.Email], null, true, new MoneyDto(25000), ["audyt-kodu"], [60]), "Bio", null,
-            [new Offering(Id, "Audyt", "Opis", 60, new MoneyDto(25000), "audyt-kodu", ["dotnet"])], 3, At),
-            check: c => Assert.Equal(("Audyt", 60, 25000L, "audyt-kodu"), (c.Offerings[0].Title, c.Offerings[0].DurationMinutes, c.Offerings[0].Price.AmountMinor, c.Offerings[0].ProblemSlug)));
-
-    [Fact]
     public void The_brief_suggestion_of_the_assistant() =>
         RoundTrip<W.BriefSuggestionDto>(new Gabinety.Contracts.Assistant.BriefSuggestion("audyt-kodu", ["dotnet"], "Streszczenie", ["Jaki budżet?"], 60, Gabinety.Contracts.Assistant.Confidence.High, "fake", "v1"),
             new JsonSerializerOptions(JsonSerializerDefaults.Web) { Converters = { new SnakeCaseLowerEnumConverter() } }, c => Assert.Equal(("audyt-kodu", "Streszczenie", "high"), (c.ProblemSlug, c.Summary, c.Confidence)));

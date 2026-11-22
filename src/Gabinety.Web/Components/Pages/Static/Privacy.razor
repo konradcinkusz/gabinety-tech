@@ -1,0 +1,10 @@
+@page "/polityka-prywatnosci"
+@attribute [AllowAnonymous]
+@attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = Gabinety.Web.Hosting.PublicPageCachePolicy.Name)]
+
+<PageMeta Title="@PlPages.Legal.PrivacyMetaTitle" Description="@PlPages.Legal.PrivacyMetaDescription" Path="/polityka-prywatnosci" />
+<LegalPage Title="@PlPages.Legal.PrivacyTitle" Doc="_doc" />
+
+@code {
+    readonly LegalDoc _doc = LegalMarkdown.Load("polityka-prywatnosci");
+}

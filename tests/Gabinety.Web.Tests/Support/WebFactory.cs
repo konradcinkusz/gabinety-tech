@@ -26,6 +26,10 @@ public sealed class WebFactory : WebApplicationFactory<Program>
         ["Site:BaseUrl"] = "http://localhost", ["RateLimit:TrustedProxyKey"] = TrustedKey,
     };
     string _environment = "Development";
+    readonly List<Action<IServiceCollection>> _services = [];
+
+    /// <summary>Replaces or adds services of the host under test (a fixed clock, for instance).</summary>
+    public WebFactory Configure(Action<IServiceCollection> configure) { _services.Add(configure); return this; }
 
     public WebFactory With(string key, string? value) { _settings[key] = value; return this; }
     public WebFactory In(string environment) { _environment = environment; return this; }
@@ -46,6 +50,7 @@ public sealed class WebFactory : WebApplicationFactory<Program>
                 services.AddHttpClient(name).ConfigurePrimaryHttpMessageHandler(() => handler);
             }
             // The kernel's one resilience handler stays; only the wait between attempts is removed so a failing backend does not make a test slow.
+            foreach (var configure in _services) configure(services);
             services.PostConfigureAll<HttpStandardResilienceOptions>(o => { o.Retry.Delay = TimeSpan.Zero; o.Retry.UseJitter = false; o.Retry.BackoffType = Polly.DelayBackoffType.Constant; o.Retry.MaxDelay = null; });
         });
     }

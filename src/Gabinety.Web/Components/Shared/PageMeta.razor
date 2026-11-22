@@ -1,0 +1,27 @@
+@inject Gabinety.Web.Hosting.WebOptions Site
+@* The head of a public page: unique title and description, one canonical URL, Open Graph (SPEC 6.5). A page that must not be indexed says so with Robots. *@
+<PageTitle>@Title</PageTitle>
+<HeadContent>
+    <meta name="description" content="@Description" />
+    <link rel="canonical" href="@Url" />
+    @if (Robots is not null) {<meta name="robots" content="@Robots" />}
+    <meta property="og:title" content="@Title" />
+    <meta property="og:description" content="@Description" />
+    <meta property="og:url" content="@Url" />
+    <meta property="og:type" content="@Type" />
+    <meta property="og:locale" content="pl_PL" />
+    @ChildContent
+</HeadContent>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Description { get; set; } = "";
+    /// <summary>The path of the page ("/cennik"); the canonical URL is the site address plus this.</summary>
+    [Parameter, EditorRequired] public string Path { get; set; } = "/";
+    [Parameter] public string Type { get; set; } = "website";
+    [Parameter] public string? Robots { get; set; }
+    /// <summary>More head elements of the page (the profile's JSON-LD): one HeadContent per page, so they travel with the metadata.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    string Url => Site.SiteBaseUrl + (Path == "/" ? "/" : Path);
+}

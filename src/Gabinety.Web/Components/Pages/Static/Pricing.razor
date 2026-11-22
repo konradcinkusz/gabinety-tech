@@ -1,0 +1,47 @@
+@page "/cennik"
+@attribute [AllowAnonymous]
+@attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = Gabinety.Web.Hosting.PublicPageCachePolicy.Name)]
+@inject IConfiguration Config
+
+<PageMeta Title="@PlPages.Pricing.MetaTitle" Description="@PlPages.Pricing.MetaDescription" Path="/cennik" />
+
+<div class="prose">
+    <header class="page-header">
+        <h1>@PlPages.Pricing.Title</h1>
+        <p class="lead">@PlPages.Pricing.Intro</p>
+    </header>
+    <section class="section" aria-labelledby="pricing-rule">
+        <h2 id="pricing-rule">@PlPages.Pricing.OnlyFirst</h2>
+        <p>@string.Format(PlPages.Pricing.Rule, Rate)</p>
+        <ul>
+            <li>@PlPages.Pricing.Later</li>
+            <li>@PlPages.Pricing.Absorbed</li>
+            <li>@PlPages.Pricing.Rounding</li>
+        </ul>
+        <p>@PlPages.Pricing.RefundNote</p>
+    </section>
+    <section class="section" aria-labelledby="pricing-example">
+        <h2 id="pricing-example">@PlPages.Pricing.ExampleTitle</h2>
+        <ScrollTable Caption="@PlPages.Pricing.ExampleCaption">
+            <thead><tr><th scope="col">@PlPages.Pricing.ColItem</th><th scope="col" class="num">@PlPages.Pricing.ColAmount</th></tr></thead>
+            <tbody>
+                <tr><th scope="row">@PlPages.Pricing.Price</th><td class="num">@Money.Pln(Fee.ExamplePriceMinor)</td></tr>
+                <tr><th scope="row">@PlPages.Pricing.FeeRow</th><td class="num">@Money.Pln(_fee)</td></tr>
+                <tr><th scope="row">@PlPages.Pricing.Payout</th><td class="num">@Money.Pln(Fee.ExamplePriceMinor - _fee)</td></tr>
+            </tbody>
+        </ScrollTable>
+    </section>
+</div>
+
+@code {
+    long _fee;
+    string Rate = "";
+
+    // The rate is runtime configuration under the key the Billing service reads (never baked in); a bad value falls back to the default.
+    protected override void OnInitialized()
+    {
+        var bps = Fee.BpsFrom(Config[Fee.ConfigKey]);
+        _fee = Fee.For(Fee.ExamplePriceMinor, bps);
+        Rate = PlFormat.Number(bps / 100.0, 2) + "%";
+    }
+}

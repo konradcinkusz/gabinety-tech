@@ -41,7 +41,8 @@ public sealed class ClientAreaFixture : IAsyncDisposable
     public static async Task<ClientAreaFixture> Visitor(Action<WebFactory>? configure = null) => new(new WebFactory(), configure);
 
     public static PractitionerProfileDto Profile(string name = "Anna Demowska", long price = 25000) =>
-        new(Sample.Card("demo-anna-demowska", name), [new OfferingDto(OfferingId, "Audyt kodu demo", "Opis oferty demo", 60, new MoneyDto(price, "PLN"), "audyt-kodu")]);
+        new(Guid.NewGuid(), "demo-anna-demowska", name, "Audyty kodu .NET", null, ["email"], null, true, new MoneyDto(price, "PLN"), "Bio demo", null,
+            [new OfferingDto(OfferingId, "Audyt kodu demo", "Opis oferty demo", 60, new MoneyDto(price, "PLN"), "audyt-kodu", ["dotnet"])], 0, new DateTimeOffset(2026, 11, 3, 9, 0, 0, TimeSpan.Zero));
 
     public static BookingDetailDto Detail(string status = "Confirmed", string practitioner = "Anna Demowska", string client = "demo-client", string payment = "Succeeded", long refunded = 0,
         bool cancel = false, bool dispute = false, bool noShow = false, bool review = false, string? meeting = null, DateTimeOffset? hold = null, string? brief = "Opis problemu demo, syntetyczny.", JsonElement? outcome = null,

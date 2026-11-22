@@ -109,7 +109,7 @@ else if (_offering is not null)
         }
         _offering = profile.Value!.Offerings.FirstOrDefault(o => o.Id == OfferingId);
         if (_offering is null) { Navigation.NotFound(); return; }
-        _practitionerName = profile.Value.Card.DisplayName;
+        _practitionerName = profile.Value.DisplayName;
         if (string.IsNullOrWhiteSpace(StartParam) || !DateTimeOffset.TryParse(StartParam, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out _start))
         {
             (_missing, _offering) = (true, null);

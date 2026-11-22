@@ -85,7 +85,12 @@ export async function addOffering(practitionerCtx: APIRequestContext, like: Publ
       techSlugs: like.techSlugs,
     },
   });
-  expect(res.status(), "create offering").toBe(201);
+  // On a refusal say WHICH one (the machine code and the field names only, never the text: the offering text is ours but the habit is "no body in logs"): a 422 is validation_failed,
+  // too_many_offerings or contact_details_not_allowed, and they mean different things. (CI once failed here with a bare 422 next to a J3 failure.)
+  if (res.status() !== 201) {
+    const b = (await res.json().catch(() => null)) as { code?: string; errors?: { field?: string }[] } | null;
+    expect(res.status(), `create offering: ${b?.code ?? "-"} ${(b?.errors ?? []).map((e) => e.field).join(",")}`).toBe(201);
+  }
   return ((await res.json()) as { id: string }).id;
 }
 

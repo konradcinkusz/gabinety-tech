@@ -271,3 +271,14 @@ The owner wants the product delivered autonomously; the supervisor decides the o
 - **The Vitest test of the Next handlers against the real authservice left CI with `web/`.** The Blazor host's identity client has no real-authservice test yet (follow-up, listed in the PR and in `AUTH.md`): fakes cover it, the journeys cover it end to end against the stand-in.
 - **Nothing was run against Fly, DNS or the owner's accounts.** The repository variable `CUTOVER_GATE` is the owner's to delete (an agent cannot).
 - **Precondition 7 (memory)** was restated from `PERFORMANCE.md` section 8, not re-measured: the host code did not change in this PR. Re-run `ONLY_CIRCUITS=1 scripts/measure-performance.sh` before the go-live if it changed since.
+
+## 9. The Blazor host's auth against the real authservice (branch `fix/blazor-real-auth`, 2026-11-22)
+
+The cutover deleted the only test of the web's auth handlers against the real authservice (`real-authservice.test.ts`). `tests/Gabinety.Integration.Tests/BlazorAuth` replaces it for the Blazor host (list in `docs/operations/AUTH.md` section 9).
+
+- **In process, no fake backend.** `WebApplicationFactory<Program>` of `Gabinety.Web` (extern alias `WebApp`, as the services in the same project) with `Backend__Auth`/`Identity__PublicUrl`/issuer/audience of the real instance; the other backends point at a closed port because the auth pages never call them. A "deploy" is a second host with the same `DataProtection:KeysPath` (an empty session cache, the same cookies); the clock is an offset `TimeProvider`, so an hour-long access token is "about to expire" without waiting.
+- **Same collection and fixture as `RealAuth`** (one PostgreSQL, the `Main`/`Confirm` instances); key rotation starts two more instances on one database and moves the host between them with a rewriting handler.
+- **Failure power** (mutation runs, each fails exactly the test named): removing the keyed lock of `UserTokens` fails the concurrent-refresh test; dropping the cookie catch-up fails the rotation test; `IsAdmin` without `SuperAdmin` fails the owner test; keeping only the first role fails the array test; dropping `Fly-Client-IP` fails the two-visitors test; skipping the identity logout fails the logout test; `HttpOnly=false` fails the cookie test.
+- **Result:** no defect found in the Blazor auth code; nothing was changed in `src/`. Run here against the v0.3.4 source as a process (AUTH.md section 10); the image run is the CI `integration` job.
+- **Not proven, stays on the owner's list:** the GitHub callback leg with a real OAuth app (GO-LIVE row 5) and e-mail confirmation delivery.
+- **Required checks** are `e2e`, `build-test`, `docker-build-backend (web)`; CI.md and GO-LIVE row 11 said otherwise.

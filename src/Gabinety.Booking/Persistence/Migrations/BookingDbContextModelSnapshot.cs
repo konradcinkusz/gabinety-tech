@@ -481,6 +481,27 @@ namespace Gabinety.Booking.Persistence.Migrations
                     b.ToTable("notifications", (string)null);
                 });
 
+            modelBuilder.Entity("Gabinety.Booking.Notifications.Preferences.NotificationPreference", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.HasKey("UserId", "Kind");
+
+                    b.ToTable("notification_preferences", (string)null);
+                });
+
             modelBuilder.Entity("Gabinety.Booking.Persistence.AvailabilityException", b =>
                 {
                     b.Property<Guid>("Id")

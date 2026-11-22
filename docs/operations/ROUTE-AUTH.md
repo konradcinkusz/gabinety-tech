@@ -75,7 +75,10 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | POST | `/api/v1/bookings` | Authenticated | all | |
 | Booking | GET | `/api/v1/bookings/{id}` | Authenticated | all | |
 | Booking | GET | `/api/v1/me/bookings` | Authenticated | all | |
+| Booking | GET | `/api/v1/me/earnings` | Authenticated | all | practitioner only (403 otherwise), own rows only; T-11.15 |
 | Booking | POST | `/api/v1/bookings/{id}/cancel` | Authenticated | all | |
+| Booking | GET | `/api/v1/me/notification-preferences` | Authenticated | all | the caller's own rows only; T-11.12 |
+| Booking | PUT | `/api/v1/me/notification-preferences` | Authenticated | all | the caller's own rows only; a transactional kind is 400; T-11.12 |
 | Booking | POST | `/api/v1/bookings/{id}/reschedule` | Authenticated | all | client of the booking only (practitioner 403, stranger 404) |
 | Booking | POST | `/api/v1/bookings/{id}/dispute` | Authenticated | all | |
 | Booking | POST | `/api/v1/bookings/{id}/report-client-no-show` | Authenticated | all | |
@@ -167,6 +170,7 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings (client and practitioner tabs), static server rendering |
 | Web | PAGE | `/moje/rezerwacje/{BookingId}` | Authenticated | all | booking detail with cancel, dispute and no-show (form posts, antiforgery) |
 | Web | GET | `/moje/rezerwacje/{BookingId}/kalendarz.ics` | Authenticated | all | the booking as an iCalendar attachment (`text/calendar`, no-store), read with the user's own bearer; only for Confirmed or Completed bookings, 404 otherwise and for another user's booking |
+| Web | PAGE | `/moje/rezerwacje/{BookingId}/zmien-termin` | Authenticated | all | the client moves a confirmed booking once, 24 h or more before its start (form posts, antiforgery); a booking that is not the caller's is the forbidden page; T-11.11 |
 | Web | PAGE | `/moje/opinie` | Authenticated | all | the practitioner's own reviews and replies |
 | Web | PAGE | `/moje/opinie/{BookingId}` | Authenticated | all | write a review (form post, antiforgery) |
 | Web | PAGE | `/rezerwacja/{OfferingId}` | Authenticated | all | booking form: brief, assistant suggestion, pay (form posts, antiforgery) |

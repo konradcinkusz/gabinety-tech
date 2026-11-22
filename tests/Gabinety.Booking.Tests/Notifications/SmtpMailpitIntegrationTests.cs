@@ -102,7 +102,8 @@ public class SmtpMailpitIntegrationTests
             Assert.DoesNotContain(Secret, all);
             Assert.DoesNotContain("demo-brief", all);
             Assert.DoesNotContain(SmtpPassword, all);
-            Assert.DoesNotContain("demo-smtp-user", all);
+            // Mailpit's own metadata ("Username") records the SMTP login name: that is the server's record of the session, not the message. The message carries none of it.
+            Assert.DoesNotContain("demo-smtp-user", m.GetProperty("Subject").GetString() + m.GetProperty("Text").GetString() + m.GetProperty("HTML").GetString());
             Assert.Contains($"/moje/rezerwacje/{id}", m.GetProperty("Text").GetString()); // the link to the page, nothing from the brief
         }
 

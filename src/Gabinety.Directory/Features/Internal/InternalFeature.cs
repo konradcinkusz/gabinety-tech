@@ -1,5 +1,6 @@
 using Gabinety.Contracts.Common;
 using Gabinety.Contracts.Directory;
+using Gabinety.Directory.Clients;
 using Gabinety.Directory.Features.Offerings;
 using Gabinety.Directory.Features.Profiles;
 using Gabinety.Directory.Features.Ranking;
@@ -110,11 +111,21 @@ public sealed class InternalFeature : IServiceFeature
         return Results.NoContent();
     }
 
-    /// <summary>Anonymises the practitioner row and its offerings. Idempotent: a second call finds no row for the old user id and answers 204.</summary>
-    static async Task<IResult> Erase(string userId, DirectoryDbContext db, TimeProvider time, CancellationToken ct)
+    /// <summary>
+    /// Anonymises the practitioner row and its offerings, after Booking has cancelled their future bookings with a full refund (ADR-0012): the practitioner id the
+    /// call needs survives the erasure, but the clients must not be left with a booking nobody will hold. When Booking cannot finish, nothing is erased and the answer is
+    /// 503, so the erasure job repeats the whole call. Idempotent: a second call finds no row for the old user id and answers 204.
+    /// </summary>
+    static async Task<IResult> Erase(string userId, DirectoryDbContext db, TimeProvider time, IBookingClient booking, CancellationToken ct)
     {
         var p = await db.Practitioners.SingleOrDefaultAsync(x => x.UserId == userId, ct);
         if (p is null) return Results.NoContent();
+        try { await booking.CancelFutureBookingsAsync(p.Id, ct); }
+        catch (BookingUnavailableException)
+        {
+            return Results.Json(ApiProblem.Of(ErrorCodes.DependencyUnavailable, "Dependency unavailable", 503,
+                "Booking could not cancel the practitioner's future bookings yet; nothing was erased. Repeat the call.", null), statusCode: 503, contentType: "application/problem+json");
+        }
 
         p.DisplayName = ErasedName; p.Headline = ""; p.Bio = "";
         p.GithubLogin = null; p.GithubLinked = false; p.Nip = null; p.NipValid = false; p.PortfolioUrl = null; p.MeetingUrlDefault = null; p.StatusReason = null;

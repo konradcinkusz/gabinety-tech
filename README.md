@@ -18,4 +18,4 @@ pnpm --dir web install --frozen-lockfile
 dotnet run --project src/Gabinety.AppHost --launch-profile fake
 ```
 
-Then `scripts/check-fake-profile.sh` checks every service. Ports: devidentity 5100, directory 5101, booking 5102, reputation 5103, assistant 5104, web 3000.
+Then `scripts/check-fake-profile.sh` checks every service. Ports: devidentity 5100, directory 5101, booking 5102, reputation 5103, assistant 5104, web 3000 (Next.js), web-blazor 3001 (the Blazor Web App port, ADR-0010 proposal: `docs/adr-proposals/0010-blazor-web-app-frontend.md`; it runs beside the Next.js app until a cutover).

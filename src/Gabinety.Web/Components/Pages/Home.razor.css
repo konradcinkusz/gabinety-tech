@@ -1,0 +1,4 @@
+.search-form { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); max-width: 42rem; }
+.search-form .field { flex: 1 1 14rem; }
+.steps { display: grid; gap: var(--space-4); }
+@media (min-width: 52rem) { .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

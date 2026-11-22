@@ -1,0 +1,5 @@
+@inject NavigationManager Navigation
+@code {
+    // A signed-out visitor on a page that needs a session goes to sign-in and comes back (?redirect=<path and query>).
+    protected override void OnInitialized() => Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe("/" + Navigation.ToBaseRelativePath(Navigation.Uri))), forceLoad: true);
+}

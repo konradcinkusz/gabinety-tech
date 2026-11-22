@@ -87,4 +87,20 @@ var web = builder.AddJavaScriptApp("web", "../../web", "dev")
     .WithEnvironment("Site__BaseUrl", "http://localhost:3000")
     .WaitFor(directory);
 
+// The Blazor Web App frontend (ADR-0010 proposal) runs beside the Next.js one until a cutover PR: same backend addresses, port 3001, the kernel's /health. It is given NO internal key: that is for
+// services calling services (ADR-0007). Not in the default profile's WaitFor chain of anything: nothing depends on a frontend.
+builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchProfileName: null)
+    .WithHttpEndpoint(port: 3001, isProxied: false)
+    .WithHttpHealthCheck("/health")
+    // Aspire starts a project WITHOUT ASPNETCORE_ENVIRONMENT here (launchProfileName: null), so it would run as Production from an unpublished build, where the pre-compressed static assets
+    // (the stylesheets, blazor.web.js) cannot be found and answer 500 to every browser (they send Accept-Encoding; curl and in-process tests do not). A developer's AppHost is Development.
+    .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
+    .WithEnvironment("Backend__Directory", DirectoryUrl)
+    .WithEnvironment("Backend__Booking", BookingUrl)
+    .WithEnvironment("Backend__Reputation", ReputationUrl)
+    .WithEnvironment("Backend__Assistant", AssistantUrl)
+    .WithEnvironment("Backend__Auth", identityAuthority)
+    .WithEnvironment("Site__BaseUrl", "http://localhost:3001")
+    .WaitFor(directory);
+
 builder.Build().Run();

@@ -1,0 +1,28 @@
+@page "/wyloguj"
+@attribute [AllowAnonymous]
+@inject SignInService SignIn
+@inject NavigationManager Navigation
+
+<PageTitle>@Pl.Logout.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@Pl.Logout.Title</h1>
+<p>@Pl.Logout.Body</p>
+<EditForm Model="Form!" FormName="logout" OnSubmit="SubmitAsync" class="stack form-narrow">
+    <div><button class="btn btn--primary" type="submit">@Pl.Logout.Submit</button></div>
+</EditForm>
+
+@code {
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm] LogoutForm? Form { get; set; }
+
+    protected override void OnInitialized() => Form ??= new();
+
+    async Task SubmitAsync()
+    {
+        await SignIn.SignOutAsync(HttpContext);
+        Navigation.NavigateTo($"/?{Gabinety.Web.Components.Layout.FlashKey.Parameter}={Gabinety.Web.Components.Layout.FlashKey.SignedOut}");
+    }
+
+    public sealed class LogoutForm { }
+}

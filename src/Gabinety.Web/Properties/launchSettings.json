@@ -1,0 +1,19 @@
+{
+  "profiles": {
+    "fake": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:3001",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Site__BaseUrl": "http://localhost:3001",
+        "Backend__Directory": "http://localhost:5101",
+        "Backend__Booking": "http://localhost:5102",
+        "Backend__Reputation": "http://localhost:5103",
+        "Backend__Assistant": "http://localhost:5104",
+        "Backend__Auth": "http://localhost:5100"
+      }
+    }
+  }
+}

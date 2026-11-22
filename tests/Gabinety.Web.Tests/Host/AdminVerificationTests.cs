@@ -28,8 +28,9 @@ public class AdminVerificationTests
         Assert.Contains("24 lis 2026, 13:00", Page.Squash(row.TextContent)); // short date in Warsaw time, no seconds
         Assert.Contains("Weryfikacja programistów", page.TextOf("nav.admin-tabs a[aria-current=page]"));
         Assert.Equal("Czeka na weryfikację", page.TextOf(".admin-segmented a[aria-current=page]"));
-        Assert.Equal("Bearer", host.Web.Directory.Requests[0].Authorization?.Split(' ')[0]); // the user's own token
-        Assert.Contains("status=Submitted", host.Web.Directory.Requests[0].PathAndQuery);
+        var queue = host.Web.Directory.Requests.Single(r => r.PathAndQuery != "/api/v1/me");
+        Assert.Equal("Bearer", queue.Authorization?.Split(' ')[0]); // the user's own token
+        Assert.Contains("status=Submitted", queue.PathAndQuery);
     }
 
     [Fact]

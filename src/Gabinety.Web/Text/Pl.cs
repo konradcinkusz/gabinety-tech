@@ -12,12 +12,16 @@ public static class Pl
         public const string Name = "Gabinety Tech", Tagline = "Płatna konsultacja ze zweryfikowanym programistą";
         public const string Copyright = "© {0} Gabinety Tech";
         public const string Terms = "Regulamin", Privacy = "Polityka prywatności", FooterLabel = "Informacje prawne";
+        // UX-010: the footer's column titles (the legal column is named by FooterLabel for assistive technology).
+        public const string ProductColumn = "Produkt", PractitionersColumn = "Dla programistów", LegalColumn = "Prawne";
     }
 
     public static class Nav
     {
         public const string Label = "Menu główne", Search = "Programiści", SignIn = "Zaloguj się", Register = "Załóż konto", MyBookings = "Moje rezerwacje", SignOut = "Wyloguj się";
         public const string Account = "Konto", PractitionerArea = "Panel programisty", Admin = "Administracja", Menu = "Menu", AccountMenu = "Twoje konto";
+        // UX-010: the public links of the header and footer, and the account menu's entry for a signed-in user without a practitioner profile (D-2).
+        public const string HowItWorks = "Jak to działa", Pricing = "Cennik", RankingRules = "Zasady rankingu", BecomePractitioner = "Zostań programistą";
     }
 
     public static class A11y

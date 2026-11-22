@@ -385,3 +385,30 @@ public class ProfileStatusTests
     [InlineData("Rejected", "Odrzucony", "danger")] [InlineData("Suspended", "Zawieszony", "danger")] [InlineData("Surprise", "Status nieznany", "neutral")]
     public void A_status_has_the_label_the_journeys_read_and_a_kind(string status, string label, string kind) => Assert.Equal((label, kind), (ProfileStatus.Label(status), ProfileStatus.Kind(status)));
 }
+
+public class EarningsMonthTests
+{
+    static readonly DateOnly Today = new(2026, 11, 22);
+
+    [Theory]
+    [InlineData(null)] [InlineData("")] [InlineData("2026-1")] [InlineData("2026-13")] [InlineData("2026-00")] [InlineData("nonsense")] [InlineData("2026-10-01")] [InlineData("2099-01")] [InlineData("2026-12")]
+    public void Only_a_month_the_card_can_show_is_parsed(string? text) => Assert.Null(EarningsMonth.Parse(text, Today));
+
+    [Fact]
+    public void The_current_month_and_the_past_ones_are_parsed_to_their_first_day() =>
+        Assert.Equal((new DateOnly(2026, 11, 1), new DateOnly(2026, 10, 1)), (EarningsMonth.Parse("2026-11", Today), EarningsMonth.Parse("2026-10", Today)));
+
+    [Theory]
+    [InlineData(2026, 10, 31)] [InlineData(2028, 2, 29)] [InlineData(2027, 2, 28)] [InlineData(2026, 4, 30)]
+    public void A_month_runs_from_its_first_day_to_its_last_inclusive(int year, int month, int last) =>
+        Assert.Equal((new DateOnly(year, month, 1), new DateOnly(year, month, last)), EarningsMonth.Range(new DateOnly(year, month, 1)));
+
+    [Fact]
+    public void The_key_and_the_period_wording() =>
+        Assert.Equal(("2026-10", "Okres: 1 października 2026 – 31 października 2026"), (EarningsMonth.Key(new DateOnly(2026, 10, 1)), EarningsMonth.Period(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31))));
+
+    [Theory]
+    [InlineData(123456, "1\u00A0234,56\u00A0zł")] [InlineData(0, "0,00\u00A0zł")] [InlineData(-2500, "−25,00\u00A0zł")]
+    public void Money_is_the_site_helper_with_the_sign_of_a_reversal_kept(long grosz, string text) =>
+        Assert.Equal(text, EarningsMonth.Amount(new MoneyDto(grosz, "PLN")));
+}

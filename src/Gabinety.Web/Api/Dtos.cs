@@ -142,3 +142,9 @@ public sealed record PaymentAccountDto(string Provider, string State);
 
 /// <summary><c>POST /api/v1/me/payments/account/onboarding</c>: <c>OnboardingUrl</c> is single use and short lived; it is never stored or logged.</summary>
 public sealed record PaymentOnboardingDto(string Provider, string State, string? OnboardingUrl);
+
+/// <summary>
+/// <c>GET /api/v1/me/earnings</c> (CONTRACTS 4.2, T-11.15): the Warsaw-day range answered (both days inclusive) and its four sums in grosz, plus the number of bookings behind the first three.
+/// The default range is the current Warsaw month, which the service decides; the page passes dates only for a month it was asked for.
+/// </summary>
+public sealed record EarningsDto(DateOnly From, DateOnly To, MoneyDto PaidOut, MoneyDto Pending, MoneyDto Disputed, MoneyDto Fees, int Count);

@@ -53,6 +53,15 @@ public sealed class PractitionerSchedulingClient(HttpClient http, VisitorAddress
     public async Task<ApiResult<AvailabilityDto>> SaveAvailabilityAsync(AvailabilityDto body, CancellationToken ct = default) =>
         await WriteAsync<AvailabilityDto>(HttpMethod.Put, "/api/v1/me/availability", await tokens.AccessTokenAsync(ct), body, ct);
 
+    /// <summary>The practitioner's earnings (CONTRACTS 4.2). Both dates are Warsaw days, inclusive; without them the service answers the current Warsaw month. 403 means the account is not a practitioner.</summary>
+    public Task<ApiResult<EarningsDto>> EarningsAsync(DateOnly? from, DateOnly? to, CancellationToken ct = default)
+    {
+        var parts = new List<string>();
+        if (from is { } f) parts.Add("from=" + f.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        if (to is { } t) parts.Add("to=" + t.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        return Get<EarningsDto>("/api/v1/me/earnings" + (parts.Count == 0 ? "" : "?" + string.Join('&', parts)), ct);
+    }
+
     /// <summary>
     /// The practitioner's bookings that start on Warsaw days from <paramref name="from"/> to <paramref name="to"/> (both inclusive, CONTRACTS 4.2 wave 3), every page of the cursor.
     /// A page that never ends is a failure, not a loop: the cap is far above a week of one practitioner's bookings.

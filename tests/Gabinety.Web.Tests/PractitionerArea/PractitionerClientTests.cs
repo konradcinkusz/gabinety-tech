@@ -119,4 +119,18 @@ public class PractitionerClientTests
         var r = await scope.ServiceProvider.GetRequiredService<PractitionerClient>().OfferingsAsync();
         Assert.Equal(0, r.Failure!.Status);
     }
+
+    [Fact]
+    public async Task Earnings_are_asked_with_the_dates_of_a_month_or_with_none_for_the_services_default_month()
+    {
+        var (web, scope, _) = Scoped();
+        await using var _w = web;
+        using var _s = scope;
+        var client = scope.ServiceProvider.GetRequiredService<PractitionerSchedulingClient>();
+        await client.EarningsAsync(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31));
+        await client.EarningsAsync(null, null);
+        var paths = web.Booking.Requests.Where(r => r.PathAndQuery.StartsWith("/api/v1/me/earnings", StringComparison.Ordinal)).Select(r => r.PathAndQuery).ToList();
+        Assert.Equal(["/api/v1/me/earnings?from=2026-10-01&to=2026-10-31", "/api/v1/me/earnings"], paths);
+        Assert.StartsWith("Bearer ", web.Booking.Requests.Last().Authorization);
+    }
 }

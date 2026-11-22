@@ -212,6 +212,11 @@ public class ContractCopiesTests
         RoundTrip<W.MeDto>(new MeDto("user-1", Id, PractitionerStatus.Approved, false, true), Plain, c => Assert.Equal((Id, "Approved", true), (c.PractitionerId, c.PractitionerStatus, c.IsModerator)));
 
     [Fact]
+    public void The_earnings_of_the_month_with_its_four_sums_and_the_count() =>
+        RoundTrip<W.EarningsDto>(new EarningsDto(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30), new MoneyDto(123456), new MoneyDto(4950), new MoneyDto(18000), new MoneyDto(3750), 7), Plain,
+            c => Assert.Equal((new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30), 123456L, 4950L, 18000L, 3750L, 7), (c.From, c.To, c.PaidOut.AmountMinor, c.Pending.AmountMinor, c.Disputed.AmountMinor, c.Fees.AmountMinor, c.Count)));
+
+    [Fact]
     public void The_notification_preferences_are_the_three_switches_by_kind() =>
         RoundTrip<W.NotificationPreferencesDto>(new NotificationPreferencesDto([new NotificationPreferenceDto("Reminder24h", false), new NotificationPreferenceDto("Reminder1h", true), new NotificationPreferenceDto("ReviewRequest", true)]), Plain,
             c => Assert.Equal([("Reminder24h", false), ("Reminder1h", true), ("ReviewRequest", true)], c.Items.Select(i => (i.Kind, i.Enabled))));

@@ -1,0 +1,46 @@
+@implements IDisposable
+@inject TimeProvider Time
+@* The only interactive part of the checkout (a render mode on this component alone, set by its page): a clock that ticks. role="timer" does not announce every second; a separate polite status is
+   rewritten only when the phase changes (5 minutes left, 1 minute left, expired: DESIGN-CONTRACT 7.9). It starts ticking after the first render, so prerendering starts no timer. *@
+@if (Phase == HoldCountdown.Phase.Expired)
+{
+    <div class="callout callout--warning" role="timer" aria-label="@BookFlowText.Checkout.HoldLabel" data-testid="hold-timer">@BookFlowText.Checkout.Expired</div>
+}
+else
+{
+    <div class="callout callout--warning" role="timer" aria-label="@BookFlowText.Checkout.HoldLabel" data-testid="hold-timer">@BookFlowText.Checkout.Hold <strong class="num">@HoldCountdown.Clock(_left)</strong></div>
+}
+<p class="sr-only" role="status" data-testid="hold-announcement">@Announcement</p>
+
+@code {
+    [Parameter, EditorRequired] public DateTimeOffset ExpiresAt { get; set; }
+
+    TimeSpan _left;
+    ITimer? _timer;
+    HoldCountdown.Phase Phase => HoldCountdown.PhaseOf(_left);
+
+    string? Announcement => Phase switch
+    {
+        HoldCountdown.Phase.FiveMinutes => BookFlowText.Checkout.AnnounceFive,
+        HoldCountdown.Phase.OneMinute => BookFlowText.Checkout.AnnounceOne,
+        HoldCountdown.Phase.Expired => BookFlowText.Checkout.Expired,
+        _ => null,
+    };
+
+    protected override void OnParametersSet() => _left = HoldCountdown.Left(ExpiresAt, Time.GetUtcNow());
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender || _timer is not null) return;
+        _timer = Time.CreateTimer(_ => _ = InvokeAsync(Tick), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    void Tick()
+    {
+        _left = HoldCountdown.Left(ExpiresAt, Time.GetUtcNow());
+        if (HoldCountdown.Expired(_left)) { _timer?.Dispose(); _timer = null; }
+        StateHasChanged();
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

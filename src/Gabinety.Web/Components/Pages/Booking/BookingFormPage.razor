@@ -1,0 +1,185 @@
+@page "/rezerwacja/{OfferingId:guid}"
+@attribute [Authorize]
+@inject DirectoryClient Directory
+@inject BookingClient Bookings
+@inject BriefAssistantClient Assistant
+@inject NavigationManager Navigation
+@inject Gabinety.Web.Hosting.WebOptions Site
+@* Static server rendering with plain form posts and antiforgery (ADR-0010: interactivity only where it is needed). Three buttons post the one form: ask the assistant, apply its proposal, pay. A form post
+   cannot be lost to a circuit that is not connected yet, which is the failure a typed brief would otherwise meet (DESIGN-CONTRACT 9.7). The brief is user free text: it is never logged. *@
+
+<PageTitle>@BookFlowText.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@BookFlowText.Title</h1>
+
+@if (_missing)
+{
+    <p>@BookFlowText.MissingSlot</p>
+    <a class="btn btn--secondary" href="@(_slug is { Length: > 0 } ? "/gabinet/" + Uri.EscapeDataString(_slug) : "/programisci")">@(_slug is { Length: > 0 } ? BookFlowText.ToProfile : BookFlowText.BackToSearch)</a>
+}
+else if (_unavailable)
+{
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@BookFlowText.ProfileUnavailable</p>
+        <a class="btn btn--secondary" href="@CurrentPath">@BookFlowText.Retry</a>
+    </div>
+}
+else if (_offering is not null)
+{
+    <div class="booking-layout">
+        <div class="booking-layout__summary">
+            <ConsultationSummary Offering="@_offering.Title" Party="@BookingFormat.Name(_practitionerName)" When="@BookingFormat.When(_start, _start.AddMinutes(_offering.DurationMinutes))"
+                                 Minutes="_offering.DurationMinutes" PriceMinor="_offering.Price.AmountMinor">
+                <div class="callout callout--info">@BookFlowText.Summary.Hold</div>
+            </ConsultationSummary>
+        </div>
+        <form method="post" @onsubmit="SubmitAsync" @formname="booking" class="form booking-layout__form" novalidate>
+            <AntiforgeryToken />
+            <input type="hidden" name="Model.AttemptKey" value="@_attemptKey" />
+            <input type="hidden" name="Model.AttemptFingerprint" value="@_attemptFingerprint" />
+            <input type="hidden" name="Model.AppliedSlug" value="@Model!.AppliedSlug" />
+            <input type="hidden" name="Model.SuggestedSlug" value="@Model!.SuggestedSlug" />
+            <BookingFormProblems Items="_problems" />
+            <CounterTextArea Id="brief" Name="Model.Brief" Label="@BookFlowText.Brief.Label" Hint="@BookFlowText.Brief.Hint" Value="@Model!.Brief" Rows="8" CounterFormat="@BookFlowText.Brief.Counter"
+                             Error="@_briefError" Autofocus="@(_problems.Count == 1)" />
+
+            <section class="assist stack stack--tight" aria-live="polite">
+                <div><button type="submit" name="Model.Intent" value="@BookingFormModel.Assist" class="btn btn--secondary" formnovalidate>@BookFlowText.Assist.Ask</button></div>
+                <p class="field__hint">@BookFlowText.Assist.Note</p>
+                @if (_assistNote is { } note) {<div class="callout callout--info">@note</div>}
+                @if (_assistApplied) {<div class="callout callout--success">@BookFlowText.Assist.Applied</div>}
+                @if (_suggestion is { } s)
+                {
+                    <div class="stack stack--tight" data-testid="proposal">
+                        <CounterTextArea Id="proposal" Name="Model.Proposal" Label="@BookFlowText.Assist.Proposal" Value="@Model!.Proposal" Rows="4" />
+                        <p class="field__hint">@string.Format(BookFlowText.Assist.Category, _categoryName ?? s.ProblemSlug)</p>
+                        @if (s.ClarifyingQuestions.Count > 0)
+                        {
+                            <p class="field__hint">@BookFlowText.Assist.Questions</p>
+                            <ul class="stack stack--tight">@foreach (var q in s.ClarifyingQuestions) {<li>@q</li>}</ul>
+                        }
+                        <div><button type="submit" name="Model.Intent" value="@BookingFormModel.Apply" class="btn btn--secondary" formnovalidate>@BookFlowText.Assist.Apply</button></div>
+                    </div>
+                }
+            </section>
+
+            @if (_failure is { } failure)
+            {
+                <div class="callout callout--danger" role="alert" data-testid="booking-error">
+                    <p>@failure.Text</p>
+                    @if (failure.OffersProfile) {<a class="btn btn--secondary" href="@("/gabinet/" + Uri.EscapeDataString(_slug!))">@BookFlowText.ToProfile</a>}
+                </div>
+            }
+            <div class="form-actions">
+                <button type="submit" name="Model.Intent" value="@BookingFormModel.Pay" class="btn btn--primary">@string.Format(BookFlowText.Form.Pay, Money.Pln(_offering.Price.AmountMinor))</button>
+            </div>
+        </form>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid OfferingId { get; set; }
+    /// <summary>The slot: a UTC instant (<c>?start=</c>).</summary>
+    [SupplyParameterFromQuery(Name = "start")] public string? StartParam { get; set; }
+    /// <summary>The profile slug (<c>?gabinet=</c>): no endpoint resolves an offering id on its own, so the offering is looked up in the public profile.</summary>
+    [SupplyParameterFromQuery(Name = "gabinet")] public string? SlugParam { get; set; }
+    [SupplyParameterFromForm(FormName = "booking")] BookingFormModel? Model { get; set; }
+
+    string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+    OfferingDto? _offering;
+    string? _practitionerName, _slug, _categoryName, _assistNote, _briefError, _attemptKey, _attemptFingerprint;
+    DateTimeOffset _start;
+    bool _missing, _unavailable, _assistApplied;
+    BriefSuggestionDto? _suggestion;
+    BookFailure? _failure;
+    List<FormProblem> _problems = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Model ??= new();
+        (_attemptKey, _attemptFingerprint) = (Model.AttemptKey, Model.AttemptFingerprint);
+        _slug = string.IsNullOrWhiteSpace(SlugParam) ? null : SlugParam.Trim();
+        if (_slug is null) { _missing = true; return; }
+        var profile = await Directory.ProfileAsync(_slug);
+        if (profile.Failure is { Status: 404 }) { Navigation.NotFound(); return; }
+        if (!profile.IsOk)
+        {
+            _unavailable = true;
+            return;
+        }
+        _offering = profile.Value!.Offerings.FirstOrDefault(o => o.Id == OfferingId);
+        if (_offering is null) { Navigation.NotFound(); return; }
+        _practitionerName = profile.Value.DisplayName;
+        if (string.IsNullOrWhiteSpace(StartParam) || !DateTimeOffset.TryParse(StartParam, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out _start))
+        {
+            (_missing, _offering) = (true, null);
+        }
+    }
+
+    async Task SubmitAsync()
+    {
+        if (_offering is null || Model is null) return;
+        switch (Model.Intent)
+        {
+            case BookingFormModel.Assist: await AskAssistantAsync(); break;
+            case BookingFormModel.Apply: Apply(); break;
+            case BookingFormModel.Pay: await PayAsync(); break;
+        }
+    }
+
+    async Task AskAssistantAsync()
+    {
+        if (!BriefRules.CanAskAssistant(Model!.Brief)) { _assistNote = BookFlowText.Assist.NeedsText; return; }
+        var result = await Assistant.SuggestAsync(Model.Brief!.Trim());
+        if (result.IsOk && !string.IsNullOrWhiteSpace(result.Value!.Summary))
+        {
+            _suggestion = result.Value;
+            (Model.Proposal, Model.SuggestedSlug) = (result.Value.Summary, result.Value.ProblemSlug);
+            var taxonomy = await Directory.TaxonomyAsync();
+            _categoryName = taxonomy.Value?.Problems.FirstOrDefault(c => c.Slug == result.Value.ProblemSlug)?.NamePl;
+            return;
+        }
+        _assistNote = result.Failure switch
+        {
+            null => BookFlowText.Assist.Failed,
+            { Status: 503 } or { Code: "assistant_unavailable" } or { Code: "dependency_unavailable" } => BookFlowText.Assist.Unavailable,
+            { Status: 429 } => BookFlowText.Assist.RateLimited,
+            _ => BookFlowText.Assist.Failed,
+        };
+    }
+
+    /// <summary>The proposal reaches the brief only by this click, and only the text the visitor left in the box.</summary>
+    void Apply()
+    {
+        var proposal = (Model!.Proposal ?? "").Trim();
+        if (proposal.Length == 0) return;
+        Model.Brief = string.IsNullOrWhiteSpace(Model.Brief) ? proposal : Model.Brief.TrimEnd() + "\n\n" + proposal;
+        Model.AppliedSlug = string.IsNullOrWhiteSpace(Model.SuggestedSlug) ? Model.AppliedSlug : Model.SuggestedSlug;
+        Model.Proposal = null;
+        _assistApplied = true;
+    }
+
+    async Task PayAsync()
+    {
+        _briefError = BriefRules.Problem(Model!.Brief);
+        _problems = _briefError is null ? [] : [new FormProblem("brief", _briefError)];
+        if (_briefError is not null) return;
+
+        var applied = string.IsNullOrWhiteSpace(Model.AppliedSlug) ? null : Model.AppliedSlug.Trim();
+        var text = Model.Brief!.Trim();
+        var fingerprint = BookingAttempt.Fingerprint(_offering!.Id, _start, text, applied, applied is not null);
+        var key = BookingAttempt.KeyFor(Model.AttemptKey, Model.AttemptFingerprint, fingerprint, Guid.NewGuid);
+        (_attemptKey, _attemptFingerprint) = (key.ToString(), fingerprint); // kept in the form: a retry of this same request reuses the key
+
+        var result = await Bookings.CreateAsync(key, new CreateBookingRequestDto(_offering.Id, _start.ToUniversalTime(), new BriefDto(text, applied, applied is not null)));
+        if (result.IsOk)
+        {
+            if (CheckoutTarget.Safe(result.Value!.CheckoutUrl, Site.SiteBaseUrl) is { } target) { Navigation.NavigateTo(target); return; }
+            _failure = new BookFailure(BookFlowText.Errors.BadTarget, false);
+            return;
+        }
+        if (result.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe(CurrentPath))); return; }
+        if (result.Failure.Code == "idempotency_conflict") (_attemptKey, _attemptFingerprint) = (null, null);
+        _failure = BookFailure.Of(result.Failure);
+    }
+}

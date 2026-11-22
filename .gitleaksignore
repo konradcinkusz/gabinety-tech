@@ -1,3 +1,5 @@
 # Synthetic, obviously fake Stripe-key-shaped literals in a startup test (T-09.05), since split in the working tree. One fingerprint per finding; no pattern, no path.
 08b882e98b4d0a91b8828acd7650ddb57380978c:tests/Gabinety.Booking.Tests/Payments/Stripe/StripeStartupTests.cs:stripe-access-token:22
 08b882e98b4d0a91b8828acd7650ddb57380978c:tests/Gabinety.Booking.Tests/Payments/Stripe/StripeStartupTests.cs:stripe-access-token:23
+# A test marker string assigned to a variable named "secret" (a user brief the test proves is never logged); renamed in the working tree. One fingerprint per finding; no pattern, no path.
+7f0205ce3613f986a68df8339b1565cdedaf2476:tests/Gabinety.Web.Tests/Pages/BookingFormTests.cs:generic-api-key:366

@@ -1,0 +1,7 @@
+.rating-scale { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Five 44 px segmented targets; the number is what is seen, "n z 5" is what is read (the radio's name). */
+.rating-scale__option { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem; padding: 0 var(--space-3);
+    border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface-raised); cursor: pointer; font-weight: 600; }
+.rating-scale__option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.rating-scale__option:has(input:checked) { background: var(--color-accent-soft); border-color: var(--color-accent); }
+.rating-scale__option:has(input:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: 2px; }

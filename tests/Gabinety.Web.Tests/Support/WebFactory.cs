@@ -37,11 +37,15 @@ public sealed class WebFactory : WebApplicationFactory<Program>
 
     public WebFactory With(string key, string? value) { _settings[key] = value; return this; }
     public WebFactory In(string environment) { _environment = environment; return this; }
+    readonly List<Microsoft.Extensions.Logging.ILoggerProvider> _logProviders = [];
+    /// <summary>Adds a logger provider to the host, so a test can read everything it logs.</summary>
+    public WebFactory LogTo(Microsoft.Extensions.Logging.ILoggerProvider provider) { _logProviders.Add(provider); return this; }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_environment);
         foreach (var (k, v) in _settings) builder.UseSetting(k, v);
+        foreach (var provider in _logProviders) builder.ConfigureLogging(l => l.AddProvider(provider));
         builder.ConfigureServices(services =>
         {
             (string Name, FakeBackend Handler)[] all = [(Gabinety.Web.Api.Backend.Directory, Directory), (Gabinety.Web.Api.Backend.Booking, Booking), (Gabinety.Web.Api.Backend.Reputation, Reputation), (Gabinety.Web.Api.Backend.Assistant, Assistant), (Gabinety.Web.Api.Backend.Auth, Identity.Backend)];

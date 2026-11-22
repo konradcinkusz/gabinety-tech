@@ -1,0 +1,9 @@
+/* The two columns of DESIGN-CONTRACT 3.5: the summary comes first in the DOM (on the phone it stays above the submit button) and sits in the right column from 56 rem, sticky. */
+.booking-layout { display: grid; gap: var(--space-5); }
+.booking-layout__summary { min-width: 0; }
+.booking-layout__form { min-width: 0; max-width: 32rem; }
+@media (min-width: 56rem) {
+    .booking-layout { grid-template-columns: minmax(0, 1fr) 22rem; align-items: start; }
+    .booking-layout__summary { grid-column: 2; grid-row: 1; position: sticky; top: var(--space-4); }
+    .booking-layout__form { grid-column: 1; grid-row: 1; }
+}

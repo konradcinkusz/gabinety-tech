@@ -1,0 +1,217 @@
+@page "/moje/rezerwacje/{BookingId:guid}"
+@attribute [Authorize]
+@inject BookingClient Bookings
+@inject NavigationManager Navigation
+@* Static server rendering. Every action is driven ONLY by the server's can* flags: the windows (24 h, 48 h, 72 h) are never recomputed here. An action opens as a state of the page (?action=), shown as a
+   native dialog that is open in the markup (no script): a GET form's button opens it, a POST form confirms it, and the result is a redirect with a fixed key (?done=), so a reload never repeats it.
+   The texts of users (the cancel reason, the dispute) are request bodies only: never logged, never echoed into a URL. *@
+
+<PageTitle>@BookingsText.DetailMetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@BookingsText.DetailTitle</h1>
+
+@if (_failure is not null)
+{
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@ActionFailure.Text(_failure)</p>
+        <a class="btn btn--secondary" href="@DetailHref()">@BookingsText.ReloadHint</a>
+    </div>
+}
+else if (_booking is { } b)
+{
+    <div class="stack">
+        @if (DoneText is { } done) {<div class="callout callout--success" role="status" data-testid="done">@done</div>}
+        <section class="card" aria-labelledby="booking-title">
+            <h2 id="booking-title">@b.OfferingTitle</h2>
+            <dl class="dl">
+                @if (BookingFormat.Name(_role == BookingClient.ClientRole ? b.Practitioner.DisplayName : b.Client?.DisplayName) is { } party)
+                {
+                    <dt>@(_role == BookingClient.ClientRole ? BookingsText.PartyPractitioner : BookingsText.PartyClient)</dt><dd>@party</dd>
+                }
+                <dt>@BookingsText.Detail.When</dt><dd>@BookingFormat.When(b.StartUtc, b.EndUtc)<br /><span class="muted">@BookingsText.Detail.Zone</span></dd>
+                <dt>@BookingsText.Detail.Duration</dt><dd>@string.Format(BookingsText.Detail.Minutes, b.DurationMinutes)</dd>
+                <dt>@BookingsText.Detail.Status</dt><dd><BookingBadge Badge="Badge.ForBooking(b.Status)" /></dd>
+                <dt>@BookingsText.Detail.Price</dt><dd class="num">@Money.Pln(b.Price.AmountMinor)</dd>
+                <dt>@BookingsText.Detail.Payment</dt>
+                <dd>
+                    <BookingBadge Badge="Badge.ForPayment(b.Payment.Status)" />
+                    @if (b.Payment.Refunded.AmountMinor > 0) {<span class="num refund-line">@string.Format(BookingsText.Detail.Refunded, Money.Pln(b.Payment.Refunded.AmountMinor))</span>}
+                </dd>
+                @if (b.Fee is { } fee) {<dt>@BookingsText.Detail.Fee</dt><dd class="num">@Money.Pln(fee.AmountMinor)</dd>}
+                @if (b.Payout is { } payout) {<dt>@BookingsText.Detail.Payout</dt><dd class="num">@Money.Pln(payout.AmountMinor)</dd>}
+            </dl>
+            @if (SafeUrl.Http(b.MeetingUrl) is { } meeting)
+            {
+                <p><a href="@meeting" rel="noopener noreferrer" target="_blank">@BookingsText.Detail.Meeting</a> <span class="muted">@BookingsText.Detail.MeetingHint</span></p>
+            }
+        </section>
+
+        @if (b.Brief is { } brief)
+        {
+            <section class="card" aria-labelledby="brief-title">
+                <h2 id="brief-title">@(_role == BookingClient.ClientRole ? BookingsText.Detail.BriefOwn : BookingsText.Detail.Brief)</h2>
+                <p class="brief">@brief.Text</p>
+            </section>
+        }
+
+        @if (Open == "cancel" && b.CanCancel)
+        {
+            <dialog open role="alertdialog" aria-labelledby="cancel-title" class="dialog card" data-testid="cancel-dialog">
+                <h2 id="cancel-title" tabindex="-1" autofocus>@BookingsText.Cancel.Title</h2>
+                <p><strong>@CancelOutcome.Sentence(_outcome, _role)</strong></p>
+                @if (_outcome is not null && _role == BookingClient.ClientRole) {<p class="muted">@BookingsText.Cancel.ClientRule</p>}
+                <form method="post" @onsubmit="CancelAsync" @formname="cancel" class="form" novalidate>
+                    <AntiforgeryToken />
+                    <BookingFormProblems Items="_problems" />
+                    <CounterTextArea Id="reason" Name="Model.Reason" Label="@BookingsText.Cancel.ReasonLabel" Hint="@BookingsText.Cancel.ReasonHint" Value="@CancelModel!.Reason" Rows="3" Error="@_reasonError" />
+                    <ActionError Failure="_actionFailure" Href="@DetailHref()" />
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn--danger">@BookingsText.Cancel.Confirm</button>
+                        <a class="btn btn--secondary" href="@DetailHref()">@BookingsText.Cancel.Keep</a>
+                    </div>
+                </form>
+            </dialog>
+        }
+        else if (Open == "dispute" && b.CanDispute)
+        {
+            <section class="card" aria-labelledby="dispute-title" data-testid="dispute-form">
+                <h2 id="dispute-title">@BookingsText.Dispute.Title</h2>
+                <p>@BookingsText.Dispute.Intro</p>
+                <form method="post" @onsubmit="DisputeAsync" @formname="dispute" class="form" novalidate>
+                    <AntiforgeryToken />
+                    <BookingFormProblems Items="_problems" />
+                    <div class="field">
+                        <label class="field__label" for="kind">@BookingsText.Dispute.KindLabel</label>
+                        <select id="kind" name="Model.Kind" class="field__control">
+                            @foreach (var k in DisputeRules.Kinds) {<option value="@k" selected="@(k == (DisputeModel!.Kind ?? DisputeRules.Kinds[0]))">@DisputeRules.KindLabel(k)</option>}
+                        </select>
+                    </div>
+                    <CounterTextArea Id="text" Name="Model.Text" Label="@BookingsText.Dispute.TextLabel" Hint="@BookingsText.Dispute.TextHint" Value="@DisputeModel!.Text" Rows="5"
+                                     CounterFormat="@BookingsText.Dispute.Counter" Error="@_textError" Autofocus="@(_problems.Count == 1)" />
+                    <ActionError Failure="_actionFailure" Href="@DetailHref()" />
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn--primary">@BookingsText.Dispute.Submit</button>
+                        <a class="btn btn--ghost" href="@DetailHref()">@BookingsText.Dispute.Close</a>
+                    </div>
+                </form>
+            </section>
+        }
+        else if (Open == "noshow" && b.CanReportNoShow)
+        {
+            <dialog open role="alertdialog" aria-labelledby="noshow-title" class="dialog card" data-testid="noshow-dialog">
+                <h2 id="noshow-title" tabindex="-1" autofocus>@BookingsText.NoShow.Title</h2>
+                <p>@BookingsText.NoShow.Body</p>
+                <form method="post" @onsubmit="NoShowAsync" @formname="noshow" class="form">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="Model.Confirm" value="yes" />
+                    <ActionError Failure="_actionFailure" Href="@DetailHref()" />
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn--danger">@BookingsText.NoShow.Confirm</button>
+                        <a class="btn btn--secondary" href="@DetailHref()">@BookingsText.NoShow.Keep</a>
+                    </div>
+                </form>
+            </dialog>
+        }
+        else
+        {
+            <div class="form-actions">
+                @if (b.CanReview) {<a class="btn btn--primary" href="@($"/moje/opinie/{b.Id}")">@BookingsText.Review</a>}
+                @if (b.CanCancel || b.CanDispute || b.CanReportNoShow)
+                {
+                    @* a GET form: the buttons open the action without a script and without a state change (a link would not be a button) *@
+                    <form method="get" action="@DetailPath" class="cluster">
+                        <input type="hidden" name="role" value="@_role" />
+                        @if (b.CanDispute) {<button type="submit" name="action" value="dispute" class="btn btn--secondary">@BookingsText.Actions.Dispute</button>}
+                        @if (b.CanReportNoShow) {<button type="submit" name="action" value="noshow" class="btn btn--secondary">@BookingsText.Actions.NoShow</button>}
+                        @if (b.CanCancel) {<button type="submit" name="action" value="cancel" class="btn btn--ghost-danger">@BookingsText.Actions.Cancel</button>}
+                    </form>
+                }
+            </div>
+        }
+        <p><a href="/moje/rezerwacje?role=@_role">@BookingsText.Back</a></p>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid BookingId { get; set; }
+    [SupplyParameterFromQuery(Name = "role")] public string? RoleParam { get; set; }
+    [SupplyParameterFromQuery(Name = "action")] public string? ActionParam { get; set; }
+    [SupplyParameterFromQuery(Name = "done")] public string? DoneParam { get; set; }
+    [SupplyParameterFromForm(FormName = "cancel", Name = "Model")] CancelForm? CancelModel { get; set; }
+    [SupplyParameterFromForm(FormName = "dispute", Name = "Model")] DisputeForm? DisputeModel { get; set; }
+    [SupplyParameterFromForm(FormName = "noshow", Name = "Model")] NoShowForm? NoShowModel { get; set; }
+
+    public sealed class CancelForm { public string? Reason { get; set; } }
+    public sealed class DisputeForm { public string? Kind { get; set; } public string? Text { get; set; } }
+    public sealed class NoShowForm { public string? Confirm { get; set; } }
+
+    /// <summary>The path the action buttons post back to (a GET form: the query is replaced by the form's own fields).</summary>
+    string DetailPath => $"/moje/rezerwacje/{BookingId}";
+
+    BookingDetailDto? _booking;
+    ApiFailure? _failure, _actionFailure;
+    CancelOutcome? _outcome;
+    string _role = BookingClient.ClientRole;
+    string? _textError, _reasonError;
+    List<FormProblem> _problems = [];
+
+    string? Open => ActionParam is "cancel" or "dispute" or "noshow" ? ActionParam : null;
+
+    string? DoneText => DoneParam switch
+    {
+        "cancelled" => BookingsText.Cancel.Done,
+        "disputed" => BookingsText.Dispute.Done,
+        "noshow" => BookingsText.NoShow.Done,
+        _ => null,
+    };
+
+    string DetailHref(string? action = null, string? done = null) =>
+        $"/moje/rezerwacje/{BookingId}?role={_role}" + (action is null ? "" : "&action=" + action) + (done is null ? "" : "&done=" + done);
+
+    protected override async Task OnInitializedAsync()
+    {
+        CancelModel ??= new();
+        DisputeModel ??= new();
+        NoShowModel ??= new();
+        _role = BookingFormat.Role(RoleParam);
+        var result = await Bookings.GetAsync(BookingId);
+        if (result.IsOk) { _booking = result.Value; _outcome = CancelOutcome.From(_booking!.CancelOutcome, _booking.Price); return; }
+        if (result.Failure!.IsUnauthenticated) { SignIn(); return; }
+        if (result.Failure.Status is 404 or 403) { Navigation.NotFound(); return; } // not this user's booking: the answer of an unknown id
+        _failure = result.Failure;
+    }
+
+    void SignIn() => Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe(DetailHref())));
+
+    Task CancelAsync()
+    {
+        _reasonError = DisputeRules.ReasonProblem(CancelModel!.Reason);
+        _problems = _reasonError is null ? [] : [new FormProblem("reason", _reasonError)];
+        return _reasonError is not null ? Task.CompletedTask : RunAsync(() => Bookings.CancelAsync(BookingId, CancelModel.Reason), "cancelled", "cancel");
+    }
+
+    Task DisputeAsync()
+    {
+        DisputeModel!.Kind ??= DisputeRules.Kinds[0];
+        var problems = new List<FormProblem>();
+        if (DisputeRules.KindProblem(DisputeModel.Kind) is { } kind) problems.Add(new("kind", kind));
+        _textError = DisputeRules.TextProblem(DisputeModel.Text);
+        if (_textError is not null) problems.Add(new("text", _textError));
+        _problems = problems;
+        return problems.Count > 0 ? Task.CompletedTask : RunAsync(() => Bookings.DisputeAsync(BookingId, DisputeModel.Kind!, DisputeModel.Text!), "disputed", "dispute");
+    }
+
+    Task NoShowAsync() => NoShowModel?.Confirm == "yes" ? RunAsync(() => Bookings.ReportNoShowAsync(BookingId), "noshow", "noshow") : Task.CompletedTask;
+
+    /// <summary>Runs one action: success is a redirect with a fixed key; a failure is kept for display next to the form; a 401 goes to sign-in.</summary>
+    async Task RunAsync(Func<Task<ApiResult<BookingDetailDto>>> call, string done, string action)
+    {
+        var result = await call();
+        if (result.IsOk) { Navigation.NavigateTo(DetailHref(done: done)); return; }
+        if (result.Failure!.IsUnauthenticated) { SignIn(); return; }
+        _actionFailure = result.Failure;
+        // the field the server named is shown under that field as well, in our words
+        if (result.Failure.Names("text")) { _textError = BookingsText.Dispute.TooShort; _problems = [new FormProblem("text", _textError)]; }
+        if (result.Failure.Names("reason")) { _reasonError = BookingsText.Cancel.ReasonTooLong; _problems = [new FormProblem("reason", _reasonError)]; }
+    }
+}

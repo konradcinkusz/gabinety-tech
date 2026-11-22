@@ -1,0 +1,2 @@
+.review-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.reply { padding-inline-start: var(--space-4); border-inline-start: 3px solid var(--color-border-strong); }

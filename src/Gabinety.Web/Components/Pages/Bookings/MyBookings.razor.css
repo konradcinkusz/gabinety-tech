@@ -1,2 +1,6 @@
-.controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
-.booking__title { font-size: var(--text-lg); margin-bottom: var(--space-1); }
+.filter-form { margin-block: var(--space-4); align-items: end; }
+.booking-row { position: relative; }
+.booking-row__title { margin: 0; font-size: var(--text-lg); }
+/* The whole row is the link target (stretched link): the link keeps the accessible name and a 44 px high target. */
+.booking-row__link { display: inline-block; padding-block: var(--space-3); font-weight: 600; }
+.booking-row__link::after { content: ""; position: absolute; inset: 0; }

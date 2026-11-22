@@ -123,7 +123,7 @@ public class LayoutTests : BunitContext
         auth.SetNotAuthorized();
         Assert.Equal(["/programisci", "/logowanie"], Render<MainLayout>(p => p.Add(l => l.Body, Body())).FindAll("header nav a").Select(a => a.GetAttribute("href")));
         auth.SetAuthorized("demo-client@demo.example");
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/wyloguj"], Render<MainLayout>(p => p.Add(l => l.Body, Body())).FindAll("header nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/programisci", "/moje/rezerwacje", "/gabinet-programisty", "/wyloguj"], Render<MainLayout>(p => p.Add(l => l.Body, Body())).FindAll("header nav a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]

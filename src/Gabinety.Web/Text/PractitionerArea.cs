@@ -146,7 +146,7 @@ public static class PlPractitioner
 
     public static class Payments
     {
-        public const string Title = "Płatności", MetaTitle = "Płatności | Gabinety Tech";
+        public const string Retry = "Spróbuj ponownie", Title = "Płatności", MetaTitle = "Płatności | Gabinety Tech";
         public const string Intro = "Klienci płacą z góry, a pieniądze trafiają do Ciebie po konsultacji, na konto płatności, które zakładasz u naszego operatora płatności (Stripe). Konfiguracja trwa kilka minut.";
         public const string StatusLabel = "Status konta płatności", Ready = "Gotowe", NeedsWork = "Wymaga uzupełnienia", NotStarted = "Nie rozpoczęto";
         public const string MustBeReady = "Bez gotowego konta płatności nie możesz przyjmować rezerwacji: klienci nie zapłacą, a Ty nie dostaniesz wypłaty.";

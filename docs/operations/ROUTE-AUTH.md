@@ -140,6 +140,12 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |
 | Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect, state checked against the cookie, code exchanged |
 | Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings, interactive server rendering |
+| Web | PAGE | `/gabinet-programisty` | Authenticated | all | practitioner dashboard and onboarding, static server rendering; any signed-in account may become a practitioner (ADR-0012 section 6) |
+| Web | PAGE | `/gabinet-programisty/profil` | Authenticated | all | practitioner profile form |
+| Web | PAGE | `/gabinet-programisty/oferty` | Authenticated | all | offers: list, confirmation before disabling, re-enable, form |
+| Web | PAGE | `/gabinet-programisty/dostepnosc` | Authenticated | all | weekly availability and blocked days |
+| Web | PAGE | `/gabinet-programisty/platnosci` | Authenticated | all | payments account status and onboarding link (PAYMENTS-GO-LIVE) |
+| Web | PAGE | `/practitioner/payments` | Authenticated | all | the return and refresh address Booking gives Stripe; forwards to `/gabinet-programisty/platnosci` |
 | Web | PAGE | `/not-found` | Anonymous | all | status code re-execution target |
 | Web | PAGE | `/Error` | Anonymous | all | exception handler target |
 | Web | ANY | `/_blazor` | Anonymous | all | circuit websocket: refused first by the origin guard for a foreign page |

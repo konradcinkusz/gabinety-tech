@@ -1,0 +1,138 @@
+@page "/gabinet-programisty/dostepnosc"
+@attribute [Authorize]
+@layout PractitionerLayout
+@inherits PractitionerPage
+@inject PractitionerSchedulingClient Scheduling
+@* One plain form holds the whole draft (rule-N-day/from/to, exception-N); "Dodaj godziny", "Usuń" and "Dodaj dzień wolny" change the draft and show it again, "Zapisz" validates it, sends it
+   and redirects with the flash. A static page keeps no state between requests, so the draft travels in the form (AvailabilityDraft). *@
+<PageTitle>@PlPractitioner.Availability.MetaTitle</PageTitle>
+<h1>@PlPractitioner.Availability.Title</h1>
+
+@if (LoadFailure is not null)
+{
+    <Alert Variant="AlertVariant.Danger" TestId="unavailable">@FailureText(LoadFailure) <a href="@PractitionerPaths.Availability">@PlPractitioner.Common.Retry</a></Alert>
+}
+else if (_draft is not null)
+{
+    <p class="lead">@PlPractitioner.Availability.Intro</p>
+    @if (_issues.Count > 0 || _serverRows.Count > 0)
+    {
+        <div class="callout callout--danger" role="alert" data-testid="availability-issues">
+            <h2 class="callout__title">@PlPractitioner.Availability.SummaryTitle</h2>
+            <ul>@foreach (var m in _issues.Select(i => i.Message).Concat(_serverRows)) {<li>@m</li>}</ul>
+        </div>
+    }
+    @if (_general is not null) {<Alert Variant="AlertVariant.Danger" TestId="availability-error">@_general</Alert>}
+    <form method="post" @onsubmit="HandleAsync" @formname="availability" class="stack" novalidate>
+        <AntiforgeryToken />
+        @* The first submit button of the form is the one Enter triggers in a field: it must be "save", never "remove". It is not for pointing at: out of the tab order and of the accessibility tree. *@
+        <button type="submit" name="cmd" value="save" class="visually-hidden" tabindex="-1" aria-hidden="true">@PlPractitioner.Common.Save</button>
+
+        <section class="card stack" aria-labelledby="weekly-title">
+            <h2 id="weekly-title">@PlPractitioner.Availability.Weekly</h2>
+            @if (_draft.Rules.Count == 0) {<p class="muted" data-testid="no-rules">@PlPractitioner.Availability.NoRules</p>}
+            @for (var i = 0; i < _draft.Rules.Count; i++)
+            {
+                var index = i;
+                var rule = _draft.Rules[i];
+                var bad = _issues.Any(x => x.Row == index);
+                <div class="@($"rule cluster{(bad ? " rule--invalid" : "")}")" role="group" aria-label="@string.Format(PlPractitioner.Availability.Row, index + 1)" data-testid="rule">
+                    <div class="field">
+                        <label class="field__label" for="@($"rule-{index}-day")">@PlPractitioner.Availability.Day</label>
+                        <select id="@($"rule-{index}-day")" name="@($"rule-{index}-day")" aria-invalid="@(bad ? "true" : null)">
+                            @for (var d = 1; d <= 7; d++) {<option value="@d" selected="@(rule.IsoWeekday == d)">@PlPractitioner.Availability.Days[d - 1]</option>}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="@($"rule-{index}-from")">@PlPractitioner.Availability.From</label>
+                        <select id="@($"rule-{index}-from")" name="@($"rule-{index}-from")" aria-invalid="@(bad ? "true" : null)">
+                            @foreach (var t in Times(rule.StartLocal)) {<option value="@t" selected="@(rule.StartLocal == t)">@t</option>}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="@($"rule-{index}-to")">@PlPractitioner.Availability.To</label>
+                        <select id="@($"rule-{index}-to")" name="@($"rule-{index}-to")" aria-invalid="@(bad ? "true" : null)">
+                            @foreach (var t in Times(rule.EndLocal)) {<option value="@t" selected="@(rule.EndLocal == t)">@t</option>}
+                        </select>
+                    </div>
+                    <button class="btn btn--ghost-danger" type="submit" name="cmd" value="@($"remove:{index}")" aria-label="@($"{PlPractitioner.Common.Remove}: {string.Format(PlPractitioner.Availability.Row, index + 1)}")">@PlPractitioner.Common.Remove</button>
+                </div>
+            }
+            <div><button class="btn btn--secondary" type="submit" name="cmd" value="add">@PlPractitioner.Availability.AddRule</button></div>
+        </section>
+
+        <section class="card stack" aria-labelledby="exceptions-title">
+            <h2 id="exceptions-title">@PlPractitioner.Availability.Exceptions</h2>
+            @if (_draft.Exceptions.Count == 0) {<p class="muted">@PlPractitioner.Availability.NoExceptions</p>}
+            else
+            {
+                <ul class="stack stack--tight" aria-label="@PlPractitioner.Availability.Exceptions">
+                    @for (var i = 0; i < _draft.Exceptions.Count; i++)
+                    {
+                        var index = i;
+                        <li class="cluster">
+                            <input type="hidden" name="@($"exception-{index}")" value="@_draft.Exceptions[index]" />
+                            <span class="num" data-testid="exception">@_draft.Exceptions[index]</span>
+                            <button class="btn btn--ghost-danger" type="submit" name="cmd" value="@($"remove-exception:{index}")" aria-label="@($"{PlPractitioner.Common.Remove}: {_draft.Exceptions[index]}")">@PlPractitioner.Common.Remove</button>
+                        </li>
+                    }
+                </ul>
+            }
+            <div class="cluster">
+                <div class="field">
+                    <label class="field__label" for="new-exception">@PlPractitioner.Availability.ExceptionDate</label>
+                    <input id="new-exception" name="new-exception" type="date" />
+                </div>
+                <button class="btn btn--secondary" type="submit" name="cmd" value="add-exception">@PlPractitioner.Availability.AddException</button>
+            </div>
+        </section>
+
+        <p class="muted">@PlPractitioner.Availability.Unsaved</p>
+        <div class="form-actions"><button class="btn btn--primary" type="submit" name="cmd" value="save">@PlPractitioner.Common.Save</button></div>
+    </form>
+}
+
+@code {
+    AvailabilityDraft? _draft;
+    IReadOnlyList<AvailabilityIssue> _issues = [];
+    IReadOnlyList<string> _serverRows = [];
+    string? _general;
+
+    /// <summary>A stored time that is not on the half hour still shows (and is reported on save) instead of silently becoming another time.</summary>
+    static IEnumerable<string> Times(string current) => AvailabilityDraft.Times.Contains(current) ? AvailabilityDraft.Times : AvailabilityDraft.Times.Prepend(current);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await LoadProfileAsync()) return;
+        var r = await Scheduling.AvailabilityAsync();
+        if (r.IsOk) { _draft = AvailabilityDraft.From(r.Value!); return; }
+        if (r.Failure!.Status == 403) { Navigation.NavigateTo(PractitionerPaths.Home); return; }
+        LoadFailure = r.Failure;
+        if (HttpContext is { Response.HasStarted: false }) HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+    }
+
+    async Task HandleAsync()
+    {
+        var f = Posted;
+        _draft = AvailabilityDraft.FromForm(f.Get);
+        var cmd = f.Text("cmd");
+        switch (cmd)
+        {
+            case "add": _draft.AddRule(); return;
+            case "add-exception": _draft.AddException(f.Get("new-exception")); return;
+            case var c when c.StartsWith("remove:") && int.TryParse(c.AsSpan(7), out var rule): _draft.RemoveRule(rule); return;
+            case var c when c.StartsWith("remove-exception:") && int.TryParse(c.AsSpan(17), out var day): _draft.RemoveException(day); return;
+            case "save": await SaveAsync(); return;
+        }
+    }
+
+    async Task SaveAsync()
+    {
+        _issues = _draft!.Validate();
+        if (_issues.Count > 0) return; // the problems are on screen; nothing is sent
+        var r = await Scheduling.SaveAvailabilityAsync(_draft.ToDto());
+        if (r.IsOk) { Done(PractitionerPaths.Availability, FlashKey.Saved); return; }
+        _serverRows = AvailabilityDraft.ServerRows(r.Failure!.Fields);
+        if (_serverRows.Count == 0) _general = FieldErrors.General(r.Failure, PlPractitioner.Availability.Failed);
+    }
+}

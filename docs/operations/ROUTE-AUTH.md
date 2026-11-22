@@ -134,6 +134,14 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/programisci` | Anonymous | all | public list, static server rendering |
 | Web | PAGE | `/programisci/{Problem}` | Anonymous | all | public list of a category |
 | Web | PAGE | `/programisci/{Problem}/{Tech}` | Anonymous | all | public list of a category and a technology |
+| Web | PAGE | `/gabinet/{Slug}` | Anonymous | all | public profile with JSON-LD, slot picker and reviews; 404/410/503 as statuses |
+| Web | PAGE | `/jak-to-dziala` | Anonymous | all | static page |
+| Web | PAGE | `/cennik` | Anonymous | all | static page, fee rate from configuration |
+| Web | PAGE | `/zasady-rankingu` | Anonymous | all | ranking rules from the Directory; 503 when it does not answer |
+| Web | PAGE | `/regulamin` | Anonymous | all | legal text (embedded markdown) |
+| Web | PAGE | `/polityka-prywatnosci` | Anonymous | all | legal text (embedded markdown) |
+| Web | GET | `/sitemap.xml` | Anonymous | all | approved practitioners and indexable categories; 503 when the Directory does not answer |
+| Web | GET | `/robots.txt` | Anonymous | all | same rules as the Next.js app |
 | Web | PAGE | `/logowanie` | Anonymous | all | sign-in form (the POST is handled by the page, antiforgery) |
 | Web | PAGE | `/wyloguj` | Anonymous | all | sign-out form |
 | Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |

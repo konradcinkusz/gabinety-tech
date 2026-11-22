@@ -245,7 +245,7 @@ public class BookingFlowModelTests
     }
 
     [Fact]
-    public void Each_rating_has_its_word() => Assert.Equal(["Bardzo słabo", "Słabo", "Przeciętnie", "Dobrze", "Bardzo dobrze"], Enumerable.Range(1, 5).Select(ReviewRules.Word));
+    public void Each_rating_has_its_word() => Assert.Equal(["Słabo", "Przeciętnie", "Dobrze", "Bardzo dobrze", "Świetnie"], ReviewsText.Scale);
 
     [Fact]
     public void In_a_fake_profile_the_mock_checkout_of_another_origin_is_followed_as_a_path_of_this_site()

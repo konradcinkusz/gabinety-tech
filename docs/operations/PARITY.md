@@ -12,20 +12,20 @@ owners; the script is authoritative, and the CI step prints its output on every 
 `not ported yet: <route> (owner <branch>; docs/operations/PARITY.md)`; the probe is live, so the skip disappears when the page lands. The cutover gate runs the journeys with
 `PARITY_STRICT=1`, which makes any such skip a failure. The Next routes under `/api/` (the BFF) have no counterpart by design (exempt: ADR-0010 decision 4).
 
-Status as of the merge of #133 (auth) and #132 (public pages); **owners update the row in the PR that ports the page** (and run `node scripts/check-parity.mjs` to see the truth).
+Status as of the merge of #132 (public), #133 (auth), #135 (booking) and #136 (admin); **owners update the row in the PR that ports the page** (and run `node scripts/check-parity.mjs` to see the truth).
 
 | Next route | Blazor route | Owner branch | J-hooks | Status |
 |---|---|---|---|---|
 | `/` | `/` | port/public | smoke | ported |
-| `/admin/ksiega` | - | port/admin | J6 | not ported |
-| `/admin/ksiega/csv` | - | port/admin | J6 | not ported |
-| `/admin/opinie` | - | port/admin | - | not ported |
-| `/admin/podejrzane` | - | port/admin | - | not ported |
-| `/admin/spory` | - | port/admin | J6 | not ported |
-| `/admin/weryfikacja` | - | port/admin | J2 | not ported |
-| `/admin/weryfikacja/[id]` | - | port/admin | J2 | not ported |
+| `/admin/ksiega` | `/admin/ksiega` | port/admin | J6 | ported |
+| `/admin/ksiega/csv` | `/admin/ksiega/csv` | port/admin | J6 | ported |
+| `/admin/opinie` | `/admin/opinie` | port/admin | - | ported |
+| `/admin/podejrzane` | `/admin/podejrzane` | port/admin | - | ported |
+| `/admin/spory` | `/admin/spory` | port/admin | J6 | ported |
+| `/admin/weryfikacja` | `/admin/weryfikacja` | port/admin | J2 | ported |
+| `/admin/weryfikacja/[id]` | `/admin/weryfikacja/{Id:guid}` | port/admin | J2 | ported |
 | `/cennik` | `/cennik` | port/public | - | ported |
-| `/checkout/mock/[bookingId]` | - | port/booking | J3, J4 | not ported |
+| `/checkout/mock/[bookingId]` | `/checkout/mock/{BookingId:guid}` | port/booking | J3, J4 | ported |
 | `/gabinet-programisty` | - | port/practitioner | J2 | not ported |
 | `/gabinet-programisty/dostepnosc` | - | port/practitioner | - | not ported |
 | `/gabinet-programisty/oferty` | - | port/practitioner | J2 | not ported |
@@ -35,10 +35,10 @@ Status as of the merge of #133 (auth) and #132 (public pages); **owners update t
 | `/konto` | `/konto` | port/auth | - | ported |
 | `/konto/export` | `/konto/export` | port/auth | - | ported |
 | `/logowanie` | `/logowanie` | port/auth | all (sign-in form) | ported |
-| `/moje/opinie` | - | port/booking | - | not ported |
-| `/moje/opinie/[bookingId]` | - | port/booking | J3 | not ported |
+| `/moje/opinie` | `/moje/opinie` | port/booking | - | ported |
+| `/moje/opinie/[bookingId]` | `/moje/opinie/{BookingId:guid}` | port/booking | J3 | ported |
 | `/moje/rezerwacje` | `/moje/rezerwacje` | port/booking | J3, smoke | ported |
-| `/moje/rezerwacje/[id]` | - | port/booking | J3, J5, J6 | not ported |
+| `/moje/rezerwacje/[id]` | `/moje/rezerwacje/{BookingId:guid}` | port/booking | J3, J5, J6 | ported |
 | `/oauth/callback` | `/oauth/callback` | port/auth | - | ported |
 | `/polityka-prywatnosci` | `/polityka-prywatnosci` | port/public | - | ported |
 | `/programisci` | `/programisci` | port/public | J1, J2, smoke | ported |
@@ -46,8 +46,8 @@ Status as of the merge of #133 (auth) and #132 (public pages); **owners update t
 | `/programisci/[problem]/[tech]` | `/programisci/{Problem}/{Tech}` | port/public | - | ported |
 | `/regulamin` | `/regulamin` | port/public | - | ported |
 | `/rejestracja` | `/rejestracja` | port/auth | J2 | ported |
-| `/rezerwacja/[offeringId]` | - | port/booking | J3, J4 | not ported |
-| `/rezerwacja/potwierdzenie/[bookingId]` | - | port/booking | - | not ported |
+| `/rezerwacja/[offeringId]` | `/rezerwacja/{OfferingId:guid}` | port/booking | J3, J4 | ported |
+| `/rezerwacja/potwierdzenie/[bookingId]` | `/rezerwacja/potwierdzenie/{BookingId:guid}` | port/booking | - | ported |
 | `/robots.txt` | `/robots.txt` | port/public | - | ported |
 | `/sitemap.xml` | `/sitemap.xml` | port/public | - | ported |
 | `/zasady-rankingu` | `/zasady-rankingu` | port/public | - | ported |

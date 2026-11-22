@@ -66,3 +66,6 @@ public sealed record ReviewabilityDto(bool Reviewable, string ClientUserId, Guid
 
 /// <summary>One row of <c>GET /internal/v1/analytics/pair-counts</c> (T-10.03): a client-practitioner pair and its paid bookings. <c>PairKey</c> is the fee hook's key. Ids and a count only.</summary>
 public sealed record PairCountDto(string PairKey, string ClientUserId, Guid PractitionerId, int Bookings);
+
+/// <summary>Body of <c>GET /api/v1/me/earnings</c> (CONTRACTS 4.2, T-11.15): the Warsaw-day range answered (both days inclusive), four sums in grosz and <c>Count</c>, the bookings behind the first three.</summary>
+public sealed record EarningsDto(DateOnly From, DateOnly To, MoneyDto PaidOut, MoneyDto Pending, MoneyDto Disputed, MoneyDto Fees, int Count);

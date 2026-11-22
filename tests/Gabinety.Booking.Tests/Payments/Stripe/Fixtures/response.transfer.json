@@ -1,0 +1,14 @@
+{
+ "id": "tr_1Qx0demo",
+ "object": "transfer",
+ "amount": 8500,
+ "amount_reversed": 0,
+ "currency": "pln",
+ "destination": "acct_1Qx0demo",
+ "destination_payment": "py_1Qx0demo",
+ "livemode": false,
+ "metadata": {},
+ "reversed": false,
+ "source_transaction": "ch_3Qx0demo",
+ "transfer_group": "booking_0f8fad5bd9cb469fa16570867728950e"
+}

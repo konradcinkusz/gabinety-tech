@@ -29,5 +29,7 @@ public static class ErrorCodes
         ContactDetailsNotAllowed = "contact_details_not_allowed", GithubNotLinked = "github_not_linked",
         NotReviewable = "not_reviewable", InvalidInput = "invalid_input", RateLimited = "rate_limited",
         AssistantUnavailable = "assistant_unavailable", DependencyUnavailable = "dependency_unavailable",
-        CrossSiteRequest = "cross_site_request";
+        CrossSiteRequest = "cross_site_request",
+        /// <summary>The practitioner has no connected payment account that can receive money yet (T-09.05, ADR proposal 0011); CONTRACTS 10.1 does not list it yet.</summary>
+        PractitionerPaymentsNotReady = "practitioner_payments_not_ready";
 }

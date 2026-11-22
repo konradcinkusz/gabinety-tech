@@ -27,6 +27,12 @@ public class AutoCompleteJob(IServiceScopeFactory scopes, TimeProvider time, ICo
 
     /// <summary>CONTRACTS 8.1 fixes the payout date of a completed booking at <c>end_utc + 48 h</c>, whatever the completion window is configured to.</summary>
     public static readonly TimeSpan PayoutDelay = TimeSpan.FromHours(48);
+    /// <summary>The practitioner no-show claim runs until start + 72 h (CONTRACTS 4.2): money never moves before it has closed (ADR proposal 0011).</summary>
+    public static readonly TimeSpan ClaimWindowAfterStart = TimeSpan.FromHours(72);
+
+    /// <summary><c>payout_due_at</c> of a completed booking: <c>max(end + 48 h, start + 72 h)</c>.</summary>
+    public static DateTimeOffset PayoutDueAt(DateTimeOffset startUtc, DateTimeOffset endUtc) =>
+        DateTimeOffset.Compare(endUtc + PayoutDelay, startUtc + ClaimWindowAfterStart) >= 0 ? endUtc + PayoutDelay : startUtc + ClaimWindowAfterStart;
 
     public override string Name => JobName;
 
@@ -92,7 +98,7 @@ public class AutoCompleteJob(IServiceScopeFactory scopes, TimeProvider time, ICo
                     Effects = c =>
                     {
                         c.Booking.EndedAt = c.Booking.EndUtc;
-                        c.Booking.PayoutDueAt = c.Booking.EndUtc + PayoutDelay;
+                        c.Booking.PayoutDueAt = PayoutDueAt(c.Booking.StartUtc, c.Booking.EndUtc);
                     },
                 }, ct);
                 if (result.Applied) applied++; // Invalid (disputed, cancelled or completed meanwhile; not due) and NotFound are no-ops

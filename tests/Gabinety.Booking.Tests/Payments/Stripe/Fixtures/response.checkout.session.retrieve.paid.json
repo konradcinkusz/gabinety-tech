@@ -1,0 +1,25 @@
+{
+ "id": "cs_test_a1B2c3D4e5F6g7H8",
+ "object": "checkout.session",
+ "amount_subtotal": 10000,
+ "amount_total": 10000,
+ "currency": "pln",
+ "client_reference_id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+ "customer_details": {
+  "email": "demo-client@example.invalid"
+ },
+ "metadata": {
+  "booking_id": "0f8fad5b-d9cb-469f-a165-70867728950e"
+ },
+ "mode": "payment",
+ "payment_intent": "pi_3Qx0demo",
+ "payment_method_types": [
+  "card",
+  "blik"
+ ],
+ "payment_status": "paid",
+ "status": "complete",
+ "success_url": "https://demo.invalid/bookings/x",
+ "url": null,
+ "livemode": false
+}

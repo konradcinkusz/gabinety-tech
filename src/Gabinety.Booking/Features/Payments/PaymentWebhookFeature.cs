@@ -45,12 +45,12 @@ public sealed class PaymentWebhookFeature : IServiceFeature
         if (raw is null) return Problem(ErrorCodes.ValidationFailed, "Validation failed", 413, "The body is larger than 64 KB.");
 
         // No secret configured: accepted in Mock mode, rejected in every other mode, before the adapter is asked.
-        if (string.IsNullOrEmpty(config["Payments:WebhookSecret"]) && !IsMock(payments))
+        if (string.IsNullOrEmpty(config["Payments:WebhookSecret"]) && !payments.WebhookSecretConfigured && !IsMock(payments))
         {
             log.LogWarning("Webhook for {Provider} rejected: no webhook secret is configured", payments.Name);
             return Problem(ErrorCodes.Unauthenticated, "Unauthenticated", 401);
         }
-        var verified = payments.VerifyWebhook(raw, http.Request.Headers[SignatureHeader].FirstOrDefault());
+        var verified = payments.VerifyWebhook(raw, http.Request.Headers[payments.SignatureHeader].FirstOrDefault());
         if (verified is null)
         {
             log.LogError(new EventId(SignatureFailedEventId, "PaymentWebhookSignatureFailed"),
@@ -100,7 +100,7 @@ public sealed class PaymentWebhookFeature : IServiceFeature
     }
 
     /// <summary>
-    /// The event id of a body whose signature did NOT verify, so it is attacker-controlled: it is read from a top-level string <c>eventId</c> and returned only when it
+    /// The event id of a body whose signature did NOT verify, so it is attacker-controlled: it is read from a top-level string <c>eventId</c> (Mock) or <c>id</c> (Stripe) and returned only when it
     /// is 1-64 characters of letters, digits, underscore or hyphen (no way to forge a log line or smuggle data). Anything else, and every parse failure, gives
     /// <see cref="NoEventIdMarker"/>. Nothing else of the body, and not the signature, is ever read into a log.
     /// </summary>
@@ -110,7 +110,7 @@ public sealed class PaymentWebhookFeature : IServiceFeature
         {
             using var doc = System.Text.Json.JsonDocument.Parse(raw);
             if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
-                && doc.RootElement.TryGetProperty("eventId", out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String
+                && (doc.RootElement.TryGetProperty("eventId", out var v) || doc.RootElement.TryGetProperty("id", out v)) && v.ValueKind == System.Text.Json.JsonValueKind.String
                 && v.GetString() is { } id && SafeEventId.IsMatch(id))
                 return id;
         }

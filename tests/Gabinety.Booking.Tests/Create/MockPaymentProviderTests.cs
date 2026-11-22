@@ -70,8 +70,8 @@ public class MockPaymentProviderTests
     /// instead of the inner message, so a host-level assertion here would be a race. Host-level "does not start" is covered in MockPaymentsFailClosedTests.
     /// </summary>
     [Theory]
-    [InlineData("Stripe")]
     [InlineData("Acme")]
+    [InlineData("Paypal")]
     public void An_unknown_Payments_Provider_stops_the_host_at_startup_with_a_message_naming_the_key(string provider)
     {
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());

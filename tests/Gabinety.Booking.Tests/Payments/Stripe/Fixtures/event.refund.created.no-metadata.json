@@ -1,0 +1,27 @@
+{
+ "id": "evt_1Qx0RefundDash",
+ "object": "event",
+ "api_version": "2026-11-18.endive",
+ "created": 1790000000,
+ "data": {
+  "object": {
+   "id": "re_3Qx0demo",
+   "object": "refund",
+   "amount": 10000,
+   "charge": "ch_3Qx0demo",
+   "created": 1790000100,
+   "currency": "pln",
+   "payment_intent": "pi_3Qx0demo",
+   "reason": null,
+   "status": "succeeded",
+   "metadata": {}
+  }
+ },
+ "livemode": false,
+ "pending_webhooks": 1,
+ "request": {
+  "id": null,
+  "idempotency_key": null
+ },
+ "type": "refund.created"
+}

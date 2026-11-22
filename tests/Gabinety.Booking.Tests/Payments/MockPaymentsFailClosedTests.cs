@@ -39,8 +39,7 @@ public class MockPaymentsFailClosedTests
     }
 
     [Theory]
-    [InlineData("Stripe", true)]
-    [InlineData("Stripe", false)]
+    [InlineData("Acme", false)]
     [InlineData("Acme", true)]
     public void A_vendor_value_without_its_adapter_stops_the_host_in_every_profile_and_says_the_adapter_is_missing(string provider, bool fake)
     {
@@ -51,7 +50,6 @@ public class MockPaymentsFailClosedTests
         var msg = PaymentsFeature.Problem(provider, nonDeployed: fake)!;
         Assert.Contains("Payments:Provider", msg);
         Assert.Contains("adapter", msg);
-        Assert.Contains("T-09.05", msg);
     }
 
     [Theory]
@@ -78,7 +76,7 @@ public class MockPaymentsFailClosedTests
         Assert.ThrowsAny<Exception>(() => h.CreateClient());
         var msg = PaymentsFeature.Problem(null, nonDeployed: false)!;
         Assert.DoesNotContain("whsec", msg);
-        Assert.Contains("T-09.05", msg);
+        Assert.Contains("Stripe", msg); // says what to set instead
     }
 
     // ---- simulate: only in the fake profile, and only for the client of the booking ----

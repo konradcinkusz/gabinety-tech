@@ -152,6 +152,11 @@ public static class PlPages
         public const string NotFoundTitle = "Nie znaleziono programisty", NotFoundBody = "Ten profil nie istnieje albo programista nie jest już widoczny w serwisie.";
         public const string NotFoundAll = "Zobacz wszystkich programistów", NotFoundCategories = "Albo wybierz problem";
         public const string Unavailable = "Nie udało się teraz wczytać profilu. Spróbuj ponownie za chwilę.";
+        // UX-014: header checks, summary panel, review summary.
+        public const string ChecksTitle = "Co sprawdziliśmy", RatingShort = "★ {0} ({1})", TechLabel = "Technologie";
+        public const string SummaryTitle = "Podsumowanie", PriceFromLabel = "od", DurationRange = "{0}–{1} min", SeeTimes = "Zobacz terminy";
+        public const string PaymentNote = "Płatność z góry, programista dostaje pieniądze po konsultacji";
+        public const string ReviewsSummaryLine = "★ {0} · {1} {2}", OpinionOne = "opinia", OpinionFew = "opinie", OpinionMany = "opinii";
     }
 
     public static class Slots

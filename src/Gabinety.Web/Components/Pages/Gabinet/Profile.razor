@@ -15,32 +15,52 @@
         <script type="application/ld+json">@((MarkupString)ProfileJsonLd.Build(p, Site.SiteBaseUrl + $"/gabinet/{Uri.EscapeDataString(p.Slug)}"))</script>
     </PageMeta>
     var portfolio = ProfileJsonLd.SafeHttps(p.PortfolioUrl);
+    var checks = p.Badges.Where(b => b != "approved").ToList();
     <header class="page-header">
-        <h1>@p.DisplayName</h1>
-        <p class="lead">@p.Headline</p>
+        <div class="identity">
+            <Avatar Name="@p.DisplayName" Size="Avatar.AvatarSize.Large" />
+            <div class="identity__text">
+                <h1>@p.DisplayName</h1>
+                <p class="lead">@p.Headline</p>
+            </div>
+        </div>
         <ul class="cluster" aria-label="@PlPages.Profile.BadgesLabel">
-            @foreach (var b in p.Badges)
+            @if (p.Badges.Contains("approved"))
             {
-                <li><span class="@($"badge{(b == "approved" ? " badge--success" : "")}")" title="@BadgeInfo(b)" aria-label="@($"{BadgeLabel(b)}. {BadgeInfo(b)}")">@BadgeLabel(b)</span></li>
+                <li><span class="badge badge--success" title="@PlPages.Profile.ApprovedInfo" aria-label="@($"{PlPages.Profile.Approved}. {PlPages.Profile.ApprovedInfo}")">@PlPages.Profile.Approved</span></li>
             }
             <li>
-                @if (p.Rating is { } rating && !p.IsNew) {<span class="badge">@string.Format(PlPages.Profile.Rating, PlFormat.Rating(rating.Average), rating.Count)</span>}
+                @if (p.Rating is { } rating && !p.IsNew) {<span class="rating">@string.Format(PlPages.Profile.RatingShort, PlFormat.Rating(rating.Average), rating.Count)</span>}
                 else {<span class="badge">@PlPages.Profile.IsNew</span>}
             </li>
         </ul>
+        @if (checks.Count > 0)
+        {
+            <details class="checks">
+                <summary>@PlPages.Profile.ChecksTitle</summary>
+                <ul>
+                    @foreach (var b in checks)
+                    {
+                        <li><strong>@BadgeLabel(b)</strong> <span class="muted">@BadgeInfo(b)</span></li>
+                    }
+                </ul>
+            </details>
+        }
         <ul class="facts muted" aria-label="@PlPages.Profile.FactsLabel">
             <li>@string.Format(PlPages.Profile.Completed, p.CompletedCount)</li>
             <li>@string.Format(PlPages.Profile.MemberSince, PlFormat.MonthYearGenitive(p.MemberSince))</li>
         </ul>
         @if (portfolio is not null || p.GithubLogin is { Length: > 0 })
         {
-            <ul class="cluster" aria-label="@PlPages.Profile.LinksLabel">
-                @if (portfolio is not null) {<li><a class="btn" href="@portfolio" rel="noopener nofollow ugc">@PlPages.Profile.Portfolio</a></li>}
-                @if (p.GithubLogin is { Length: > 0 } login) {<li><a class="btn" href="@ProfileJsonLd.Github(login)" rel="noopener nofollow">@PlPages.Profile.Github</a></li>}
+            <ul class="cluster profile-links" aria-label="@PlPages.Profile.LinksLabel">
+                @if (portfolio is not null) {<li><a class="link" href="@portfolio" rel="noopener nofollow ugc">@PlPages.Profile.Portfolio</a></li>}
+                @if (p.GithubLogin is { Length: > 0 } login) {<li><a class="link" href="@ProfileJsonLd.Github(login)" rel="noopener nofollow">@PlPages.Profile.Github</a></li>}
             </ul>
         }
     </header>
 
+    <div class="layout">
+    <div class="layout__main">
     <section class="section" aria-labelledby="about">
         <h2 id="about">@PlPages.Profile.AboutTitle</h2>
         <p class="bio">@p.Bio</p>
@@ -61,8 +81,12 @@
                         <div class="card">
                             <h3>@o.Title</h3>
                             <p class="description">@o.Description</p>
+                            @if (TechNames(o) is { Count: > 0 } techs)
+                            {
+                                <ul class="cluster tags" aria-label="@PlPages.Profile.TechLabel">@foreach (var t in techs) {<li><span class="badge badge--neutral">@t</span></li>}</ul>
+                            }
                             <p class="cluster"><span>@string.Format(PlPages.Profile.Duration, o.DurationMinutes)</span><span class="num price">@Money.Pln(o.Price.AmountMinor)</span></p>
-                            <a class="btn btn--primary" href="@($"/rezerwacja/{o.Id}?gabinet={Uri.EscapeDataString(p.Slug)}")" aria-label="@string.Format(PlPages.Profile.BookOffering, o.Title)">@PlPages.Profile.Book</a>
+                            <a class="btn btn--primary" href="@BookHref(p.Slug, o)" aria-label="@string.Format(PlPages.Profile.BookOffering, o.Title)">@PlPages.Profile.Book</a>
                             <SlotPicker Slug="@p.Slug" Offering="o" Slots="_slots.GetValueOrDefault(o.Id) ?? OfferSlots.Failed" Windows="_windows" Today="_today"
                                         SelectedDay="@(Oferta == o.Id ? _day : null)" />
                         </div>
@@ -86,6 +110,10 @@
         }
         else
         {
+            @if (p.Rating is { } avg && !p.IsNew)
+            {
+                <p class="reviews-summary" data-testid="reviews-summary">@string.Format(PlPages.Profile.ReviewsSummaryLine, PlFormat.Rating(avg.Average), avg.Count, OpinionWord(avg.Count))</p>
+            }
             <ul class="reviews">
                 @foreach (var r in _reviews.Items)
                 {
@@ -105,6 +133,17 @@
             }
         }
     </section>
+    </div>
+    @if (p.Offerings.Count > 0)
+    {
+        <aside class="card summary" aria-label="@PlPages.Profile.SummaryTitle" data-testid="profile-summary">
+            <p class="summary__price"><span class="muted">@PlPages.Profile.PriceFromLabel</span> <span class="num price">@Gabinety.Web.Components.Pages.Practitioners.ListFormat.Price(p.Offerings.Min(o => o.Price.AmountMinor))</span></p>
+            <p class="muted">@DurationRange(p.Offerings)</p>
+            <a class="btn btn--primary" href="@($"#oferta-{p.Offerings[0].Id}")">@PlPages.Profile.SeeTimes</a>
+            <p class="muted">@PlPages.Profile.PaymentNote</p>
+        </aside>
+    }
+    </div>
 }
 else if (_gone)
 {
@@ -135,6 +174,25 @@ else
     Dictionary<Guid, OfferSlots> _slots = [];
     PageDto<ReviewDto>? _reviews;
     IReadOnlyList<CategoryDto> _suggestions = [];
+    Dictionary<string, string> _techs = [];
+
+    List<string> TechNames(OfferingDto o) => [.. o.TechSlugs.Select(t => _techs.GetValueOrDefault(t) ?? t)];
+
+    /// <summary>The offer's own picker, or straight to its first free time (the booking page needs <c>start</c>: a link without it is a dead end).</summary>
+    string BookHref(string slug, OfferingDto o) =>
+        _slots.GetValueOrDefault(o.Id) is { Available: true, Days: [{ Slots: [var first, ..] }, ..] }
+            ? SlotPickerModel.BookingHref(o.Id, first.StartUtc, slug)
+            : $"#oferta-{o.Id}";
+
+    static string DurationRange(IReadOnlyList<OfferingDto> offers)
+    {
+        var (min, max) = (offers.Min(o => o.DurationMinutes), offers.Max(o => o.DurationMinutes));
+        return min == max ? string.Format(PlPages.Profile.Duration, min) : string.Format(PlPages.Profile.DurationRange, min, max);
+    }
+
+    /// <summary>Polish plural of "opinia": 1 opinia, 2-4 opinie (not 12-14), the rest opinii.</summary>
+    public static string OpinionWord(int n) => n == 1 ? PlPages.Profile.OpinionOne
+        : n % 10 is >= 2 and <= 4 && n % 100 is < 12 or > 14 ? PlPages.Profile.OpinionFew : PlPages.Profile.OpinionMany;
 
     static string BadgeLabel(string b) => b switch { "email" => PlPages.Profile.Email, "github" => PlPages.Profile.GithubBadge, "nip" => PlPages.Profile.Nip, "approved" => PlPages.Profile.Approved, _ => b };
     static string BadgeInfo(string b) => b switch { "email" => PlPages.Profile.EmailInfo, "github" => PlPages.Profile.GithubInfo, "nip" => PlPages.Profile.NipInfo, "approved" => PlPages.Profile.ApprovedInfo, _ => "" };
@@ -161,7 +219,9 @@ else
         // Independent reads: the slots of every offer (one request per 14-day window) and the reviews. Each is a region: a failure of one never takes the page down.
         var slotTasks = p.Offerings.ToDictionary(o => o.Id, o => ReadSlotsAsync(p.Id, o.Id, now));
         var reviewsTask = Reputation.ReviewsAsync(p.Id, ReviewCursor);
-        await Task.WhenAll([.. slotTasks.Values, reviewsTask]);
+        var techTask = Directory.TaxonomyAsync(); // cached by the client; soft: without it the tags show the slug
+        await Task.WhenAll([.. slotTasks.Values, reviewsTask, techTask]);
+        _techs = (techTask.Result.Value?.Techs ?? []).GroupBy(t => t.Slug).ToDictionary(g => g.Key, g => g.First().NamePl);
         _slots = slotTasks.ToDictionary(t => t.Key, t => t.Value.Result);
         _reviews = reviewsTask.Result.Value;
         _profile = p;

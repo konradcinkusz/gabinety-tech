@@ -20,7 +20,8 @@ public class ProfilePageTests
         Assert.Equal(["O mnie", "Oferta", "Opinie"], page.All("h2").Select(h => h.TextContent));
         Assert.Equal(["Audyt kodu .NET", "Krótka konsultacja"], page.All("li h3").Select(h => h.TextContent)); // getByRole("heading", {level: 3}) inside the offer's listitem
         var offer = page.All("ul.offerings > li")[0];
-        Assert.Equal($"/rezerwacja/{PublicSupport.OfferA}?gabinet=demo-anna-demowska", offer.QuerySelector("a[aria-label='Zarezerwuj: Audyt kodu .NET']")!.GetAttribute("href"));
+        // UX-014 (V-5): the link carries the first free time; the old start-less URL was a dead end.
+        Assert.Equal($"/rezerwacja/{PublicSupport.OfferA}?start=2026-11-24T09%3A00%3A00Z&gabinet=demo-anna-demowska", offer.QuerySelector("a[aria-label='Zarezerwuj: Audyt kodu .NET']")!.GetAttribute("href"));
         var ld = page.All("script[type='application/ld+json']"); // exactly one, with the display name (journey J1)
         Assert.Single(ld);
         Assert.Contains("Anna Ąćęł Demowska", ld[0].TextContent);
@@ -31,6 +32,89 @@ public class ProfilePageTests
         Assert.Contains("Audyty kodu .NET", page.One("meta[name=description]")!.GetAttribute("content"));
         Assert.Equal("reviews-title", page.One("section#opinie")!.GetAttribute("aria-labelledby")); // named by its heading: getByRole("region", {name: "Opinie"})
         Assert.Equal("Opinie", page.TextOf("#reviews-title"));
+    }
+
+    [Fact]
+    public async Task Book_link_goes_to_the_first_free_slot_or_else_to_the_offers_picker()
+    {
+        await using var with = PublicSupport.Host();
+        var book = (await Get(with)).All("ul.offerings > li")[1].QuerySelector("a.btn--primary")!;
+        Assert.Equal("Zarezerwuj", book.TextContent); Assert.Equal("Zarezerwuj: Krótka konsultacja", book.GetAttribute("aria-label"));
+        Assert.Equal($"/rezerwacja/{PublicSupport.OfferB}?start=2026-11-24T09%3A00%3A00Z&gabinet=demo-anna-demowska", book.GetAttribute("href"));
+
+        foreach (var booking in new Func<HttpRequestMessage, HttpResponseMessage>[] { _ => FakeBackend.Json(new SlotsDto([])), FakeBackend.Throw(new HttpRequestException("down")) })
+        {
+            await using var without = PublicSupport.Host(booking: booking);
+            var page = await Get(without);
+            Assert.Equal($"#oferta-{PublicSupport.OfferA}", page.All("ul.offerings > li")[0].QuerySelector("a.btn--primary")!.GetAttribute("href"));
+            Assert.NotNull(page.One($"li#oferta-{PublicSupport.OfferA}"));
+            Assert.DoesNotContain(page.All("a"), a => a.GetAttribute("href") is { } h && h.StartsWith("/rezerwacja/") && !h.Contains("start="));
+        }
+    }
+
+    [Fact]
+    public async Task Header_has_one_success_badge_the_other_checks_in_details_and_quiet_links()
+    {
+        await using var web = PublicSupport.Host();
+        var page = await Get(web);
+        var header = page.One("header.page-header")!;
+        Assert.Equal(["Zatwierdzony"], header.QuerySelectorAll(".badge--success").Select(b => b.TextContent));
+        Assert.NotNull(header.QuerySelector(".avatar--large"));
+        Assert.Equal("Nowy", header.QuerySelector("ul[aria-label=Weryfikacje] .badge:not(.badge--success)")!.TextContent);
+        var checks = header.QuerySelector("details.checks")!;
+        Assert.Equal("Co sprawdziliśmy", checks.QuerySelector("summary")!.TextContent);
+        Assert.Equal(["E-mail zweryfikowany", "GitHub połączony", "NIP zweryfikowany"], checks.QuerySelectorAll("li strong").Select(b => b.TextContent));
+        Assert.Empty(header.QuerySelectorAll("a.btn"));
+        Assert.Equal(["Portfolio", "GitHub"], header.QuerySelectorAll("a.link").Select(a => a.TextContent));
+
+        await using var rated = PublicSupport.Host(PublicSupport.DefaultDirectory(PublicSupport.Profile(isNew: false, rating: new RatingDto(4.8, 25))));
+        var r = await Get(rated);
+        Assert.Equal("★ 4,8 (25)", r.TextOf("header .rating"));
+        Assert.DoesNotContain("Nowy", r.TextOf("header ul[aria-label=Weryfikacje]"));
+    }
+
+    [Fact]
+    public async Task Offers_show_technology_tags_from_the_taxonomy_and_fail_soft_without_it()
+    {
+        await using var web = PublicSupport.Host();
+        var tags = (await Get(web)).All("ul.offerings > li")[0].QuerySelectorAll(".tags .badge--neutral");
+        Assert.Equal([".NET"], tags.Select(t => t.TextContent));
+
+        var down = PublicSupport.DefaultDirectory();
+        await using var failing = PublicSupport.Host(r => r.RequestUri!.AbsolutePath == "/api/v1/taxonomy" ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) : down(r));
+        var page = await Get(failing);
+        Assert.Equal(HttpStatusCode.OK, page.Status);
+        Assert.Equal(["dotnet"], page.All("ul.offerings > li")[0].QuerySelectorAll(".tags .badge--neutral").Select(t => t.TextContent)); // the slug is the fallback text
+    }
+
+    [Fact]
+    public async Task The_summary_panel_shows_price_durations_the_link_to_the_first_offer_and_the_payment_line()
+    {
+        await using var web = PublicSupport.Host();
+        var aside = (await Get(web)).One("aside.summary")!;
+        Assert.Contains("od", aside.TextContent); Assert.Contains("110", aside.TextContent);
+        Assert.Contains("30–60 min", aside.TextContent);
+        Assert.Equal($"#oferta-{PublicSupport.OfferA}", aside.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("Zobacz terminy", aside.QuerySelector("a")!.TextContent);
+        Assert.Contains("Płatność z góry, programista dostaje pieniądze po konsultacji", aside.TextContent);
+
+        await using var none = PublicSupport.Host(PublicSupport.DefaultDirectory(PublicSupport.Profile(offerings: [])));
+        Assert.Null((await Get(none)).One("aside.summary"));
+    }
+
+    [Theory]
+    [InlineData(1, "opinia")] [InlineData(2, "opinie")] [InlineData(4, "opinie")] [InlineData(5, "opinii")] [InlineData(12, "opinii")] [InlineData(22, "opinie")] [InlineData(25, "opinii")]
+    public void Opinion_word_follows_polish_plural_rules(int n, string word) => Assert.Equal(word, Gabinety.Web.Components.Pages.Gabinet.Profile.OpinionWord(n));
+
+    [Fact]
+    public async Task Reviews_have_a_summary_line_above_the_list_when_rated()
+    {
+        var review = new ReviewDto(Guid.NewGuid(), 5, "Super", new DateTimeOffset(2026, 11, 20, 12, 0, 0, TimeSpan.Zero), null);
+        await using var web = PublicSupport.Host(PublicSupport.DefaultDirectory(PublicSupport.Profile(isNew: false, rating: new RatingDto(4.8, 25))), reputation: _ => FakeBackend.Json(new PageDto<ReviewDto>([review], null)));
+        var section = (await Get(web)).One("section#opinie")!;
+        Assert.Equal("★ 4,8 · 25 opinii", section.QuerySelector("[data-testid=reviews-summary]")!.TextContent);
+        Assert.Contains("Ocena: 5 z 5", section.QuerySelector("ul.reviews li")!.TextContent);
+        Assert.Equal("reviews-summary", section.QuerySelector("[data-testid=reviews-summary] ~ ul.reviews") is null ? "" : "reviews-summary");
     }
 
     [Fact]

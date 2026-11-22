@@ -1,0 +1,7 @@
+.field { gap: var(--space-1); }
+.field__label { font-weight: 600; }
+.field__optional { font-weight: 400; color: var(--color-text-muted); }
+.field__hint { margin: 0; font-size: var(--text-sm); color: var(--color-text-muted); }
+.field__counter { margin: 0; text-align: right; font-size: var(--text-sm); color: var(--color-text-muted); }
+.field__error { margin: 0; font-size: var(--text-sm); color: var(--color-danger); }
+.field--invalid input, .field--invalid select, .field--invalid textarea { border-color: var(--color-danger); border-width: 2px; }

@@ -1,0 +1,7 @@
+.rule { align-items: flex-end; gap: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.rule--invalid { border-bottom-color: var(--color-danger); }
+.callout__title { font-size: var(--text-lg); margin-bottom: var(--space-2); }
+.stack--tight { gap: var(--space-2); }
+.btn--ghost-danger { background: transparent; border-color: transparent; color: var(--color-danger); }
+.btn--secondary { background: var(--color-surface-raised); border-color: var(--color-accent); color: var(--color-accent); }
+.field__label { font-weight: 600; }

@@ -1,0 +1,28 @@
+@* One field of a form (contract 4.4, 5.5): label, hint, the control, the counter INSIDE the field, and the error under it. The control is the child content; it gets the ids it must point at.
+   The error starts with a visually hidden "Błąd:" so a screen reader says what it is. *@
+<div class="@($"field{(HasError ? " field--invalid" : "")}")">
+    <label class="field__label" for="@Id">@Label@if (Optional) {<span class="field__optional"> (@PlPractitioner.Common.Optional)</span>}</label>
+    @if (Hint is not null) {<p class="field__hint" id="@HintId">@Hint</p>}
+    @ChildContent(new FieldContext(Id, DescribedBy, HasError))
+    @if (Max is { } max) {<p class="field__counter" aria-hidden="true">@string.Format(PlPractitioner.Common.Counter, Length, max)</p>}
+    @if (HasError) {<p class="field__error" id="@ErrorId"><span class="visually-hidden">@($"{PlPractitioner.Common.ErrorWord} ")</span>@Error</p>}
+</div>
+
+@code {
+    public sealed record FieldContext(string Id, string? DescribedBy, bool Invalid);
+
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public bool Optional { get; set; }
+    /// <summary>The longest value; with it the counter "n / max" is shown inside the field.</summary>
+    [Parameter] public int? Max { get; set; }
+    [Parameter] public int Length { get; set; }
+    [Parameter, EditorRequired] public RenderFragment<FieldContext> ChildContent { get; set; } = default!;
+
+    bool HasError => !string.IsNullOrEmpty(Error);
+    string HintId => Id + "-hint";
+    string ErrorId => Id + "-error";
+    string? DescribedBy => string.Join(' ', new[] { Hint is not null ? HintId : null, HasError ? ErrorId : null }.OfType<string>()) is { Length: > 0 } s ? s : null;
+}

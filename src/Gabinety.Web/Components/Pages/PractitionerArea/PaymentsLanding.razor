@@ -1,0 +1,12 @@
+@page "/practitioner/payments"
+@attribute [Authorize]
+@inject NavigationManager Navigation
+@* The addresses Booking gives the payment provider (<c>{Site__BaseUrl}/practitioner/payments?return=1</c> and <c>?refresh=1</c>, PR #127) are fixed in the Booking service; the page of this host is
+   /gabinet-programisty/platnosci. This route only forwards, keeping the two flags it knows. *@
+@code {
+    [SupplyParameterFromQuery(Name = "return")] public string? ReturnParam { get; set; }
+    [SupplyParameterFromQuery(Name = "refresh")] public string? RefreshParam { get; set; }
+
+    protected override void OnInitialized() =>
+        Navigation.NavigateTo(PractitionerPaths.Payments + (ReturnParam == "1" ? "?return=1" : RefreshParam == "1" ? "?refresh=1" : ""));
+}

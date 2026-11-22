@@ -13,12 +13,16 @@ namespace Gabinety.Web.Tests;
 /// <summary>The real host with every backend replaced by a fake handler: no network, no login (BLAZOR-WEB-APP section 13).</summary>
 public sealed class WebFactory : WebApplicationFactory<Program>
 {
+
     public const string TrustedKey = "test-trusted-proxy-key-0123456789abcdef0123456789";
     public FakeBackend Directory { get; } = new();
     public FakeBackend Booking { get; } = new();
     public FakeBackend Reputation { get; } = new();
     public FakeBackend Assistant { get; } = new();
-    public FakeIdentity Identity { get; } = new();
+    /// <summary>The identity service. Pass one in to start a second process (a deploy) against the same service.</summary>
+    public FakeIdentity Identity { get; private set; } = new();
+    /// <summary>A second process (a deploy) talks to the SAME identity service: call before the first request.</summary>
+    public WebFactory SharingIdentity(FakeIdentity? identity) { if (identity is not null) Identity = identity; return this; }
     readonly Dictionary<string, string?> _settings = new()
     {
         ["Backend:Directory"] = "http://directory.test", ["Backend:Booking"] = "http://booking.test", ["Backend:Reputation"] = "http://reputation.test",
@@ -61,6 +65,8 @@ public sealed class Browser(WebFactory factory)
     readonly Dictionary<string, string> _cookies = [];
     public IReadOnlyDictionary<string, string> Cookies => _cookies;
     public List<string> SetCookieLog { get; } = [];
+    /// <summary>A cookie the browser already holds (a session from before a deploy, a tampered one).</summary>
+    public Browser WithCookie(string name, string value) { _cookies[name] = value; return this; }
 
     public async Task<Page> GetAsync(string path, params (string Name, string Value)[] headers) => await SendAsync(new HttpRequestMessage(HttpMethod.Get, path), headers);
 

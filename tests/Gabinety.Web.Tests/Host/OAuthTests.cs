@@ -120,7 +120,10 @@ public class OAuthTests
 
         var (_, s3, _) = await Start(browser);
         web.Identity.Backend.Respond = _ => FakeBackend.Raw("{\"requiresTwoFactor\":true,\"challengeToken\":\"x\",\"expiresIn\":300}");
-        Assert.Equal("/logowanie?error=two_factor_not_supported", (await browser.GetAsync($"/oauth/callback?code=c&state={s3}")).Location);
+        var challenge = await browser.GetAsync($"/oauth/callback?code=c&state={s3}");
+        Assert.Equal("/logowanie/kod", challenge.Location); // a real second step, not an error
+        Assert.Contains(challenge.SetCookies, c => c.StartsWith("gt_2fa=") && c.Contains("httponly", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(challenge.SetCookies, c => c.StartsWith("gt_session="));
 
         var (_, s4, _) = await Start(browser);
         web.Identity.Backend.Respond = r => r.RequestUri!.AbsolutePath.Contains("exchange") ? FakeBackend.Json(new { accessToken = web.Identity.Issue(), refreshToken = "r", expiresIn = 3600 }) : FakeBackend.Raw(web.Identity.Jwks());
@@ -128,7 +131,7 @@ public class OAuthTests
     }
 
     [Fact]
-    public async Task Sign_in_states_two_factor_and_unverified_e_mail_reach_the_login_page_as_messages()
+    public async Task Sign_in_states_unverified_e_mail_is_a_message_and_two_factor_is_a_second_step()
     {
         await using var web = Web();
         web.Identity.Backend.Respond = r => r.RequestUri!.AbsolutePath == "/api/v1/auth/login" ? FakeBackend.Raw("{\"emailVerificationRequired\":true}", HttpStatusCode.Forbidden) : FakeBackend.Raw(web.Identity.Jwks());
@@ -136,7 +139,7 @@ public class OAuthTests
         Assert.Contains("Potwierdź adres e-mail", r1.TextOf("[role=alert]"));
         web.Identity.Backend.Respond = _ => FakeBackend.Raw("{\"requiresTwoFactor\":true,\"challengeToken\":\"x\",\"expiresIn\":300}");
         var r2 = await web.NewBrowser().PostFormAsync("/logowanie", new Dictionary<string, string> { ["Model.Email"] = "a@demo.example", ["Model.Password"] = "x" });
-        Assert.Contains("dwuskładnikowym", r2.TextOf("[role=alert]"));
+        Assert.Equal("/logowanie/kod", r2.Location); // the code is asked for on its own page (TwoFactorTests)
         Assert.DoesNotContain(r2.SetCookies, c => c.StartsWith("gt_session="));
     }
 }

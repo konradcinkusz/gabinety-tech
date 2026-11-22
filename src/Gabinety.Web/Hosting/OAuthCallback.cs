@@ -39,10 +39,10 @@ public static class OAuthEndpoints
         if (fromCookie is not null) http.Response.Cookies.Delete(StateCookie, Options(web, TimeSpan.Zero)); // single use: every outcome deletes it, with the attributes it was set with
         http.Response.Headers.CacheControl = "no-store";
         if (!StateMatches(state, fromCookie) || string.IsNullOrEmpty(code)) return Results.Redirect($"{ReturnTarget.LoginPath}?error=github_failed");
-        return await signIn.SignInWithExchangeCodeAsync(http, code, http.RequestAborted) switch
+        return await signIn.SignInWithExchangeCodeAsync(http, code, ReturnTarget.Safe(redirect), http.RequestAborted) switch
         {
             SignInOutcome.SignedIn => Results.Redirect(ReturnTarget.Safe(redirect)),
-            SignInOutcome.TwoFactor => Results.Redirect($"{ReturnTarget.LoginPath}?error=two_factor_not_supported"),
+            SignInOutcome.TwoFactor => Results.Redirect(ReturnTarget.TwoFactorUrl(ReturnTarget.Safe(redirect))), // the challenge is sealed in its cookie; the code is asked for on its own page
             _ => Results.Redirect($"{ReturnTarget.LoginPath}?error=github_failed"),
         };
     }

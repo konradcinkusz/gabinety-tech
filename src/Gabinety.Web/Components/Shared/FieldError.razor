@@ -1,0 +1,10 @@
+@* The inline error under a control (DESIGN-CONTRACT 4.4): "Błąd:" is read by a screen reader and not shown; the control points here with aria-describedby. Renders nothing when the field is fine. *@
+@if (Problem is not null)
+{
+    <p class="field__error" id="@(FieldId)-error"><span class="visually-hidden">@Pl.FormErrors.Error</span>@Problem.Message</p>
+}
+
+@code {
+    [Parameter, EditorRequired] public string FieldId { get; set; } = "";
+    [Parameter] public FormProblem? Problem { get; set; }
+}

@@ -1,0 +1,10 @@
+@page "/rejestracja/sprawdz-skrzynke"
+@attribute [AllowAnonymous]
+@* The registration the identity service accepted with 202: no session yet, the address must be confirmed. A page of its own (the form post redirects here), so a reload does not post again. *@
+
+<PageTitle>@Pl.CheckInbox.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@Pl.CheckInbox.Title</h1>
+<Alert Variant="AlertVariant.Success" TestId="check-inbox">@Pl.CheckInbox.Body</Alert>
+<p class="muted">@Pl.CheckInbox.Hint</p>
+<p><a class="btn btn--primary" href="@ReturnTarget.LoginPath">@Pl.CheckInbox.SignIn</a></p>

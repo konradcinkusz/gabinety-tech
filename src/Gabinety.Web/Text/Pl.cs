@@ -11,11 +11,13 @@ public static class Pl
     {
         public const string Name = "Gabinety Tech", Tagline = "Płatna konsultacja ze zweryfikowanym programistą";
         public const string Copyright = "© {0} Gabinety Tech";
+        public const string Terms = "Regulamin", Privacy = "Polityka prywatności", FooterLabel = "Informacje prawne";
     }
 
     public static class Nav
     {
-        public const string Label = "Menu główne", Search = "Programiści", SignIn = "Zaloguj się", MyBookings = "Moje rezerwacje", SignOut = "Wyloguj się";
+        public const string Label = "Menu główne", Search = "Programiści", SignIn = "Zaloguj się", Register = "Załóż konto", MyBookings = "Moje rezerwacje", SignOut = "Wyloguj się";
+        public const string Account = "Konto", PractitionerArea = "Panel programisty", Admin = "Administracja", Menu = "Menu", AccountMenu = "Twoje konto";
     }
 
     public static class A11y
@@ -91,6 +93,61 @@ public static class Pl
         public const string TwoFactor = "Konta z uwierzytelnianiem dwuskładnikowym nie są jeszcze obsługiwane.";
         public const string Unavailable = "Logowanie jest chwilowo niedostępne. Spróbuj ponownie za chwilę.";
         public const string GithubFailed = "Logowanie przez GitHub nie powiodło się. Spróbuj ponownie lub użyj hasła.";
+        public const string RateLimited = "Zbyt wiele prób logowania. Spróbuj ponownie za minutę.";
+        public const string LockedOut = "Konto jest chwilowo zablokowane po wielu nieudanych próbach logowania. Spróbuj ponownie za kilka minut.";
+        public const string Github = "Zaloguj się przez GitHub", Or = "albo", NoAccount = "Nie masz konta?", Summary = "Popraw dane logowania";
+        public const string EmailRequired = "Podaj adres e-mail.", PasswordRequired = "Podaj hasło.", EmailInvalid = "Podaj poprawny adres e-mail.";
+        public const string SessionExpired = "Sesja wygasła. Zaloguj się ponownie.";
+    }
+
+    /// <summary>The second step of a two-factor sign-in (<c>/logowanie/kod</c>). The challenge itself is a sealed cookie; nothing of it is shown.</summary>
+    public static class TwoFactor
+    {
+        public const string Title = "Kod weryfikacyjny", MetaTitle = "Kod weryfikacyjny | Gabinety Tech";
+        public const string Lead = "Twoje konto ma włączone uwierzytelnianie dwuskładnikowe. Wpisz kod z aplikacji uwierzytelniającej.";
+        public const string RecoveryLead = "Wpisz jeden z kodów odzyskiwania zapisanych przy włączaniu uwierzytelniania dwuskładnikowego. Każdego kodu można użyć tylko raz.";
+        public const string CodeLabel = "Kod z aplikacji", RecoveryLabel = "Kod odzyskiwania", CodeHint = "6 cyfr.", Submit = "Zaloguj się";
+        public const string UseRecovery = "Użyj kodu odzyskiwania", UseApp = "Użyj kodu z aplikacji", Back = "Wróć do logowania";
+        public const string CodeRequired = "Wpisz kod.", Invalid = "Nieprawidłowy kod. Sprawdź go i spróbuj ponownie.";
+        public const string Expired = "Czas na wpisanie kodu minął. Zaloguj się ponownie.";
+        public const string RateLimited = "Zbyt wiele prób. Spróbuj ponownie za minutę.";
+        public const string Unavailable = "Logowanie jest chwilowo niedostępne. Spróbuj ponownie za chwilę.";
+    }
+
+    public static class Register
+    {
+        public const string Title = "Załóż konto", MetaTitle = "Załóż konto | Gabinety Tech", Email = "Adres e-mail", Password = "Hasło", Submit = "Załóż konto";
+        public const string PasswordHint = "Co najmniej 8 znaków, w tym mała i wielka litera, cyfra i znak specjalny.";
+        public const string ConsentPrefix = "Akceptuję ", ConsentAnd = " i ", ConsentSuffix = ".", Terms = "Regulamin", Privacy = "Politykę prywatności";
+        public const string VersionTitle = "Wersja z dnia {0}";
+        public const string EmailRequired = "Podaj adres e-mail.", EmailInvalid = "Podaj poprawny adres e-mail.", EmailTooLong = "Adres e-mail może mieć najwyżej 254 znaki.";
+        public const string PasswordRequired = "Podaj hasło.";
+        public const string PasswordTooShort = "Hasło musi mieć co najmniej 8 znaków.";
+        public const string PasswordWeak = "Hasło musi zawierać małą i wielką literę, cyfrę i znak specjalny.";
+        public const string PasswordTooShortAndWeak = "Hasło musi mieć co najmniej 8 znaków oraz zawierać małą i wielką literę, cyfrę i znak specjalny.";
+        public const string PasswordTooLong = "Hasło może mieć najwyżej 200 znaków.";
+        public const string ConsentRequired = "Aby założyć konto, zaakceptuj Regulamin i Politykę prywatności.";
+        public const string RateLimited = "Zbyt wiele prób. Spróbuj ponownie za minutę.";
+        public const string Failed = "Nie udało się założyć konta. Sprawdź dane i spróbuj ponownie.";
+        public const string Unavailable = "Rejestracja jest chwilowo niedostępna. Spróbuj ponownie za chwilę.";
+        public const string HaveAccount = "Masz już konto?", SignInLink = "Zaloguj się";
+        public const string TwoFactor = "Konto wymaga kodu weryfikacyjnego.";
+    }
+
+    /// <summary>The state after a registration the identity service accepted without a session (202): the address must be confirmed first. A real page, so a reload does not post again.</summary>
+    public static class CheckInbox
+    {
+        public const string Title = "Sprawdź skrzynkę", MetaTitle = "Sprawdź skrzynkę | Gabinety Tech";
+        public const string Body = "Wysłaliśmy wiadomość z linkiem potwierdzającym. Po potwierdzeniu adresu możesz się zalogować.";
+        public const string Hint = "Nie widzisz wiadomości? Zajrzyj do folderu ze spamem albo spróbuj ponownie za kilka minut.";
+        public const string SignIn = "Przejdź do logowania";
+    }
+
+    /// <summary>"Popraw N pól" with the Polish plural: 1 pole, 2-4 pola, 5-21 pól, 22-24 pola.</summary>
+    public static class FormErrors
+    {
+        public const string Error = "Błąd: ";
+        public static string Summary(int count) => $"Popraw {count} {(count == 1 ? "pole" : count % 10 is >= 2 and <= 4 && count % 100 is < 12 or > 14 ? "pola" : "pól")}";
     }
 
     public static class Logout
@@ -131,5 +188,27 @@ public static class Pl
         /// <summary>Months in the genitive, for "28 marca".</summary>
         public static readonly string[] MonthsGenitive = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "września", "października", "listopada", "grudnia"];
         public static readonly string[] Weekdays = ["niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"];
+    }
+
+    /// <summary>The account page (<c>/konto</c>, port of <c>web/src/components/auth/strings.ts</c> "account"); the versions of the documents go to a title, never to the text (DESIGN-CONTRACT 8).</summary>
+    public static class Account
+    {
+        public const string Title = "Konto", MetaTitle = "Konto | Gabinety Tech", Email = "Adres e-mail";
+        public const string Verified = "Adres e-mail potwierdzony", NotVerified = "Adres e-mail niepotwierdzony. Sprawdź skrzynkę i kliknij link z wiadomości.";
+        public const string Consents = "Zgody";
+        public const string TermsAccepted = "Regulamin: zaakceptowany", TermsPending = "Regulamin: wymaga ponownej akceptacji";
+        public const string PrivacyAccepted = "Polityka prywatności: zaakceptowana", PrivacyPending = "Polityka prywatności: wymaga ponownej akceptacji";
+        public const string VersionTitle = "Wersja dokumentu: {0}";
+        public const string AcceptCurrent = "Zaakceptuj aktualne wersje";
+        public const string Data = "Twoje dane", Export = "Pobierz moje dane (JSON)", SignOut = "Wyloguj się";
+        public const string DeleteTitle = "Usunięcie konta";
+        public const string DeleteBody = "Konto zostanie usunięte, a dane po okresie przechowywania zanonimizowane. Tej operacji nie da się cofnąć.";
+        public const string DeleteConfirm = "Rozumiem i chcę usunąć konto", DeletePassword = "Hasło (potwierdzenie)", DeleteSubmit = "Usuń konto";
+        public const string DeleteFailed = "Nie udało się usunąć konta. Sprawdź hasło i spróbuj ponownie.";
+        public const string DeleteConfirmRequired = "Zaznacz potwierdzenie, aby usunąć konto.";
+        public const string DeletePasswordRequired = "Podaj hasło, aby potwierdzić usunięcie konta.";
+        public const string DeleteUnavailable = "Usuwanie konta jest chwilowo niedostępne. Spróbuj ponownie za chwilę.";
+        public const string AcceptFailed = "Nie udało się zapisać zgód. Spróbuj ponownie za chwilę.";
+        public const string Unavailable = "Dane konta są chwilowo niedostępne. Spróbuj ponownie za chwilę.";
     }
 }

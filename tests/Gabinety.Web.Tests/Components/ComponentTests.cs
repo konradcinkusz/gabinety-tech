@@ -122,9 +122,13 @@ public class LayoutTests : BunitContext
     {
         var auth = AddAuthorization();
         auth.SetNotAuthorized();
-        Assert.Equal(["/programisci", "/logowanie"], Render<MainLayout>(p => p.Add(l => l.Body, Body())).FindAll("header nav a").Select(a => a.GetAttribute("href")));
+        var visitor = Render<MainLayout>(p => p.Add(l => l.Body, Body()));
+        Assert.Equal(["/programisci"], visitor.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/logowanie", "/rejestracja"], visitor.FindAll("header .site-account a").Select(a => a.GetAttribute("href")));
         auth.SetAuthorized("demo-client@demo.example");
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/wyloguj"], Render<MainLayout>(p => p.Add(l => l.Body, Body())).FindAll("header nav a").Select(a => a.GetAttribute("href")));
+        var member = Render<MainLayout>(p => p.Add(l => l.Body, Body()));
+        Assert.Equal(["/programisci", "/moje/rezerwacje", "/gabinet-programisty"], member.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/konto", "/wyloguj"], member.FindAll("header .site-account a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]

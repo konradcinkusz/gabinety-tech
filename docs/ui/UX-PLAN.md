@@ -234,6 +234,8 @@ Status: **UX-060 (partly) and UX-062 are done; UX-061 and UX-063 are deferred.**
 
 ### Wave 3: needs a contract or backend change first (start in `gabinety-tech-spec`)
 
+**Status 2026-11-22:** done in phase 11 of the spec (PROGRESS T-11.01 to T-11.21), PRs #165 to #187: UX-071 (#166, #174, #177, #179), UX-072 (#169, #172, #178), UX-073 (#165, #175, #180), UX-074 only as the switchable reminder/review mails on `/konto` (#181, #185; no in-app notification list), UX-075 (#167, #183, #184, #186), UX-076 as a help page without a form (#176, ADR in spec), and the avatar part of UX-070 as the verified GitHub picture (#168, ADR-0013; no upload and no moderation). Open: the in-app notification list, photo upload, the funnel measurement.
+
 | ID | Task | Needs |
 |---|---|---|
 | UX-070 | Practitioner photos (upload, moderation, `avatarUrl` on card and profile) | Directory contract and storage; replaces the initials of UX-012 |

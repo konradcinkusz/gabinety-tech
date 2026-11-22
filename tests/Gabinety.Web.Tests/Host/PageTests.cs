@@ -100,7 +100,7 @@ public class PageTests
         var page = await web.NewBrowser().GetAsync("/programisci/audyt-kodu?duration=60&cursor=CUR");
         Assert.Equal(HttpStatusCode.OK, page.Status);
         Assert.Equal("Audyt kodu", page.TextOf("h1")); // the page object: expect(list.heading()).toHaveText(namePl)
-        Assert.Equal("Wyniki: 5", Page.Squash(page.TextOf("header p:last-of-type")));
+        Assert.Null(page.One("[data-testid=count]")); // F-05: a filtered, paged variant has no total, so it states none (the sitemap's 5 is the unfiltered category)
         var next = page.One("nav[aria-label=Paginacja] a[rel=next]")!;
         Assert.Equal("/programisci/audyt-kodu?duration=60&cursor=NEXT", next.GetAttribute("href"));
         Assert.Equal("/programisci/audyt-kodu?duration=60", page.One("nav[aria-label=Paginacja] a[rel=prev]")!.GetAttribute("href")); // cursors are forward-only: back means the first page

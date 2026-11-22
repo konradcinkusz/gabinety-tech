@@ -4,6 +4,8 @@
   <ItemGroup>
     <ProjectReference Include="../Gabinety.ServiceDefaults/Gabinety.ServiceDefaults.csproj" />
     <ProjectReference Include="../Gabinety.ServiceDefaults.Edge/Gabinety.ServiceDefaults.Edge.csproj" />
+    <!-- The owner's legal text, embedded (the same files as web/content/legal until the cutover; a test pins them identical). -->
+    <EmbeddedResource Include="Content/Legal/*.md" LogicalName="Gabinety.Web.Content.Legal.%(Filename)%(Extension)" />
     <InternalsVisibleTo Include="Gabinety.Web.Tests" />
   </ItemGroup>
 </Project>

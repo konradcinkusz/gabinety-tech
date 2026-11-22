@@ -56,7 +56,7 @@ public class ListViewTests
     {
         var v = View();
         Assert.Equal("Programiści", v.Heading);
-        Assert.Equal("Wyniki: 6", v.CountText);
+        Assert.Equal("Wyniki: 6", v.CountText(2, false));
         Assert.Equal("Programiści do konsultacji online | Gabinety Tech", v.MetaTitle);
     }
 

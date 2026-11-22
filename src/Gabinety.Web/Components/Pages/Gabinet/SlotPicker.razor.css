@@ -1,0 +1,5 @@
+.slot-picker { display: grid; gap: var(--space-3); margin-top: var(--space-3); }
+.slot-days { display: flex; gap: var(--space-2); overflow-x: auto; padding: var(--space-1); margin: 0; }
+.slot-days li { flex: none; }
+.slot-times { display: grid; grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr)); gap: var(--space-2); margin: 0; }
+.slot { display: block; text-align: center; font-variant-numeric: tabular-nums; min-height: 2.75rem; line-height: 2rem; }

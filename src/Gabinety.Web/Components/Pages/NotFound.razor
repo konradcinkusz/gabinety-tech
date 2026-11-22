@@ -1,11 +1,19 @@
 @page "/not-found"
 @attribute [AllowAnonymous]
 @layout MainLayout
+@using Gabinety.Web.Components.Pages.Gabinet
+@using Microsoft.AspNetCore.Diagnostics
+@inject DirectoryClient Directory
 
 @* The status-code middleware re-executes this page for every refusal without a body and passes the original status (?status=403): a refusal of a signed-in user (F-10) says "Brak dostępu", the rest say "not found". *@
 @if (Status == StatusCodes.Status403Forbidden)
 {
     <ForbiddenNotice />
+}
+else if (_profile)
+{
+    <PageMeta Title="@(PlPages.Profile.NotFoundTitle + " | " + Pl.Site.Name)" Description="@PlPages.Profile.NotFoundBody" Path="/not-found" Robots="noindex,follow" />
+    <ProfileNotFoundBlock Suggestions="_suggestions" />
 }
 else
 {
@@ -17,4 +25,16 @@ else
 
 @code {
     [SupplyParameterFromQuery(Name = "status")] public int? Status { get; set; }
+    [CascadingParameter] HttpContext? Http { get; set; }
+
+    bool _profile;
+    IReadOnlyList<CategoryDto> _suggestions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The status-code middleware re-executes /not-found, so the address that was asked for is in the feature (or in the request when the router rendered this page in place).
+        var asked = Http?.Features.Get<IStatusCodeReExecuteFeature>()?.OriginalPath ?? Http?.Request.Path.Value;
+        _profile = Status != StatusCodes.Status403Forbidden && ProfileNotFound.Matches(asked);
+        if (_profile) _suggestions = (await Directory.TaxonomyAsync()).Value?.Problems.Take(3).ToList() ?? [];
+    }
 }

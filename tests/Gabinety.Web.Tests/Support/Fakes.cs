@@ -94,6 +94,17 @@ public sealed class FakeIdentity
     public bool Down { get; set; }
     /// <summary>Set by <c>/logout</c>: authservice revokes every refresh token of the user.</summary>
     public bool Revoked { get; private set; }
+    /// <summary>The password the account has now: <see cref="Password"/> until a change-password succeeds.</summary>
+    string _password = Password;
+    /// <summary>The new password that the stand-in refuses with Identity's array of rule messages (a rule only the server knows).</summary>
+    public const string RefusedPassword = "Refused-By-Server-1!";
+    /// <summary>Every refresh token issued, in order.</summary>
+    readonly List<string> _issuedRefresh = [];
+    public IReadOnlyList<string> IssuedRefreshTokens { get { lock (_gate) return [.. _issuedRefresh]; } }
+    /// <summary>Refresh tokens a password change has revoked (authservice revokes every refresh token of the user): a refresh with one of them is refused.</summary>
+    public HashSet<string> SupersededRefreshTokens { get; } = [];
+    /// <summary>When false, change-password answers 200 without a fresh pair (authservice with ReissueTokensOnPasswordChange off): the session must end.</summary>
+    public bool ReissueOnPasswordChange { get; set; } = true;
     public TimeSpan AccessLifetime { get; set; } = TimeSpan.FromHours(1);
     public string[] Roles { get; set; } = [];
 
@@ -153,19 +164,21 @@ public sealed class FakeIdentity
                     return FakeBackend.Json(new { error = "Invalid code." }, HttpStatusCode.Unauthorized);
                 case "/api/v1/auth/login":
                     if (LoginStatus != 0) return new HttpResponseMessage((HttpStatusCode)LoginStatus);
-                    if (Field("password") == Password && LockedOut) return FakeBackend.Json(new { error = "locked", lockedOut = true, lockoutEnd = "2026-12-01T10:00:00Z" }, HttpStatusCode.Unauthorized);
-                    if (Field("password") == Password && RequireTwoFactor) return FakeBackend.Json(new { requiresTwoFactor = true, challengeToken = "challenge-1", expiresIn = 300 });
-                    if (Field("password") != Password) return FakeBackend.Json(new { message = "Invalid email or password." }, HttpStatusCode.Unauthorized);
+                    if (Field("password") == _password && LockedOut) return FakeBackend.Json(new { error = "locked", lockedOut = true, lockoutEnd = "2026-12-01T10:00:00Z" }, HttpStatusCode.Unauthorized);
+                    if (Field("password") == _password && RequireTwoFactor) return FakeBackend.Json(new { requiresTwoFactor = true, challengeToken = "challenge-1", expiresIn = 300 });
+                    if (Field("password") != _password) return FakeBackend.Json(new { message = "Invalid email or password." }, HttpStatusCode.Unauthorized);
                     return Tokens(Field("email")!);
                 case "/api/v1/auth/refresh":
                     RefreshCalls++;
                     if (RefreshStatus != 0) return new HttpResponseMessage((HttpStatusCode)RefreshStatus); // throttled or failing: the token is not spent
                     SpentRefreshTokens.Add(Field("refreshToken") ?? "");
-                    if (RefuseRefresh || Revoked || Field("refreshToken") is null || SpentRefreshTokens.Count(t => t == Field("refreshToken")) > 1) return FakeBackend.Json(new { message = "Invalid refresh token." }, HttpStatusCode.Unauthorized); // a replay is refused like the real service
+                    if (RefuseRefresh || Revoked || Field("refreshToken") is null || SupersededRefreshTokens.Contains(Field("refreshToken")!) || SpentRefreshTokens.Count(t => t == Field("refreshToken")) > 1) return FakeBackend.Json(new { message = "Invalid refresh token." }, HttpStatusCode.Unauthorized); // a replay is refused like the real service
                     return Tokens("demo-client@demo.example", AccessTokenSigner);
                 case "/api/v1/auth/logout":
                     Revoked = true;
                     return FakeBackend.Json(new { message = "Logged out." });
+                case "/api/v1/auth/change-password":
+                    return ChangePassword(r, doc);
             }
         }
         if (Account(r, path, doc) is { } account) return account;
@@ -173,7 +186,34 @@ public sealed class FakeIdentity
     }
 
     HttpResponseMessage Tokens(string email, RSA? signWith = null) =>
-        FakeBackend.Json(new { accessToken = Issue(email: email, signWith: signWith), refreshToken = $"refresh-{++_counter}", expiresIn = (int)AccessLifetime.TotalSeconds, tokenType = "Bearer" });
+        FakeBackend.Json(new { accessToken = Issue(email: email, signWith: signWith), refreshToken = NewRefresh(), expiresIn = (int)AccessLifetime.TotalSeconds, tokenType = "Bearer" });
+
+    string NewRefresh()
+    {
+        var token = $"refresh-{++_counter}";
+        _issuedRefresh.Add(token);
+        return token;
+    }
+
+    /// <summary>
+    /// authservice's <c>change-password</c> (bearer required): the current password is checked first (<c>Incorrect password.</c> as an array), then the new one against the rules.
+    /// Success sets the new password, revokes every refresh token issued so far and answers a fresh pair under <c>tokens</c>, unless <see cref="ReissueOnPasswordChange"/> is off.
+    /// </summary>
+    HttpResponseMessage ChangePassword(HttpRequestMessage r, JsonDocument? doc)
+    {
+        if (r.Headers.Authorization is null) return FakeBackend.Json(new { error = "Unauthorized" }, HttpStatusCode.Unauthorized);
+        string? Field(string n) => doc is not null && doc.RootElement.TryGetProperty(n, out var v) ? v.GetString() : null;
+        var newPassword = Field("newPassword") ?? "";
+        if (Field("currentPassword") != _password) return FakeBackend.Json(new { errors = new[] { "Incorrect password." } }, HttpStatusCode.BadRequest);
+        if (newPassword.Length < 8 || newPassword == RefusedPassword)
+            return FakeBackend.Json(new { errors = new[] { "Passwords must have at least one non alphanumeric character." } }, HttpStatusCode.BadRequest);
+        _password = newPassword;
+        foreach (var refresh in _issuedRefresh) SupersededRefreshTokens.Add(refresh);
+        var tokens = ReissueOnPasswordChange
+            ? (object)new { accessToken = Issue(email: AccountEmail), refreshToken = NewRefresh(), expiresIn = (int)AccessLifetime.TotalSeconds, tokenType = "Bearer" }
+            : null;
+        return FakeBackend.Json(new { message = "Password changed successfully.", sessionsRevoked = true, tokens });
+    }
 
     // ---- the account endpoints (me, consents, export, delete), as authservice answers them ----
     public bool EmailConfirmed { get; set; } = true;
@@ -216,7 +256,7 @@ public sealed class FakeIdentity
                     LastDeleteBody = body?.RootElement.GetRawText();
                     var password = body is not null && body.RootElement.TryGetProperty("password", out var p) ? p.GetString() : null;
                     if (body is null || body.RootElement.GetProperty("confirmation").GetString() != "DELETE") return FakeBackend.Json(new { error = "Confirmation text must be 'DELETE'" }, HttpStatusCode.BadRequest);
-                    if (HasPassword && password != Password) return FakeBackend.Json(new { error = "Invalid password" }, HttpStatusCode.BadRequest);
+                    if (HasPassword && password != _password) return FakeBackend.Json(new { error = "Invalid password" }, HttpStatusCode.BadRequest);
                     AccountDeleted = true;
                     return FakeBackend.Json(new { message = "Account deleted successfully" });
             }

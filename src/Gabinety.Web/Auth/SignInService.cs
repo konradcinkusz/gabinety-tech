@@ -61,6 +61,30 @@ public sealed class SignInService(IdentityClient identity, ITokenVerifier verifi
     }
 
     /// <summary>
+    /// Changes the password of the signed-in user and keeps THIS session: the fresh pair the service returns is verified, then written into the session's cache and cookie in the same
+    /// response, so this browser stays signed in while the service ends the others. Without a pair, or with one that does not verify, the session ends here too (<see cref="ChangeOutcome.ChangedSignedOut"/>).
+    /// </summary>
+    public async Task<ChangeOutcome> ChangePasswordAsync(HttpContext http, string currentPassword, string newPassword, CancellationToken ct = default)
+    {
+        if (http.User.FindFirst(SessionCookie.SessionClaim)?.Value is not { } sid || await tokens.AccessTokenAsync(ct) is not { } access) return ChangeOutcome.Unauthenticated;
+        var result = await identity.ChangePasswordAsync(access, currentPassword, newPassword, ct);
+        if (result.Outcome != ChangeOutcome.Changed) return result.Outcome == ChangeOutcome.ChangedSignedOut ? await EndAfterChangeAsync(http, ct) : result.Outcome;
+
+        var (verdict, token) = await verifier.VerifyAsync(result.AccessToken!, ct);
+        if (verdict != VerifyOutcome.Valid || token is null) return await EndAfterChangeAsync(http, ct);
+        var who = new SessionIdentity(token.Subject, token.Email, token.Roles);
+        cache.Open(sid, result.AccessToken!, token.ExpiresAt, result.RefreshToken!, who);
+        await SessionCookie.WriteAsync(http, sid, who, result.RefreshToken!, time);
+        return ChangeOutcome.Changed;
+    }
+
+    async Task<ChangeOutcome> EndAfterChangeAsync(HttpContext http, CancellationToken ct)
+    {
+        await SignOutAsync(http, ct);
+        return ChangeOutcome.ChangedSignedOut;
+    }
+
+    /// <summary>
     /// Ends the session: revokes it on the identity service (best effort; its logout revokes every refresh token of the user), marks it over here so the same cookie is refused at once,
     /// then deletes the cookie with the attributes it was set with. A cookie that is not (or no longer) valid is deleted all the same.
     /// </summary>

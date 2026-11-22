@@ -100,7 +100,7 @@ public class AccountPageTests
     {
         var (web, browser) = await SignedIn();
         await using var __ = web;
-        var page = await browser.PostFormAsync("/konto", Delete("", true));
+        var page = await browser.PostFormAsync("/konto", "delete-account", Delete("", true));
         Assert.NotNull(page.One("details.account__danger[open]"));
         Assert.Equal("Podaj hasło, aby potwierdzić usunięcie konta.", page.TextOf("details[open] [data-testid=delete-error]"));
     }
@@ -186,9 +186,9 @@ public class AccountPageTests
     {
         var (web, browser) = await SignedIn();
         await using var __ = web;
-        var noConfirm = await browser.PostFormAsync("/konto", Delete(FakeIdentity.Password, false));
+        var noConfirm = await browser.PostFormAsync("/konto", "delete-account", Delete(FakeIdentity.Password, false));
         Assert.Contains("Zaznacz potwierdzenie, aby usunąć konto.", noConfirm.TextOf("[data-testid=delete-error]"));
-        var noPassword = await browser.PostFormAsync("/konto", Delete("", true));
+        var noPassword = await browser.PostFormAsync("/konto", "delete-account", Delete("", true));
         Assert.Equal("Podaj hasło, aby potwierdzić usunięcie konta.", noPassword.TextOf("[data-testid=delete-error]"));
         Assert.False(web.Identity.AccountDeleted);
         Assert.Null(web.Identity.LastDeleteBody);
@@ -199,7 +199,7 @@ public class AccountPageTests
     {
         var (web, browser) = await SignedIn();
         await using var __ = web;
-        var page = await browser.PostFormAsync("/konto", Delete("Wrong-Passw0rd-xyz", true));
+        var page = await browser.PostFormAsync("/konto", "delete-account", Delete("Wrong-Passw0rd-xyz", true));
         Assert.Equal(HttpStatusCode.OK, page.Status);
         Assert.Equal("Nie udało się usunąć konta. Sprawdź hasło i spróbuj ponownie.", page.TextOf("[data-testid=delete-error]"));
         Assert.DoesNotContain("Wrong-Passw0rd-xyz", page.Html);
@@ -214,7 +214,7 @@ public class AccountPageTests
         await using var __ = web;
         var inner = web.Identity.Backend.Respond;
         web.Identity.Backend.Respond = r => r.Method == HttpMethod.Delete ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) : inner(r);
-        var response = await browser.PostFormAsync("/konto", Delete(FakeIdentity.Password, true));
+        var response = await browser.PostFormAsync("/konto", "delete-account", Delete(FakeIdentity.Password, true));
         Assert.Contains("chwilowo niedostępne", response.TextOf("[data-testid=delete-error]"));
     }
 
@@ -223,7 +223,7 @@ public class AccountPageTests
     {
         var (web, browser) = await SignedIn();
         await using var __ = web;
-        var response = await browser.PostFormAsync("/konto", Delete(FakeIdentity.Password, true));
+        var response = await browser.PostFormAsync("/konto", "delete-account", Delete(FakeIdentity.Password, true));
         Assert.Equal(HttpStatusCode.Found, response.Status);
         Assert.Equal("/", response.Location);
         Assert.True(web.Identity.AccountDeleted);
@@ -242,7 +242,7 @@ public class AccountPageTests
         web.Identity.HasPassword = false;
         var page = await browser.GetAsync("/konto");
         Assert.Null(page.One("#delete-password"));
-        var response = await browser.PostFormAsync("/konto", Delete(null, true));
+        var response = await browser.PostFormAsync("/konto", "delete-account", Delete(null, true));
         Assert.Equal(HttpStatusCode.Found, response.Status);
         using var sent = JsonDocument.Parse(web.Identity.LastDeleteBody!);
         Assert.False(sent.RootElement.TryGetProperty("password", out var __x));

@@ -19,6 +19,14 @@ public sealed record ForgotResult(ForgotOutcome Outcome, bool IsOAuthOnly = fals
 /// <summary>The answer of <c>reset-password</c>. <c>InvalidToken</c>: the token or the address is wrong, used or expired (one outcome, the person is told nothing more). <c>PasswordRejected</c>: the password breaks a rule (the token stays usable).</summary>
 public enum ResetOutcome { Done, InvalidToken, PasswordRejected, RateLimited, Unavailable }
 
+/// <summary>
+/// The answer of <c>change-password</c>. <c>Changed</c>: the password is set and the service issued a fresh pair for this session. <c>ChangedSignedOut</c>: the password is set but no pair
+/// came back, so the session has to end. <c>CurrentPasswordWrong</c> and <c>PasswordRejected</c> leave the password unchanged (the first marks the current field, the second the new one).
+/// </summary>
+public enum ChangeOutcome { Changed, ChangedSignedOut, CurrentPasswordWrong, PasswordRejected, Unauthenticated, RateLimited, Unavailable }
+
+public sealed record ChangeResult(ChangeOutcome Outcome, string? AccessToken = null, string? RefreshToken = null);
+
 public sealed record IdentityResult(IdentityOutcome Outcome, string? AccessToken = null, string? RefreshToken = null, int ExpiresInSeconds = 3600, string? ChallengeToken = null);
 
 /// <summary>
@@ -140,6 +148,64 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
             }
         }
         return passwordProblem ? ResetOutcome.PasswordRejected : ResetOutcome.InvalidToken;
+    }
+
+    /// <summary>
+    /// Changes the password of the signed-in user (authservice's <c>change-password</c>, bearer = the caller's access token). Identity's own failure is a 400 with <c>errors</c> as an ARRAY
+    /// (<c>Incorrect password.</c> is the current password, any other message about the password is a rule) and the model validation a 400 with <c>errors</c> as an OBJECT keyed by field
+    /// (<c>CurrentPassword</c>, <c>NewPassword</c>). A 200 carries a fresh pair under <c>tokens</c> when the service reissues them, and none otherwise. The passwords travel in the body only.
+    /// </summary>
+    public async Task<ChangeResult> ChangePasswordAsync(string accessToken, string currentPassword, string newPassword, CancellationToken ct = default)
+    {
+        using var request = Request("/api/v1/auth/change-password", new { currentPassword, newPassword }, accessToken);
+        try
+        {
+            using var response = await http.SendAsync(request, ct);
+            var status = (int)response.StatusCode;
+            if (status == 200) return await ChangedAsync(response, ct);
+            if (status == 401) return new ChangeResult(ChangeOutcome.Unauthenticated);
+            if (status == 429) return new ChangeResult(ChangeOutcome.RateLimited);
+            if (status != 400) return new ChangeResult(ChangeOutcome.Unavailable);
+            try
+            {
+                using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                return new ChangeResult(ClassifyChangeFailure(doc.RootElement));
+            }
+            catch (JsonException) { return new ChangeResult(ChangeOutcome.Unavailable); }
+        }
+        catch (Exception) when (!ct.IsCancellationRequested) { return new ChangeResult(ChangeOutcome.Unavailable); }
+    }
+
+    static async Task<ChangeResult> ChangedAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("tokens", out var tokens) && tokens.ValueKind == JsonValueKind.Object
+                && tokens.TryGetProperty("accessToken", out var at) && at.ValueKind == JsonValueKind.String && tokens.TryGetProperty("refreshToken", out var rt) && rt.ValueKind == JsonValueKind.String)
+                return new ChangeResult(ChangeOutcome.Changed, at.GetString(), rt.GetString());
+        }
+        catch (JsonException) { }
+        return new ChangeResult(ChangeOutcome.ChangedSignedOut); // no pair came back, or the answer is unreadable: the password is set, so the session ends
+    }
+
+    static ChangeOutcome ClassifyChangeFailure(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("errors", out var errors)) return ChangeOutcome.Unavailable;
+        if (errors.ValueKind == JsonValueKind.Object)
+        {
+            var fields = errors.EnumerateObject().Select(f => f.Name).ToList();
+            if (fields.Any(f => f.Equals("CurrentPassword", StringComparison.OrdinalIgnoreCase))) return ChangeOutcome.CurrentPasswordWrong;
+            if (fields.Count > 0 && fields.All(f => f.Equals("NewPassword", StringComparison.OrdinalIgnoreCase))) return ChangeOutcome.PasswordRejected;
+            return ChangeOutcome.Unavailable;
+        }
+        if (errors.ValueKind == JsonValueKind.Array)
+        {
+            var messages = errors.EnumerateArray().Where(i => i.ValueKind == JsonValueKind.String).Select(i => i.GetString()!).ToList();
+            if (messages.Any(m => m.Contains("incorrect", StringComparison.OrdinalIgnoreCase))) return ChangeOutcome.CurrentPasswordWrong;
+            if (messages.Count > 0 && messages.All(m => m.Contains("password", StringComparison.OrdinalIgnoreCase))) return ChangeOutcome.PasswordRejected;
+        }
+        return ChangeOutcome.Unavailable;
     }
 
     /// <summary>The GitHub leg's one-time code, exchanged for tokens (PR #118).</summary>

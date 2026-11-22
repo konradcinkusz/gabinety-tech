@@ -1,8 +1,15 @@
-@* Filters as plain links (no JavaScript); each link keeps the other filters and returns to the first page. *@
-@* The filters sit in a disclosure titled "Filtry (n)": open by default (it works without JavaScript and a visitor sees the filters at once); the phone can fold it away (P-LIST-1). *@
-<details class="filters" open>
+@* Filters as plain links and a GET form (no JavaScript); each link keeps the other filters and returns to the first page. *@
+@* The disclosure is open only when a filter is active (the phone starts folded, P-LIST-1); from 52 rem the CSS shows its content whatever its state. *@
+<details class="filters" open="@(ActiveCount > 0)">
 <summary>@Pl.Filters.Label@(ActiveCount > 0 ? $" ({ActiveCount})" : "")</summary>
 <nav aria-label="@Pl.Filters.Label">
+    @* The search joins the panel head. A plain GET form: the other filters ride along as hidden fields. *@
+    <form method="get" action="@State.Path" role="search" class="search-form">
+        @if (State.Duration is { } duration) {<input type="hidden" name="duration" value="@duration" />}
+        @if (State.MaxPriceMinor is { } price) {<input type="hidden" name="maxPriceMinor" value="@price" />}
+        <input name="q" type="search" maxlength="60" value="@State.Q" aria-label="@Pl.Filters.SearchLabel" placeholder="@Pl.Filters.SearchPlaceholder" />
+        <button class="btn" type="submit">@Pl.Filters.Search</button>
+    </form>
     @foreach (var group in Groups)
     {
         <section class="filters__group">
@@ -15,13 +22,6 @@
             </ul>
         </section>
     }
-    @* A plain GET form: works without JavaScript and keeps the other filters as hidden fields. *@
-    <form method="get" action="@State.Path" role="search" class="search-form">
-        @if (State.Duration is { } duration) {<input type="hidden" name="duration" value="@duration" />}
-        @if (State.MaxPriceMinor is { } price) {<input type="hidden" name="maxPriceMinor" value="@price" />}
-        <input name="q" type="search" maxlength="60" value="@State.Q" aria-label="@Pl.Filters.SearchLabel" placeholder="@Pl.Filters.SearchPlaceholder" />
-        <button class="btn" type="submit">@Pl.Filters.Search</button>
-    </form>
 </nav>
 </details>
 

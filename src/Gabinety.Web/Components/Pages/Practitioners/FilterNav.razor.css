@@ -1,14 +1,34 @@
+/* UX-013 (V-3). The joined rows (.segmented) and the chips (.chip) come from the shared sheet; this sheet only lays out the panel and the problem list.
+   Tokens only: no colour literal here (StyleContractTests). */
+
 .filters { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr); min-width: 0; } /* a grid item may shrink below its content, or the chips push out of the sidebar */
 .filters__group { min-width: 0; }
 .filters__group h2 { font-size: var(--text-md); margin-bottom: var(--space-2); }
+
+/* The search joins the panel head: the field takes the width, the button keeps its tap size. */
 .search-form { display: flex; gap: var(--space-2); }
 .search-form input { flex: 1; min-width: 0; }
 
-/* P-LIST-1: the filters are one panel; duration and price are joined segmented controls. */
-.filters > summary { min-height: 2.75rem; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
-.filters ::deep .segmented { display: inline-flex; flex-wrap: wrap; margin: 0 0 var(--space-3); padding: 0; gap: 0; }
-.filters ::deep .segmented li:not(:first-child) .chip { border-left-width: 0; }
-.filters ::deep .segmented .chip { border-radius: 0; min-height: 2.75rem; display: inline-flex; align-items: center; }
-.filters ::deep .segmented li:first-child .chip { border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
-.filters ::deep .segmented li:last-child .chip { border-radius: 0 var(--radius-pill) var(--radius-pill) 0; }
-@media (min-width: 52rem) { .filters > summary { pointer-events: none; } }
+/* The summary is the phone's fold control; from 52 rem the panel is always open, so the summary only names it. */
+.filters > summary { min-height: var(--tap); display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+
+/* Duration (2 options) and price (4 options) are equal columns of .segmented. Four columns on a 390 px phone leave about 85 px each:
+   smaller side padding and text, and the labels wrap inside their own column, so the row never breaks into a second line. */
+.filters__group .segmented { margin: 0 0 var(--space-3); }
+.filters__group .segmented .chip { min-height: var(--tap); padding-inline: var(--space-1); font-size: var(--text-sm); }
+
+/* The problem group: compact wrapped chips below 52 rem, one link per 44 px row from 52 rem. */
+.filters__group .link-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
+.filters__group .link-list .chip { min-height: var(--tap); padding-inline: var(--space-2); }
+
+@media (min-width: 52rem) {
+  .filters > summary { pointer-events: none; }
+  .filters:not([open]) > :not(summary) { display: grid; }
+  .filters__group .link-list { flex-direction: column; flex-wrap: nowrap; gap: var(--space-1); }
+  .filters__group .link-list .chip { width: 100%; justify-content: flex-start; border-radius: var(--radius-md); }
+}
+
+/* Current Chromium hides a closed disclosure's content in its ::details-content slot, so the rule above does not reach it there. Separate block: an engine without the pseudo-element drops only this rule. */
+@media (min-width: 52rem) {
+  .filters:not([open])::details-content { content-visibility: visible; }
+}

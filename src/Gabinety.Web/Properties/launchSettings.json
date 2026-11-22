@@ -4,10 +4,10 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": false,
-      "applicationUrl": "http://localhost:3001",
+      "applicationUrl": "http://localhost:3000",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Site__BaseUrl": "http://localhost:3001",
+        "Site__BaseUrl": "http://localhost:3000",
         "Backend__Directory": "http://localhost:5101",
         "Backend__Booking": "http://localhost:5102",
         "Backend__Reputation": "http://localhost:5103",

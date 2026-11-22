@@ -7,7 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
-    <PackageReference Include="Aspire.Hosting.JavaScript" />
     <ProjectReference Include="../Gabinety.Directory/Gabinety.Directory.csproj" />
     <ProjectReference Include="../Gabinety.Booking/Gabinety.Booking.csproj" />
     <ProjectReference Include="../Gabinety.Reputation/Gabinety.Reputation.csproj" />

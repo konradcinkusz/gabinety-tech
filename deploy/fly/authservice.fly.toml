@@ -23,7 +23,7 @@ primary_region = "fra"
   # E-mail confirmation stays off on staging until T-09.06 provides a sender (spike: default is on only when SendGrid is configured).
   Auth__RequireConfirmedEmail = "false"
   # Rate limit (20 auth calls a minute per client address, hard-coded upstream) must count VISITORS, not the web app that calls on their behalf. authservice takes the address from
-  # this header: on Fly the edge sets it for public traffic, and the web sends the visitor's address in it over the private network (web/src/lib/session/identity.ts).
+  # this header: on Fly the edge sets it for public traffic, and the web sends the visitor's address in it over the private network (src/Gabinety.Web/Auth/IdentityClient.cs).
   # Verify on the first deploy that the edge overwrites a client-sent Fly-Client-IP (docs/operations/AUTH.md section 9, finding 4).
   Network__ClientIpHeader = "Fly-Client-IP"
   Cors__AllowedOrigins__0 = "https://<web-public-host>"

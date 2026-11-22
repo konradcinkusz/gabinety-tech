@@ -110,7 +110,7 @@ public class WebOptionsTests
         Assert.Equal([KeyValuePair.Create<string, string?>("Services:directory:http:0", "http://localhost:5101"), KeyValuePair.Create<string, string?>("Services:directory:https:1", "https://directory.internal:8443")], o.ServiceConfiguration());
     }
 
-    [Fact] public void Defaults_are_the_fake_profile_address_and_no_proxy_key() { var o = WebOptions.From(new ConfigurationBuilder().Build()); Assert.Equal("http://localhost:3001", o.SiteBaseUrl); Assert.Null(o.TrustedProxyKey); Assert.False(o.SecureCookies); }
+    [Fact] public void Defaults_are_the_fake_profile_address_and_no_proxy_key() { var o = WebOptions.From(new ConfigurationBuilder().Build()); Assert.Equal("http://localhost:3000", o.SiteBaseUrl); Assert.Null(o.TrustedProxyKey); Assert.False(o.SecureCookies); }
 }
 
 public class FlashKeyTests

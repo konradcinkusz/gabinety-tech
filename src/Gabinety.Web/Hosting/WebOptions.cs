@@ -12,7 +12,7 @@ public sealed class WebOptions
     public static readonly string[] BackendNames = [Backend.Directory, Backend.Booking, Backend.Reputation, Backend.Assistant, Backend.Auth];
 
     /// <summary><c>Site:BaseUrl</c>: the public address. Decides the Secure flag of the cookies and is an allowed origin of the guard (a TLS-terminating proxy hides it from the request).</summary>
-    public string SiteBaseUrl { get; init; } = "http://localhost:3001";
+    public string SiteBaseUrl { get; init; } = "http://localhost:3000";
 
     /// <summary><c>RateLimit:TrustedProxyKey</c>, shared with the services: lets them trust the visitor address this host forwards (PR #110). Not the internal key; it opens no route.</summary>
     public string? TrustedProxyKey { get; init; }
@@ -46,7 +46,7 @@ public sealed class WebOptions
         }
         return new WebOptions
         {
-            SiteBaseUrl = (Opt(config["Site:BaseUrl"]) ?? "http://localhost:3001").TrimEnd('/'),
+            SiteBaseUrl = (Opt(config["Site:BaseUrl"]) ?? "http://localhost:3000").TrimEnd('/'),
             TrustedProxyKey = Opt(config["RateLimit:TrustedProxyKey"]),
             IdentityIssuer = Opt(config["Identity:Issuer"]),
             IdentityAudience = Opt(config["Identity:Audience"]),

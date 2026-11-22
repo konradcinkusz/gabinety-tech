@@ -3,23 +3,18 @@ import { randomUUID } from "node:crypto";
 import { resetAndReseed } from "./demo-data";
 import { accessTokenOf } from "./auth";
 import { urls } from "./env";
-import { isBlazor } from "./host";
 import { fetchRetrying, json } from "./http";
 
 /**
  * Helpers of the booking and review journeys (J3, J4). Additive: nothing here changes the harness.
- * Calls on behalf of a signed-in user go through the web app's BFF (`/api/proxy/...`) with that user's cookie jar, exactly as the browser does.
+ * Calls on behalf of a signed-in user go straight to the service with that user's bearer token (the host has no proxy).
  * A helper never logs a body: briefs and review texts are user free text.
  */
 type Opts = Parameters<APIRequestContext["get"]>[1];
-/**
- * `request.get/post` of one service's `/api/v1`: through the BFF proxy on HOST=next, straight to the service with the context's bearer token on HOST=blazor
- * (the Blazor host has no proxy, see auth.ts). Same paths either way.
- */
+/** `request.get/post` of one service's `/api/v1`, straight to the service with the context's bearer token (the host has no proxy, see auth.ts). */
 function svc(request: APIRequestContext, service: "booking" | "reputation") {
-  const url = (path: string) => (isBlazor ? `${urls[service]}/api/v1${path}` : `/api/proxy/${service}/api/v1${path}`);
+  const url = (path: string) => `${urls[service]}/api/v1${path}`;
   const withAuth = (o: Opts): Opts => {
-    if (!isBlazor) return o;
     const token = accessTokenOf(request);
     return { ...o, headers: { ...(o?.headers ?? {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) } };
   };

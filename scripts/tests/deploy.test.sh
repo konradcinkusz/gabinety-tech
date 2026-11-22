@@ -10,7 +10,7 @@ check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi
 has() { grep -Fq -- "$2" <<< "$1"; }
 
 # ---------- detect-changes ----------
-all="$tmp/all.txt"; sed -n 's/^[a-z]* *\(gabinety-[a-z-]*\) .*/\1/p' "$root/deploy/estate.conf" > "$all"
+all="$tmp/all.txt"; sed -n 's/^[a-z-]* *\(gabinety-[a-z-]*\) .*/\1/p' "$root/deploy/estate.conf" > "$all"
 run_detect() { # <changed-files-content> <existing-file> [base]
   printf '%s' "$1" > "$tmp/changed"; : > "$tmp/out"
   "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$2" --head HEAD ${3+--base "$3"} --changed-files "$tmp/changed" --github-output "$tmp/out" > "$tmp/table"
@@ -19,22 +19,22 @@ sel() { grep -qx "$1=true" "$tmp/out"; }
 nosel() { grep -qx "$1=false" "$tmp/out"; }
 
 run_detect $'src/Gabinety.Booking/Foo.cs\n' "$all" v1
-check "booking change selects booking only" bash -c "$(declare -f sel nosel); tmp=$tmp; sel booking && nosel directory && nosel web && nosel postgres && nosel authservice && nosel reputation && nosel assistant"
+check "booking change selects booking only" bash -c "$(declare -f sel nosel); tmp=$tmp; sel booking && nosel directory && nosel web-blazor && nosel postgres && nosel authservice && nosel reputation && nosel assistant"
 check "build_matrix holds only selected built apps" grep -qx 'build_matrix=\[{"key":"booking","fly_app":"gabinety-booking-staging","dockerfile":"src/Gabinety.Booking/Dockerfile","context":"."}\]' "$tmp/out"
 run_detect $'Directory.Packages.props\n' "$all" v1
-check "shared path selects every dotnet app, not web/postgres/authservice" bash -c "$(declare -f sel nosel); tmp=$tmp; for a in directory booking reputation assistant; do sel \$a || exit 1; done; for a in web postgres authservice; do nosel \$a || exit 1; done"
+check "shared path selects every dotnet app and the web host, not postgres/authservice" bash -c "$(declare -f sel nosel); tmp=$tmp; for a in directory booking reputation assistant web-blazor; do sel \$a || exit 1; done; for a in postgres authservice; do nosel \$a || exit 1; done"
 run_detect $'src/Gabinety.Contracts/X.cs\nsrc/Gabinety.ServiceDefaults/Y.cs\n' "$all" v1
 check "Contracts and ServiceDefaults are shared" bash -c "$(declare -f sel); tmp=$tmp; sel directory && sel assistant"
 run_detect $'src/Gabinety.Llm/A.cs\n' "$all" v1
 check "Llm selects assistant only" bash -c "$(declare -f sel nosel); tmp=$tmp; sel assistant && nosel booking && nosel directory"
 run_detect $'src/Gabinety.Billing/A.cs\n' "$all" v1
 check "Billing selects booking" bash -c "$(declare -f sel nosel); tmp=$tmp; sel booking && nosel reputation"
-run_detect $'web/src/app/page.tsx\n' "$all" v1
-check "web change selects web only" bash -c "$(declare -f sel nosel); tmp=$tmp; sel web && nosel directory"
+run_detect $'src/Gabinety.Web/Components/App.razor\n' "$all" v1
+check "a change in the web host selects web-blazor only" bash -c "$(declare -f sel nosel); tmp=$tmp; sel web-blazor && nosel directory"
 run_detect $'deploy/fly/init-databases.sql\n' "$all" v1
 check "init script selects postgres" bash -c "$(declare -f sel nosel); tmp=$tmp; sel postgres && nosel authservice"
 run_detect $'docs/README.md\nsrc/Gabinety.BookingX/a.cs\n' "$all" v1
-check "unrelated and look-alike paths select nothing" bash -c "$(declare -f nosel); tmp=$tmp; for a in directory booking reputation assistant web postgres authservice; do nosel \$a || exit 1; done"
+check "unrelated and look-alike paths select nothing" bash -c "$(declare -f nosel); tmp=$tmp; for a in directory booking reputation assistant web-blazor postgres authservice; do nosel \$a || exit 1; done"
 check "empty build matrix when nothing is selected" grep -qx 'build_matrix=\[\]' "$tmp/out"
 grep -v booking "$all" > "$tmp/nobooking"
 run_detect $'docs/README.md\n' "$tmp/nobooking" v1
@@ -42,18 +42,18 @@ check "an app that does not exist is always selected" bash -c "$(declare -f sel 
 check "the reason names the missing app" has "$(cat "$tmp/table")" "Fly app does not exist"
 : > "$tmp/none"
 run_detect $'docs/README.md\n' "$tmp/none" v1
-check "cold estate selects everything" bash -c "$(declare -f sel); tmp=$tmp; for a in postgres authservice directory booking reputation assistant web; do sel \$a || exit 1; done"
+check "cold estate selects everything" bash -c "$(declare -f sel); tmp=$tmp; for a in postgres authservice directory booking reputation assistant web-blazor; do sel \$a || exit 1; done"
 : > "$tmp/out"; "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head HEAD --changed-files /dev/null --github-output "$tmp/out" > /dev/null
-check "no changes and all apps exist selects nothing" bash -c "$(declare -f nosel); tmp=$tmp; nosel web && nosel booking"
+check "no changes and all apps exist selects nothing" bash -c "$(declare -f nosel); tmp=$tmp; nosel web-blazor && nosel booking"
 # without --changed-files and without --base: first tag, everything
 : > "$tmp/out"; "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head HEAD --github-output "$tmp/out" > "$tmp/table"
-check "no previous tag selects everything" bash -c "$(declare -f sel); tmp=$tmp; sel web && sel postgres"
+check "no previous tag selects everything" bash -c "$(declare -f sel); tmp=$tmp; sel web-blazor && sel postgres"
 # a real git diff between two commits
-g="$tmp/repo"; git init -q "$g"; (cd "$g" && git config user.email t@t && git config user.name t && mkdir -p web src/Gabinety.Booking && echo a > web/a && echo a > src/Gabinety.Booking/a && git add -A && git commit -qm one && git tag v1 && echo b >> web/a && git add -A && git commit -qm two)
+g="$tmp/repo"; git init -q "$g"; (cd "$g" && git config user.email t@t && git config user.name t && mkdir -p src/Gabinety.Web src/Gabinety.Booking && echo a > src/Gabinety.Web/a && echo a > src/Gabinety.Booking/a && git add -A && git commit -qm one && git tag v1 && echo b >> src/Gabinety.Web/a && git add -A && git commit -qm two)
 : > "$tmp/out"; (cd "$g" && "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head HEAD --base v1 --github-output "$tmp/out" > "$tmp/table")
-check "git diff between tags selects web only" bash -c "$(declare -f sel nosel); tmp=$tmp; sel web && nosel booking"
+check "git diff between tags selects web-blazor only" bash -c "$(declare -f sel nosel); tmp=$tmp; sel web-blazor && nosel booking"
 : > "$tmp/out"; (cd "$g" && "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head HEAD --base nosuchref --github-output "$tmp/out" > "$tmp/table")
-check "an unreadable base selects everything" bash -c "$(declare -f sel); tmp=$tmp; sel booking && sel web"
+check "an unreadable base selects everything" bash -c "$(declare -f sel); tmp=$tmp; sel booking && sel web-blazor"
 
 # ---------- estate and map consistency ----------
 check "secrets.map apps are all in estate.conf" bash -c "
@@ -109,49 +109,45 @@ check "network is public, private or flycast for every app, Assistant is flycast
   awk '!/^#/ && NF && \$1 != \"shared\" {print \$1, \$NF}' '$root/deploy/estate.conf' | grep -Evq ' (public|private|flycast)\$' && exit 1
   awk '\$1 == \"assistant\" {print \$NF}' '$root/deploy/estate.conf' | grep -qx flycast"
 
-# ---------- the cutover row (ADR-0010): ready, tested as if enabled, and dormant until the cutover PR uncomments it ----------
-cut="$tmp/estate-cutover.conf"; sed 's/^#cutover# //' "$root/deploy/estate.conf" > "$cut"
-check "the cutover row is commented out in the live estate (nothing deploys it yet)" bash -c "grep -q '^#cutover# web-blazor ' '$root/deploy/estate.conf' && ! grep -q '^web-blazor ' '$root/deploy/estate.conf'"
-cutover_row_ok() { # fields of the enabled row: key fly_app kind dockerfile context shared paths smoke smoke_path network
-  local row; row="$(grep '^web-blazor ' "$cut")" || { echo "no cutover row"; return 1; }
+# ---------- the web host row (ADR-0010, the cutover): the Blazor Web App is the estate's web app ----------
+check "the estate has the web-blazor row live, no commented cutover row and no Next.js web row" bash -c "grep -q '^web-blazor ' '$root/deploy/estate.conf' && ! grep -q '^#cutover#' '$root/deploy/estate.conf' && ! grep -Eq '^web +' '$root/deploy/estate.conf'"
+web_row_ok() { # fields of the row: key fly_app kind dockerfile context shared paths smoke smoke_path network
+  local row; row="$(grep '^web-blazor ' "$root/deploy/estate.conf")" || { echo "no web-blazor row"; return 1; }
   local f; read -r -a f <<< "$row"
   [ "${#f[@]}" = 10 ] || { echo "fields: ${#f[@]}"; return 1; }
   [ "${f[1]}" = gabinety-web-blazor-staging ] && [ "${f[2]}" = built ] && [ -f "$root/${f[3]}" ] && [ "${f[7]}" = public ] && [ "${f[8]}" = /alive ] && [ "${f[9]}" = public ] &&
     grep -q '^app = "gabinety-web-blazor-staging"' "$root/deploy/fly/web-blazor.fly.toml"
 }
-check "enabled, the cutover row is well formed: 10 fields, a Dockerfile and a config that exist and name the app, public, /alive" cutover_row_ok
-check "enabled, the cutover row has shape of the web row (kind, network, columns)" bash -c "
-  [ \$(awk '\$1==\"web-blazor\" {print NF}' '$cut') = \$(awk '\$1==\"web\" {print NF}' '$cut') ] &&
-  [ \"\$(awk '\$1==\"web-blazor\" {print \$3, \$(NF)}' '$cut')\" = \"built public\" ]"
+check "the web-blazor row is well formed: 10 fields, a Dockerfile and a config that exist and name the app, public, /alive" web_row_ok
+check "the row has the shape of a built public app" bash -c "[ \"\$(awk '\$1==\"web-blazor\" {print \$3, \$(NF)}' '$root/deploy/estate.conf')\" = \"built public\" ]"
+check "the web row is last (SPEC 9: the web app deploys after the services it calls)" bash -c "[ \"\$(awk '!/^#/ && NF {k=\$1} END {print k}' '$root/deploy/estate.conf')\" = web-blazor ]"
 : > "$tmp/out"; "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head HEAD --changed-files <(printf 'src/Gabinety.Web/Foo.cs\n') --github-output "$tmp/out" > "$tmp/table"
-check "live estate: a change in src/Gabinety.Web selects no app (the Blazor host is not deployed)" bash -c "! grep -q '^web-blazor=' '$tmp/out' && ! grep -qx 'web=true' '$tmp/out'"
-sed -n 's/^[a-z-]* *\(gabinety-[a-z-]*\) .*/\1/p' "$cut" > "$tmp/all-cutover"
-: > "$tmp/out"; "$d/detect-changes.sh" --estate "$cut" --existing-apps "$tmp/all-cutover" --head HEAD --changed-files <(printf 'src/Gabinety.Web/Foo.cs\n') --github-output "$tmp/out" > "$tmp/table"
-check "enabled: a change in src/Gabinety.Web selects web-blazor only, and it is in the build matrix" bash -c "grep -qx 'web-blazor=true' '$tmp/out' && grep -qx 'web=false' '$tmp/out' && grep -q 'web-blazor' '$tmp/out' && grep -q 'src/Gabinety.Web/Dockerfile' '$tmp/out'"
-: > "$tmp/out"; "$d/detect-changes.sh" --estate "$cut" --existing-apps "$tmp/all-cutover" --head HEAD --changed-files <(printf 'Directory.Packages.props\n') --github-output "$tmp/out" > "$tmp/table"
-check "enabled: a shared path selects web-blazor (shared = yes: it references ServiceDefaults)" grep -qx 'web-blazor=true' "$tmp/out"
-check "secrets.map has the Blazor host's rows and set-secrets stages them" bash -c "grep -Eq '^web-blazor +RateLimit__TrustedProxyKey ' '$root/deploy/secrets.map'"
-check "deploy.yml has the dormant deploy-web-blazor job gated on the detect output" bash -c "grep -q 'deploy-web-blazor:' '$root/.github/workflows/deploy.yml' && grep -q \"outputs.web-blazor == 'true'\" '$root/.github/workflows/deploy.yml'"
+check "a change in src/Gabinety.Web selects web-blazor only, and it is in the build matrix" bash -c "grep -qx 'web-blazor=true' '$tmp/out' && ! grep -q '^web=' '$tmp/out' && grep -qx 'directory=false' '$tmp/out' && grep -q 'src/Gabinety.Web/Dockerfile' '$tmp/out'"
+: > "$tmp/out"; "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head HEAD --changed-files <(printf 'Directory.Packages.props\n') --github-output "$tmp/out" > "$tmp/table"
+check "a shared path selects web-blazor (shared = yes: it references ServiceDefaults)" grep -qx 'web-blazor=true' "$tmp/out"
+check "secrets.map has the web host's row and no row for the retired Next.js app" bash -c "grep -Eq '^web-blazor +RateLimit__TrustedProxyKey ' '$root/deploy/secrets.map' && ! grep -Eq '^web +' '$root/deploy/secrets.map'"
+check "deploy.yml has deploy-web-blazor gated on the detect output and no deploy-web job" bash -c "grep -q 'deploy-web-blazor:' '$root/.github/workflows/deploy.yml' && grep -q \"outputs.web-blazor == 'true'\" '$root/.github/workflows/deploy.yml' && ! grep -Eq '^  deploy-web:' '$root/.github/workflows/deploy.yml' && ! grep -q 'outputs.web ==' '$root/.github/workflows/deploy.yml'"
+check "the old Fly config of the Next.js app is gone" bash -c "! test -e '$root/deploy/fly/web.fly.toml'"
 check "_deploy-app.yml creates the web-blazor volume and fixes its owner" bash -c "grep -q 'webdata 1 fra' '$root/.github/workflows/_deploy-app.yml' && grep -q 'chown -R app /data' '$root/.github/workflows/_deploy-app.yml'"
 
-# ---------- the web BFF reaches the private apps only over .internal / .flycast (F-03) ----------
+# ---------- the web host reaches the private apps only over .internal / .flycast (F-03) ----------
 check "private topology: web uses .internal/.flycast, no private app has [[services.ports]]" "$root/scripts/check-private-topology.sh"
 
 # ---------- base-ref: a failed run must not hide an app from the next tag ----------
 b="$tmp/brepo"; git init -q -b main "$b"
-(cd "$b" && git config user.email t@t && git config user.name t && mkdir -p web src/Gabinety.Booking && echo a > web/a && echo a > src/Gabinety.Booking/a && git add -A && git commit -qm one && git tag v1 && git tag deployed/staging
+(cd "$b" && git config user.email t@t && git config user.name t && mkdir -p src/Gabinety.Web src/Gabinety.Booking && echo a > src/Gabinety.Web/a && echo a > src/Gabinety.Booking/a && git add -A && git commit -qm one && git tag v1 && git tag deployed/staging
   echo b >> src/Gabinety.Booking/a && git add -A && git commit -qm two && git tag v2          # run of v2 FAILED: the marker stays on v1
-  echo b >> web/a && git add -A && git commit -qm three && git tag v3)
+  echo b >> src/Gabinety.Web/a && git add -A && git commit -qm three && git tag v3)
 check "base-ref is the marker when it exists" bash -c "cd '$b' && [ \"\$('$d/base-ref.sh' v3 2>/dev/null)\" = deployed/staging ]"
 check "base-ref falls back to the previous release tag without a marker" bash -c "cd '$b' && git tag -d deployed/staging >/dev/null && [ \"\$('$d/base-ref.sh' v3 2>/dev/null)\" = v2 ]; git tag deployed/staging v1"
 check "base-ref prints nothing on the first tag" bash -c "cd '$g' && [ -z \"\$('$d/base-ref.sh' v1 2>/dev/null)\" ]"
 : > "$tmp/out"; (cd "$b" && "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head v3 --base "$("$d/base-ref.sh" v3 2>/dev/null)" --github-output "$tmp/out" > "$tmp/table")
-check "after a failed previous run both its app (booking) and the new one (web) are selected" bash -c "$(declare -f sel nosel); tmp=$tmp; sel booking && sel web && nosel directory"
+check "after a failed previous run both its app (booking) and the new one (web-blazor) are selected" bash -c "$(declare -f sel nosel); tmp=$tmp; sel booking && sel web-blazor && nosel directory"
 : > "$tmp/out"; (cd "$b" && "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head v3 --base v2 --github-output "$tmp/out" > "$tmp/table")
-check "the old behaviour (previous tag as base) would have hidden booking" bash -c "$(declare -f sel nosel); tmp=$tmp; sel web && nosel booking"
+check "the old behaviour (previous tag as base) would have hidden booking" bash -c "$(declare -f sel nosel); tmp=$tmp; sel web-blazor && nosel booking"
 (cd "$b" && git tag -f deployed/staging v3 >/dev/null)
 : > "$tmp/out"; (cd "$b" && "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head v3 --base "$("$d/base-ref.sh" v3 2>/dev/null)" --github-output "$tmp/out" > "$tmp/table")
-check "after a successful run (marker moved) nothing is selected again" bash -c "$(declare -f nosel); tmp=$tmp; nosel booking && nosel web"
+check "after a successful run (marker moved) nothing is selected again" bash -c "$(declare -f nosel); tmp=$tmp; nosel booking && nosel web-blazor"
 
 # ---------- image-ref: the registry switch ----------
 check "ghcr.io, owner lower-cased" bash -c "[ \"\$('$d/image-ref.sh' ghcr.io KonradCinkusz booking gabinety-booking-staging)\" = ghcr.io/konradcinkusz/gabinety-booking ]"
@@ -226,9 +222,9 @@ echo "$*" >> "$STUB_LOG"; [ "${STUB_CURL_OK:-1}" = 1 ]
 STUB
 chmod +x "$tmp/bin/curl"
 : > "$tmp/log"
-check "smoke public calls the public URL and path" bash -c "PATH='$tmp/bin':\$PATH '$d/smoke.sh' web gabinety-web-staging public /api/health | grep -q 'SMOKE web ok'; grep -q 'https://gabinety-web-staging.fly.dev/api/health' '$tmp/log'"
-check "smoke public honours PUBLIC_URL" bash -c "PATH='$tmp/bin':\$PATH PUBLIC_URL=https://example.test/ '$d/smoke.sh' web gabinety-web-staging public /api/health >/dev/null; grep -q 'https://example.test/api/health' '$tmp/log'"
-check "smoke public fails when curl fails" bash -c "! PATH='$tmp/bin':\$PATH STUB_CURL_OK=0 '$d/smoke.sh' web gabinety-web-staging public /api/health >/dev/null"
+check "smoke public calls the public URL and path" bash -c "PATH='$tmp/bin':\$PATH '$d/smoke.sh' web-blazor gabinety-web-blazor-staging public /alive | grep -q 'SMOKE web-blazor ok'; grep -q 'https://gabinety-web-blazor-staging.fly.dev/alive' '$tmp/log'"
+check "smoke public honours PUBLIC_URL" bash -c "PATH='$tmp/bin':\$PATH PUBLIC_URL=https://example.test/ '$d/smoke.sh' web-blazor gabinety-web-blazor-staging public /alive >/dev/null; grep -q 'https://example.test/alive' '$tmp/log'"
+check "smoke public fails when curl fails" bash -c "! PATH='$tmp/bin':\$PATH STUB_CURL_OK=0 '$d/smoke.sh' web-blazor gabinety-web-blazor-staging public /alive >/dev/null"
 
 # ---------- verify-default-branch ----------
 r="$tmp/vrepo"; git init -q -b main "$r"; (cd "$r" && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m a && git update-ref refs/remotes/origin/main HEAD && git checkout -q -b side && git commit -q --allow-empty -m b)
@@ -238,7 +234,7 @@ check "a commit off the default branch fails" bash -c "cd '$r' && ! '$d/verify-d
 check "an unfetched default branch fails" bash -c "cd '$r' && ! '$d/verify-default-branch.sh' $main_sha nope >/dev/null 2>&1"
 
 # ---------- summary ----------
-check "summary passes when all succeeded or were skipped" bash -c "NEEDS_JSON='{\"deploy-web\":{\"result\":\"success\"},\"deploy-booking\":{\"result\":\"skipped\"}}' '$d/summary.sh' v1.0.0 | grep -q 'not selected'"
-check "summary fails on a failed job" bash -c "! NEEDS_JSON='{\"deploy-web\":{\"result\":\"failure\"}}' '$d/summary.sh' v1.0.0 >/dev/null"
+check "summary passes when all succeeded or were skipped" bash -c "NEEDS_JSON='{\"deploy-web-blazor\":{\"result\":\"success\"},\"deploy-booking\":{\"result\":\"skipped\"}}' '$d/summary.sh' v1.0.0 | grep -q 'not selected'"
+check "summary fails on a failed job" bash -c "! NEEDS_JSON='{\"deploy-web-blazor\":{\"result\":\"failure\"}}' '$d/summary.sh' v1.0.0 >/dev/null"
 
 echo; echo "$pass passed, $fail failed"; [ "$fail" = 0 ]

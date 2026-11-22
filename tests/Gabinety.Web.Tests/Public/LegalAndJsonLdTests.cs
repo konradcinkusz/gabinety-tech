@@ -65,11 +65,9 @@ public class LegalMarkdownTests : BunitContext
 
     [Theory]
     [InlineData("regulamin")] [InlineData("polityka-prywatnosci")]
-    public void The_embedded_text_is_the_owners_file_and_both_copies_are_identical_so_they_cannot_drift(string name)
+    public void The_embedded_text_is_the_owners_file_and_the_resource_is_the_file(string name)
     {
-        var mine = File.ReadAllText(Path.Combine(Repo.Web, "Content", "Legal", name + ".md"));
-        var theirs = File.ReadAllText(Path.Combine(Repo.Web, "..", "..", "web", "content", "legal", name + ".md")); // single source at the cutover: web/ goes, this stays
-        Assert.Equal(theirs, mine);
+        var mine = File.ReadAllText(Path.Combine(Repo.Web, "Content", "Legal", name + ".md")); // the one copy since the cutover (the Next.js copy went with web/)
         var doc = LegalMarkdown.Load(name);
         Assert.NotEmpty(doc.Blocks);
         Assert.Equal(LegalMarkdown.Parse(mine).Version, doc.Version); // the embedded resource is the file

@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       key:
-        description: App key of deploy/estate.conf (postgres, authservice, directory, booking, reputation, assistant, web, web-blazor at the cutover)
+        description: App key of deploy/estate.conf (postgres, authservice, directory, booking, reputation, assistant, web-blazor)
         required: true
         type: string
 permissions:
@@ -23,7 +23,7 @@ jobs:
       SHA: ${{ github.sha }}
       OWNER: ${{ github.repository_owner }}
       IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY || 'ghcr.io' }}
-      PUBLIC_URL: ${{ inputs.key == 'authservice' && vars.PUBLIC_URL_AUTHSERVICE || inputs.key == 'web' && vars.PUBLIC_URL_WEB || '' }}
+      PUBLIC_URL: ${{ inputs.key == 'authservice' && vars.PUBLIC_URL_AUTHSERVICE || inputs.key == 'web-blazor' && vars.PUBLIC_URL_WEB_BLAZOR || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@1.5

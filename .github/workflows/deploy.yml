@@ -1,5 +1,5 @@
 # T-09.03: tag-driven deploy to staging (SPEC 9, FLY-IO-DEPLOYMENT 10-12, reference-architecture P12).
-#   verify-tag -> detect-changes -> build (matrix, GHCR) -> deploy-postgres -> deploy-authservice -> directory -> booking -> reputation -> assistant -> web -> summary
+#   verify-tag -> detect-changes -> build (matrix, GHCR) -> deploy-postgres -> deploy-authservice -> directory -> booking -> reputation -> assistant -> web-blazor -> summary
 # The apps, their paths, Dockerfiles and smoke checks are deploy/estate.conf; the secrets are deploy/secrets.map; the steps of one app are _deploy-app.yml.
 # What the owner configures first (GitHub environment "staging", secrets, variables) is docs/operations/DEPLOY.md. Not run against Fly yet (T-09.01).
 name: deploy
@@ -44,8 +44,7 @@ jobs:
       booking: ${{ steps.detect.outputs.booking }}
       reputation: ${{ steps.detect.outputs.reputation }}
       assistant: ${{ steps.detect.outputs.assistant }}
-      web: ${{ steps.detect.outputs.web }}
-      web-blazor: ${{ steps.detect.outputs.web-blazor }} # empty until the cutover row of deploy/estate.conf is enabled: the job below then runs, before that it never does
+      web-blazor: ${{ steps.detect.outputs.web-blazor }}
       build_matrix: ${{ steps.detect.outputs.build_matrix }}
     steps:
       - uses: actions/checkout@v4
@@ -187,16 +186,7 @@ jobs:
     secrets: inherit
     with:
       key: assistant
-  deploy-web:
-    needs: [detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation, deploy-assistant]
-    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.web == 'true' }}
-    permissions:
-      contents: read
-    uses: ./.github/workflows/_deploy-app.yml
-    secrets: inherit
-    with:
-      key: web
-  # The Blazor Web App (ADR-0010). Dormant: its output exists only when the `#cutover# web-blazor` row of deploy/estate.conf is uncommented (docs/operations/CUTOVER.md).
+  # The web host: the Blazor Web App (ADR-0010), the Fly app gabinety-web-blazor-staging (docs/operations/CUTOVER.md).
   deploy-web-blazor:
     needs: [detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation, deploy-assistant]
     if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.web-blazor == 'true' }}
@@ -209,7 +199,7 @@ jobs:
 
   # 5. One table for the run: what was deployed and healthy, what was not selected, what failed. Fails the run when any job failed.
   summary:
-    needs: [verify-tag, detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation, deploy-assistant, deploy-web, deploy-web-blazor]
+    needs: [verify-tag, detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation, deploy-assistant, deploy-web-blazor]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

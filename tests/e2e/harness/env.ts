@@ -1,10 +1,8 @@
 /** Where the fake profile listens (AppHost `Program.cs`, `scripts/check-fake-profile.sh`). Overridable for a non-default setup. */
-import { webBaseUrl, webHealthPath } from "./host";
-
 const e = (name: string, fallback: string) => process.env[name] || fallback;
 
 export const urls = {
-  web: webBaseUrl, // HOST / BASE_URL / E2E_WEB_URL: see host.ts
+  web: e("E2E_WEB_URL", process.env.BASE_URL || "http://localhost:3000").replace(/\/$/, ""), // the Blazor host (src/Gabinety.Web); BASE_URL is an alias
   devidentity: e("E2E_IDENTITY_URL", "http://localhost:5100"),
   directory: e("E2E_DIRECTORY_URL", "http://localhost:5101"),
   booking: e("E2E_BOOKING_URL", "http://localhost:5102"),
@@ -12,14 +10,14 @@ export const urls = {
   assistant: e("E2E_ASSISTANT_URL", "http://localhost:5104"),
 } as const;
 
-/** `/health` of every service, in start order (the web app's is `/api/health`). */
+/** `/health` of every service, in start order (the web app, the Blazor host, answers the kernel's `/health` too). */
 export const healthUrls: Record<string, string> = {
   devidentity: `${urls.devidentity}/health`,
   directory: `${urls.directory}/health`,
   booking: `${urls.booking}/health`,
   reputation: `${urls.reputation}/health`,
   assistant: `${urls.assistant}/health`,
-  web: `${urls.web}${webHealthPath}`,
+  web: `${urls.web}/health`,
 };
 
 /**

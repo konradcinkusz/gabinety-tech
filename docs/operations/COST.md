@@ -22,7 +22,7 @@ and the totals follow. The owner (or T-10.04 at M2) re-checks them against the p
 
 | App | Size | Machines | Arithmetic | USD / month |
 |---|---|---|---|---|
-| `gabinety-web-staging` | 512 MB | 1, always on | 3.32 | 3.32 |
+| `gabinety-web-blazor-staging` (the web host, a stateful frontend: section 4) | 512 MB | 1, always on | 3.32 | 3.32 |
 | `gabinety-directory-staging` | 512 MB | 1, always on | 3.32 | 3.32 |
 | `gabinety-booking-staging` | 512 MB | 1, always on | 3.32 | 3.32 |
 | `gabinety-reputation-staging` | 256 MB | 1, always on | 2.02 | 2.02 |
@@ -39,7 +39,7 @@ were given dedicated IPv4 addresses the total rises by 3 x 2.00 = 6.00 (not plan
 ## 3. The P7 diagnostic: every in-request call has a callee that pins a machine
 
 Rule (`fly-io-deployment` section 7, `reference-architecture` P7): for every synchronous call A to B, either B keeps a machine running, or A's timeout comfortably
-exceeds B's cold start. Read from the HttpClients (`src/Gabinety.*/Clients`, `Jobs/*/Directory*Client.cs`), `web/src/lib/api/proxy.ts` and SPEC 5.1:
+exceeds B's cold start. Read from the HttpClients (`src/Gabinety.*/Clients`, `Jobs/*/Directory*Client.cs`), `src/Gabinety.Web/Api` and SPEC 5.1:
 
 | Caller to callee | Call | Callee pins a machine? | Address in `fly.toml` |
 |---|---|---|---|
@@ -65,6 +65,6 @@ private apps are deployed with `--no-public-ips`. Without the private IPv6 the `
 
 ## 4. The Blazor web app (ADR-0010): no scale to zero, memory budget
 
-`gabinety-web-blazor-staging` (`deploy/fly/web-blazor.fly.toml`) replaces `gabinety-web-staging` at the cutover. It is a stateful frontend: `min_machines_running = 1`, auto stop off, one machine, so **it costs the always-on figure and can never be idle-stopped** (a stop ends every open page). Size 512 MB shared-cpu-1x: 3.32 USD a month at the assumed rates of section 1, the same as the Next app. Add a 1 GB volume for the Data Protection keys: 1 x 0.15 = **0.15 USD**. The estate ceiling of section 2 therefore rises by 0.15 (27.89 to 28.04), and **by another 3.32 for the fortnight or so while the old app stays as the rollback** (`CUTOVER.md` section 3).
+`gabinety-web-blazor-staging` (`deploy/fly/web-blazor.fly.toml`) replaced the Next.js app `gabinety-web-staging` at the cutover. It is a stateful frontend: `min_machines_running = 1`, auto stop off, one machine, so **it costs the always-on figure and can never be idle-stopped** (a stop ends every open page). Size 512 MB shared-cpu-1x: 3.32 USD a month at the assumed rates of section 1, the same as the Next app was. Add a 1 GB volume for the Data Protection keys: 1 x 0.15 = **0.15 USD**. The estate ceiling of section 2 therefore rises by 0.15 (27.89 to 28.04), and **by another 3.32 for the fortnight or so while the old Next.js app stays as the rollback** (`CUTOVER.md` section 3).
 
 Memory budget (measured in a CI-like container, **not on Fly**, `PERFORMANCE.md` section 8): idle host 143 MB RSS, 269 MB with 150 idle interactive pages, 512 MB machine. About 100 to 150 simultaneous active pages per machine; the proxy sheds above 150 connections. If real use exceeds that, 1 GB is 5.92 USD (+2.60 a month); a second machine needs session affinity and a shared session store first, not just a count.

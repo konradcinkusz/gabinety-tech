@@ -21,36 +21,11 @@ jobs:
       - run: scripts/check-authservice-pin.sh # one authservice digest in the fly toml, the AppHost, the integration tests and this file
       - run: dotnet build -warnaserror
       - run: dotnet test --no-build --filter "tier!=integration"
-  web:
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: web/package.json
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
-      - run: pnpm --dir web install --frozen-lockfile
-      - run: pnpm --dir web lint
-      - run: pnpm --dir web typecheck
-      - run: pnpm --dir web test
-      - run: pnpm --dir web build
-  # e2e runs the journeys J1-J7 against BOTH web hosts (ADR-0010, docs/operations/PARITY.md), each on its own fresh fake profile (the journeys write data, J3 cannot run twice on one stack),
-  # in parallel, so the wall time is that of one run. The job that runs HOST=next keeps its old name `e2e` (a required check by that name stays valid); the Blazor one is `e2e-blazor`.
-  # Both are required until the cutover removes web/ (docs/operations/CUTOVER.md). On the Blazor host a step that needs a page its owner has not ported yet is SKIPPED with the owner's branch
-  # in the reason; PARITY_STRICT=1 (the cutover gate) turns those skips into failures.
+  # e2e runs the journeys J1-J7 (docs/operations, tests/e2e/README.md) against the Blazor web host (ADR-0010) on a fresh fake profile (the journeys write data, J3 cannot run twice on one stack).
+  # The check name `e2e` is a required check.
   e2e:
-    name: ${{ matrix.host == 'next' && 'e2e' || format('e2e-{0}', matrix.host) }}
     runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
     timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        host: [next, blazor]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -58,34 +33,27 @@ jobs:
           global-json-file: global.json
       - uses: pnpm/action-setup@v4
         with:
-          package_json_file: web/package.json
+          package_json_file: tests/e2e/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: pnpm --dir web install --frozen-lockfile
       - name: Start the fake profile (no Docker, no credentials)
         run: |
           nohup dotnet run --project src/Gabinety.AppHost --launch-profile fake > apphost.log 2>&1 &
       - name: Every service answers /health
         run: scripts/check-fake-profile.sh
-      - name: Route parity (Next page routes have a Blazor route; report only, a gate under CUTOVER_GATE=1)
-        if: matrix.host == 'blazor'
-        run: node --test scripts/tests/check-parity.test.mjs && node scripts/check-parity.mjs
-        env:
-          CUTOVER_GATE: ${{ vars.CUTOVER_GATE || '0' }} # the cutover PR sets the repository variable (or this value) to 1: from then on a missing route fails CI
       # --- e2e harness (T-08.03a): Playwright against the running fake profile. Journeys J1-J7 only add specs under tests/e2e/journeys. ---
       - run: pnpm --dir tests/e2e install --frozen-lockfile
       - run: pnpm --dir tests/e2e exec playwright install --with-deps chromium
       - name: Playwright (harness smoke and journeys)
         run: pnpm --dir tests/e2e test
         env:
-          CI: "true"
-          HOST: ${{ matrix.host }} # next = web/ on :3000, blazor = src/Gabinety.Web on :3001 (tests/e2e/harness/env.ts)
+          CI: "true" # the web host is src/Gabinety.Web on :3000 (tests/e2e/harness/env.ts)
       - name: Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-report-${{ matrix.host }}
+          name: e2e-report
           path: |
             tests/e2e/playwright-report
             tests/e2e/test-results
@@ -94,20 +62,20 @@ jobs:
       - name: AppHost log on failure
         if: failure()
         run: tail -100 apphost.log
-  # --- docker-build (backend images; T-09.02). The web image has its own entry. ---
+  # --- docker-build (the service images and the web host's; T-09.02). ---
   docker-build-backend:
     runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        # `web-blazor` is the Blazor Web App frontend (ADR-0010 proposal), project Gabinety.Web; the Next.js image has its own job below (docker-build-web).
+        # `web` is the Blazor Web App frontend (ADR-0010), project Gabinety.Web; the check name `docker-build-backend (web)` is a required check.
         include:
           - { service: directory, project: Directory }
           - { service: booking, project: Booking }
           - { service: reputation, project: Reputation }
           - { service: assistant, project: Assistant }
-          - { service: web-blazor, project: Web }
+          - { service: web, project: Web }
     steps:
       - uses: actions/checkout@v4
       - name: Build the image (context = repository root)
@@ -126,15 +94,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: web/package.json
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: pnpm --dir web install --frozen-lockfile
       - run: dotnet build -warnaserror
-      # One real authservice for the AuthContract suite and the web's real-service tests (AUTH_BASE_URL). The Testcontainers tests (tests/Gabinety.Integration.Tests/RealAuth, ThinSlice)
+      # One real authservice for the AuthContract suite and the web host's real-service tests (AUTH_BASE_URL). The Testcontainers tests (tests/Gabinety.Integration.Tests/RealAuth, ThinSlice)
       # start their own instances of the same image. Network__ClientIpHeader lets each test name its own client address: authservice limits auth calls to 20 a minute per address.
       # The InitialAdmin and the dummy OAuth values are synthetic (CI only); GitHub sign-in can only be STARTED with them, never completed.
       - name: Start PostgreSQL and the real authservice image (pinned by digest)
@@ -161,40 +122,6 @@ jobs:
           curl -fsS http://localhost:8081/health/ready
           echo "AUTH_BASE_URL=http://localhost:8081" >> "$GITHUB_ENV"
       - run: dotnet test --no-build --filter "tier=integration" --logger "console;verbosity=detailed"
-      - name: The web's auth handlers against the real authservice (Vitest, skipped without AUTH_BASE_URL)
-        run: pnpm --dir web exec vitest run src/lib/session/real-authservice.test.ts
-        env:
-          AUTH_ADMIN_EMAIL: owner@example.test
-          AUTH_ADMIN_PASSWORD: Owner-Pass-1234!
-          AUTH_GITHUB_CONFIGURED: "1"
       - name: authservice log on failure
         if: failure()
         run: docker logs authsvc 2>&1 | tail -60
-  # ---- docker-build: web (T-09.02). Separate job so the backend images' rows do not conflict with this one. ----
-  docker-build-web:
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build the web image
-        run: docker build -t gabinety-web:ci web
-      - name: Runs as non-root
-        run: |
-          uid=$(docker run --rm --entrypoint id gabinety-web:ci -u)
-          echo "uid=$uid"; [ "$uid" != 0 ]
-      - name: Europe/Warsaw resolves
-        run: |
-          docker run --rm --entrypoint node gabinety-web:ci -e \
-            'const z=new Intl.DateTimeFormat("en",{timeZone:"Europe/Warsaw",timeZoneName:"short"}).format(new Date()); if(!/GMT\+[12]|CE/.test(z)) {console.error(z); process.exit(1)}'
-          docker run --rm --entrypoint test gabinety-web:ci -e /usr/share/zoneinfo/Europe/Warsaw
-      - name: Answers /api/health
-        run: |
-          docker run -d --name web -p 8080:8080 gabinety-web:ci
-          for i in $(seq 1 30); do
-            [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/health)" = 200 ] && break
-            sleep 1
-          done
-          curl -fsS http://localhost:8080/api/health
-      - name: Image log on failure
-        if: failure()
-        run: docker logs web 2>&1 | tail -60 || true

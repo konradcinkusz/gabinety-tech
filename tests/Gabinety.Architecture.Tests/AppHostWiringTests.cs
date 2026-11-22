@@ -74,48 +74,49 @@ public class AppHostWiringTests
         Assert.Contains("AddRateLimiting(builder.Configuration)", program);
     }
 
-    // ---- the Blazor web host next to the Next.js app (ADR-0010 proposal): two frontends, one fake profile ----
+    // ---- the Blazor web host, the only frontend since the cutover (ADR-0010) ----
 
     /// <summary>The statement that adds the Blazor host: from its AddProject to the end of the chain.</summary>
     static string BlazorWeb() => Regex.Match(Program, @"AddProject<Projects\.Gabinety_Web>\(""web-blazor"".*?;\n", RegexOptions.Singleline).Value;
 
     [Fact]
-    public void The_Blazor_host_is_a_second_web_resource_on_3001_with_health_and_the_backend_addresses()
+    public void The_Blazor_host_is_the_web_resource_on_3000_with_health_and_the_backend_addresses()
     {
         var web = BlazorWeb();
         Assert.NotEmpty(web);
-        Assert.Contains("WithHttpEndpoint(port: 3001", web);
+        Assert.Contains("WithHttpEndpoint(port: 3000", web);
         Assert.Contains("WithHttpHealthCheck(\"/health\")", web);
         foreach (var setting in new[] { "Backend__Directory", "Backend__Booking", "Backend__Reputation", "Backend__Assistant", "Backend__Auth", "Site__BaseUrl" }) Assert.Contains(setting, web);
-        Assert.Contains("\"Site__BaseUrl\", \"http://localhost:3001\"", web);
+        Assert.Contains("\"Site__BaseUrl\", \"http://localhost:3000\"", web);
         Assert.Contains("WaitFor(directory)", web);
         // found by running it in a browser: without this the host runs as Production from an unpublished build and its compressed static assets answer 500
         Assert.Contains("WithEnvironment(\"ASPNETCORE_ENVIRONMENT\", \"Development\")", web);
     }
 
     [Fact]
-    public void The_Next_js_app_is_still_on_3000_beside_it()
+    public void There_is_no_JavaScript_app_resource_any_more()
     {
-        Assert.Contains("AddJavaScriptApp(\"web\"", Program);
-        Assert.Contains("WithHttpEndpoint(port: 3000, env: \"PORT\"", Program);
-        Assert.Contains("\"Site__BaseUrl\", \"http://localhost:3000\"", Program);
+        Assert.DoesNotContain("AddJavaScriptApp", Program);
+        Assert.DoesNotContain("WithPnpm", Program);
+        Assert.False(System.IO.Directory.Exists(Path.Combine(Repo.Root, "web")), "web/ (Next.js) was retired by the cutover");
     }
 
     [Fact]
     public void The_Blazor_host_gets_the_same_backend_addresses_as_the_services_and_no_internal_key()
     {
         var web = BlazorWeb();
-        // the identity provider is the one the Next.js app is given; the internal keys (ADR-0007) are for services calling services, never for a frontend
+        // the identity provider is the one every backend is given; the internal keys (ADR-0007) are for services calling services, never for a frontend
         Assert.Contains("identityAuthority", web);
         Assert.DoesNotContain("Internal__Key", web);
         Assert.DoesNotContain("internalKey", web);
     }
 
     [Fact]
-    public void The_fake_profile_check_waits_for_both_frontends()
+    public void The_fake_profile_check_waits_for_the_one_frontend()
     {
         var script = File.ReadAllText(Path.Combine(Repo.Root, "scripts/check-fake-profile.sh"));
-        Assert.Contains("http://localhost:3000/api/health", script); // the old one stays
-        Assert.Contains("http://localhost:3001/health", script);
+        Assert.Contains("http://localhost:3000/health", script);
+        Assert.DoesNotContain("3001", script);
+        Assert.DoesNotContain("/api/health", script);
     }
 }

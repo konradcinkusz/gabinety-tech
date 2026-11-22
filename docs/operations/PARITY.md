@@ -1,18 +1,16 @@
-# PARITY: Next.js routes against the Blazor host (ADR-0010)
+# PARITY: done on 2026-11-22
 
-The parity checklist the **cutover PR gate reads** (`docs/operations/CUTOVER.md`, step 1). Two hosts run side by side until the cutover: Next.js (`web/`, :3000) and
-the Blazor Web App (`src/Gabinety.Web`, :3001 in the fake profile). A Next route with no Blazor route (and no exemption) blocks the cutover.
+The Next.js frontend (`web/`) was retired by the cutover PR (`docs/operations/CUTOVER.md`, sections 0-1); `src/Gabinety.Web` (the Blazor Web App, ADR-0010) is the only web host.
+This file is the archive of the gate that preceded it. The gate itself (`scripts/check-parity.mjs`, its test, `scripts/parity-exemptions.json`, the `CUTOVER_GATE` repository variable, the
+`HOST=next|blazor` switch and `PARITY_STRICT` of the e2e harness) was deleted with `web/`: there is nothing left to compare. It lives in the git history before the cutover commit.
 
-**Enforced by** `scripts/check-parity.mjs`: it enumerates the page and route files of `web/src/app` and the `@page`, `MapGet`/`MapPost` and `...Path` constants of `src/Gabinety.Web`,
-compares them (dynamic segments by position, not name) and prints what is missing. Report only by default; with `CUTOVER_GATE=1` (the repository variable of the same name in CI,
-set by the cutover PR) it exits 1 on any missing route. Exemptions live in `scripts/parity-exemptions.json`, each with a reason. This table is the human view of the same facts and the
-owners; the script is authoritative, and the CI step prints its output on every run of the `e2e-blazor` job.
+**Result at the gate** (`CUTOVER_GATE=1 node scripts/check-parity.mjs`): 44 Next routes, 35 ported, 9 exempt, 0 missing. Journeys J1-J7 passed on the Blazor host with no skips
+(`HOST=blazor PARITY_STRICT=1`, 18 tests).
 
-**Journeys** J1-J7 run against both hosts (`HOST=next|blazor`, `tests/e2e`). On the Blazor host a journey whose page is not ported is **skipped** with the reason
-`not ported yet: <route> (owner <branch>; docs/operations/PARITY.md)`; the probe is live, so the skip disappears when the page lands. The cutover gate runs the journeys with
-`PARITY_STRICT=1`, which makes any such skip a failure. The Next routes under `/api/` (the BFF) have no counterpart by design (exempt: ADR-0010 decision 4).
+**The one exemption.** `/api/*`, the Next BFF (`/api/auth`, `/api/proxy`, `/api/config`, `/api/health`): no counterpart by design. The Blazor host never lets the browser call a backend
+(ADR-0010 decision 4); its health route is the kernel's `/health`.
 
-Status as of the merge of #132 (public), #133 (auth), #135 (booking) and #136 (admin); **owners update the row in the PR that ports the page** (and run `node scripts/check-parity.mjs` to see the truth).
+**Route map** (Next route to Blazor route; every row was ported before the cutover):
 
 | Next route | Blazor route | Owner branch | J-hooks | Status |
 |---|---|---|---|---|
@@ -26,10 +24,10 @@ Status as of the merge of #132 (public), #133 (auth), #135 (booking) and #136 (a
 | `/admin/weryfikacja/[id]` | `/admin/weryfikacja/{Id:guid}` | port/admin | J2 | ported |
 | `/cennik` | `/cennik` | port/public | - | ported |
 | `/checkout/mock/[bookingId]` | `/checkout/mock/{BookingId:guid}` | port/booking | J3, J4 | ported |
-| `/gabinet-programisty` | - | port/practitioner | J2 | not ported |
-| `/gabinet-programisty/dostepnosc` | - | port/practitioner | - | not ported |
-| `/gabinet-programisty/oferty` | - | port/practitioner | J2 | not ported |
-| `/gabinet-programisty/profil` | - | port/practitioner | J2 | not ported |
+| `/gabinet-programisty` | `/gabinet-programisty` | port/practitioner | J2 | ported |
+| `/gabinet-programisty/dostepnosc` | `/gabinet-programisty/dostepnosc` | port/practitioner | - | ported |
+| `/gabinet-programisty/oferty` | `/gabinet-programisty/oferty` | port/practitioner | J2 | ported |
+| `/gabinet-programisty/profil` | `/gabinet-programisty/profil` | port/practitioner | J2 | ported |
 | `/gabinet/[slug]` | `/gabinet/{Slug}` | port/public | J1, J2, J3, J4 | ported |
 | `/jak-to-dziala` | `/jak-to-dziala` | port/public | - | ported |
 | `/konto` | `/konto` | port/auth | - | ported |
@@ -52,5 +50,5 @@ Status as of the merge of #132 (public), #133 (auth), #135 (booking) and #136 (a
 | `/sitemap.xml` | `/sitemap.xml` | port/public | - | ported |
 | `/zasady-rankingu` | `/zasady-rankingu` | port/public | - | ported |
 
-Not routes, but parity all the same (cutover preconditions of ADR-0010): the stateless session cookie (deploys must not sign users out), the five-minute output cache of public pages,
-password rules on registration, (done: the J7 Blazor variant, `j7-foreign-origin.blazor.spec.ts`, runs on the Blazor host and the Next variant on Next; `OriginGuardHostTests` pin the guard in-process as well).
+Not routes, but parity all the same (cutover preconditions of ADR-0010), all met before the cutover: the stateless session cookie (deploys do not sign users out), the five-minute output cache of
+the public pages, password rules on registration, the J7 variant against `/logowanie` (`OriginGuardHostTests` pin the guard in-process as well).

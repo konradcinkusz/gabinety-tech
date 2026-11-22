@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { expect, type APIRequestContext, type APIResponse, type Browser, type BrowserContext } from "@playwright/test";
 import { demoPassword, emailOf, urls } from "./env";
-import { isBlazor } from "./host";
 import { accessTokenOf, registerAtIdentity, signInViaBff } from "./auth";
 import { fetchRetrying, json } from "./http";
 
 /**
- * Helpers shared by the money journeys (J5, J6, J7): set-up through the same BFF the browser uses, so a journey drives only the screen it is about
+ * Helpers shared by the money journeys (J5, J6, J7): set-up straight at the services with the signed-in user's token, so a journey drives only the screen it is about
  * (cancel, dispute, resolve) through the UI. Every name is in the `demo-` namespace and unique per call, so journeys (and parallel CI sessions) do not
  * share rows, and the "one fee per client and practitioner pair" rule (CONTRACTS 9.1) always starts fresh. Nothing here logs a body or a token.
  */
@@ -16,7 +15,7 @@ export const uniqueDemoName = (tag: string): string => `demo-${tag}-${randomUUID
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * The Blazor host has no `/api/proxy/<service>/...` (the browser never calls a backend), so on HOST=blazor the same path goes straight to the service with the
+ * The host has no `/api/proxy/<service>/...` (the browser never calls a backend), so the `/api/proxy/<service>/...` path of a call goes straight to the service with the
  * user's bearer token (`signInViaBff` keeps it). Set-up and verification only: what a journey is ABOUT still goes through the UI.
  */
 function direct(ctx: APIRequestContext, path: string, headers: Record<string, string> | undefined): { url: string; headers: Record<string, string> | undefined } {
@@ -36,7 +35,7 @@ export async function bff(
 ): Promise<APIResponse> {
   const deadline = Date.now() + budgetMs;
   let delay = 500;
-  const target = isBlazor ? direct(ctx, path, headers) : { url: path, headers };
+  const target = direct(ctx, path, headers);
   for (;;) {
     const res = await ctx.fetch(target.url, { method, headers: target.headers, data: body, failOnStatusCode: false });
     if ((res.status() !== 429 && res.status() !== 503) || Date.now() + delay > deadline) return res;
@@ -48,11 +47,7 @@ export async function bff(
 
 /** Registers a fresh demo user (DevIdentity gives a `demo-` address the `demo-` subject) and signs the context in as it. */
 export async function registerDemoUser(context: BrowserContext, userName: string): Promise<void> {
-  if (isBlazor) await registerAtIdentity(userName);
-  else {
-    const res = await context.request.post("/api/auth/register", { data: { email: emailOf(userName), password: demoPassword } });
-    expect(res.status(), `register ${userName}`).toBe(200);
-  }
+  await registerAtIdentity(userName);
   await signInViaBff(context, userName);
 }
 

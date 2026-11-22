@@ -8,7 +8,7 @@ Owner's operating procedures for staging on Fly.io. Written from the code of thi
 
 State when this was written (2026-11-18): no Fly account or app exists (T-09.01, T-09.02, T-09.03 not done), the payment provider is the mock (T-09.05), no real booking has happened on staging (T-09.08), and the authoring session had no .NET SDK, so no service was started. Therefore only the backup, restore and retention steps of section 2 were run, and only locally on synthetic data. Everything else is `[not run]`.
 
-Names: apps are `gabinety-<name>-staging` (`web`, `directory`, `booking`, `reputation`, `assistant`, `authservice`, `postgres`, `backup`); services listen on 8080 on the private network (`<app>.internal:8080`); only `web`, `authservice` and Booking are public (SPEC §4.3); Booking's public listener serves only the webhook, `/alive` and `/api/v1/*` except `/api/v1/admin/*`, everything else including `/internal/*` is 404 from the edge (F-03, `src/Gabinety.Booking/PublicEdge.cs`). Directory, Reputation and Assistant have no public address (`scripts/deploy/assert-no-public-ip.sh` fails the deploy otherwise). `fly` is the Fly CLI; every command takes `-a <app>`.
+Names: apps are `gabinety-<name>-staging` (`web-blazor`, `directory`, `booking`, `reputation`, `assistant`, `authservice`, `postgres`, `backup`); services listen on 8080 on the private network (`<app>.internal:8080`); only `web-blazor`, `authservice` and Booking are public (SPEC §4.3); Booking's public listener serves only the webhook, `/alive` and `/api/v1/*` except `/api/v1/admin/*`, everything else including `/internal/*` is 404 from the edge (F-03, `src/Gabinety.Booking/PublicEdge.cs`). Directory, Reputation and Assistant have no public address (`scripts/deploy/assert-no-public-ip.sh` fails the deploy otherwise). `fly` is the Fly CLI; every command takes `-a <app>`.
 
 ## 2. Backups and restore
 
@@ -25,7 +25,7 @@ Scripts, configuration and the "not verified" list: `deploy/fly/backup/README.md
 
 ## 3. Deploy
 
-The deploy procedure belongs to `docs/operations/DEPLOY.md` (T-09.03). That file does not exist on `main` yet: **pending T-09.03**. Until then, the order is SPEC §9: postgres, authservice, directory, booking, reputation, assistant, web, started by a tag `v*`.
+The deploy procedure belongs to `docs/operations/DEPLOY.md` (T-09.03). That file does not exist on `main` yet: **pending T-09.03**. Until then, the order is SPEC §9: postgres, authservice, directory, booking, reputation, assistant, web-blazor, started by a tag `v*`.
 
 | # | Step | Tag |
 |---|---|---|
@@ -60,7 +60,7 @@ SPEC §11 names these platform secrets: the webhook secret, the internal keys, t
 | 5.8 | Backup credentials (`backup: RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID`, `..._SECRET_ACCESS_KEY`) | New key pair at the object-store provider, stage, `fly secrets deploy -a gabinety-backup-staging`, run the next backup by hand (`fly machine start <id>`) and check the log, revoke the old pair. | `[not run: no bucket]` |
 | 5.9 | Fly deploy token (GitHub Actions secret) | `fly tokens create deploy -a <app>`, update the repository secret, delete the old token. | `[not run: no Fly account]` |
 | 5.10 | A secret leaked (it appeared in a log, a chat or a commit) | Rotate it first (the row above), then remove the leak; the secret scanner (`secret-scan` job) catches commits, not chats. | `[not run]` |
-| 5.11 | Rate-limit proxy key (`RateLimit__TrustedProxyKey` on `web`, `directory`, `booking`, `reputation`, `assistant`; GitHub secret `RATE_LIMIT_TRUSTED_PROXY_KEY`) | One value on all five apps (the web app sends it as `X-Edge-Key`; a service trusts the forwarded visitor address only when it matches). It is not an internal key and **opens no route**: a request carrying `X-Edge-Key` to `/internal/*` is 404 (edge guard), and the key is never accepted as `X-Internal-Key`. Same strength and distinctness rule as the internal keys: 43+ characters, and different from every internal key the app holds (startup check). Rotate: stage the new value on the four backends first, then on web, deploy all five; during the gap the limiter falls back to the peer address (one shared bucket), nothing fails. | `[not run: no apps]` |
+| 5.11 | Rate-limit proxy key (`RateLimit__TrustedProxyKey` on `web-blazor`, `directory`, `booking`, `reputation`, `assistant`; GitHub secret `RATE_LIMIT_TRUSTED_PROXY_KEY`) | One value on all five apps (the web app sends it as `X-Edge-Key`; a service trusts the forwarded visitor address only when it matches). It is not an internal key and **opens no route**: a request carrying `X-Edge-Key` to `/internal/*` is 404 (edge guard), and the key is never accepted as `X-Internal-Key`. Same strength and distinctness rule as the internal keys: 43+ characters, and different from every internal key the app holds (startup check). Rotate: stage the new value on the four backends first, then on web, deploy all five; during the gap the limiter falls back to the peer address (one shared bucket), nothing fails. | `[not run: no apps]` |
 
 ## 6. Payment webhook failure burst
 
@@ -138,15 +138,15 @@ Order (SPEC §8): authservice deletes the account, then the owner calls the eras
 7. **Gap B (closed in code, ADR-0012):** the cascade on suspension and erasure exists (section 9). Still open for the owner: (a) there is no administrator cancel of a single booking; (b) decided: the cascade is not counted in `practitioner_cancel_count` (ADR-0012).
 8. **Gap C (closed in code):** `Internal__PreviousKey` (task/hardening-webhook-key) and, with F-03, a second `Internal__Callers__<Name>` both give an overlap period during a rotation (5.3). CONTRACTS §10 lists neither setting yet, nor `Internal__Callers__*`, `Internal__RejectPublicEdge`, `Internal__EdgeHeaders`, `Internal__EnforceKeyStrength`.
 9. **Public-edge headers (F-03, owner or staging check):** the code guard treats a request carrying `Fly-Client-IP`, `X-Forwarded-For`, `Fly-Forwarded-Proto`, `Fly-Forwarded-Port`, `Fly-Forwarded-Ssl` or `X-Forwarded-Proto` as coming from the Internet (`Internal__EdgeHeaders` overrides the list). fly.io was not reachable when this was written, so it is **not verified** that `.internal` (direct 6PN) requests carry none and that `.flycast` requests (through the Fly proxy) carry them or not. Check on staging with a request header dump; until then the guard is **off for the Assistant** (`Internal__RejectPublicEdge=false` in `assistant.fly.toml`), which is safe because it has no public address. Also confirm the Directory and Reputation calls from Booking and Reputation still answer 200 after the first deploy (a 404 there would mean `.internal` carries an edge header).
-10. **Which apps are public** (owner decision, F-03): the repository now deploys only `web`, `authservice` and Booking publicly, as SPEC §4.3 says; Booking is filtered in code because Fly cannot expose one path. The alternative is a separate tiny webhook app.
+10. **Which apps are public** (owner decision, F-03): the repository now deploys only `web-blazor`, `authservice` and Booking publicly, as SPEC §4.3 says; Booking is filtered in code because Fly cannot expose one path. The alternative is a separate tiny webhook app.
 
-## 12. The Blazor web app (`gabinety-web-blazor-staging`; from the cutover, ADR-0010)
+## 12. The web host (`gabinety-web-blazor-staging`, the Blazor Web App, ADR-0010)
 
-Read `DEPLOY.md` section 5 first. This is the one app that keeps state in memory; its failure modes are different from the Next app's.
+Read `DEPLOY.md` section 5 first. This is the one stateful app (open circuits in memory, the Data Protection keys on a volume), so its failure modes differ from the stateless backends'.
 
 | Symptom | Likely cause | Do |
 |---|---|---|
-| Everybody was signed out | a deploy or restart (the session store is in memory until the stateless cookie lands, ADR-0010) | expected; say so in the release note. After the stateless cookie: look for a changed Data Protection key ring (the volume was recreated) |
+| Everybody was signed out | the session cookie is sealed with the Data Protection key ring (stateless, ADR-0010), so a deploy or restart must NOT sign anybody out: the key ring changed (the volume was recreated or not mounted) or `DataProtection__KeysPath` moved | `fly ssh console -C "ls -l /data/keys"`; restore the volume or accept the one-time sign-out and say so in the release note |
 | Open forms fail with a validation or antiforgery error after a deploy | the Data Protection keys are not on the volume | `fly ssh console -C "ls -l /data/keys"`: empty or not writable means the volume is missing or not owned by `app`: `fly ssh console -C "chown -R app /data"`, restart |
 | Pages load but do nothing (buttons, forms on interactive pages) | the circuit did not connect: websocket blocked, or `Site__BaseUrl` is wrong so the origin guard refuses `/_blazor` | browser DevTools, Network, WS; `fly logs` for `cross_site_request`; fix `Site__BaseUrl` |
 | 503 from the proxy under load; memory near 512 MB | too many circuits (`COST.md` and `PERFORMANCE.md` give the measured capacity) | lower `Circuit__DisconnectedMaxRetained` / `Circuit__DisconnectedRetentionSeconds`, or `fly scale memory 1024`; the proxy `hard_limit` of 200 connections sheds before the machine dies |

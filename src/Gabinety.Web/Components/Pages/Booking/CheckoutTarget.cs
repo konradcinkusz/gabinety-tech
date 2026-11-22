@@ -13,7 +13,7 @@ public static class CheckoutTarget
         if (string.IsNullOrWhiteSpace(url) || url.Any(c => c < 0x20 || c == '\\')) return null;
         if (url.StartsWith('/')) return url.StartsWith("//") ? null : url;
         if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || !string.IsNullOrEmpty(u.UserInfo)) return null;
-        // Fake profile only (the mock provider): Booking builds the mock checkout address from ITS Site:BaseUrl, which is the other frontend's origin while two hosts run side by side (Next :3000, this host :3001).
+        // Fake profile only (the mock provider): Booking builds the mock checkout address from ITS Site:BaseUrl, which is this host's origin (Site:BaseUrl, :3000 in the fake profile).
         // The mock page exists on this host only in a fake profile (WebOptions.MockPayments), so an absolute address whose path is exactly the mock checkout of a booking is followed as a path of this site.
         // Never in a deployed profile (mockPayments false), and the path is matched exactly (a guid, no query), so it cannot be used to go anywhere else.
         if (mockPayments && System.Text.RegularExpressions.Regex.IsMatch(u.AbsolutePath, "^/checkout/mock/[0-9a-fA-F-]{36}$") && string.IsNullOrEmpty(u.Query) && (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps)) return u.AbsolutePath;

@@ -8,12 +8,15 @@ public sealed record RefreshRequest(string? RefreshToken);
 public sealed record RecordConsentRequest(bool? AcceptedTerms, bool? AcceptedPrivacy);
 public sealed record ExchangeRequest(string? Code);
 public sealed record DeleteAccountRequest(string? Password, string? Confirmation);
+public sealed record ForgotPasswordRequest(string? Email);
+public sealed record ResetPasswordRequest(string? Email, string? Token, string? NewPassword);
+public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 
 public static class Endpoints
 {
     private const string Version = "2026-01-01"; // authservice's default ConsentVersions (appsettings.json), the value the integration job's real image answers
 
-    public static void MapDevIdentityEndpoints(this WebApplication app, string? publicBaseUrl)
+    public static void MapDevIdentityEndpoints(this WebApplication app, string? publicBaseUrl, bool fakeProfile = false)
     {
         var store = app.Services.GetRequiredService<IdentityStore>();
         var tokens = app.Services.GetRequiredService<TokenIssuer>();
@@ -133,6 +136,42 @@ public static class Endpoints
                         sessions = Array.Empty<object>(),
                     }));
 
+            // Password recovery. Shapes and codes are those of authservice's AuthController (ForgotPassword, ResetPassword, ChangePassword).
+            // Its [ApiController] answers a request that fails model validation with a 400 problem document whose `errors` is an object keyed by field; Identity's own
+            // failures (bad token, rules, wrong current password) are 400 { errors: [...] }.
+            const string ForgotMessage = "If an account with that email exists, a password reset link has been sent.";
+
+            app.MapPost($"{prefix}/forgot-password", (ForgotPasswordRequest r) =>
+            {
+                if (ModelProblem(("Email", EmailProblem(r.Email))) is { } problem) return problem;
+                store.IssueResetToken(r.Email!.Trim()); // a known and an unknown address answer byte for byte the same
+                return Results.Ok(new { message = ForgotMessage, isOAuthOnly = false }); // no account here is OAuth-only
+            });
+
+            app.MapPost($"{prefix}/reset-password", (ResetPasswordRequest r) =>
+            {
+                if (ModelProblem(("Email", EmailProblem(r.Email)), ("Token", Required(r.Token, "Reset token is required")), ("NewPassword", NewPasswordProblem(r.NewPassword, "Password must be between 8 and 100 characters"))) is { } problem) return problem;
+                var errors = store.ResetPassword(r.Email!.Trim(), r.Token!, r.NewPassword!, PasswordRules);
+                return errors.Count > 0
+                    ? Results.BadRequest(new { errors })
+                    : Results.Ok(new { message = "Password has been reset successfully. You can now sign in with your new password." });
+            });
+
+            app.MapPost($"{prefix}/change-password", async (HttpRequest request, ChangePasswordRequest r) =>
+            {
+                if (await CallerAsync(request) is not { } u) return Results.Unauthorized();
+                if (ModelProblem(("CurrentPassword", Required(r.CurrentPassword, "Current password is required")), ("NewPassword", NewPasswordProblem(r.NewPassword, "New password must be between 8 and 100 characters"))) is { } problem) return problem;
+                var errors = store.ChangePassword(u, r.CurrentPassword!, r.NewPassword!, PasswordRules);
+                if (errors.Count > 0) return Results.BadRequest(new { errors });
+                // authservice defaults: RevokeSessionsOnPasswordChange and ReissueTokensOnPasswordChange are both true, so every session ends and the caller gets a fresh pair.
+                return Results.Ok(new
+                {
+                    message = "Password changed successfully. All other sessions have been signed out.",
+                    sessionsRevoked = true,
+                    tokens = TokenResponse(u, store.IssueRefresh(u)),
+                });
+            });
+
             // A soft delete: the account can no longer sign in; the data stays for a retention period (authservice: ApplicationUser.DefaultRetentionDays).
             app.MapDelete($"{prefix}/account", async (HttpRequest request, [Microsoft.AspNetCore.Mvc.FromBody] DeleteAccountRequest r) =>
             {
@@ -144,6 +183,11 @@ public static class Endpoints
                 return Results.Ok(new { message = "Account deleted successfully" });
             });
         }
+
+        // Development only: the fake profile sends no e-mail, so the reset token is read here. Mapped only under GABINETY_FAKE=1 (without it the route is a 404).
+        if (fakeProfile)
+            app.MapGet("/dev/last-reset-token", (string? email) =>
+                email is not null && store.LastResetToken(email.Trim()) is { } token ? Results.Ok(new { token }) : Results.NotFound());
 
         // No provider is configured in the stand-in, as in authservice without OAuth credentials.
         foreach (var prefix in new[] { "/api/v1/external-auth", "/api/external-auth" })
@@ -177,6 +221,24 @@ public static class Endpoints
         if (!p.Any(char.IsAsciiDigit)) yield return "Passwords must have at least one digit ('0'-'9').";
         if (!p.Any(char.IsAsciiLetterLower)) yield return "Passwords must have at least one lowercase ('a'-'z').";
         if (!p.Any(char.IsAsciiLetterUpper)) yield return "Passwords must have at least one uppercase ('A'-'Z').";
+    }
+
+    private static string? Required(string? value, string message) => string.IsNullOrEmpty(value) ? message : null;
+
+    private static string? EmailProblem(string? email) =>
+        string.IsNullOrEmpty(email) ? "Email is required"
+        : email.Length > 256 ? "Email cannot exceed 256 characters"
+        : !IsEmail(email) ? "Invalid email format" : null;
+
+    private static string? NewPasswordProblem(string? password, string lengthMessage) =>
+        string.IsNullOrEmpty(password) ? "New password is required" : password.Length is < 8 or > 100 ? lengthMessage : null;
+
+    /// <summary>The 400 problem document of ASP.NET's [ApiController] model validation, or null when every field is fine.</summary>
+    private static IResult? ModelProblem(params (string Field, string? Message)[] fields)
+    {
+        var errors = fields.Where(f => f.Message is not null).ToDictionary(f => f.Field, f => new[] { f.Message! });
+        return errors.Count == 0 ? null
+            : Results.Json(new { type = "https://tools.ietf.org/html/rfc9110#section-15.5.1", title = "One or more validation errors occurred.", status = 400, errors }, statusCode: StatusCodes.Status400BadRequest);
     }
 
     private static bool IsEmail(string? s) => !string.IsNullOrWhiteSpace(s) && MailAddress.TryCreate(s.Trim(), out var a) && a.Address == s.Trim();

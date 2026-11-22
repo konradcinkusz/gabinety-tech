@@ -261,7 +261,18 @@ Ruled out by reading the code: the version ordering (Reputation's version is a p
 
 **Migration lists.** Directory, Reputation and Assistant skeleton migration tests now use the Booking model: `Expected` = the assembly's `Database.GetMigrations()` (via the design-time factory), `Shipped` = the pinned released prefix; the applied history must equal `Expected` and start with `Shipped`. A new migration no longer edits these tests. Failure power checked offline against `AssertHistory` for all three (Expected equals Shipped today): a dropped, an extra, a renamed released and a reordered migration each fail. The Docker-backed run is the CI integration job.
 
-## 8. Production configuration: e-mail, model, config coverage (branch `fix/prod-wiring`, 2026-11-22)
+## 8. The cutover PR: retire Next.js (branch `cutover/retire-nextjs`, 2026-11-22)
+
+The owner wants the product delivered autonomously; the supervisor decides the open points (revisable). `docs/operations/CUTOVER.md` sections 0 and 1 were executed as one PR; sections 2 and 3 stay the owner's go-live runbook.
+
+- **`deploy/fly/web.fly.toml` is deleted in this PR, not after the old app is gone.** It named `web/Dockerfile`, which no longer exists, and `scripts/check-fly-toml.sh` (a required check) rejects a config whose Dockerfile is missing. No `flyctl` command that keeps, scales or destroys the old app needs the file. Redeploying the old app needs the commit before the cutover (CUTOVER.md section 4). The `web` row of `deploy/secrets.map` goes with it (nothing deploys that app any more; the secret already staged on it stays).
+- **The estate key stays `web-blazor`** (Fly app `gabinety-web-blazor-staging`, a NEW app beside the old one; the old one is the rollback). Only the CI check name is `web` (`docker-build-backend (web)`), as CUTOVER.md says. Renaming the AppHost resource and the estate key to `web` would also rename the Fly config, the job and the secrets rows: not worth the churn, revisit with the retirement of the old app.
+- **`PUBLIC_URL_WEB` becomes `PUBLIC_URL_WEB_BLAZOR`.** The old variable (if the owner set it) names the old public host; reusing it for the new app's smoke would probe the wrong app.
+- **The Vitest test of the Next handlers against the real authservice left CI with `web/`.** The Blazor host's identity client has no real-authservice test yet (follow-up, listed in the PR and in `AUTH.md`): fakes cover it, the journeys cover it end to end against the stand-in.
+- **Nothing was run against Fly, DNS or the owner's accounts.** The repository variable `CUTOVER_GATE` is the owner's to delete (an agent cannot).
+- **Precondition 7 (memory)** was restated from `PERFORMANCE.md` section 8, not re-measured: the host code did not change in this PR. Re-run `ONLY_CIRCUITS=1 scripts/measure-performance.sh` before the go-live if it changed since.
+
+## 9. Production configuration: e-mail, model, config coverage (branch `fix/prod-wiring`, 2026-11-22)
 
 **Decision: e-mail is `Smtp` in the deployed estate only when it can work.** `deploy/secrets.map` stages `Notifications__Provider=Smtp` through a new `@if(NAME,NAME)` gate (set-secrets.sh) only when GitHub secrets `NOTIFICATIONS_SMTP_HOST` and `NOTIFICATIONS_SMTP_FROM` exist; `booking.fly.toml` no longer sets the provider (a secret and an `[env]` line of the same name must not compete), so the code default `Log` applies otherwise. All six SMTP values are GitHub *secrets* (the deploy reads the secrets context only), not variables.
 **Honesty.** Outside the fake profile a `Log` provider is announced: one startup warning and `email: Degraded` in `/health/details` (`NotificationsFeature`; tests in `SmtpWiringTests`). The fake profile stays quiet.

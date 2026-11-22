@@ -1,5 +1,4 @@
 import { test, expect } from "../harness/fixtures";
-import { requirePorted } from "../harness/parity";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
 import { reseedIfRequested, freeSlots, getBooking, publicProfile } from "../harness/booking-api";
 import { BookingFormPage, MockCheckoutPage, PractitionerProfilePage } from "../harness/pages-booking";
@@ -21,7 +20,6 @@ test.describe("J4 the Assistant is down", () => {
   });
 
   test("the brief form still books and no suggestion is shown", async ({ page, context, signInAs }) => {
-    await requirePorted(page.request, "/gabinet/demo-dariusz-fikcyjny", "/rezerwacja/00000000-0000-0000-0000-000000000000", "/checkout/mock/00000000-0000-0000-0000-000000000000"); // HOST=blazor: skip with the owner named until the pages land (PARITY.md)
     await signInAs("demo-client");
     const target = await publicProfile(SLUG);
     const offering = target.offerings[0]!;

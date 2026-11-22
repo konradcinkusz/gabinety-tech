@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Memory per interactive circuit of the Blazor host (ADR-0010 "Cost": "memory per open interactive page is the capacity limit and has not been measured"; T-10.04 extension).
 //
-//   node scripts/perf/measure-circuits.mjs --url http://localhost:3001 --pid <pid of the Blazor host> [--levels 10,25,50] [--page /moje/rezerwacje] [--out DIR]
+//   node scripts/perf/measure-circuits.mjs --url http://localhost:3000 --pid <pid of the Blazor host> [--levels 10,25,50] [--page /moje/rezerwacje] [--out DIR]
 //
 // What it does: signs in N times through the real sign-in form (each sign-in is its own server-side session, as N visitors would have), opens `--page` (an INTERACTIVE page: it starts a
 // circuit) in N browser pages, waits until each circuit answered `StartCircuit`, lets the host's memory settle, and reads the host process's memory from /proc/<pid> (VmRSS = the working
@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
-const url = arg("url", "http://localhost:3001").replace(/\/$/, "");
+const url = arg("url", "http://localhost:3000").replace(/\/$/, "");
 const pid = Number(arg("pid", process.env.BLAZOR_PID ?? "0"));
 const levels = arg("levels", process.env.CIRCUIT_LEVELS ?? "10,25,50").split(/[ ,]+/).map(Number).filter((n) => n > 0).sort((a, b) => a - b);
 const page = arg("page", "/moje/rezerwacje");

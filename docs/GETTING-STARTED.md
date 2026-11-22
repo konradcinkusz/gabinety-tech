@@ -8,7 +8,7 @@ Every command below was run on Linux with the .NET SDK 10.0.404 (`global.json` a
 
 The fake profile needs **no Docker, no database, no credentials**: in-memory storage, a mock payment provider, a fake language model, a development identity provider (`tools/Gabinety.DevIdentity`). Everything is synthetic (`demo-` names) and lost on restart.
 
-You need the .NET 10 SDK and pnpm (Node 22). If `dotnet --version` is not found (a fresh container usually has no SDK), install it for your user, no root needed:
+You need the .NET 10 SDK (pnpm and Node 22 only for the end-to-end tests in `tests/e2e`). If `dotnet --version` is not found (a fresh container usually has no SDK), install it for your user, no root needed:
 
 ```bash
 curl -sSL -o dotnet-install.sh https://builds.dotnet.microsoft.com/dotnet/scripts/v1/dotnet-install.sh
@@ -19,7 +19,6 @@ export PATH="$HOME/.dotnet:$PATH"; dotnet --version                       # 10.0
 (`ci.dot.net` is blocked in some sandboxes; `builds.dotnet.microsoft.com` is the host to use.) Then start the profile. `dotnet run` stays in the foreground for as long as the profile runs, so use a second terminal for everything below, or send it to the background (`nohup dotnet run ... > /tmp/apphost.log 2>&1 &`):
 
 ```bash
-pnpm --dir web install --frozen-lockfile        # about 3 s
 dotnet run --project src/Gabinety.AppHost --launch-profile fake
 ```
 
@@ -27,15 +26,14 @@ The first run builds everything (about 1 to 2 minutes). The terminal prints only
 
 | Part | URL |
 |---|---|
-| Web app, Next.js (`web/`, complete; the default until the cutover) | http://localhost:3000 |
-| Web app, Blazor Web App (`src/Gabinety.Web`, ADR-0010; same backends, same demo users; pages arrive as their port branches merge, see `docs/operations/PARITY.md`) | http://localhost:3001 |
+| Web app, Blazor Web App (`src/Gabinety.Web`, ADR-0010; it replaced the Next.js app, see `docs/operations/PARITY.md`) | http://localhost:3000 |
 | Dev identity (stand-in for the auth service) | http://localhost:5100 |
 | Directory | http://localhost:5101 |
 | Booking | http://localhost:5102 |
 | Reputation | http://localhost:5103 |
 | Assistant | http://localhost:5104 |
 
-Each backend answers `GET /health`; the Next web app answers `/api/health`, the Blazor host `/health` (and `/alive`).
+Each backend and the web host answer `GET /health` (the web host also `/alive`).
 
 ### Is it ready?
 
@@ -51,7 +49,7 @@ ok   directory http://localhost:5101/health
 ok   booking http://localhost:5102/health
 ok   reputation http://localhost:5103/health
 ok   assistant http://localhost:5104/health
-ok   web http://localhost:3000/api/health
+ok   web http://localhost:3000/health
 ok   seeded practitioners: 6 (wanted 6)
 ok   web /programisci
 ```
@@ -98,7 +96,7 @@ Every caller (web server, seeder, services, browser) is one `localhost` address,
 
 ## 2. Demo users
 
-Sign in at http://localhost:3000/logowanie (Next) or http://localhost:3001/logowanie (Blazor): "Zaloguj się". One fixed **development** password for all seeded users (not a secret; it protects nothing and exists only in the stand-in identity provider):
+Sign in at http://localhost:3000/logowanie: "Zaloguj się". One fixed **development** password for all seeded users (not a secret; it protects nothing and exists only in the stand-in identity provider):
 
 | | |
 |---|---|
@@ -155,44 +153,45 @@ A profile that already has reviews (after running the e2e suite, or the seeded p
 
 #### J3 by curl (no browser)
 
-The same path through the real HTTP surface, as the browser makes it: the web app's `/api/auth/login` sets the session cookies, `/api/proxy/<service>/...` forwards to the services with that cookie. Needs `curl` and `jq`; run it after the seeder has finished (section 1). It was run exactly like this; the ids are looked up, not typed.
+The same path through the real HTTP surface, without a browser: the web host never lets a browser call a backend, so this talks to the services directly with the user's bearer token from the identity stand-in (what `tests/e2e/harness` does for its set-up). Needs `curl` and `jq`; run it after the seeder has finished (section 1). The web host's own pages (step 7) need a session cookie, which only the sign-in form sets, so they are checked here anonymously.
 
 ```bash
-W=localhost:3000; B=$W/api/proxy/booking/api/v1; R=$W/api/proxy/reputation/api/v1
+W=localhost:3000; B=localhost:5102/api/v1; R=localhost:5103/api/v1
 K=demo-development-internal-key-not-a-secret
-login() { curl -s -c "$1" -H 'Content-Type: application/json' -d "{\"email\":\"$2@demo.example\",\"password\":\"Demo-Dev-Passw0rd!\"}" $W/api/auth/login; }
-login /tmp/client.jar demo-client                  # {"authenticated":true,"userId":"demo-client",...}; tokens are cookies, never in the body
+tok() { curl -s -H 'Content-Type: application/json' -d "{\"email\":\"$1@demo.example\",\"password\":\"Demo-Dev-Passw0rd!\"}" localhost:5100/api/v1/auth/login | jq -r .accessToken; }   # never print it
+CT=$(tok demo-client); PT=$(tok demo-practitioner-3)
+auth() { echo "Authorization: Bearer $1"; }
 
 # 1. browse (no sign-in): the public profile read straight from Directory has the ids
 curl -s localhost:5101/api/v1/practitioners/demo-celina-przykladowska | jq -c '{id,isNew,offer:.offerings[0].id}'
 P=<id from above>; OFF=<offer id>
-curl -s -b /tmp/client.jar "$B/practitioners/$P/slots?offeringId=$OFF&from=$(date +%F)&to=$(date -d '+13 days' +%F)" | jq -c '.slots[0]'
+curl -s -H "$(auth $CT)" "$B/practitioners/$P/slots?offeringId=$OFF&from=$(date +%F)&to=$(date -d '+13 days' +%F)" | jq -c '.slots[0]'
 START=<startUtc of a slot>; END=<its endUtc>
 
 # 2. book: 201 {"bookingId":...,"status":"PendingPayment","checkoutUrl":...}
-ID=$(curl -s -b /tmp/client.jar -H "Idempotency-Key: $(cat /proc/sys/kernel/random/uuid)" -H 'Content-Type: application/json' \
+ID=$(curl -s -H "$(auth $CT)" -H "Idempotency-Key: $(cat /proc/sys/kernel/random/uuid)" -H 'Content-Type: application/json' \
   -d "{\"offeringId\":\"$OFF\",\"startUtc\":\"$START\",\"brief\":{\"text\":\"Prototyp z modelem językowym.\",\"aiAssisted\":false}}" $B/bookings | jq -r .bookingId)
 
 # 3. pay on the mock: {"outcome":"Applied"}; the booking is then Confirmed / payment Succeeded
-curl -s -b /tmp/client.jar -H 'Content-Type: application/json' -d "{\"bookingId\":\"$ID\",\"outcome\":\"succeeded\"}" $B/payments/simulate
-curl -s -b /tmp/client.jar $B/bookings/$ID | jq -c '{status,payment}'
-login /tmp/p3.jar demo-practitioner-3; curl -s -b /tmp/p3.jar $B/bookings/$ID | jq -c '{status,brief:.brief.text}'   # the practitioner sees it, with the brief
+curl -s -H "$(auth $CT)" -H 'Content-Type: application/json' -d "{\"bookingId\":\"$ID\",\"outcome\":\"succeeded\"}" $B/payments/simulate
+curl -s -H "$(auth $CT)" $B/bookings/$ID | jq -c '{status,payment}'
+curl -s -H "$(auth $PT)" $B/bookings/$ID | jq -c '{status,brief:.brief.text}'   # the practitioner sees it, with the brief
 
 # 4. pass time: minutes from NOW to END + 48 h (+ a margin), on both services
 M=$(( ( $(date -d "$END" +%s) + 48*3600 - $(date +%s) ) / 60 + 60 ))
 for p in 5102 5103; do curl -s -X POST -H "X-Internal-Key: $K" -H 'Content-Type: application/json' -d "{\"offsetMinutes\":$M}" localhost:$p/internal/v1/test/clock; done
 
 # 5. wait for the auto-complete job (took 21 s when run; allow up to about 70 s)
-until curl -s -b /tmp/client.jar $B/bookings/$ID | jq -e '.status=="Completed" and .canReview' >/dev/null; do sleep 5; done
+until curl -s -H "$(auth $CT)" $B/bookings/$ID | jq -e '.status=="Completed" and .canReview' >/dev/null; do sleep 5; done
 
 # 6. review: 201 {"reviewId":...,"status":"Published"}
-curl -s -b /tmp/client.jar -H 'Content-Type: application/json' -d "{\"bookingId\":\"$ID\",\"rating\":5,\"text\":\"Rzetelna konsultacja.\"}" $R/reviews
+curl -s -H "$(auth $CT)" -H 'Content-Type: application/json' -d "{\"bookingId\":\"$ID\",\"rating\":5,\"text\":\"Rzetelna konsultacja.\"}" $R/reviews
 for p in 5102 5103; do curl -s -X POST -H "X-Internal-Key: $K" -H 'Content-Type: application/json' -d '{"offsetMinutes":0}' localhost:$p/internal/v1/test/clock; done
 
 # 7. the published review (public, no cookie), and the pages
 curl -s $R/practitioners/$P/reviews | jq -c '.items[0]'
 for u in /programisci /gabinet/demo-celina-przykladowska; do curl -s -o /dev/null -w "$u %{http_code}\n" $W$u; done
-curl -s -b /tmp/client.jar -o /dev/null -w "/moje/rezerwacje %{http_code}\n" $W/moje/rezerwacje      # 307 to /logowanie without the cookie
+curl -s -o /dev/null -w "/moje/rezerwacje %{http_code}\n" $W/moje/rezerwacje      # 302 to /logowanie without the session cookie
 ```
 
 `GET $B/me/bookings` needs `?role=client` or `?role=practitioner` (400 without it).
@@ -213,7 +212,7 @@ curl -s -b /tmp/client.jar -o /dev/null -w "/moje/rezerwacje %{http_code}\n" $W/
 4. `/admin/ksiega`: the ledger (download as CSV). For a 250,00 zł booking refunded 100,00 zł: `ClientCharge` 25000, `Refund` 10000, `PlatformFee` 2250, `PractitionerPayout` 12750 (grosz). The payout row appears after Booking's payout job (every 60 s). `/admin/opinie` is the review-moderation list.
 
 ### J7 A foreign origin is refused
-Automated only: a state-changing request through the web origin with a foreign `Origin` header, or `Sec-Fetch-Site: cross-site`, gets `403` with code `cross_site_request` and creates nothing. Run `pnpm --dir tests/e2e test -- --grep J7`.
+Automated only: the sign-in POST to the web origin with a foreign `Origin` header, or `Sec-Fetch-Site: cross-site`, gets `403` with code `cross_site_request` and creates nothing. Run `pnpm --dir tests/e2e test -- --grep J7`.
 
 ## 4. Other pages
 
@@ -248,9 +247,8 @@ done
 |---|---|---|
 | .NET build and unit/contract tests | `dotnet build -warnaserror && dotnet test --filter "tier!=integration"` | .NET 10 SDK |
 | .NET integration tier | `dotnet test --filter "tier=integration"` | Docker (Testcontainers starts PostgreSQL 17); CI also starts the real auth service image for the auth contract suite (`AUTH_BASE_URL`) |
-| Web | `pnpm --dir web lint`, `typecheck`, `test`, `build` | pnpm, Node 22 |
-| End to end | `pnpm --dir tests/e2e install --frozen-lockfile`, then `pnpm --dir tests/e2e exec playwright install chromium` once, then `pnpm --dir tests/e2e test` (Next, the default) or `HOST=blazor pnpm --dir tests/e2e test` (the Blazor host on :3001; `BASE_URL` overrides the address) | a running fake profile (section 1) |
-| Parity of the two hosts | `node scripts/check-parity.mjs` (report), `CUTOVER_GATE=1 node scripts/check-parity.mjs` (the cutover gate), `PARITY_STRICT=1` makes a skipped Blazor journey step a failure | Node |
+| Web host | part of the unit tier: `dotnet test tests/Gabinety.Web.Tests` (host, component and render-mode tests, no network) | .NET 10 SDK |
+| End to end | `pnpm --dir tests/e2e install --frozen-lockfile`, then `pnpm --dir tests/e2e exec playwright install chromium` once, then `pnpm --dir tests/e2e test` (the web host on :3000; `E2E_WEB_URL` overrides the address) | a running fake profile (section 1) |
 | Memory per Blazor circuit | `ONLY_CIRCUITS=1 scripts/measure-performance.sh` (publishes a Release host, opens N interactive pages, reads the process memory; `docs/operations/PERFORMANCE.md`) | the fake profile, `pnpm --dir tests/e2e install`, Chromium |
 | Assistant evals (fake model) | part of the unit tier: `dotnet test tests/Gabinety.Assistant.Tests --filter "FullyQualifiedName~Evals"` | .NET |
 | Assistant evals (live model) and live smoke | `EVAL_LIVE=1 dotnet test tests/Gabinety.Assistant.Tests --filter "tier=live"`, `scripts/smoke-llm.sh` | owner's machine, a real model, **spends credits** (see `evals/README.md`) |
@@ -259,14 +257,13 @@ Results measured:
 
 - `dotnet build -warnaserror`: `Build succeeded. 0 Warning(s) 0 Error(s)`.
 - `dotnet test --filter "tier!=integration"`: all projects passed (Llm 91, Architecture 43, Scheduling 10, Billing 36, Assistant 152 passed and 2 skipped, Ranking 14, Integration (unit tier) 123, Directory 355, Reputation 239, Booking 631), 1 min 10 s.
-- `pnpm --dir web`: lint, typecheck, build exit 0; tests `Test Files 65 passed (65)`, `Tests 614 passed (614)`.
 - `pnpm --dir tests/e2e test` against the fresh fake profile: `18 passed (2.9m)` (harness, J1 to J7).
 - Evals with the fake model: `Passed! - Failed: 0, Passed: 19, Skipped: 2`.
 
 End-to-end details:
 
 - Chromium at a fixed path (sandboxes, some CI images): `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`. Traces off: `--trace off`. Pick journeys: `pnpm --dir tests/e2e test -- --grep "J3|J4"`.
-- `HOST=blazor`: the journeys run against the Blazor host. A step that needs a page its port branch has not merged yet is **skipped**, with `not ported yet: <route> (owner <branch>)` as the reason; the skip goes away by itself when the route exists. Interactive Blazor pages are entered with `gotoInteractive`/`watchCircuit` (`tests/e2e/harness/circuit.ts`), which wait for the circuit (`StartCircuit` answered on the websocket) before anything is typed; nothing sleeps. The Blazor host has no `/api/proxy`, so the set-up and verification calls of the journeys go to the backends directly with the signed-in user's token (`harness/auth.ts`).
+- Interactive pages are entered with `gotoInteractive`/`watchCircuit` (`tests/e2e/harness/circuit.ts`), which wait for the circuit (`StartCircuit` answered on the websocket) before anything is typed; nothing sleeps. The web host has no `/api/proxy`, so the set-up and verification calls of the journeys go to the backends directly with the signed-in user's token (`harness/auth.ts`).
 - The run waits for the services and for the seeder to finish (section 1; up to `E2E_WAIT_SECONDS`, `E2E_SEEDER_WAIT_SECONDS`; `E2E_WAIT_FOR_SEEDER=0` skips it on a profile that has been seeded already).
 - The journeys write data (J3 adds three reviews to Celina Przykładowska and then she no longer shows "Nowy"). CI throws its stack away. On a long-lived local profile run with `E2E_RESEED=1`: after each journey that wrote data the harness removes the `demo-` data and seeds again (minutes per run), so the next run starts clean. Without it a second full run can fail J3 ("start from the seeded profile with no reviews"); restart the profile or reseed (section 1) first.
 - `scripts/smoke-llm.sh` makes ONE real model call. It refuses when `CI` is set or `Llm__Provider=Fake` (printed `smoke-llm: refusing to run when CI is set ...` and `smoke-llm: Llm:Provider is Fake; a smoke run needs a real model.`, exit 2).
@@ -297,7 +294,7 @@ What Docker is for in this repository:
 
 - **PostgreSQL** in the default profile (above), and in `deploy/fly/postgres.fly.toml` for staging (one instance, five databases from `deploy/fly/init-databases.sql`).
 - **Testcontainers** in the integration tier of the tests (PostgreSQL 17); without a Docker daemon those tests fail with `DockerUnavailableException: Docker is either not running or misconfigured`.
-- **Images**: `src/Gabinety.{Directory,Booking,Reputation,Assistant}/Dockerfile` and `web/Dockerfile`, checked in CI (`docker-build` jobs, `scripts/check-docker-image.sh <image>`: non-root, `/alive`, `Europe/Warsaw`). The real auth service is run from its pinned image in CI and deployed with `deploy/fly/authservice.fly.toml` (`docs/operations/AUTH.md`).
+- **Images**: `src/Gabinety.{Directory,Booking,Reputation,Assistant}/Dockerfile` and `src/Gabinety.Web/Dockerfile`, checked in CI (`docker-build` jobs, `scripts/check-docker-image.sh <image>`: non-root, `/alive`, `Europe/Warsaw`). The real auth service is run from its pinned image in CI and deployed with `deploy/fly/authservice.fly.toml` (`docs/operations/AUTH.md`).
 - **Deploy** configuration for Fly.io: `deploy/fly/*`.
 
 Not needed for any of sections 1 to 6.
@@ -313,6 +310,8 @@ Accounts and secrets are not something this repository can create (T-09.01): the
 - Click-through by hand in a browser: the steps in section 3 are taken from the Playwright journeys, which pass (18 of 18), not from a person following this text. The J3 path was later followed on a fresh checkout with `curl` only (see "Walkthrough record"); the clicking itself, the Polish button names and the page rendering in a real browser (including the client-loaded review list on the public profile) were still not done by a person.
 
 ## Walkthrough record
+
+*A historical record of 2026-11-18, when the web app was still the Next.js one (`web/`, retired by the cutover of 2026-11-22): the commands and URLs below are what ran then, not what to type now.*
 
 Cold-start check of this guide (T-08.06), by a fresh session that followed the guide and read no other source until it had to (the curl calls were then taken from `tests/e2e/harness`, see the first finding).
 

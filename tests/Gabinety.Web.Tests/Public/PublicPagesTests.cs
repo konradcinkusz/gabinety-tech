@@ -358,7 +358,7 @@ public class SeoEndpointsTests
     }
 
     [Fact]
-    public async Task Robots_has_the_rules_of_the_Next_app_and_points_at_the_sitemap()
+    public async Task Robots_has_the_crawler_rules_and_points_at_the_sitemap()
     {
         await using var web = PublicSupport.Host();
         var page = await web.NewBrowser().GetAsync("/robots.txt");
@@ -370,12 +370,10 @@ public class SeoEndpointsTests
     }
 
     [Fact]
-    public void The_disallowed_paths_are_exactly_those_of_the_Next_app()
+    public void The_disallowed_paths_are_the_private_areas_and_the_api()
     {
-        // web/src/lib/seo/sitemap.ts DISALLOWED_PATHS: the two hosts tell a crawler the same thing.
-        var ts = File.ReadAllText(Path.Combine(Repo.Web, "..", "..", "web", "src", "lib", "seo", "sitemap.ts"));
-        var listed = System.Text.RegularExpressions.Regex.Match(ts, @"DISALLOWED_PATHS = \[(.*?)\]").Groups[1].Value.Split(',').Select(s => s.Trim().Trim('"')).ToArray();
-        Assert.Equal(listed, Gabinety.Web.Hosting.SeoContent.DisallowedPaths);
+        // pinned as a literal since the cutover (it was compared with the Next.js list in web/src/lib/seo/sitemap.ts, which went with web/)
+        Assert.Equal(["/moje", "/gabinet-programisty", "/admin", "/rezerwacja", "/checkout", "/api"], Gabinety.Web.Hosting.SeoContent.DisallowedPaths);
     }
 }
 

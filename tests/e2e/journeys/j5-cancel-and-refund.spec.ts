@@ -1,5 +1,4 @@
 import { expect, test } from "../harness/fixtures";
-import { requirePorted } from "../harness/parity";
 import { restoreClock } from "../harness/clock";
 import { resetAndReseed } from "../harness/demo-data";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
@@ -32,7 +31,6 @@ test.describe("J5 cancel: refund early, none late", () => {
   });
 
   test("cancelling more than 24 h ahead shows the refund and the payment is Refunded", async ({ page, context, clock }) => {
-    await requirePorted(page.request, "/moje/rezerwacje/00000000-0000-0000-0000-000000000000"); // HOST=blazor: skip with the owner named until the pages land (PARITY.md)
     const profile = await publicProfile(SLUG);
     const offering = profile.offerings[0];
     await registerDemoUser(context, uniqueDemoName("j5-early"));
@@ -61,7 +59,6 @@ test.describe("J5 cancel: refund early, none late", () => {
   });
 
   test("cancelling inside 24 h shows no refund and the payment is unchanged", async ({ page, context, clock }) => {
-    await requirePorted(page.request, "/moje/rezerwacje/00000000-0000-0000-0000-000000000000"); // HOST=blazor: skip with the owner named until the pages land (PARITY.md)
     const profile = await publicProfile(SLUG);
     const offering = profile.offerings[0];
     await registerDemoUser(context, uniqueDemoName("j5-late"));

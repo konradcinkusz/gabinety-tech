@@ -143,7 +143,7 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/regulamin` | Anonymous | all | legal text (embedded markdown) |
 | Web | PAGE | `/polityka-prywatnosci` | Anonymous | all | legal text (embedded markdown) |
 | Web | GET | `/sitemap.xml` | Anonymous | all | approved practitioners and indexable categories; 503 when the Directory does not answer |
-| Web | GET | `/robots.txt` | Anonymous | all | same rules as the Next.js app |
+| Web | GET | `/robots.txt` | Anonymous | all | the rules of the retired Next.js app (the sitemap and robots of ADR-0010) |
 | Web | PAGE | `/logowanie` | Anonymous | all | sign-in form (the POST is handled by the page, antiforgery) |
 | Web | PAGE | `/logowanie/kod` | Anonymous | all | second step of a two-factor sign-in; needs the sealed `gt_2fa` challenge cookie, else back to `/logowanie` |
 | Web | PAGE | `/rejestracja` | Anonymous | all | registration form (the POST is handled by the page, antiforgery) |

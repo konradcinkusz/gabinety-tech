@@ -61,7 +61,7 @@ if [ "${ONLY_CIRCUITS:-0}" = 1 ]; then
 fi
 
 for u in http://localhost:5100 http://localhost:5101 http://localhost:5102 "$WEB_URL"; do
-  path=/health; [ "$u" = "$WEB_URL" ] && path=/api/health
+  path=/health
   [ "$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$u$path" || true)" = 200 ] || { say "FAIL: $u$path is not healthy; start the stack with scripts/perf-stack.sh"; exit 1; }
 done
 approved=$(curl -s "http://localhost:5101/api/v1/sitemap" | jq '.practitioners | length')
@@ -75,7 +75,7 @@ say "approved practitioners in the Directory: $approved"
   echo "\"cpu\": \"$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ //')\", \"cores\": $(nproc), \"memoryGiB\": $(awk '/MemTotal/ {printf "%.1f", $2/1048576}' /proc/meminfo),"
   echo "\"kernel\": \"$(uname -sr)\", \"dotnet\": \"$(dotnet --version 2>/dev/null || echo n/a)\", \"node\": \"$(node --version)\","
   echo "\"postgres\": \"$(psql -h "${PGHOST:-127.0.0.1}" -U "${PGUSER:-postgres}" -tAc 'show server_version' 2>/dev/null || echo n/a)\","
-  echo "\"dbProfile\": \"$DB_PROFILE\", \"approvedPractitioners\": $approved, \"webUrl\": \"$WEB_URL\", \"webMode\": \"next start (production build)\","
+  echo "\"dbProfile\": \"$DB_PROFILE\", \"approvedPractitioners\": $approved, \"webUrl\": \"$WEB_URL\", \"webMode\": \"Blazor host, Release publish, Production\","
   echo "\"durationSeconds\": $DURATION, \"concurrency\": $CONC, \"lighthouse\": \"$LIGHTHOUSE_VERSION\""
   echo "}"
 } > "$OUT/environment.json"
@@ -128,7 +128,7 @@ fi
 if [ "${BLAZOR_CIRCUITS:-0}" = 1 ]; then circuits || say "Blazor circuit measurement failed (the other rows stand)"; fi
 
 # the run is valid only if the stack stayed up to the end (a database that died mid-run once left cached pages answering 200 for a while)
-for u in http://localhost:5101/api/v1/sitemap http://localhost:5102/health "$WEB_URL/api/health"; do
+for u in http://localhost:5101/api/v1/sitemap http://localhost:5102/health "$WEB_URL/health"; do
   [ "$(curl -s -o /dev/null -w '%{http_code}' -m 5 "$u" || true)" = 200 ] || { say "INVALID RUN: $u does not answer 200 after the measurement"; exit 1; }
 done
 node "$ROOT/scripts/perf/report.mjs" "$OUT"

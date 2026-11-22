@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# F-03 (T-10.10): the private apps of deploy/estate.conf stay private in the committed config, and the web BFF (the only caller from outside the backends) reaches them over
+# F-03 (T-10.10): the private apps of deploy/estate.conf stay private in the committed config, and the web host (the only caller from outside the backends) reaches them over
 # the private network: Backend__Directory/Booking/Reputation = <app>.internal:8080, Backend__Assistant = <app>.flycast. Also F-10/F-11: https Site__BaseUrl and the identity settings are in the
 # deployed templates. No network, no secrets.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0; bad() { echo "FAIL: $*" >&2; fail=1; }
-web=deploy/fly/web.fly.toml
-# both frontends (the Next BFF and, from the cutover, the Blazor host) reach the private apps the same way
-for web_cfg in "$web" deploy/fly/web-blazor.fly.toml; do
+web=deploy/fly/web-blazor.fly.toml
+# the web host reaches the private apps over the private network
+for web_cfg in "$web"; do
   for k in directory booking reputation; do
     grep -Eq "^[[:space:]]*Backend__${k^} = \"http://gabinety-${k}-staging\.internal:8080\"" "$web_cfg" || bad "$web_cfg: Backend__${k^} must be http://gabinety-${k}-staging.internal:8080"
   done
@@ -23,7 +23,7 @@ while read -r key _ _ _ _ _ _ _ _ network; do
 done < deploy/estate.conf
 # the only public apps are the three of SPEC 4.3
 pub="$(awk '!/^#/ && NF && $1 != "shared" && $NF == "public" {print $1}' deploy/estate.conf | sort | tr '\n' ' ')"
-[ "$pub" = "authservice booking web " ] || bad "public apps in deploy/estate.conf are '$pub', expected 'authservice booking web' (SPEC 4.3)"
+[ "$pub" = "authservice booking web-blazor " ] || bad "public apps in deploy/estate.conf are '$pub', expected 'authservice booking web-blazor' (SPEC 4.3; the web row of the estate is web-blazor since the cutover)"
 # F-10 / F-11 (T-10.16): the settings the code cannot supply for itself stay in the deployed templates: https site URL (the session cookies are Secure only then) and,
 # on every app that validates tokens, an https authority and the audience (the services also refuse to start without them, Gabinety.ServiceDefaults.Edge).
 grep -Eq '^[[:space:]]*Site__BaseUrl = "https://' "$web" || bad "$web: Site__BaseUrl must be an https URL (cookies are Secure only then)"

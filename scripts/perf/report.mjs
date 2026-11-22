@@ -33,7 +33,7 @@ if (c1 && c20) {
   rows.push({ id: "category-ttfb", row: "Category page time to first byte, cached, p75", tool: "scripts/perf/load.mjs", command: `${commands["category-c1"]}  |  ${commands["category-c20"]}`,
     metric: "p75 ttfb ms (worse of 1 and 20 clients)", value: worst, unit: "ms", target: 800, verdict: bad ? "invalid" : worst <= 800 ? "pass" : "miss",
     detail: { unloaded: c1.ttfbMs, loaded20: c20.ttfbMs, rpsUnloaded: c1.rps, rpsLoaded20: c20.rps },
-    note: "local loopback to the production build (`next start`), NOT from outside and NOT staging" });
+    note: "local loopback to the Release build of the Blazor host (Production), NOT from outside and NOT staging" });
 } else rows.push({ id: "category-ttfb", row: "Category page time to first byte, cached, p75", tool: "-", metric: "p75 ttfb ms", value: null, target: 800, verdict: "not measured", note: "no raw result" });
 
 const lh = readdirSync(`${out}/raw`).filter((f) => /^lighthouse-\d+\.json$/.test(f)).map((f) => JSON.parse(readFileSync(`${out}/raw/${f}`, "utf8")));

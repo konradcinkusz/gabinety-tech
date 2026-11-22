@@ -8,7 +8,7 @@
 # app "*" = every app below; "backends" = the four backend services (directory, booking, reputation, assistant: the keys read by ServiceDefaults and ServiceDefaults.Edge).
 # The scan: every key the code of an app reads (Configuration["A:B"], GetConnectionString("x"), GetValue<T>("A:B")) must be listed here, so a new key cannot arrive unclassified.
 # Keys read as a section (Internal:Callers:<Caller>, Internal:Keys:<Callee>) are listed one row per caller or callee: their evidence is the section name.
-# authservice is a pinned third-party image (its own config is in its fly.toml and secrets.map rows) and the Next.js web app is retired: neither is scanned.
+# authservice is a pinned third-party image (its own config is in its fly.toml and secrets.map rows) (not scanned); the Next.js app is gone (cutover, ADR-0010).
 
 backends      Identity:Authority                       required    the JWT issuer every service validates against (CONTRACTS 10.2)
 backends      Identity:Audience                        optional    default "gabinety"; named in every toml anyway
@@ -17,7 +17,7 @@ backends      Internal:EdgeHeaders                     optional
 backends      Internal:EnforceKeyStrength              optional
 backends      Internal:RejectPublicEdge                optional    F-03 code guard; the Assistant sets it false on purpose (flycast)
 backends      RateLimit:PerMinute                      optional
-backends      RateLimit:TrustedProxyKey                optional    one value on web and every backend (secrets.map)
+backends      RateLimit:TrustedProxyKey                optional    one value on web-blazor and every backend (secrets.map)
 backends      Database:Provider                        required    PostgreSQL when deployed
 backends      GABINETY_FAKE                            fake-only   the fake profile switch
 

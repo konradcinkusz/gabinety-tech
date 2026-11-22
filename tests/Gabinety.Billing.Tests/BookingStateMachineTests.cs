@@ -63,10 +63,13 @@ public class BookingStateMachineTests
     [Fact]
     public void Terminal_statuses_accept_nothing()
     {
-        S[] terminal = [S.CancelledByClient, S.LateCancelledByClient, S.CancelledByPractitioner, S.Expired, S.Completed, S.ClientNoShow, S.Resolved];
+        S[] terminal = [S.CancelledByClient, S.LateCancelledByClient, S.CancelledByPractitioner, S.Expired, S.ClientNoShow, S.Resolved];
         foreach (var from in terminal)
             foreach (var trigger in Enum.GetValues<T>())
                 Assert.False(BookingStateMachine.Next(from, trigger, Start, Early).Allowed);
+        // Completed accepts one thing: the client's dispute (the caller bounds it by start + 72 h, ADR proposal 0011)
+        foreach (var trigger in Enum.GetValues<T>().Where(t => t != T.ClientDisputes))
+            Assert.False(BookingStateMachine.Next(S.Completed, trigger, Start, Early).Allowed);
     }
 
     [Fact]

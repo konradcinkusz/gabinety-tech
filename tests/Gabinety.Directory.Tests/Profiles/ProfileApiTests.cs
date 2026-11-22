@@ -24,12 +24,27 @@ public sealed class FakeEmail : IEmailVerifiedLookup
     public Task<bool> IsVerifiedAsync(string bearerToken, CancellationToken ct) => Task.FromResult(Verified);
 }
 
+/// <summary>The Booking double of the suspension and erasure cascade: records the calls, can fail, and can look at the world at the moment of the call.</summary>
+public sealed class FakeBooking : Gabinety.Directory.Clients.IBookingClient
+{
+    public readonly List<Guid> Calls = [];
+    public bool Down;
+    public Func<Guid, Task>? AtCall;
+    public async Task CancelFutureBookingsAsync(Guid practitionerId, CancellationToken ct)
+    {
+        lock (Calls) Calls.Add(practitionerId);
+        if (AtCall is not null) await AtCall(practitionerId);
+        if (Down) throw new Gabinety.Directory.Clients.BookingUnavailableException();
+    }
+}
+
 /// <summary>Directory host with an in-memory RSA key as its JWKS (same approach as SkeletonFactory, which is sealed) and a fake e-mail lookup.</summary>
 public class ProfileFactory : WebApplicationFactory<Program>
 {
     const string Audience = "directory-test", Issuer = "https://issuer.demo.invalid";
     readonly RSA _rsa = RSA.Create(2048);
     public FakeEmail Email { get; } = new();
+    public FakeBooking Booking { get; } = new();
     protected virtual string Provider => "InMemory";
     protected virtual string? ConnectionString => null;
 
@@ -55,6 +70,7 @@ public class ProfileFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(s =>
         {
             s.AddSingleton<IEmailVerifiedLookup>(Email);
+            s.AddSingleton<Gabinety.Directory.Clients.IBookingClient>(Booking);
             s.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, o =>
             {
                 var cfg = new OpenIdConnectConfiguration { Issuer = Issuer };

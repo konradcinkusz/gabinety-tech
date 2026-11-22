@@ -23,10 +23,11 @@ export type AdminReviewPage = { items: AdminReview[]; nextCursor?: string | null
 export const REVIEW_STATUSES = ["Held", "Published", "Rejected"] as const satisfies readonly ReviewStatus[];
 export const REASONS = ["spam", "abuse", "personal_data", "off_topic", "threat"] as const;
 export const PAGE_LIMIT = 20;
+export const REASON_MIN = 10;
 export const REASON_MAX = 500;
 
-/** The API wants a reason of 1 to 500 characters after trimming. */
-export const reasonProblem = (text: string): "invalid" | null => (text.trim().length >= 1 && text.trim().length <= REASON_MAX ? null : "invalid");
+/** The API wants a reason of 10 to 500 characters after trimming. */
+export const reasonProblem = (text: string): "invalid" | null => (text.trim().length >= REASON_MIN && text.trim().length <= REASON_MAX ? null : "invalid");
 
 export type DecisionResult = { ok: true } | { ok: false; status: number; code: string };
 const BASE = "/api/proxy/reputation/api/v1";

@@ -101,7 +101,6 @@ public class NotificationSchedulingTests
     [Theory]
     [InlineData(BookingTrigger.ClientCancels, 72)]          // CancelledByClient
     [InlineData(BookingTrigger.ClientCancels, 5)]           // LateCancelledByClient: no review either
-    [InlineData(BookingTrigger.PractitionerCancels, 72)]
     public async Task A_cancellation_removes_the_unsent_reminders_and_review_request_and_keeps_a_sent_confirmation(BookingTrigger trigger, int startInHours)
     {
         using var h = new CreateHost();
@@ -114,6 +113,30 @@ public class NotificationSchedulingTests
         Assert.Equal(2, rows.Count);
         Assert.All(rows, r => Assert.Equal(NotificationKind.BookingConfirmed, r.Kind));
         Assert.NotNull(rows.Single(r => r.ToUserId == Client).SentAt);
+    }
+
+    [Fact]
+    public async Task A_practitioner_cancel_also_removes_the_unsent_rows_and_tells_the_client_with_Cancelled_due_now()
+    {
+        using var h = new CreateHost();
+        var id = await ConfirmedWithRows(h, TimeSpan.FromHours(72));
+        await MarkSent(h, id, NotificationKind.BookingConfirmed, Client);
+
+        Assert.True((await Fee.Apply(h, id, BookingTrigger.PractitionerCancels)).Applied);
+
+        var rows = await Rows(h, id);
+        Assert.Equal([NotificationKind.BookingConfirmed, NotificationKind.BookingConfirmed, NotificationKind.Cancelled], rows.Select(r => r.Kind).Order());
+        var cancelled = rows.Single(r => r.Kind == NotificationKind.Cancelled);
+        Assert.Equal((Client, h.Clock.GetUtcNow(), null), (cancelled.ToUserId, cancelled.DueAt, cancelled.SentAt));
+    }
+
+    [Fact]
+    public async Task A_cancellation_by_the_client_sends_the_client_no_Cancelled_notification()
+    {
+        using var h = new CreateHost();
+        var id = await ConfirmedWithRows(h, TimeSpan.FromHours(72));
+        Assert.True((await Fee.Apply(h, id, BookingTrigger.ClientCancels)).Applied);
+        Assert.DoesNotContain(NotificationKind.Cancelled, await Kinds(h, id));
     }
 
     [Fact]

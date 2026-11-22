@@ -20,12 +20,14 @@ primary_region = "fra"
   # Authservice is public (it is the JWT issuer): the same URL the web app and every validator use.
   Identity__Authority = "https://<authservice-public-host>"
   Identity__Audience = "gabinety"
+  Backend__Booking = "http://gabinety-booking-staging.internal:8080"   # suspension and erasure ask Booking to cancel the future bookings (ADR-0012)
   # Optional: Directory__MeetingHosts__0 etc. (CONTRACTS 10.3); defaults apply when unset.
   # Ranking__EffectiveFrom and the fee/ranking constants of CONTRACTS 9 are the owner's: not set here, the code defaults apply (D-17).
 
 # Secrets (NOT here), set once with `fly secrets set --app gabinety-directory-staging`:
 #   ConnectionStrings__directorydb  (postgres at gabinety-postgres-staging.internal:5432, database directorydb, its own role)
 #   Internal__Callers__Booking, Internal__Callers__Reputation   (one key per caller, never shared; the callers hold theirs as Internal__Keys__Directory; F-03)
+#   Internal__Keys__Booking   (the key Directory sends to Booking for the cancellation of a suspended practitioner's bookings; F-03, ADR-0012)
 #   optional Internal__Callers__Owner                            (the owner's key for the RUNBOOK 8 erasure hook)
 
 [http_service]

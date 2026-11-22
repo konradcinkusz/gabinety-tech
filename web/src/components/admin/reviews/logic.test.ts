@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { REASON_MAX, reasonProblem, runDecision } from "./api";
+import { REASON_MAX, REASON_MIN, reasonProblem, runDecision } from "./api";
 import { cursorOf, statusOf } from "./server";
 
-describe("reasonProblem: the API wants 1 to 500 characters after trimming", () => {
-  it.each([["a", null], ["  x  ", null], ["a".repeat(REASON_MAX), null], ["", "invalid"], ["   ", "invalid"], ["a".repeat(REASON_MAX + 1), "invalid"]])(
+describe("reasonProblem: the API wants 10 to 500 characters after trimming, as for practitioner verification", () => {
+  it.each([["a".repeat(REASON_MIN), null], ["  Spam reklamowy  ", null], ["a".repeat(REASON_MAX), null], ["a".repeat(REASON_MIN - 1), "invalid"], ["  krótko  ", "invalid"], ["", "invalid"], ["   ", "invalid"], ["a".repeat(REASON_MAX + 1), "invalid"]])(
     "%j -> %s", (raw, out) => expect(reasonProblem(raw)).toBe(out));
 });
 describe("statusOf / cursorOf", () => {

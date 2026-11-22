@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Gabinety.Reputation.Clients;
+using Gabinety.Reputation.Jobs.SummaryPush;
 using Gabinety.Reputation.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -91,6 +92,8 @@ sealed class ReviewsHost : WebApplicationFactory<Program>
     readonly RSA _rsa = RSA.Create(2048);
     public FakeBooking Booking { get; } = new();
     public ReviewsClock Clock { get; } = new();
+    /// <summary>Stands in for Directory: records the pushes the job makes (the real client has no address here).</summary>
+    public RecordingReputationClient Directory { get; } = new();
     public ReviewsLogSink Logs { get; } = new();
     public Dictionary<string, string?> Settings { get; } = new();
 
@@ -119,6 +122,8 @@ sealed class ReviewsHost : WebApplicationFactory<Program>
             s.RemoveAll<IBookingClient>();
             s.AddSingleton<IBookingClient>(new BookingClient(
                 new HttpClient(Booking) { BaseAddress = new Uri(FakeBooking.BaseUrl) }, FakeBooking.Key, retryDelay: TimeSpan.Zero));
+            s.RemoveAll<IDirectoryReputationClient>();
+            s.AddSingleton<IDirectoryReputationClient>(Directory);
             s.RemoveAll<TimeProvider>();
             s.AddSingleton<TimeProvider>(Clock);
             s.AddLogging(b => b.SetMinimumLevel(LogLevel.Trace).AddProvider(Logs));

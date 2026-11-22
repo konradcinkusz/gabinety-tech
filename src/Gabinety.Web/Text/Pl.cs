@@ -21,6 +21,8 @@ public static class Pl
     public static class A11y
     {
         public const string SkipToContent = "Przejdź do treści", Flash = "Komunikaty", Pagination = "Paginacja", PreviousPage = "Poprzednia strona", NextPage = "Następna strona";
+        /// <summary>Read before a field error by a screen reader (the error text itself is not colour only).</summary>
+        public const string ErrorPrefix = "Błąd:";
     }
 
     public static class Errors

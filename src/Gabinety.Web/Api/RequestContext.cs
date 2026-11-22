@@ -12,6 +12,8 @@ public static class RequestContext
 {
     public static readonly HttpRequestOptionsKey<string> AccessToken = new("gabinety.access-token");
     public static readonly HttpRequestOptionsKey<string> VisitorAddress = new("gabinety.visitor-address");
+    /// <summary>The attempt budget of ONE request, for the calls SPEC 5.1 gives more than the 5 s of a read (the payment provider call of a booking: 10 s; the assistant: 35 s). Read by <see cref="ApiResilience"/>.</summary>
+    public static readonly HttpRequestOptionsKey<TimeSpan> Timeout = new("gabinety.timeout");
 }
 
 /// <summary>

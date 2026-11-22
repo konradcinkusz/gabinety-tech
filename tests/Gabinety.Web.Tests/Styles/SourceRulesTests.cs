@@ -13,8 +13,8 @@ public partial class SourceRulesTests
     [Fact]
     public void User_facing_Polish_text_is_in_one_place_Pl_cs_and_nowhere_else()
     {
-        // SPEC 5 rule 1: no Polish string literal in a component or a class outside the one file of the surface.
-        var offenders = Repo.WebFiles("*.razor").Concat(Repo.WebFiles("*.cs")).Where(f => Repo.Rel(f) != "Text/Pl.cs")
+        // SPEC 5 rule 1: no Polish string literal in a component or a class outside the text classes of the surface (Text/*.cs, one per area).
+        var offenders = Repo.WebFiles("*.razor").Concat(Repo.WebFiles("*.cs")).Where(f => !Repo.Rel(f).StartsWith("Text/"))
             .SelectMany(f => WithoutComments(File.ReadAllText(f), f.EndsWith(".razor")).Split('\n').Select((line, i) => (f, i, line)).Where(t => Polish().IsMatch(t.line)).Select(t => $"{Repo.Rel(t.f)}:{t.i + 1}"))
             .ToList();
         Assert.True(offenders.Count == 0, "Polish text outside Text/Pl.cs: " + string.Join(", ", offenders));

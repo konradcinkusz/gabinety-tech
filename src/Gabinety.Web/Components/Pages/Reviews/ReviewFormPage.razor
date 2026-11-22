@@ -1,0 +1,97 @@
+@page "/moje/opinie/{BookingId:guid}"
+@attribute [Authorize]
+@inject ReviewsClient Reviews
+@inject NavigationManager Navigation
+@* Static server rendering, a plain form post with antiforgery. Whether a booking can be reviewed is Reputation's decision (the can-review flag led here and the service decides again): the page validates the
+   shape and maps the refusals by code. A success is a redirect with a fixed key (?sent=), so a reload never sends the review twice. The text is user free text: never logged, never shown back in a URL. *@
+
+<PageTitle>@ReviewsText.FormMetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@ReviewsText.FormTitle</h1>
+
+@if (SentKey is { } sent)
+{
+    <section class="card stack" aria-labelledby="thanks">
+        <h2 id="thanks">@ReviewsText.Done.Title</h2>
+        <div class="@("callout callout--" + (sent == "published" ? "success" : "info"))" role="status">@(sent == "published" ? ReviewsText.Done.Published : ReviewsText.Done.Held)</div>
+        <p><a href="/moje/rezerwacje">@ReviewsText.Form.Back</a></p>
+    </section>
+}
+else if (_state is "already" or "not-reviewable")
+{
+    <section class="card stack">
+        <h2>@(_state == "already" ? ReviewsText.Already.Title : ReviewsText.NotReviewable.Title)</h2>
+        <p>@(_state == "already" ? ReviewsText.Already.Body : ReviewsText.NotReviewable.Body)</p>
+        <p><a href="/moje/rezerwacje">@ReviewsText.Form.Back</a></p>
+    </section>
+}
+else
+{
+    <form method="post" @onsubmit="SubmitAsync" @formname="review" class="form" novalidate>
+        <AntiforgeryToken />
+        <p>@ReviewsText.Form.Intro</p>
+        <FormProblems Items="_problems" />
+        <fieldset class="option-group @(_ratingError is not null ? "field--invalid" : "")" aria-describedby="@(_ratingError is not null ? "rating-hint rating-error" : "rating-hint")">
+            <legend>@ReviewsText.Form.RatingLegend</legend>
+            <p class="field__hint" id="rating-hint">@ReviewsText.Form.ScaleHint</p>
+            <div class="rating-scale">
+                @for (var n = ReviewRules.RatingMin; n <= ReviewRules.RatingMax; n++)
+                {
+                    var value = n;
+                    <label class="rating-scale__option">
+                        <input type="radio" id="@("rating-" + value)" name="Model.Rating" value="@value" checked="@(Model!.Rating == value)" />
+                        <span aria-hidden="true">@value</span>
+                        <span class="sr-only">@string.Format(ReviewsText.Form.RatingOption, value)</span>
+                    </label>
+                }
+            </div>
+            @if (Model!.Rating is >= ReviewRules.RatingMin and <= ReviewRules.RatingMax) {<p class="field__hint">@string.Format(ReviewsText.Form.RatingPreview, ReviewRules.Word(Model.Rating.Value))</p>}
+            @if (_ratingError is not null) {<p class="field__error" id="rating-error"><span class="sr-only">@Pl.A11y.ErrorPrefix </span>@_ratingError</p>}
+        </fieldset>
+        <CounterTextArea Id="text" Name="Model.Text" Label="@ReviewsText.Form.TextLabel" Hint="@ReviewsText.Form.TextHint" Value="@Model!.Text" Rows="6" CounterFormat="@ReviewsText.Form.Counter"
+                         Error="@_textError" Autofocus="@(_problems.Count == 1 && _ratingError is null)" />
+        @if (_failure is not null) {<div class="callout callout--danger" role="alert" data-testid="review-error"><p>@ReviewRules.FailureText(_failure)</p></div>}
+        <div class="form-actions">
+            <button type="submit" class="btn btn--primary">@ReviewsText.Form.Submit</button>
+            <a class="btn btn--ghost" href="/moje/rezerwacje">@ReviewsText.Form.Back</a>
+        </div>
+    </form>
+}
+
+@code {
+    [Parameter] public Guid BookingId { get; set; }
+    /// <summary><c>?sent=published|held</c>: what the redirect after a successful post says (a fixed set of keys; nothing from the query is rendered).</summary>
+    [SupplyParameterFromQuery(Name = "sent")] public string? SentParam { get; set; }
+    [SupplyParameterFromForm(FormName = "review")] ReviewFormModel? Model { get; set; }
+
+    public sealed class ReviewFormModel { public int? Rating { get; set; } public string? Text { get; set; } }
+
+    string? SentKey => SentParam is "published" or "held" ? SentParam : null;
+
+    string? _state, _ratingError, _textError;
+    ApiFailure? _failure;
+    List<FormProblem> _problems = [];
+
+    protected override void OnInitialized() => Model ??= new();
+
+    async Task SubmitAsync()
+    {
+        _ratingError = ReviewRules.RatingProblem(Model!.Rating);
+        _textError = ReviewRules.TextProblem(Model.Text);
+        _problems = [.. (_ratingError is null ? [] : new[] { new FormProblem("rating-1", _ratingError) }), .. (_textError is null ? [] : new[] { new FormProblem("text", _textError) })];
+        _failure = null;
+        if (_problems.Count > 0) return;
+
+        var result = await Reviews.CreateAsync(BookingId, Model.Rating!.Value, Model.Text!);
+        if (result.IsOk) { Navigation.NavigateTo($"/moje/opinie/{BookingId}?sent=" + (ReviewRules.IsPublished(result.Value!.Status) ? "published" : "held")); return; }
+        var f = result.Failure!;
+        if (f.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe($"/moje/opinie/{BookingId}"))); return; }
+        switch (f.Code)
+        {
+            case "already_reviewed": _state = "already"; return;
+            case "not_reviewable": _state = "not-reviewable"; return;
+        }
+        if (f.Names("text")) { _textError = ReviewsText.Form.TextInvalid; _problems = [new FormProblem("text", _textError)]; return; }
+        _failure = f;
+    }
+}

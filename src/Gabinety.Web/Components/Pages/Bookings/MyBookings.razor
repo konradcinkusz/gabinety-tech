@@ -1,119 +1,95 @@
 @page "/moje/rezerwacje"
 @attribute [Authorize]
-@* The one interactive page of this PR: INTERACTIVE SERVER on this page only, not on the roots (ADR-0010). It is an authenticated area with controls (role, status, "show more"). It is still
-   prerendered, so the first load is HTML; OnInitializedAsync therefore runs twice (once for the HTML, once on the circuit): a read, so the double call is accepted (BLAZOR-WEB-APP section 3). *@
-@rendermode InteractiveServer
-@implements IDisposable
 @inject BookingClient Bookings
 @inject NavigationManager Navigation
+@* Static server rendering: the role is a tab (a link), the status filter is a GET form and "more" is a link with the cursor, so the list is complete HTML and a URL reopens the same view (DESIGN-CONTRACT 5.9, G-2).
+   The rows keep the structure the journeys read (J3): a list item with the title, the state and a "Szczegóły" link. *@
 
 <PageTitle>@Pl.Bookings.MetaTitle</PageTitle>
 <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
 <h1>@Pl.Bookings.Title</h1>
 
-<AuthorizeView>
-    <Authorized>
-        <div class="controls">
-            <div role="group" aria-label="@Pl.Bookings.RoleLabel" class="cluster">
-                @foreach (var r in new[] { BookingClient.ClientRole, BookingClient.PractitionerRole })
-                {
-                    <button type="button" class="@($"btn{(r == _role ? " btn--primary" : "")}")" aria-pressed="@(r == _role ? "true" : "false")" data-testid="@($"role-{r}")" @onclick="() => SetRoleAsync(r)">
-                        @(r == BookingClient.ClientRole ? Pl.Bookings.Client : Pl.Bookings.Practitioner)
-                    </button>
-                }
-            </div>
-            <label class="field field--inline">
-                @Pl.Bookings.StatusLabel
-                <select data-testid="status-filter" value="@_status" @onchange="e => SetStatusAsync(e.Value?.ToString())">
-                    <option value="">@Pl.Bookings.AllStatuses</option>
-                    @foreach (var s in BookingFormat.Statuses)
-                    {
-                        <option value="@s" selected="@(s == _status)">@BookingFormat.StatusLabel(s)</option>
-                    }
-                </select>
-            </label>
-        </div>
-
-        @if (_failure is { } failure)
+<nav class="tabs" aria-label="@BookingsText.TabsLabel">
+    <ul>
+        @foreach (var r in new[] { BookingClient.ClientRole, BookingClient.PractitionerRole })
         {
-            if (failure.IsUnauthenticated)
-            {
-                <Alert Variant="AlertVariant.Danger" TestId="bookings-error">@Pl.Bookings.SignedOut <a href="@ReturnTarget.LoginUrl("/moje/rezerwacje")">@Pl.Bookings.SignInAgain</a></Alert>
-            }
-            else
-            {
-                <Alert Variant="AlertVariant.Danger" TestId="bookings-error">@BookingFormat.FailureText(failure)</Alert>
-            }
+            <li><a class="tabs__link" href="@Href(r, _status, null)" aria-current="@(r == _role ? "page" : null)">@(r == BookingClient.ClientRole ? Pl.Bookings.Client : Pl.Bookings.Practitioner)</a></li>
         }
-        else if (_items.Count == 0 && !_loading)
-        {
-            <p class="empty-state" data-testid="bookings-empty">@Pl.Bookings.Empty</p>
-        }
+    </ul>
+</nav>
 
-        <ul class="stack bookings" data-testid="bookings">
-            @foreach (var b in _items)
+<form method="get" action="/moje/rezerwacje" class="cluster filter-form">
+    <input type="hidden" name="role" value="@_role" />
+    <div class="field field--inline">
+        <label class="field__label" for="status">@Pl.Bookings.StatusLabel</label>
+        <select id="status" name="status" class="field__control" data-testid="status-filter">
+            <option value="">@Pl.Bookings.AllStatuses</option>
+            @foreach (var s in BookingFormat.Statuses)
             {
-                <li class="card" data-testid="booking-row">
-                    <h2 class="booking__title">@b.OfferingTitle</h2>
-                    <p class="muted">@BookingFormat.OtherParty(b, _role) · @BookingFormat.When(b) · <span class="num">@Money.Pln(b.Price.AmountMinor)</span></p>
-                    <p><span class="badge">@BookingFormat.StatusLabel(b.Status)</span></p>
-                </li>
+                <option value="@s" selected="@(s == _status)">@BookingFormat.StatusLabel(s)</option>
             }
-        </ul>
-        @if (_loading) {<p role="status" data-testid="bookings-loading">@Pl.Bookings.Loading</p>}
-        @if (_next is not null && !_loading) {<button type="button" class="btn" data-testid="bookings-more" @onclick="MoreAsync">@Pl.Bookings.More</button>}
-    </Authorized>
-    <NotAuthorized>
-        @* The sign-in ended while the page was open (the cookie's expiry, a closed session): said here, because a circuit does not re-authenticate on every call. *@
-        <Alert Variant="AlertVariant.Danger" TestId="bookings-signed-out">@Pl.Bookings.SignedOut <a href="@ReturnTarget.LoginUrl("/moje/rezerwacje")">@Pl.Bookings.SignInAgain</a></Alert>
-    </NotAuthorized>
-</AuthorizeView>
+        </select>
+    </div>
+    <button type="submit" class="btn btn--secondary">@BookingsText.Filter</button>
+</form>
+
+@if (_failure is { } failure)
+{
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@BookingFormat.FailureText(failure)</p>
+        <a class="btn btn--secondary" href="@Href(_role, _status, _cursor)">@BookingsText.Retry</a>
+    </div>
+}
+else if (_page is { Items.Count: 0 })
+{
+    <div class="empty-state" data-testid="bookings-empty">
+        <h2>@BookingsText.EmptyTitle</h2>
+        <p>@(_status != "" ? BookingsText.EmptyFiltered : _role == BookingClient.ClientRole ? BookingsText.EmptyClient : BookingsText.EmptyPractitioner)</p>
+        @if (_status != "") {<a class="btn btn--secondary" href="@Href(_role, "", null)">@BookingsText.ShowAll</a>}
+        else if (_role == BookingClient.ClientRole) {<a class="btn btn--primary" href="/programisci">@BookingsText.FindPractitioner</a>}
+    </div>
+}
+else if (_page is not null)
+{
+    <ul class="stack bookings" data-testid="bookings">
+        @foreach (var b in _page.Items)
+        {
+            <li class="card booking-row" data-testid="booking-row">
+                <div class="cluster cluster--between">
+                    <h2 class="booking-row__title">@b.OfferingTitle</h2>
+                    <BookingBadge Badge="Badge.ForBooking(b.Status)" />
+                </div>
+                <p class="muted">@BookingFormat.MetaLine(BookingFormat.Name(_role == BookingClient.ClientRole ? b.Practitioner.DisplayName : b.Client?.DisplayName), BookingFormat.When(b), Money.Pln(b.Price.AmountMinor))</p>
+                <a class="booking-row__link" href="@($"/moje/rezerwacje/{b.Id}?role={_role}")">@BookingsText.Details<span class="sr-only">: @b.OfferingTitle</span></a>
+            </li>
+        }
+    </ul>
+    @if (_page.NextCursor is { } next) {<a class="btn btn--secondary" rel="next" href="@Href(_role, _status, next)">@BookingsText.Next</a>}
+}
 
 @code {
     /// <summary>The view is shareable: <c>?role=practitioner&amp;status=Confirmed</c> reopens the same listing.</summary>
     [SupplyParameterFromQuery(Name = "role")] public string? RoleParam { get; set; }
     [SupplyParameterFromQuery(Name = "status")] public string? StatusParam { get; set; }
+    [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+    [CascadingParameter] HttpContext? Http { get; set; }
 
-    readonly List<BookingViewDto> _items = [];
     string _role = BookingClient.ClientRole, _status = "";
-    string? _next;
-    bool _loading;
+    string? _cursor;
+    PageDto<BookingViewDto>? _page;
     ApiFailure? _failure;
-    CancellationTokenSource? _load; // the one load in flight: a newer request cancels it, and Dispose cancels it when the circuit ends (BLAZOR-WEB-APP section 6)
 
-    protected override Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        (_role, _status) = (BookingFormat.Role(RoleParam), BookingFormat.StatusFilter(StatusParam));
-        return LoadAsync(append: false);
+        (_role, _status, _cursor) = (BookingFormat.Role(RoleParam), BookingFormat.StatusFilter(StatusParam), string.IsNullOrWhiteSpace(CursorParam) ? null : CursorParam);
+        (_page, _failure) = (null, null);
+        var result = await Bookings.MyBookingsAsync(_role, _status, _cursor);
+        if (result.IsOk) { _page = result.Value; return; }
+        if (result.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe("/" + Navigation.ToBaseRelativePath(Navigation.Uri)))); return; }
+        _failure = result.Failure;
+        if (Http is { Response.HasStarted: false }) Http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
     }
 
-    Task SetRoleAsync(string role) { if (role == _role) return Task.CompletedTask; _role = role; return LoadAsync(append: false); }
-
-    Task SetStatusAsync(string? status) { _status = BookingFormat.StatusFilter(status); return LoadAsync(append: false); }
-
-    Task MoreAsync() => LoadAsync(append: true);
-
-    async Task LoadAsync(bool append)
-    {
-        _load?.Cancel();
-        var mine = _load = new CancellationTokenSource();
-        var cursor = append ? _next : null;
-        if (!append) { _items.Clear(); _next = null; _failure = null; }
-        _loading = true;
-        try
-        {
-            var result = await Bookings.MyBookingsAsync(_role, _status, cursor, mine.Token);
-            if (mine.IsCancellationRequested) return; // a newer request owns the list
-            if (result.IsOk) { _items.AddRange(result.Value!.Items); _next = result.Value.NextCursor; }
-            else (_next, _failure) = (null, result.Failure);
-        }
-        catch (OperationCanceledException) { return; }
-        finally { if (_load == mine) _loading = false; }
-    }
-
-    public void Dispose()
-    {
-        _load?.Cancel();
-        _load?.Dispose();
-    }
+    static string Href(string role, string status, string? cursor) =>
+        "/moje/rezerwacje?role=" + role + (status.Length > 0 ? "&status=" + Uri.EscapeDataString(status) : "") + (string.IsNullOrEmpty(cursor) ? "" : "&cursor=" + Uri.EscapeDataString(cursor));
 }

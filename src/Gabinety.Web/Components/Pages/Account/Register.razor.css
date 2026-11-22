@@ -1,0 +1,13 @@
+/* The registration card is centred in the form column; the column itself is --form-width (wwwroot/app.css .container--form). */
+.auth-page { margin-inline: auto; }
+
+/* The password rules are a visible checklist, described by the password field (aria-describedby). */
+.password-rules { margin: 0; padding-inline-start: var(--space-5); }
+
+/* The show/hide control sits beside the password. It is hidden until the script enables it; the display rule must win over .btn. */
+.auth-password { display: flex; align-items: stretch; gap: var(--space-2); }
+.auth-password .field__control { flex: 1 1 auto; min-width: 0; }
+.auth-password button[hidden] { display: none; }
+
+/* The GitHub mark is decorative: it takes the text colour of the button. */
+.auth-github__mark { flex: none; width: 1.25rem; height: 1.25rem; }

@@ -1,0 +1,2 @@
+/* The card is centred in the form column; the column itself is --form-width (wwwroot/app.css .container--form). */
+.auth-page { margin-inline: auto; }

@@ -8,48 +8,67 @@
 
 <PageTitle>@Pl.Register.MetaTitle</PageTitle>
 <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
-<h1>@Pl.Register.Title</h1>
 
-@if (!_available)
-{
-    <Alert Variant="AlertVariant.Danger" TestId="register-unavailable">@Pl.Register.Unavailable</Alert>
-}
-else
-{
-    <FormSummary Problems="_problems" />
-    @if (_message is not null)
-    {
-        <Alert Variant="AlertVariant.Danger" TestId="register-error">@_message</Alert>
-    }
-    <EditForm Model="Model!" FormName="register" OnSubmit="SubmitAsync" class="form form-narrow" novalidate>
-        <input type="hidden" name="Model.TermsVersion" value="@Model!.TermsVersion" />
-        <input type="hidden" name="Model.PrivacyVersion" value="@Model!.PrivacyVersion" />
-        <div class="field @Invalid(RegisterModel.EmailId)">
-            <label class="field__label" for="@RegisterModel.EmailId">@Pl.Register.Email</label>
-            <input id="@RegisterModel.EmailId" name="Model.Email" value="@Model!.Email" class="field__control" type="email" autocomplete="email" inputmode="email" maxlength="254"
-                       aria-invalid="@AriaInvalid(RegisterModel.EmailId)" aria-describedby="@Describe(RegisterModel.EmailId)" />
-            <FieldError FieldId="@RegisterModel.EmailId" Problem="_problems.For(RegisterModel.EmailId)" />
-        </div>
-        <div class="field @Invalid(RegisterModel.PasswordId)">
-            <label class="field__label" for="@RegisterModel.PasswordId">@Pl.Register.Password</label>
-            <p class="field__hint" id="@(RegisterModel.PasswordId)-hint">@Pl.Register.PasswordHint</p>
-            <input id="@RegisterModel.PasswordId" name="Model.Password" class="field__control" type="password" autocomplete="new-password"
-                       aria-invalid="@AriaInvalid(RegisterModel.PasswordId)" aria-describedby="@Describe(RegisterModel.PasswordId, hint: true)" />
-            <FieldError FieldId="@RegisterModel.PasswordId" Problem="_problems.For(RegisterModel.PasswordId)" />
-        </div>
-        <div class="field @Invalid(RegisterModel.ConsentId)">
-            <label class="option" for="@RegisterModel.ConsentId">
-                <input type="checkbox" id="@RegisterModel.ConsentId" name="Model.Consent" value="true" checked="@Model!.Consent" aria-invalid="@AriaInvalid(RegisterModel.ConsentId)" aria-describedby="@Describe(RegisterModel.ConsentId)" />
-                <span>@Pl.Register.ConsentPrefix<a href="/regulamin" title="@VersionTitle(Model!.TermsVersion)">@Pl.Register.Terms</a>@Pl.Register.ConsentAnd<a href="/polityka-prywatnosci" title="@VersionTitle(Model!.PrivacyVersion)">@Pl.Register.Privacy</a>@Pl.Register.ConsentSuffix</span>
-            </label>
-            <FieldError FieldId="@RegisterModel.ConsentId" Problem="_problems.For(RegisterModel.ConsentId)" />
-        </div>
-        <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.Register.Submit</button></div>
-    </EditForm>
-    <div class="divider"><span>@Pl.Login.Or</span></div>
-    <p><a class="btn btn--secondary" href="@GithubHref">@Pl.Login.Github</a></p>
-}
-<p>@Pl.Register.HaveAccount <a href="@ReturnTarget.LoginUrl(ReturnTarget.Safe(Redirect))">@Pl.Register.SignInLink</a></p>
+<div class="container--form auth-page">
+    <div class="card">
+        <h1>@Pl.Register.Title</h1>
+
+        @if (!_available)
+        {
+            <Alert Variant="AlertVariant.Danger" TestId="register-unavailable">@Pl.Register.Unavailable</Alert>
+        }
+        else
+        {
+            @if (ForBooking)
+            {
+                <p class="callout callout--info" data-testid="booking-context">@Pl.Register.BookingContext</p>
+            }
+
+            <FormSummary Problems="_problems" />
+            @if (_message is not null)
+            {
+                <Alert Variant="AlertVariant.Danger" TestId="register-error">@_message</Alert>
+            }
+            <EditForm Model="Model!" FormName="register" OnSubmit="SubmitAsync" class="form" novalidate>
+                <input type="hidden" name="Model.TermsVersion" value="@Model!.TermsVersion" />
+                <input type="hidden" name="Model.PrivacyVersion" value="@Model!.PrivacyVersion" />
+                <div class="field @Invalid(RegisterModel.EmailId)">
+                    <label class="field__label" for="@RegisterModel.EmailId">@Pl.Register.Email</label>
+                    <input id="@RegisterModel.EmailId" name="Model.Email" value="@Model!.Email" class="field__control" type="email" autocomplete="email" inputmode="email" maxlength="254"
+                           aria-invalid="@AriaInvalid(RegisterModel.EmailId)" aria-describedby="@Describe(RegisterModel.EmailId)" />
+                    <FieldError FieldId="@RegisterModel.EmailId" Problem="_problems.For(RegisterModel.EmailId)" />
+                </div>
+                <div class="field @Invalid(RegisterModel.PasswordId)">
+                    <label class="field__label" for="@RegisterModel.PasswordId">@Pl.Register.Password</label>
+                    <ul class="field__hint password-rules" id="@RulesId">
+                        <li>@Pl.Register.RuleLength</li>
+                        <li>@Pl.Register.RuleCase</li>
+                        <li>@Pl.Register.RuleDigit</li>
+                        <li>@Pl.Register.RuleSymbol</li>
+                    </ul>
+                    <div class="auth-password">
+                        <input id="@RegisterModel.PasswordId" name="Model.Password" class="field__control" type="password" autocomplete="new-password"
+                               aria-invalid="@AriaInvalid(RegisterModel.PasswordId)" aria-describedby="@Describe(RegisterModel.PasswordId, RulesId)" />
+                        @* Progressive enhancement: hidden here, shown by the script that adds the reveal. *@
+                        <button type="button" class="btn btn--ghost" data-enhance="reveal" data-target="#@(RegisterModel.PasswordId)" hidden>@Pl.Register.ShowPassword</button>
+                    </div>
+                    <FieldError FieldId="@RegisterModel.PasswordId" Problem="_problems.For(RegisterModel.PasswordId)" />
+                </div>
+                <div class="field @Invalid(RegisterModel.ConsentId)">
+                    <label class="option" for="@RegisterModel.ConsentId">
+                        <input type="checkbox" id="@RegisterModel.ConsentId" name="Model.Consent" value="true" checked="@Model!.Consent" aria-invalid="@AriaInvalid(RegisterModel.ConsentId)" aria-describedby="@Describe(RegisterModel.ConsentId)" />
+                        <span>@Pl.Register.ConsentPrefix<a href="/regulamin" title="@VersionTitle(Model!.TermsVersion)">@Pl.Register.Terms</a>@Pl.Register.ConsentAnd<a href="/polityka-prywatnosci" title="@VersionTitle(Model!.PrivacyVersion)">@Pl.Register.Privacy</a>@Pl.Register.ConsentSuffix</span>
+                    </label>
+                    <FieldError FieldId="@RegisterModel.ConsentId" Problem="_problems.For(RegisterModel.ConsentId)" />
+                </div>
+                <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.Register.Submit</button></div>
+            </EditForm>
+            <div class="divider"><span>@Pl.Login.Or</span></div>
+            <p><a class="btn btn--secondary auth-github" href="@GithubHref"><svg class="auth-github__mark" aria-hidden="true" focusable="false" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>@Pl.Login.Github</a></p>
+        }
+        <p>@Pl.Register.HaveAccount <a href="@ReturnTarget.LoginUrl(ReturnTarget.Safe(Redirect))">@Pl.Register.SignInLink</a></p>
+    </div>
+</div>
 
 @code {
     [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
@@ -58,11 +77,15 @@ else
 
     [SupplyParameterFromForm] RegisterModel? Model { get; set; }
 
+    const string RulesId = "register-password-rules";
+
     FormProblems _problems = new();
     string? _message;
     bool _available = true;
 
     string Back => ReturnTarget.Safe(Redirect);
+    /// <summary>A registration that continues a booking: the context line says so. Only the sanitised target is read; the query itself is never printed.</summary>
+    bool ForBooking => Back.StartsWith("/rezerwacja/", StringComparison.Ordinal);
     string GithubHref => OAuthEndpoints.StartPath + (Back == "/" ? "" : $"?{ReturnTarget.Parameter}={Uri.EscapeDataString(Back)}");
 
     protected override async Task OnInitializedAsync()
@@ -100,6 +123,7 @@ else
 
     string Invalid(string id) => _problems.For(id) is null ? "" : "field--invalid";
     string? AriaInvalid(string id) => _problems.For(id) is null ? null : "true";
-    string? Describe(string id, bool hint = false) => string.Join(' ', new[] { hint ? id + "-hint" : null, _problems.For(id) is null ? null : id + "-error" }.Where(x => x is not null)) is { Length: > 0 } d ? d : null;
+    /// <summary>The ids a control is described by: its own hint (if any) and its error (if any); null when there are none.</summary>
+    string? Describe(string id, string? hintId = null) => string.Join(' ', new[] { hintId, _problems.For(id) is null ? null : id + "-error" }.Where(x => x is not null)) is { Length: > 0 } d ? d : null;
     static string? VersionTitle(string? version) => string.IsNullOrEmpty(version) ? null : string.Format(Pl.Register.VersionTitle, version);
 }

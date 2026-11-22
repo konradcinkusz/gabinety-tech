@@ -49,6 +49,7 @@ Aplikacja: <http://localhost:3000>. Pełny przewodnik (logowanie, ścieżki, zeg
 | `Gabinety.Assistant` | asystent (model językowy) | 5104 |
 | `Gabinety.DevIdentity` | zamiennik dostawcy tożsamości | 5100 |
 | `web/` | aplikacja webowa z BFF | 3000 |
+| `src/Gabinety.Web` | port frontendu na Blazor Web App obok `web/` (propozycja ADR-0010: `docs/adr-proposals/0010-blazor-web-app-frontend.md`) | 3001 |
 
 Usługi .NET 10 (minimal API, EF Core, PostgreSQL) uruchamia Aspire AppHost. Autoryzacja: tokeny RS256 z [authservice](https://github.com/konradcinkusz/authservice). Pieniądze to `long` w groszach, czas pochodzi z `TimeProvider`.
 

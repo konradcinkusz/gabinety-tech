@@ -19,7 +19,10 @@ public partial class ArchitectureRules
         ["Gabinety.Booking"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts", "Gabinety.Billing", "Gabinety.Scheduling"],
         ["Gabinety.Reputation"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts"],
         ["Gabinety.Assistant"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge", "Gabinety.Contracts", "Gabinety.Llm"],
-        ["Gabinety.AppHost"] = [.. Services.Select(s => "Gabinety." + s)],
+        ["Gabinety.AppHost"] = [.. Services.Select(s => "Gabinety." + s), "Gabinety.Web"],
+        // ADR-0010 (proposal): the Blazor web host. The kernel and its Edge project, nothing else: the DTOs it reads are its own copies and the contract is HTTP (BLAZOR-WEB-APP section 4).
+        // The owner adds this edge to SPEC 3.2 (listed in the PR).
+        ["Gabinety.Web"] = ["Gabinety.ServiceDefaults", "Gabinety.ServiceDefaults.Edge"],
         ["Gabinety.DevIdentity"] = [], ["Gabinety.DemoSeeder"] = [], // tools/: no project reference at all
     };
 
@@ -38,6 +41,7 @@ public partial class ArchitectureRules
     {
         ["Gabinety.Billing"] = [], ["Gabinety.Scheduling"] = [], ["Gabinety.Ranking"] = [], ["Gabinety.Contracts"] = [],
         ["Gabinety.Llm"] = ["GitHub.Copilot.SDK"],
+        ["Gabinety.Web"] = [], // the ASP.NET Core shared framework only: no component library, no JS interop package, no CSS framework (BLAZOR-WEB-APP section 4)
     };
 
     /// <summary>Documented exceptions as (file under src/, member name) -> reason. Must start empty.</summary>
@@ -132,6 +136,16 @@ public partial class ArchitectureRules
             if (PackageBudget.TryGetValue(p.Name, out var pk)) bad.AddRange(p.PackageRefs.Except(pk).Select(r => $"{p.File} package {r} is over budget"));
         }
         Assert.True(bad.Count == 0, "edges outside SPEC 3.2: " + string.Join("; ", bad));
+    }
+
+    [Fact]
+    public void The_web_host_does_not_reach_a_service_or_the_contracts_or_the_SDK()
+    {
+        var web = Repo.Projects().Single(p => p.Name == "Gabinety.Web");
+        string[] forbidden = ["Gabinety.Contracts", "Gabinety.Llm", "Gabinety.Directory", "Gabinety.Booking", "Gabinety.Reputation", "Gabinety.Assistant", "Gabinety.Billing", "Gabinety.Scheduling", "Gabinety.Ranking", "Gabinety.DevIdentity"];
+        Assert.True(!web.ProjectRefs.Intersect(forbidden).Any(), $"{web.File} references {string.Join(", ", web.ProjectRefs.Intersect(forbidden))}: the web host talks to the services over HTTP (P3)");
+        Assert.Empty(web.PackageRefs);
+        Assert.Contains("Gabinety.ServiceDefaults.Edge", AllowedEdges["Gabinety.Web"]); // the origin guard lives there, outside the 400-line kernel
     }
 
     [Fact]

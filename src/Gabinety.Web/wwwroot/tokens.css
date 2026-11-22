@@ -1,0 +1,84 @@
+/* The design tokens of the web host. NEUTRAL placeholder values (ADR-0010): the real design contract (docs/ui/DESIGN-CONTRACT.md and docs/ui/tokens.css, written on branch
+   task/ui-audit) replaces THIS FILE and nothing else: same token names, or the names are mapped here. app.css and every Foo.razor.css use var(--token) only, never a colour value
+   (StyleContractTests reads them from disk). Light is the default; dark redefines the tokens and nothing else. Text pairs reach 4.5:1 in both themes (the same test). */
+:root {
+  color-scheme: light dark;
+
+  /* surface */
+  --color-bg: #ffffff;
+  --color-surface: #f5f6f8;
+  --color-surface-raised: #ffffff;
+  /* text */
+  --color-text: #15181e;
+  --color-text-secondary: #3f4756;
+  --color-text-muted: #596271;
+  /* accent: the interactive colour, its hover state, the text on it and a soft fill */
+  --color-accent: #1d4ed8;
+  --color-accent-hover: #1e40af;
+  --color-accent-contrast: #ffffff;
+  --color-accent-soft: #e8efff;
+  /* status colours with soft fills */
+  --color-success: #0f6b3d;
+  --color-success-soft: #e6f6ec;
+  --color-warning: #8a4b00;
+  --color-warning-soft: #fff4de;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+  /* lines and focus */
+  --color-border: #cfd5de;
+  --color-border-strong: #747e8f;
+  --color-focus: #1d4ed8;
+  --shadow-sm: 0 1px 2px rgb(21 24 30 / 0.08);
+  --shadow-md: 0 4px 12px rgb(21 24 30 / 0.12);
+
+  /* shape, space and layout (not theme dependent) */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-pill: 999px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --gutter: 1rem;
+  --content-width: 64rem;
+
+  /* type: system fonts only (no web fonts) */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --leading-tight: 1.25;
+  --leading-body: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f1217;
+    --color-surface: #171b22;
+    --color-surface-raised: #1d222b;
+    --color-text: #eef1f6;
+    --color-text-secondary: #c3cad6;
+    --color-text-muted: #9aa4b4;
+    --color-accent: #7aa2ff;
+    --color-accent-hover: #9bb9ff;
+    --color-accent-contrast: #0b1220;
+    --color-accent-soft: #1c2a4d;
+    --color-success: #5ad08a;
+    --color-success-soft: #12291d;
+    --color-warning: #f2b55c;
+    --color-warning-soft: #33260f;
+    --color-danger: #ff8a80;
+    --color-danger-soft: #3a1714;
+    --color-border: #2b323d;
+    --color-border-strong: #6b768a;
+    --color-focus: #9bb9ff;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 12px rgb(0 0 0 / 0.5);
+  }
+}

@@ -86,15 +86,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [directory, booking, reputation, assistant]
+        # `web-blazor` is the Blazor Web App frontend (ADR-0010 proposal), project Gabinety.Web; the Next.js image has its own job below (docker-build-web).
+        include:
+          - { service: directory, project: Directory }
+          - { service: booking, project: Booking }
+          - { service: reputation, project: Reputation }
+          - { service: assistant, project: Assistant }
+          - { service: web-blazor, project: Web }
     steps:
       - uses: actions/checkout@v4
       - name: Build the image (context = repository root)
-        run: |
-          svc="$(tr a-z A-Z <<< "${MATRIX_SERVICE:0:1}")${MATRIX_SERVICE:1}"
-          docker build -f "src/Gabinety.$svc/Dockerfile" --build-arg VCS_REF="$GITHUB_SHA" -t "gabinety-$MATRIX_SERVICE:ci" .
+        run: docker build -f "src/Gabinety.$PROJECT/Dockerfile" --build-arg VCS_REF="$GITHUB_SHA" -t "gabinety-$MATRIX_SERVICE:ci" .
         env:
           MATRIX_SERVICE: ${{ matrix.service }}
+          PROJECT: ${{ matrix.project }}
       - name: Non-root, /alive, Europe/Warsaw
         run: scripts/check-docker-image.sh "gabinety-${{ matrix.service }}:ci" ${{ matrix.service == 'assistant' && '--copilot-runtime' || '' }}
   # --- end docker-build (backend) ---

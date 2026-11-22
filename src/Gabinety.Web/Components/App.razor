@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="/" />
+    @* Tokens first (swap this one file for the design contract's token block), then the shared classes, then the scoped bundle of every Foo.razor.css. *@
+    <link rel="stylesheet" href="@Assets["tokens.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["Gabinety.Web.styles.css"]" />
+    <HeadOutlet />
+</head>
+<body>
+    @* Static server rendering is the default (ADR-0010): NO @rendermode on Routes or HeadOutlet. A page that needs interaction says @rendermode InteractiveServer itself. *@
+    <Routes />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+</html>

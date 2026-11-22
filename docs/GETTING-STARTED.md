@@ -28,6 +28,7 @@ The first run builds everything (about 1 to 2 minutes). The terminal prints only
 | Part | URL |
 |---|---|
 | Web app (open this) | http://localhost:3000 |
+| Web app, Blazor port (ADR-0010 proposal; same backends, same demo users, fewer pages) | http://localhost:3001 |
 | Dev identity (stand-in for the auth service) | http://localhost:5100 |
 | Directory | http://localhost:5101 |
 | Booking | http://localhost:5102 |

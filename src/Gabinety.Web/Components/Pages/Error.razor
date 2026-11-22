@@ -1,0 +1,10 @@
+@page "/Error"
+@attribute [AllowAnonymous]
+@layout MainLayout
+
+<PageTitle>@Pl.Errors.GenericTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<div class="callout callout--danger" role="alert">
+    <h1>@Pl.Errors.GenericTitle</h1>
+    <p>@Pl.Errors.GenericBody</p>
+</div>

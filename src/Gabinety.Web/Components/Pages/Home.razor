@@ -1,0 +1,75 @@
+@page "/"
+@attribute [AllowAnonymous]
+@inject DirectoryClient Directory
+@inject Gabinety.Web.Hosting.WebOptions Site
+@* Static server rendering: the HTML below is what a crawler and a visitor without JavaScript get. *@
+
+<PageTitle>@Pl.Home.MetaTitle</PageTitle>
+<HeadContent>
+    <meta name="description" content="@Pl.Home.MetaDescription" />
+    <link rel="canonical" href="@(Site.SiteBaseUrl + "/")" />
+    <meta property="og:title" content="@Pl.Home.MetaTitle" />
+    <meta property="og:description" content="@Pl.Home.MetaDescription" />
+    <meta property="og:url" content="@(Site.SiteBaseUrl + "/")" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pl_PL" />
+</HeadContent>
+
+<header class="page-header">
+    <h1>@Pl.Home.Title</h1>
+    <p class="lead">@Pl.Home.Lead</p>
+</header>
+
+@* A plain GET form: works without JavaScript. *@
+<form method="get" action="/programisci" role="search" aria-label="@Pl.Home.SearchRegion" class="search-form">
+    <div class="field">
+        <label for="home-q">@Pl.Home.SearchLabel</label>
+        <input id="home-q" name="q" type="text" maxlength="60" placeholder="@Pl.Home.SearchPlaceholder" autocomplete="off" />
+    </div>
+    <div><button class="btn btn--primary" type="submit">@Pl.Home.SearchButton</button></div>
+</form>
+
+<section class="section" aria-labelledby="home-categories">
+    <h2 id="home-categories">@Pl.Home.CategoriesTitle</h2>
+    @if (_problems is null)
+    {
+        <Alert Variant="AlertVariant.Danger" TestId="categories-error">@Pl.Home.CategoriesUnavailable</Alert>
+    }
+    else
+    {
+        <ul class="link-list" aria-label="@Pl.Home.CategoriesLabel" data-testid="categories">
+            @foreach (var c in _problems)
+            {
+                <li><a class="chip" href="@($"/programisci/{Uri.EscapeDataString(c.Slug)}")">@c.NamePl</a></li>
+            }
+        </ul>
+    }
+    <a href="/programisci">@Pl.Home.AllPractitioners</a>
+</section>
+
+<section class="section" aria-labelledby="home-steps">
+    <h2 id="home-steps">@Pl.Home.StepsTitle</h2>
+    <ol class="steps">
+        <li class="card"><h3>@Pl.Home.Step1Title</h3><p>@Pl.Home.Step1Body</p></li>
+        <li class="card"><h3>@Pl.Home.Step2Title</h3><p>@Pl.Home.Step2Body</p></li>
+        <li class="card"><h3>@Pl.Home.Step3Title</h3><p>@Pl.Home.Step3Body</p></li>
+    </ol>
+</section>
+
+<section class="section" aria-labelledby="home-rules">
+    <h2 id="home-rules">@Pl.Home.RulesTitle</h2>
+    <p class="prose">@Pl.Home.RulesBody</p>
+</section>
+
+@code {
+    [CascadingParameter] HttpContext? Http { get; set; }
+
+    IReadOnlyList<CategoryDto>? _problems;
+
+    // The categories are a region of the page: a failing Directory shows an error state there and the rest of the page stays (SPEC 6.5). The H1 is always rendered.
+    protected override async Task OnInitializedAsync()
+    {
+        var taxonomy = await Directory.TaxonomyAsync();
+        _problems = taxonomy.IsOk ? taxonomy.Value!.Problems : null;
+    }
+}

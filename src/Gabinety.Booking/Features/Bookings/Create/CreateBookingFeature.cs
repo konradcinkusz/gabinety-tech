@@ -7,6 +7,7 @@ using System.Text.Json;
 using Gabinety.Billing;
 using Gabinety.Booking.Clients;
 using Gabinety.Booking.Features.Slots;
+using Gabinety.Booking.Notifications;
 using Gabinety.Booking.Payments.Abstractions;
 using Gabinety.Booking.Persistence;
 using Gabinety.Contracts.Booking;

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Gabinety.Booking.Clients;
 using Gabinety.Booking.Notifications;
+using Gabinety.Booking.Persistence;
 using Gabinety.Booking.Tests.Smtp;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +35,9 @@ public class RecipientAddressTests
         public Rig(bool smtp = true)
         {
             Host.Emails[Client] = ClientAddress;
+            // Its OWN in-memory database: on the shared one another test's dispatcher would claim these rows (and this one theirs).
+            var db = "recipients-" + Guid.NewGuid().ToString("N");
+            Host.Configure = s => s.AddDbContext<BookingDbContext>(o => o.UseInMemoryDatabase(db));
             if (smtp)
             {
                 Host.Settings["Notifications:Provider"] = "Smtp";
@@ -90,12 +94,12 @@ public class RecipientAddressTests
     }
 
     [Fact]
-    public async Task Confirming_a_booking_by_payment_schedules_the_two_confirmations_two_reminders_and_the_review_request()
+    public async Task Confirming_a_booking_by_payment_schedules_the_two_confirmations_the_reminder_still_ahead_and_the_review_request()
     {
         using var t = new Rig(smtp: false);
         var id = await t.ConfirmedBooking();
         var kinds = (await t.Rows(id)).Select(n => n.Kind).Order().ToList();
-        Assert.Equal(new[] { NotificationKind.BookingConfirmed, NotificationKind.BookingConfirmed, NotificationKind.Reminder24h, NotificationKind.Reminder1h, NotificationKind.ReviewRequest }.Order(), kinds);
+        Assert.Equal(new[] { NotificationKind.BookingConfirmed, NotificationKind.BookingConfirmed, NotificationKind.Reminder1h, NotificationKind.ReviewRequest }.Order(), kinds); // the start is 22 h away: no 24 h reminder
     }
 
     [Fact]

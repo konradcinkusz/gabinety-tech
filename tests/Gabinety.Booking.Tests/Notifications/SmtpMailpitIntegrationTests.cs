@@ -57,6 +57,8 @@ public class SmtpMailpitIntegrationTests
 
         using var host = new CreateHost();
         host.Emails[Client] = ClientAddress;
+        var db = "mailpit-" + Guid.NewGuid().ToString("N"); // its own in-memory database: no other test's dispatcher may claim these rows
+        host.Configure = s => s.AddDbContext<Gabinety.Booking.Persistence.BookingDbContext>(o => Microsoft.EntityFrameworkCore.InMemoryDbContextOptionsExtensions.UseInMemoryDatabase(o, db));
         host.Settings["Notifications:Provider"] = "Smtp";
         host.Settings["Notifications:Smtp:Host"] = mailpit.Hostname;
         host.Settings["Notifications:Smtp:Port"] = mailpit.GetMappedPublicPort(1025).ToString();

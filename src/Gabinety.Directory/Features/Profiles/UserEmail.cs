@@ -1,13 +1,14 @@
 using System.Net.Mail;
 using System.Security.Claims;
 
-namespace Gabinety.ServiceDefaults;
+namespace Gabinety.Directory.Features.Profiles;
 
 /// <summary>
 /// The e-mail address of the signed-in user, read from the access token (claim <c>email</c>, always present; CONTRACTS 1, <c>docs/spikes/authservice.md</c> section 1).
+/// A service keeps its own copy of this small rule (Booking: <c>Notifications/UserEmail.cs</c>), not a shared one: the kernel is budgeted (SPEC 3.2).
 /// Personal data: a caller stores it as a snapshot where a notification needs it and never logs it. A value that is not a bare <c>local@domain</c> yields null.
 /// </summary>
-public static class UserEmail
+internal static class UserEmail
 {
     public const int MaxLength = 254;
 

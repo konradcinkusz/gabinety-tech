@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using Gabinety.Booking.Clients;
-using Gabinety.ServiceDefaults;
 
 namespace Gabinety.Booking.Notifications;
 

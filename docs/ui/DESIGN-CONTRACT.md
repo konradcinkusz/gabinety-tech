@@ -6,6 +6,7 @@ Evidence for every rule: [`UI-AUDIT.md`](UI-AUDIT.md) (finding ids G-x, P-x, F-x
 Rules of the contract (from the guide, applied):
 
 1. Plain CSS in two places: `wwwroot/app.css` (tokens, element styles, the shared classes of section 4) and one scoped `Foo.razor.css` per component. No CSS framework, no web font, no icon font, no JS.
+   **Amended 2026-11-22 (owner decision D-1, UX-005):** one first-party script is allowed, `wwwroot/enhance.js` (same origin, no dependency, under 5 KB, covered by `script-src 'self'`). It is progressive enhancement only: every page works without it, and each behaviour (live counters, a pending submit button, a modal `<dialog>` for a state that also lives in the URL, show-password, copy link, auto-submit of a filter select) has a no-script fallback that is the page as served. Elements opt out with `data-enhance="off"`. No other script, no third-party script.
 2. **Colour only through tokens.** No hex, `rgb()`, `hsl()` or named colour outside the two token blocks of `tokens.css`. A `StyleContractTests` class reads `app.css` from disk and fails on a stray colour, on a missing token, on a missing dark block, and on a missing shared class name of section 4.
 3. Light is the default; dark is `@media (prefers-color-scheme: dark)` redefining colour tokens and **nothing else**. A user switch is out of scope; `data-theme="light"` on `<html>` is the one escape hatch the token block already honours.
 4. A polish task uses the class names of section 4 or stops and asks. It does not invent one.

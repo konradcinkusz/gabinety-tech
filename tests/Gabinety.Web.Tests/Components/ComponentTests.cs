@@ -23,17 +23,20 @@ public class PresentationalComponentTests : BunitContext
         var link = cut.Find("h2 a");
         Assert.Equal(("Anna Demowska", "/gabinet/demo-anna-demowska"), (link.TextContent, link.GetAttribute("href")));
         Assert.Equal("Audyty kodu .NET i konsultacje architektury", cut.Find("p").TextContent);
-        Assert.Equal(["Zweryfikowany", "★ 4,5 (12)"], cut.FindAll("li .badge").Select(b => b.TextContent)); // P-LIST-2: one badge, the checks are on the profile
-        Assert.Contains("badge--success", cut.FindAll("li .badge")[0].ClassName);
-        Assert.Equal("Ocena 4,5 (12)", cut.FindAll("li .badge")[1].GetAttribute("aria-label"));
-        Assert.Equal("od 250,00 zł 30 min, 60 min", System.Text.RegularExpressions.Regex.Replace(cut.Find("p.cluster").TextContent.Replace('\u00A0', ' '), @"\s+", " "));
+        Assert.Equal(["Zweryfikowany"], cut.FindAll(".badge").Select(b => b.TextContent)); // P-LIST-2: one badge, the checks are on the profile
+        Assert.Contains("badge--success", cut.Find(".badge").ClassName);
+        Assert.Equal("\u2605 4,5 (12)", cut.Find(".practitioner-card__rating").TextContent); // the rating is text, not a second badge
+        Assert.Equal("Ocena 4,5 (12)", cut.Find(".practitioner-card__rating").GetAttribute("aria-label"));
+        Assert.Equal("od 250\u00A0zł", cut.Find(".practitioner-card__from").TextContent); // whole amounts: no grosz
+        Assert.Equal("30 min, 60 min", cut.Find(".practitioner-card__durations").TextContent);
+        Assert.Equal("card card--link practitioner-card", cut.Find("article").ClassName); // the whole card is the link target
     }
 
     [Fact]
     public void A_new_practitioner_is_marked_new_and_a_rating_below_the_threshold_is_not_shown()
     {
         var cut = Render<PractitionerCard>(p => p.Add(c => c.Practitioner, Sample.Card(badges: [], rating: new RatingDto(5.0, 2), isNew: true)));
-        Assert.Equal(["Nowy"], cut.FindAll("li .badge").Select(b => b.TextContent));
+        Assert.Equal(["Nowy"], cut.FindAll(".badge").Select(b => b.TextContent));
     }
 
     [Fact]

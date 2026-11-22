@@ -3,4 +3,8 @@
 .results { display: grid; gap: var(--space-4); }
 .breadcrumb { margin-bottom: var(--space-3); font-size: var(--text-sm); }
 .breadcrumb li + li::before { content: "/"; margin-right: var(--space-2); color: var(--color-text-muted); }
-.empty-state { display: grid; gap: var(--space-3); justify-items: start; }
+.result-summary { margin: 0 0 var(--space-3); }
+.result-summary__total { font-weight: 600; }
+.empty-state { display: grid; gap: var(--space-3); justify-items: start; padding: var(--space-5) 0; }
+.empty-state__title { margin: 0; font-size: var(--text-lg); }
+.empty-state p { margin: 0; color: var(--color-text-secondary); }

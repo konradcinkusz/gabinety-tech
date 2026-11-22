@@ -1,0 +1,21 @@
+.avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+    line-height: 1;
+    user-select: none;
+}
+
+.avatar--small { width: 2.25rem; height: 2.25rem; font-size: var(--text-sm); }
+.avatar--medium { width: 3rem; height: 3rem; font-size: var(--text-md); }
+.avatar--large { width: 4.5rem; height: 4.5rem; font-size: var(--text-xl); }
+
+.avatar--accent { background: var(--color-accent-soft); color: var(--color-accent-soft-text); }
+.avatar--success { background: var(--color-success-soft); color: var(--color-success); }
+.avatar--warning { background: var(--color-warning-soft); color: var(--color-warning); }
+.avatar--danger { background: var(--color-danger-soft); color: var(--color-danger); }
+.avatar--neutral { background: var(--color-surface-sunken); color: var(--color-text-secondary); }

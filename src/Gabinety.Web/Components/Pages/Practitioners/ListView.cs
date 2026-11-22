@@ -33,9 +33,28 @@ public sealed class ListView(ListState state, TaxonomyDto taxonomy, SitemapDto s
     /// The count line (F-05): it must never contradict the list. The unfiltered first page of a category is counted by the sitemap; a filtered variant or a later page has no total (the
     /// Directory pages by cursor), so its count is the page's own items only when that page is the whole result (first page, no next cursor), and is omitted otherwise.
     /// </summary>
-    public string? CountText(int itemsOnPage, bool hasNextPage) =>
-        !State.IsVariant ? (itemsOnPage == 0 && !hasNextPage ? string.Format(Pl.ListPage.Count, 0) : string.Format(Pl.ListPage.Count, Count))
-        : State.Cursor is null && !hasNextPage ? string.Format(Pl.ListPage.Count, itemsOnPage) : null;
+    public string? CountText(int itemsOnPage, bool hasNextPage) => ResultCount(itemsOnPage, hasNextPage) is { } n ? string.Format(Pl.ListPage.Count, n) : null;
+
+    /// <summary>The number the count line states, or null when the page cannot state one (see <see cref="CountText"/>).</summary>
+    public int? ResultCount(int itemsOnPage, bool hasNextPage) =>
+        !State.IsVariant ? (itemsOnPage == 0 && !hasNextPage ? 0 : Count)
+        : State.Cursor is null && !hasNextPage ? itemsOnPage : null;
+
+    /// <summary>The Polish names of the problem categories, by slug: a card shows its problems by name, and a slug the taxonomy does not know is not shown.</summary>
+    public IReadOnlyDictionary<string, string> ProblemNames { get; } = taxonomy.Problems.DistinctBy(c => c.Slug).ToDictionary(c => c.Slug, c => c.NamePl);
+
+    /// <summary>
+    /// The active narrowing filters as removable chips: each link drops that one filter and keeps the rest. The problem and the technology are the page itself (its path, heading and
+    /// breadcrumb), not a filter, so they are not chips; "Wyczyść filtry" keeps them for the same reason.
+    /// </summary>
+    public IReadOnlyList<FilterItem> ActiveChips()
+    {
+        var chips = new List<FilterItem>();
+        if (State.Duration is { } d) chips.Add(new FilterItem(string.Format(Pl.Filters.Minutes, d), State.WithDuration(null).Href(), false));
+        if (State.MaxPriceMinor is { } price) chips.Add(new FilterItem(string.Format(Pl.Filters.UpTo, ListFormat.Price(price)), State.WithMaxPrice(null).Href(), false));
+        if (!string.IsNullOrEmpty(State.Q)) chips.Add(new FilterItem(string.Format(Pl.ListPage.SearchChip, State.Q), (State with { Q = null, Cursor = null }).Href(), false));
+        return chips;
+    }
 
     /// <summary>The number of active narrowing filters: the "Filtry (2)" of the phone disclosure.</summary>
     public int ActiveFilters => (State.Problem is null ? 0 : 1) + (State.Tech is null ? 0 : 1) + (State.Duration is null ? 0 : 1) + (State.MaxPriceMinor is null ? 0 : 1) + (string.IsNullOrEmpty(State.Q) ? 0 : 1);

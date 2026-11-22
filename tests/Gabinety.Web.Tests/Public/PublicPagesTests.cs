@@ -287,8 +287,8 @@ public class ListPageFixesTests
         await using var web = Host(0, false);
         var page = await web.NewBrowser().GetAsync("/programisci?q=zzzzzz");
         Assert.Equal("Wyniki: 0", page.TextOf("[data-testid=count]"));
-        Assert.Contains("Brak programistów dla wybranych filtrów", page.TextOf("[data-testid=empty]"));
-        Assert.Equal("/programisci", page.One(".empty-state a.btn")!.GetAttribute("href"));
+        Assert.Contains("Nie ma programistów dla tych filtrów", page.TextOf("[data-testid=empty]"));
+        Assert.Equal("/programisci", page.One(".empty-state a.btn--ghost")!.GetAttribute("href")); // Wyczyść filtry, shown because a filter is active
         Assert.Empty(page.All("[data-testid=practitioner-list]"));
     }
 
@@ -321,7 +321,8 @@ public class ListPageFixesTests
         await using var web = PublicSupport.Host(r => r.RequestUri!.AbsolutePath == "/api/v1/practitioners"
             ? FakeBackend.Json(new PageDto<PractitionerCardDto>([Sample.Card(rating: new RatingDto(4.8, 25), isNew: false)], null)) : PublicSupport.DefaultDirectory()(r));
         var card = (await web.NewBrowser().GetAsync("/programisci")).One("[data-testid=practitioner-card]")!;
-        Assert.Equal(["Zweryfikowany", "★ 4,8 (25)"], card.QuerySelectorAll(".badge").Select(b => b.TextContent));
+        Assert.Equal(["Zweryfikowany"], card.QuerySelectorAll(".badge").Select(b => b.TextContent));
+        Assert.Equal("★ 4,8 (25)", card.QuerySelector(".practitioner-card__rating")!.TextContent);
     }
 }
 

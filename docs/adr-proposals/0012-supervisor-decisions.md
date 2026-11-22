@@ -79,3 +79,32 @@ for a suspension, reason `practitioner_suspended`, notification `Cancelled` to t
 **Decision.** `Network__ClientIpHeader=Fly-Client-IP` on authservice (fly toml, AppHost). Fly's edge sets that header for public traffic; the web sends the visitor's validated address in it on its server-to-authservice calls only. `X-Forwarded-For` was not used: it is multi-valued and client-appendable, and the header option needs no proxy lists. The Blazor gateway must forward the address the same way.
 
 **Consequences.** Visitors have separate buckets (tested against the real image). To verify on the first deploy: Fly's edge overwrites a client-sent `Fly-Client-IP`. Not changed: a `429` on refresh still ends the session in the web. Proof and details: `docs/operations/AUTH.md` section 9, finding 4.
+
+## Practitioner area (wave 2, branch `port/practitioner`)
+
+Decisions made by the session that ported `/gabinet-programisty/*` to the Blazor host. Revisable; the code points here.
+
+**Any signed-in account may become a practitioner (F-10, audit open question 1).** The dashboard of an account with no profile says so on the page ("Każde zalogowane konto może założyć gabinet programisty. Nie musisz zakładać
+osobnego konta, a konto klienta zostaje bez zmian.", hook `data-testid="open-to-all"`). The header shows one entry, `Panel programisty`, to every signed-in account (`SiteNavigation.PractitionerPanel`): whether an
+account already has a profile is the Directory's knowledge (`GET /api/v1/me`), not a claim of the token, and a Directory call on every page render for the sake of one label is not worth it, so the shell does not
+guess and the dashboard onboards. The practitioner guard is per page: no session is a redirect to sign-in (the cookie scheme), an account with no profile is a redirect from every sub-page to the dashboard, a
+service that is down is a `503` page with a retry link (not a `200` error page).
+
+**Re-enabling an offer needs a service route (F-04, P-OFF-1): `POST /api/v1/me/practitioner/offerings/{id}/activate`.** The Directory had `deactivate` and said "there is no reactivation"; the audit asks for a way back.
+The route is the mirror of `deactivate`: `204`, idempotent, the practitioner's own offer only (`404` otherwise), `422 too_many_offerings` when five are already active (the same limit as create). It is the only change
+outside `src/Gabinety.Web`; tests in `OfferingApiTests`, row in `ROUTE-AUTH.md`. **CONTRACTS to change:** 3.5 offerings table: `POST /api/v1/me/practitioner/offerings/{id}/activate` -> `204`; `404`; `422 too_many_offerings`.
+Disabling needs a confirmation step on the page (`?wylacz=<id>`, `role="alertdialog"`, no JavaScript), enabling does not (it is the undo).
+
+**The Stripe return address.** Booking (PR #127) hands Stripe `{Site__BaseUrl}/practitioner/payments?return=1` and `?refresh=1`; those are fixed in the service. The page of this host is `/gabinet-programisty/platnosci`
+(the area's own address); `/practitioner/payments` is a signed-in route that forwards to it keeping only the two flags it knows. Changing the service to use the new address is the cleaner end state and is not needed.
+The onboarding link is shown on the page after the post and followed by the practitioner, not answered with a redirect: the CSP says `form-action 'self'`, which browsers also apply to a redirect that answers a
+form post. A link that is not an absolute `https` URL without credentials is never shown. Nothing about the link is stored or logged.
+
+**The payments banner and the demo provider.** The dashboard banner ("Płatności nie są jeszcze gotowe") shows when `GET /api/v1/me/payments/account` answers `none` or `pending`. The Mock provider answers `404`: that is
+"nothing to set up" (the fake profile hides the banner and the payments step reads "tryb demonstracyjny"). An answer that cannot be read (Booking down) shows no banner and is never offered as the next step.
+
+**Profile label.** The bio field stays labelled with the word `Opis` ("Opis (o mnie)"): journey J2 finds it with `getByLabel("Opis")` and the Next.js host runs the same journeys until the cutover. When the cutover
+removes `web/`, the label can become `O mnie` with the page object changed in the same PR (DESIGN-CONTRACT 9.5).
+
+**Static pages, no circuit.** The whole area is static server rendering with plain forms (antiforgery, post-redirect-get with a flash by fixed key, errors in a summary and under each field). No page in the area runs a
+circuit, so the journeys have no connection to wait for and the pages work without JavaScript. The availability editor keeps its draft in the form (`rule-N-day`, ...), add and remove are posts that show the draft again.

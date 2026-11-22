@@ -15,7 +15,7 @@ public static class SiteNavigation
     public static readonly NavItem Practitioners = new("/programisci", Pl.Nav.Search);
 
     /// <summary>
-    /// The practitioner's area, for every signed-in account: any account may become a practitioner (supervisor decision, ADR-0012 section 6), and whether one already has a profile is the Directory's
+    /// The practitioner's area, for every signed-in account: any account may become a practitioner (supervisor decision, ADR-0012, "Practitioner area"), and whether one already has a profile is the Directory's
     /// knowledge, not a claim of the token, so the shell does not guess: the dashboard onboards an account with no profile and says so there (F-10).
     /// </summary>
     public static readonly NavItem PractitionerPanel = new(Pages.PractitionerArea.PractitionerPaths.Home, PlPractitioner.Title);

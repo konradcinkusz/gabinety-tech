@@ -9,6 +9,8 @@ public sealed record MyPractitioner(Guid Id, string Slug, string Status, string 
     string? MeetingUrlDefault, string? Nip, bool GithubLinked, string? GithubLogin);
 public sealed record MyOffering(Guid Id, string Title, string Description, int DurationMinutes, long PriceMinor, string ProblemSlug, string[] TechSlugs, bool IsActive);
 public sealed record TaxonomyView(string[] Problems, string[] Techs);
+/// <summary>The practitioner's own contract availability (ADR proposal 0013); <c>Status</c> is <c>not_available | available_now | available_from</c>.</summary>
+public sealed record MyContract(string Status, DateOnly? AvailableFrom, int? HoursPerWeek, long? RateMinor);
 
 /// <summary>The Directory API as the seeder uses it: user calls with a bearer token, admin calls, and the internal pushes with X-Internal-Key. Errors carry the status and the error code, never a body.</summary>
 public sealed class DirectoryApi(HttpClient http, SeedOptions options, TimeProvider time)
@@ -89,6 +91,18 @@ public sealed class DirectoryApi(HttpClient http, SeedOptions options, TimeProvi
         if (r.Status != HttpStatusCode.OK) throw Fail("github link request", r);
         var v = await SendAsync(HttpMethod.Post, "/api/v1/me/practitioner/github-link/verify", u.AccessToken, false, null, ct);
         if (v.Status != HttpStatusCode.NoContent) throw Fail("github link verify (needs a GitHub lookup that answers in the fake profile)", v);
+    }
+
+    public async Task<MyContract> GetContractAsync(DemoUser u, CancellationToken ct)
+    {
+        var r = await SendAsync(HttpMethod.Get, "/api/v1/me/practitioner/contract-availability", u.AccessToken, false, null, ct);
+        return r.Status == HttpStatusCode.OK ? Read<MyContract>(r, "get contract availability") : throw Fail("get contract availability", r);
+    }
+
+    public async Task SetContractAsync(DemoUser u, MyContract wanted, CancellationToken ct)
+    {
+        var r = await SendAsync(HttpMethod.Put, "/api/v1/me/practitioner/contract-availability", u.AccessToken, false, wanted, ct);
+        if (r.Status != HttpStatusCode.OK) throw Fail("set contract availability", r);
     }
 
     public async Task<IReadOnlyList<MyOffering>> OfferingsAsync(DemoUser u, CancellationToken ct)

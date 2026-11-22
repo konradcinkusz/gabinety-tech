@@ -95,7 +95,17 @@ public class PresentationalComponentTests : BunitContext
 
 public class LayoutTests : BunitContext
 {
-    public LayoutTests() => Services.AddSingleton<TimeProvider>(TestClock.Default());
+    /// <summary>The header and the footer ask the Directory whether a signed-in account is a practitioner; the answer is a fake (a client with no profile unless a test says otherwise).</summary>
+    readonly FakeBackend _me = new();
+
+    sealed class Token : IAccessTokenSource { public Task<string?> AccessTokenAsync(CancellationToken ct = default) => Task.FromResult<string?>("tok"); }
+
+    public LayoutTests()
+    {
+        Services.AddSingleton<TimeProvider>(TestClock.Default());
+        _me.Respond = _ => FakeBackend.Json(new MeDto("demo-client", null, null, false, false));
+        Services.AddSingleton(new MeClient(new HttpClient(_me) { BaseAddress = new Uri("http://directory.test") }, new VisitorAddressAccessor(new HttpContextAccessor()), new Token()));
+    }
 
     static RenderFragment Body(string html = "<h1>Treść</h1>") => b => b.AddMarkupContent(0, html);
 
@@ -116,8 +126,8 @@ public class LayoutTests : BunitContext
         Assert.Single(cut.FindAll("footer"));
         Assert.Single(cut.FindAll("header"));
         Assert.Equal("Treść", main.QuerySelector("h1")!.TextContent);
-        Assert.Equal("© 2026 Gabinety Tech", cut.Find("footer p").TextContent);
-        Assert.Equal("Gabinety Tech", cut.Find("a.brand").TextContent);
+        Assert.Equal("© 2026 Gabinety Tech", cut.Find("footer p.site-footer__copy").TextContent);
+        Assert.Equal("Gabinety Tech", cut.Find("a.brand").TextContent.Trim()); // the mark is an svg without text: the name is the link text
     }
 
     [Fact]
@@ -126,12 +136,12 @@ public class LayoutTests : BunitContext
         var auth = AddAuthorization();
         auth.SetNotAuthorized();
         var visitor = Render<MainLayout>(p => p.Add(l => l.Body, Body()));
-        Assert.Equal(["/programisci"], visitor.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], visitor.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
         Assert.Equal(["/logowanie", "/rejestracja"], visitor.FindAll("header .site-account a").Select(a => a.GetAttribute("href")));
         auth.SetAuthorized("demo-client@demo.example");
         var member = Render<MainLayout>(p => p.Add(l => l.Body, Body()));
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/gabinet-programisty"], member.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
-        Assert.Equal(["/konto", "/wyloguj"], member.FindAll("header .site-account a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], member.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/moje/rezerwacje", "/konto", "/gabinet-programisty", "/wyloguj"], member.FindAll("header .account-menu a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]

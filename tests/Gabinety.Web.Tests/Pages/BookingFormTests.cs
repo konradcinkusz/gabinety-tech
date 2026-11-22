@@ -72,7 +72,7 @@ public class BookingFormTests
     {
         await using var f = await Open();
         await f.Browser.GetAsync(BookingUrl);
-        Assert.Equal(["/api/v1/practitioners/demo-anna-demowska"], f.Web.Directory.Requests.Select(r => r.PathAndQuery));
+        Assert.Equal(["/api/v1/practitioners/demo-anna-demowska"], f.Web.Directory.Requests.Where(r => r.PathAndQuery != "/api/v1/me").Select(r => r.PathAndQuery));
         Assert.Empty(f.Web.Booking.Requests);
         Assert.Empty(f.Web.Assistant.Requests);
     }

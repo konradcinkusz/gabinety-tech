@@ -71,6 +71,7 @@ public static class WebHostingExtensions
         app.MapOAuth();
         app.MapAdminEndpoints(); // the ledger download (a stream, not a page)
         app.MapAccountEndpoints(); // /konto/export
+        app.MapCalendarEndpoints(); // /moje/rezerwacje/{id}/kalendarz.ics
 
         app.MapSeoEndpoints(); // sitemap.xml, robots.txt
         // Interactive server rendering is registered for the pages that ask for it. The circuit endpoints (/_blazor/*) and the framework's own (/_framework/*) are anonymous: an interactive page

@@ -20,6 +20,7 @@
 }
 else if (_booking is { } b)
 {
+    <BookingSteps Current="2" />
     @if (b.Status != "PendingPayment")
     {
         <div class="callout callout--info" role="status">
@@ -31,8 +32,8 @@ else if (_booking is { } b)
     else
     {
         var expired = b.HoldExpiresAt is { } hold && HoldCountdown.Expired(HoldCountdown.Left(hold, Time.GetUtcNow()));
-        <div class="callout callout--info">@BookFlowText.Checkout.Demo</div>
         <div class="checkout-layout">
+            <div class="callout callout--info">@BookFlowText.Checkout.Demo</div>
             <ConsultationSummary Offering="@b.OfferingTitle" Party="@BookingFormat.Name(b.Practitioner.DisplayName)" When="@BookingFormat.When(b.StartUtc, b.EndUtc)" Minutes="b.DurationMinutes" PriceMinor="b.Price.AmountMinor">
                 @if (b.HoldExpiresAt is { } until) {<HoldTimer @rendermode="InteractiveServer" ExpiresAt="until" />}
             </ConsultationSummary>

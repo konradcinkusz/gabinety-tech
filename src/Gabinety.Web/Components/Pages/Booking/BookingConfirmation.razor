@@ -11,7 +11,7 @@
     <meta name="robots" content="noindex,follow" />
     @if (_refreshSeconds is { } seconds) {<meta http-equiv="refresh" content="@seconds" />}
 </HeadContent>
-<h1>@BookFlowText.Confirmation.Title</h1>
+<h1>@(_booking?.Status == "Confirmed" ? BookFlowText.Confirmation.ConfirmedTitle : BookFlowText.Confirmation.Title)</h1>
 
 @if (_failure is not null)
 {
@@ -22,8 +22,10 @@
 }
 else if (_booking is { } b)
 {
+    var confirmed = b.Status == "Confirmed";
+    <BookingSteps Current="3" />
     <div class="stack booking-confirmation">
-        @if (b.Status == "Confirmed") {<div class="callout callout--success" role="status">@BookFlowText.Confirmation.Confirmed</div>}
+        @if (confirmed) {<div class="callout callout--success" role="status">@BookFlowText.Confirmation.Confirmed</div>}
         else if (b.Status == "PendingPayment") {<div class="callout callout--info" role="status">@BookFlowText.Confirmation.Pending <a href="@CurrentPath">@BookFlowText.Confirmation.Refresh</a></div>}
         else {<div class="callout callout--warning" role="status">@BookFlowText.Confirmation.Other</div>}
         <ConsultationSummary Offering="@b.OfferingTitle" Party="@BookingFormat.Name(b.Practitioner.DisplayName)" When="@BookingFormat.When(b.StartUtc, b.EndUtc)"
@@ -34,8 +36,20 @@ else if (_booking is { } b)
                 <p class="muted">@BookFlowText.Summary.MeetingHint</p>
             }
         </ConsultationSummary>
+        @if (confirmed)
+        {
+            <section class="card booking-confirmation__next" aria-labelledby="next-steps-title">
+                <h2 id="next-steps-title">@BookFlowText.Confirmation.NextTitle</h2>
+                <ul class="booking-confirmation__list">
+                    <li>@BookFlowText.Confirmation.NextEmail</li>
+                    <li>@BookFlowText.Confirmation.NextMeeting</li>
+                    <li>@BookFlowText.Confirmation.NextCancel <a href="/cennik">@BookFlowText.Confirmation.NextCancelLink</a>.</li>
+                </ul>
+            </section>
+        }
         <div class="form-actions">
             <a class="btn btn--primary" href="@($"/moje/rezerwacje/{b.Id}?role=client")">@BookFlowText.Confirmation.View</a>
+            @if (confirmed) {<a class="btn btn--secondary" href="@($"/moje/rezerwacje/{b.Id}/kalendarz.ics")">@BookFlowText.Confirmation.Calendar</a>}
             <a class="btn btn--secondary" href="/programisci">@BookFlowText.Confirmation.ToSearch</a>
         </div>
     </div>

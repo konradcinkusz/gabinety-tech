@@ -215,8 +215,10 @@ public class CheckoutAndConfirmationTests
         var dd = page.QuerySelectorAllText(".booking-summary dd");
         Assert.Equal(["Audyt kodu demo", "Anna Demowska", "wtorek, 8 grudnia, 12:00–13:00", "60 min", "250,00\u00a0zł"], dd);
         Assert.DoesNotContain(" ·", page.TextOf(".booking-summary")); // no separator glued to nothing (F-03)
-        Assert.Equal([$"/moje/rezerwacje/{BookingId}?role=client", "/programisci"], page.All(".form-actions a").Select(a => a.GetAttribute("href")));
-        Assert.Equal(["btn btn--primary", "btn btn--secondary"], page.All(".form-actions a").Select(a => a.ClassName));
+        // UX-021: three ways on (the calendar file is added between the detail and the search)
+        Assert.Equal([$"/moje/rezerwacje/{BookingId}?role=client", $"/moje/rezerwacje/{BookingId}/kalendarz.ics", "/programisci"], page.All(".form-actions a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["btn btn--primary", "btn btn--secondary", "btn btn--secondary"], page.All(".form-actions a").Select(a => a.ClassName));
+        Assert.Equal(["Zobacz rezerwację", "Dodaj do kalendarza", "Wróć do wyszukiwarki"], page.All(".form-actions a").Select(a => a.TextContent.Trim()));
         var meeting = page.One("a[target=_blank]")!;
         Assert.Equal("https://meet.example/demo-sala", meeting.GetAttribute("href"));
         Assert.Equal("noopener noreferrer", meeting.GetAttribute("rel"));
@@ -308,6 +310,60 @@ public class CheckoutAndConfirmationTests
         Assert.Equal(Confirmation, page.Location);
         await using var visitor = await ClientAreaFixture.Visitor();
         Assert.StartsWith("/logowanie?redirect=", (await visitor.Browser.GetAsync($"/bookings/{BookingId}")).Location);
+    }
+
+    // ---- UX-021: the steps, the headings, "Co dalej", the notice at the width of the summary
+
+    [Fact]
+    public async Task The_confirmed_booking_is_titled_as_confirmed_and_any_other_state_keeps_the_plain_title()
+    {
+        await using var confirmed = await Open(Detail("Confirmed"));
+        Assert.Equal(["Rezerwacja potwierdzona"], (await confirmed.Browser.GetAsync(Confirmation)).All("h1").Select(h => h.TextContent));
+
+        await using var pending = await Open(Detail("PendingPayment", payment: "Created", hold: DateTimeOffset.UtcNow.AddMinutes(5)));
+        var page = await pending.Browser.GetAsync(Confirmation);
+        Assert.Equal(["Rezerwacja"], page.All("h1").Select(h => h.TextContent)); // no page claims success it does not have
+        Assert.Empty(page.All(".booking-confirmation__next")); // "Co dalej" describes a confirmed booking only
+    }
+
+    [Fact]
+    public async Task The_confirmation_says_what_happens_next_under_the_summary_and_the_refund_is_a_link_to_the_price_list_not_a_number()
+    {
+        await using var f = await Open(Detail("Confirmed"));
+        var page = await f.Browser.GetAsync(Confirmation);
+        var next = page.One(".booking-confirmation__next")!;
+        Assert.Equal("Co dalej", next.QuerySelector("h2")!.TextContent);
+        Assert.Equal(3, next.QuerySelectorAll("li").Length);
+        Assert.Contains("Wyślemy e-mail ze szczegółami rezerwacji.", next.TextContent);
+        Assert.Contains("Moje rezerwacje", next.TextContent);
+        Assert.Equal("/cennik", next.QuerySelector("li a")!.GetAttribute("href"));
+        Assert.Matches(@"^\s*Rezerwację możesz anulować.*Zasady zwrotu znajdziesz w cenniku\.\s*$", next.QuerySelectorAll("li")[2].TextContent.Replace(' ', ' '));
+        Assert.DoesNotMatch(@"\d+\s*(dni|godz|h)\b", next.TextContent); // the window is never stated here
+        Assert.True(next.NextElementSibling is null || next.NextElementSibling.ClassList.Contains("form-actions")); // under the summary, above the actions
+        Assert.Equal("Rezerwacja potwierdzona. Dziękujemy!", page.One(".callout--success")!.TextContent); // the exact success text is still the hook
+    }
+
+    [Fact]
+    public async Task The_steps_show_the_last_step_as_current_on_the_confirmation_and_the_payment_step_on_the_checkout()
+    {
+        await using var confirmed = await Open(Detail("Confirmed"));
+        var steps = (await confirmed.Browser.GetAsync(Confirmation)).One(".booking-steps")!;
+        Assert.Equal("Gotowe", steps.QuerySelector("[aria-current=step] .booking-steps__name")!.FirstChild!.TextContent.Trim());
+
+        await using var f = await Fake();
+        var checkout = (await f.Browser.GetAsync(Checkout)).One(".booking-steps")!;
+        Assert.Equal("Płatność", checkout.QuerySelector("[aria-current=step] .booking-steps__name")!.FirstChild!.TextContent.Trim());
+        Assert.Equal(2, checkout.QuerySelectorAll(".booking-steps__item--done").Length); // Termin and Opis are finished
+    }
+
+    [Fact]
+    public async Task The_demonstration_notice_and_the_summary_share_one_column_container()
+    {
+        await using var f = await Fake();
+        var page = await f.Browser.GetAsync(Checkout);
+        var notice = page.One(".callout--info")!;
+        Assert.Equal(page.One(".booking-summary")!.ParentElement, notice.ParentElement);
+        Assert.Equal("checkout-layout", notice.ParentElement!.ClassName);
     }
 }
 

@@ -86,7 +86,15 @@ public static class BookFlowText
     public static class Confirmation
     {
         public const string Title = "Rezerwacja", MetaTitle = "Rezerwacja | Gabinety Tech";
+        /// <summary>The h1 of a confirmed booking (UX-021); the other states keep <see cref="Title"/> so no page claims success it does not have.</summary>
+        public const string ConfirmedTitle = "Rezerwacja potwierdzona";
         public const string Confirmed = "Rezerwacja potwierdzona. Dziękujemy!", Pending = "Czekamy na potwierdzenie płatności.", Other = "Ta rezerwacja nie jest aktywna.";
         public const string Refresh = "Odśwież", View = "Zobacz rezerwację", ToSearch = "Wróć do wyszukiwarki";
+        public const string Calendar = "Dodaj do kalendarza";
+        /// <summary>The "Co dalej" list under the summary of a confirmed booking.</summary>
+        public const string NextTitle = "Co dalej", NextEmail = "Wyślemy e-mail ze szczegółami rezerwacji.", NextMeeting = "Link do spotkania otwórz w terminie konsultacji.";
+        public const string NextCancel = "Rezerwację możesz anulować w zakładce Moje rezerwacje. Zasady zwrotu znajdziesz w", NextCancelLink = "cenniku";
+        /// <summary>The calendar file's text (RFC 5545 DESCRIPTION): the practitioner's name, and the meeting link when it is safe.</summary>
+        public const string CalendarPractitioner = "Programista: {0}", CalendarMeeting = "Link do spotkania: {0}";
     }
 }

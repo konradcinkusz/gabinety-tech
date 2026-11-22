@@ -125,6 +125,7 @@ public class NotificationDispatcherTests
     [InlineData(NotificationKind.DisputeOpened)]
     [InlineData(NotificationKind.DisputeResolved)]
     [InlineData(NotificationKind.PayoutSent)]
+    [InlineData(NotificationKind.Rescheduled)]
     public async Task Other_kinds_are_still_sent_after_the_booking_start(NotificationKind kind)
     {
         using var t = new NotificationHost();

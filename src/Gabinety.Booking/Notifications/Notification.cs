@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace Gabinety.Booking.Notifications;
 
 /// <summary>The kinds of CONTRACTS 4.1 <c>notifications.kind</c>. Stored as the enum NAME.</summary>
-public enum NotificationKind { BookingConfirmed, Reminder24h, Reminder1h, Cancelled, ReviewRequest, DisputeOpened, DisputeResolved, PayoutSent }
+public enum NotificationKind { BookingConfirmed, Reminder24h, Reminder1h, Cancelled, ReviewRequest, DisputeOpened, DisputeResolved, PayoutSent, Rescheduled }
 
 /// <summary>
 /// One e-mail to send to one user about one booking (CONTRACTS 4.1). Unique per <c>(booking_id, kind, to_user_id)</c>.

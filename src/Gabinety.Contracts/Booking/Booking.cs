@@ -34,6 +34,9 @@ public sealed record BriefDto([property: Required, StringLength(2000, MinimumLen
 public sealed record CreateBookingRequest(Guid OfferingId, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantConverter))] DateTimeOffset StartUtc, BriefDto Brief);
 public sealed record CreateBookingResponse(Guid BookingId, BookingStatus Status, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantConverter))] DateTimeOffset HoldExpiresAt, string CheckoutUrl);
 
+/// <summary>Body of <c>POST /api/v1/bookings/{id}/reschedule</c> (CONTRACTS 4.2): the new start, a UTC instant (offset Z).</summary>
+public sealed record RescheduleRequest(DateTimeOffset? StartUtc = null);
+
 public sealed record CancelRequest([property: StringLength(500)] string? Reason = null);
 public sealed record DisputeRequest(DisputeKind Kind, [property: Required, StringLength(1000, MinimumLength = 10)] string Text);
 public sealed record ResolveRequest(Resolution Resolution, long? RefundMinor, [property: Required, StringLength(500, MinimumLength = 10)] string Note);
@@ -53,7 +56,7 @@ public sealed record PaymentView(PaymentStatus Status, MoneyDto Refunded);
 public sealed record BookingView(Guid Id, BookingStatus Status, string? StatusReason, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantConverter))] DateTimeOffset StartUtc, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantConverter))] DateTimeOffset EndUtc,
     int DurationMinutes, string OfferingTitle, MoneyDto Price, PractitionerRef Practitioner, ClientRef? Client, BriefDto? Brief,
     string? MeetingUrl, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantNullableConverter))] DateTimeOffset? HoldExpiresAt, PaymentView Payment, MoneyDto? Fee, MoneyDto? Payout,
-    bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview, CancelOutcomeDto? CancelOutcome = null);
+    bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview, CancelOutcomeDto? CancelOutcome = null, bool CanReschedule = false);
 
 public sealed record ReviewabilityDto(bool Reviewable, string ClientUserId, Guid PractitionerId, [property: System.Text.Json.Serialization.JsonConverter(typeof(Gabinety.Contracts.Common.UtcInstantNullableConverter))] DateTimeOffset? CompletedAt);
 

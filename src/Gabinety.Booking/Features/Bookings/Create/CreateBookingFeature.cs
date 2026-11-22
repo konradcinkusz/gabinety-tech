@@ -143,7 +143,7 @@ public sealed class CreateBookingFeature : IServiceFeature
     }
 
     /// <summary>One transaction under the practitioner lock: advisory lock on PostgreSQL (inside the retrying execution strategy), a process lock elsewhere.</summary>
-    static async Task<IResult> InLockedTransaction(BookingDbContext db, Guid practitionerId, Func<Task<IResult>> body, CancellationToken ct)
+    internal static async Task<IResult> InLockedTransaction(BookingDbContext db, Guid practitionerId, Func<Task<IResult>> body, CancellationToken ct)
     {
         if (!db.Database.IsRelational())
         {

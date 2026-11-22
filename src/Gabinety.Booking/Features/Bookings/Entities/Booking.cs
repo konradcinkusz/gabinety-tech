@@ -46,6 +46,9 @@ public sealed class Booking
     public string? DisputeText { get; set; }
     public string? DisputeResolution { get; set; }
     public DateTimeOffset? ResolvedAt { get; set; }
+    /// <summary>How many times the client moved this booking (CONTRACTS 4.1, T-11.10). At most one is allowed.</summary>
+    public short RescheduleCount { get; set; }
+    public DateTimeOffset? RescheduledAt { get; set; }
 }
 
 sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
@@ -86,6 +89,8 @@ sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         b.Property(x => x.DisputeText).HasColumnName("dispute_text").HasMaxLength(1000);
         b.Property(x => x.DisputeResolution).HasColumnName("dispute_resolution").HasMaxLength(20);
         b.Property(x => x.ResolvedAt).HasColumnName("resolved_at");
+        b.Property(x => x.RescheduleCount).HasColumnName("reschedule_count").HasDefaultValue((short)0);
+        b.Property(x => x.RescheduledAt).HasColumnName("rescheduled_at");
         b.HasIndex(x => new { x.PractitionerId, x.StartUtc });
         b.HasIndex(x => new { x.ClientUserId, x.IdempotencyKey }).IsUnique();
         b.HasIndex(x => new { x.Status, x.HoldExpiresAt });

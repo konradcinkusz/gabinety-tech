@@ -1,11 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 import { urls } from "./harness/env";
+import { BLAZOR_SPECS, isBlazor } from "./harness/host";
 
 // The harness owns this file (T-08.03a); journeys only add `journeys/jN-*.spec.ts` files.
 // Nothing is started here: the fake profile is already running (see README.md). `globalSetup` waits for it and for the seeded data.
 export default defineConfig({
   testDir: ".",
-  testMatch: ["journeys/**/*.spec.ts", "harness/**/*.spec.ts"],
+  // HOST=next (default): everything except the Blazor-only specs. HOST=blazor: only the journeys the Blazor host supports (harness/host.ts BLAZOR_SPECS).
+  testMatch: isBlazor ? [...BLAZOR_SPECS] : ["journeys/**/*.spec.ts", "harness/**/*.spec.ts"],
+  testIgnore: isBlazor ? [] : ["**/*.blazor.spec.ts"],
   globalSetup: "./harness/global-setup.ts",
   // Journeys share one in-memory system (the clock offset, the demo data, the Directory's 60/min per address limit): one at a time.
   fullyParallel: false,

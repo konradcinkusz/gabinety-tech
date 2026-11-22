@@ -1,8 +1,10 @@
 /** Where the fake profile listens (AppHost `Program.cs`, `scripts/check-fake-profile.sh`). Overridable for a non-default setup. */
+import { webBaseUrl, webHealthPath } from "./host";
+
 const e = (name: string, fallback: string) => process.env[name] || fallback;
 
 export const urls = {
-  web: e("E2E_WEB_URL", "http://localhost:3000"),
+  web: webBaseUrl, // HOST / BASE_URL / E2E_WEB_URL: see host.ts
   devidentity: e("E2E_IDENTITY_URL", "http://localhost:5100"),
   directory: e("E2E_DIRECTORY_URL", "http://localhost:5101"),
   booking: e("E2E_BOOKING_URL", "http://localhost:5102"),
@@ -17,7 +19,7 @@ export const healthUrls: Record<string, string> = {
   booking: `${urls.booking}/health`,
   reputation: `${urls.reputation}/health`,
   assistant: `${urls.assistant}/health`,
-  web: `${urls.web}/api/health`,
+  web: `${urls.web}${webHealthPath}`,
 };
 
 /**

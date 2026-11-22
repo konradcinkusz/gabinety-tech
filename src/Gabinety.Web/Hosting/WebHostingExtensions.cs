@@ -33,6 +33,7 @@ public static class WebHostingExtensions
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddPublicPageCache(); // five minutes, anonymous public GETs only (Hosting/PublicPageCache.cs)
         builder.Services.AddScoped<CircuitHandler, VisitorCircuitHandler>();
+        builder.Services.AddAvatarClient(); // GitHub's avatar of a verified practitioner (ADR-0013)
 
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(o =>
         {
@@ -72,6 +73,7 @@ public static class WebHostingExtensions
         app.MapAdminEndpoints(); // the ledger download (a stream, not a page)
         app.MapAccountEndpoints(); // /konto/export
         app.MapCalendarEndpoints(); // /moje/rezerwacje/{id}/kalendarz.ics
+        app.MapAvatarEndpoint(); // /avatar/{slug}
 
         app.MapSeoEndpoints(); // sitemap.xml, robots.txt
         // Interactive server rendering is registered for the pages that ask for it. The circuit endpoints (/_blazor/*) and the framework's own (/_framework/*) are anonymous: an interactive page

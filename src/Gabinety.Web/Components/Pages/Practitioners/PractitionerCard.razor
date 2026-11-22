@@ -1,6 +1,6 @@
 <article class="card card--link practitioner-card" data-testid="practitioner-card">
     <div class="practitioner-card__avatar">
-        <Avatar Name="@Practitioner.DisplayName" Size="Avatar.AvatarSize.Medium" />
+        <Avatar Name="@Practitioner.DisplayName" Size="Avatar.AvatarSize.Medium" Slug="@(Practitioner.GithubLogin is { Length: > 0 } ? Practitioner.Slug : null)" />
     </div>
     <div class="practitioner-card__body">
         <h2 class="practitioner-card__name"><a href="@($"/gabinet/{Practitioner.Slug}")">@Practitioner.DisplayName</a></h2>

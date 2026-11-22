@@ -18,7 +18,7 @@
     var checks = p.Badges.Where(b => b != "approved").ToList();
     <header class="page-header">
         <div class="identity">
-            <Avatar Name="@p.DisplayName" Size="Avatar.AvatarSize.Large" />
+            <Avatar Name="@p.DisplayName" Size="Avatar.AvatarSize.Large" Slug="@(p.GithubLogin is { Length: > 0 } ? p.Slug : null)" />
             <div class="identity__text">
                 <h1>@p.DisplayName</h1>
                 <p class="lead">@p.Headline</p>

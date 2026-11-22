@@ -36,6 +36,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Directory | POST | `/api/v1/me/practitioner/offerings` | Authenticated | all | |
 | Directory | PUT | `/api/v1/me/practitioner/offerings/{id}` | Authenticated | all | |
 | Directory | POST | `/api/v1/me/practitioner/offerings/{id}/deactivate` | Authenticated | all | |
+| Directory | POST | `/api/v1/me/practitioner/offerings/{id}/activate` | Authenticated | all | undo of deactivate; 422 `too_many_offerings` at 5 active |
 | Directory | POST | `/api/v1/me/practitioner/github-link` | Authenticated | all | |
 | Directory | POST | `/api/v1/me/practitioner/github-link/verify` | Authenticated | all | |
 | Directory | GET | `/api/v1/admin/practitioners` | Admin | all | |

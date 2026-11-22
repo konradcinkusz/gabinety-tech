@@ -164,6 +164,33 @@ public class OfferingApiTests(OfferingFactory f) : IClassFixture<OfferingFactory
     }
 
     [Fact]
+    public async Task Activate_turns_a_deactivated_offering_back_on_and_is_idempotent()
+    {
+        var c = await Practitioner(f);
+        var o = await Created(c, Valid());
+        await c.PostAsync($"{Url}/{o.Id}/deactivate", null);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.PostAsync($"{Url}/{o.Id}/activate", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.PostAsync($"{Url}/{o.Id}/activate", null)).StatusCode);
+        Assert.True((await List(c)).Single().IsActive);
+    }
+
+    [Fact]
+    public async Task Activate_refuses_a_sixth_active_offering_and_another_practitioners_offering_is_404()
+    {
+        var c = await Practitioner(f);
+        var first = await Created(c, Valid(title: "Pierwsza oferta"));
+        await c.PostAsync($"{Url}/{first.Id}/deactivate", null);
+        for (var i = 0; i < 5; i++) await Created(c, Valid(title: $"Oferta numer {i}"));
+        var r = await c.PostAsync($"{Url}/{first.Id}/activate", null);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, r.StatusCode);
+        Assert.Equal("too_many_offerings", (await ProblemOf(r)).Code);
+        Assert.False((await List(c)).Single(x => x.Id == first.Id).IsActive);
+
+        var other = await Practitioner(f);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PostAsync($"{Url}/{first.Id}/activate", null)).StatusCode);
+    }
+
+    [Fact]
     public async Task Put_changes_the_offering_and_leaves_the_others_untouched_and_does_not_reactivate()
     {
         var c = await Practitioner(f);

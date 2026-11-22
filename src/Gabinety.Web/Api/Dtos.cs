@@ -37,3 +37,38 @@ public sealed record ReviewDto(Guid Id, int Rating, string Text, DateTimeOffset 
 
 /// <summary>The gateway state of the Assistant (CONTRACTS 6): <c>Ready | Fake | NotAuthenticated | Unavailable | Disabled</c>. A page keys off this, not off the health verdict.</summary>
 public sealed record AssistantStatusDto(string State, IReadOnlyList<string> Features);
+
+// ---- the practitioner's own area (CONTRACTS 3.3, 3.5, 4.2; docs/operations/PAYMENTS-GO-LIVE.md)
+
+/// <summary><c>GET /api/v1/me</c>.</summary>
+public sealed record MeDto(string UserId, Guid? PractitionerId, string? PractitionerStatus, bool IsAdmin, bool IsModerator);
+
+/// <summary><c>GET /api/v1/me/practitioner</c>; <c>Status</c> is <c>Draft | Submitted | Approved | Rejected | Suspended</c>.</summary>
+public sealed record PractitionerPrivateDto(Guid Id, string Slug, string Status, string? StatusReason, string DisplayName, string Headline, string Bio, string? PortfolioUrl,
+    string? MeetingUrlDefault, string? Nip, bool EmailVerified, bool GithubLinked, bool NipValid, string? GithubLogin);
+
+public sealed record CreatePractitionerBody(string DisplayName);
+
+public sealed record UpdatePractitionerBody(string DisplayName, string Headline, string Bio, string? PortfolioUrl, string? MeetingUrlDefault, string? Nip);
+
+public sealed record OfferingPrivateDto(Guid Id, string Title, string Description, int DurationMinutes, MoneyDto Price, string ProblemSlug, IReadOnlyList<string> TechSlugs, bool IsActive, string? MeetingUrl);
+
+public sealed record OfferingsDto(IReadOnlyList<OfferingPrivateDto> Items);
+
+public sealed record OfferingBody(string Title, string Description, int DurationMinutes, long PriceMinor, string ProblemSlug, IReadOnlyList<string> TechSlugs, string? MeetingUrl);
+
+public sealed record GithubLinkBody(string GithubLogin);
+
+public sealed record GithubChallengeDto(string Code);
+
+public sealed record AvailabilityRuleDto(int IsoWeekday, string StartLocal, string EndLocal);
+
+public sealed record AvailabilityExceptionDto(string DateLocal);
+
+public sealed record AvailabilityDto(IReadOnlyList<AvailabilityRuleDto> Rules, IReadOnlyList<AvailabilityExceptionDto> Exceptions);
+
+/// <summary><c>GET /api/v1/me/payments/account</c>: <c>State</c> is <c>none | pending | ready</c>. A provider with no connected accounts (the mock) answers 404.</summary>
+public sealed record PaymentAccountDto(string Provider, string State);
+
+/// <summary><c>POST /api/v1/me/payments/account/onboarding</c>: <c>OnboardingUrl</c> is single use and short lived; it is never stored or logged.</summary>
+public sealed record PaymentOnboardingDto(string Provider, string State, string? OnboardingUrl);

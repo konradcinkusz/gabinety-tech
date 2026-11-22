@@ -1,0 +1,6 @@
+.badge { white-space: nowrap; }
+.badge--neutral { color: var(--color-text-secondary); background: var(--color-surface); }
+.badge--success { color: var(--color-success); background: var(--color-success-soft); border-color: var(--color-success); }
+.badge--warning { color: var(--color-text); background: var(--color-warning-soft); border-color: var(--color-warning); }
+.badge--danger { color: var(--color-text); background: var(--color-danger-soft); border-color: var(--color-danger); }
+.badge--info { color: var(--color-text); background: var(--color-accent-soft); border-color: var(--color-accent); }

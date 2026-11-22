@@ -117,11 +117,13 @@ public class SiteNavigationTests
 {
     [Fact] public void The_practitioner_list_comes_first_for_everybody() { Assert.Equal("/programisci", SiteNavigation.Items(false)[0].Href); Assert.Equal("/programisci", SiteNavigation.Items(true)[0].Href); }
 
+    [Fact] public void The_practitioner_panel_is_for_signed_in_accounts_only_and_sign_out_stays_last() { Assert.DoesNotContain(SiteNavigation.Items(false), i => i.Href.StartsWith("/gabinet-programisty")); Assert.Equal("/wyloguj", SiteNavigation.Items(true)[^1].Href); Assert.Equal("Panel programisty", SiteNavigation.PractitionerPanel.Label); }
+
     [Fact]
     public void Order_is_pinned()
     {
         Assert.Equal(["/programisci", "/logowanie"], SiteNavigation.Items(false).Select(i => i.Href));
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/wyloguj"], SiteNavigation.Items(true).Select(i => i.Href));
+        Assert.Equal(["/programisci", "/moje/rezerwacje", "/gabinet-programisty", "/wyloguj"], SiteNavigation.Items(true).Select(i => i.Href));
     }
 }
 

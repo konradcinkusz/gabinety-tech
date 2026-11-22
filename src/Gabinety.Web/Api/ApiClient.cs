@@ -11,7 +11,8 @@ namespace Gabinety.Web.Api;
 /// </summary>
 public abstract class ApiClient(HttpClient http, VisitorAddressAccessor visitor)
 {
-    public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) } };
+    /// <summary>An absent optional field is omitted, not sent as null (CONTRACTS 0): writing skips nulls; reading is unaffected.</summary>
+    public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) } };
 
     protected Task<ApiResult<T>> GetAsync<T>(string path, string? accessToken, CancellationToken ct) => SendAsync<T>(HttpMethod.Get, path, accessToken, ct);
 

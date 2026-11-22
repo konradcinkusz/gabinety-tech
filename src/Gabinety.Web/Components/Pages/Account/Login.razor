@@ -1,32 +1,38 @@
 @page "/logowanie"
 @attribute [AllowAnonymous]
+@using Gabinety.Web.Hosting
 @inject SignInService SignIn
 @inject NavigationManager Navigation
-@* Static server rendering: a form post handled by the host with [SupplyParameterFromForm]; it works with JavaScript disabled and is protected by antiforgery. *@
+@* Static server rendering: a form post handled by the host with [SupplyParameterFromForm]; it works with JavaScript disabled and is protected by antiforgery. Every failed sign-in prints ONE text per kind: a wrong password and an unknown address are the same text (the page never says whether an e-mail exists). *@
 
 <PageTitle>@Pl.Login.MetaTitle</PageTitle>
 <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
 <h1>@Pl.Login.Title</h1>
 
+<FormSummary Problems="_problems" />
 @if (_message is not null)
 {
     <Alert Variant="AlertVariant.Danger" TestId="login-error">@_message</Alert>
 }
 
-<EditForm Model="Model!" FormName="login" OnValidSubmit="SubmitAsync" class="stack form-narrow" novalidate>
-    <DataAnnotationsValidator />
-    <div class="field">
-        <label for="login-email">@Pl.Login.Email</label>
-        <InputText id="login-email" type="email" @bind-Value="Model!.Email" autocomplete="username" />
-        <div class="field__error"><ValidationMessage For="() => Model!.Email" /></div>
+<EditForm Model="Model!" FormName="login" OnSubmit="SubmitAsync" class="form form-narrow" novalidate>
+    <div class="field @(_problems.For(LoginModel.EmailId) is null ? "" : "field--invalid")">
+        <label class="field__label" for="@LoginModel.EmailId">@Pl.Login.Email</label>
+        <InputText id="@LoginModel.EmailId" class="field__control" type="email" @bind-Value="Model!.Email" autocomplete="username" inputmode="email"
+                   aria-invalid="@(_problems.For(LoginModel.EmailId) is null ? null : "true")" aria-describedby="@(_problems.For(LoginModel.EmailId) is null ? null : LoginModel.EmailId + "-error")" />
+        <FieldError FieldId="@LoginModel.EmailId" Problem="_problems.For(LoginModel.EmailId)" />
     </div>
-    <div class="field">
-        <label for="login-password">@Pl.Login.Password</label>
-        <InputText id="login-password" type="password" @bind-Value="Model!.Password" autocomplete="current-password" />
-        <div class="field__error"><ValidationMessage For="() => Model!.Password" /></div>
+    <div class="field @(_problems.For(LoginModel.PasswordId) is null ? "" : "field--invalid")">
+        <label class="field__label" for="@LoginModel.PasswordId">@Pl.Login.Password</label>
+        <InputText id="@LoginModel.PasswordId" class="field__control" type="password" @bind-Value="Model!.Password" autocomplete="current-password"
+                   aria-invalid="@(_problems.For(LoginModel.PasswordId) is null ? null : "true")" aria-describedby="@(_problems.For(LoginModel.PasswordId) is null ? null : LoginModel.PasswordId + "-error")" />
+        <FieldError FieldId="@LoginModel.PasswordId" Problem="_problems.For(LoginModel.PasswordId)" />
     </div>
-    <div><button class="btn btn--primary" type="submit">@Pl.Login.Submit</button></div>
+    <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.Login.Submit</button></div>
 </EditForm>
+<div class="divider"><span>@Pl.Login.Or</span></div>
+<p><a class="btn btn--secondary" href="@GithubHref">@Pl.Login.Github</a></p>
+<p>@Pl.Login.NoAccount <a href="@ReturnTarget.RegisterUrl(Back)">@Pl.Register.Title</a></p>
 
 @code {
     [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
@@ -39,26 +45,37 @@
 
     [SupplyParameterFromForm] LoginModel? Model { get; set; }
 
+    FormProblems _problems = new();
     string? _message;
+
+    string Back => ReturnTarget.Safe(Redirect);
+    string GithubHref => OAuthEndpoints.StartPath + (Back == "/" ? "" : $"?{ReturnTarget.Parameter}={Uri.EscapeDataString(Back)}");
 
     protected override void OnInitialized()
     {
         Model ??= new();
-        if (HttpContext.User.Identity?.IsAuthenticated == true) { Navigation.NavigateTo(ReturnTarget.Safe(Redirect)); return; }
-        _message = Error switch { "github_failed" => Pl.Login.GithubFailed, "two_factor_not_supported" => Pl.Login.TwoFactor, _ => null };
+        if (HttpContext.User.Identity?.IsAuthenticated == true) { Navigation.NavigateTo(Back); return; }
+        _message = Error switch { "github_failed" => Pl.Login.GithubFailed, "session_expired" => Pl.Login.SessionExpired, _ => null };
     }
 
     async Task SubmitAsync()
     {
-        var outcome = await SignIn.SignInAsync(HttpContext, Model!.Email!.Trim(), Model!.Password!);
-        if (outcome == SignInOutcome.SignedIn) { Navigation.NavigateTo(ReturnTarget.Safe(Redirect)); return; }
+        _problems = Model!.Validate();
+        if (_problems.Any) { Model = new LoginModel { Email = Model.Email }; return; }
+        var outcome = await SignIn.SignInAsync(HttpContext, Model.Email!.Trim(), Model.Password!, Back, HttpContext.RequestAborted);
+        switch (outcome)
+        {
+            case SignInOutcome.SignedIn: Navigation.NavigateTo(Back); return;
+            case SignInOutcome.TwoFactor: Navigation.NavigateTo(ReturnTarget.TwoFactorUrl(Back)); return;
+        }
         _message = outcome switch
         {
-            SignInOutcome.InvalidCredentials => Pl.Login.InvalidCredentials,
+            SignInOutcome.InvalidCredentials or SignInOutcome.Rejected => Pl.Login.InvalidCredentials,
+            SignInOutcome.LockedOut => Pl.Login.LockedOut,
+            SignInOutcome.RateLimited => Pl.Login.RateLimited,
             SignInOutcome.VerificationRequired => Pl.Login.VerificationRequired,
-            SignInOutcome.TwoFactor => Pl.Login.TwoFactor,
             _ => Pl.Login.Unavailable,
         };
-        Model = new LoginModel { Email = Model!.Email }; // the password is not sent back to the browser
+        Model = new LoginModel { Email = Model.Email }; // the password is not sent back to the browser
     }
 }

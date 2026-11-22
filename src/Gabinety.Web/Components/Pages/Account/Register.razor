@@ -1,0 +1,105 @@
+@page "/rejestracja"
+@attribute [AllowAnonymous]
+@using Gabinety.Web.Hosting
+@inject SignInService SignIn
+@inject IdentityClient Identity
+@inject NavigationManager Navigation
+@* Static server rendering: a form post handled by the host, antiforgery protected, works with JavaScript disabled (journey J2 registers a practitioner through it). All problems are shown at once (DESIGN-CONTRACT 5.5). *@
+
+<PageTitle>@Pl.Register.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@Pl.Register.Title</h1>
+
+@if (!_available)
+{
+    <Alert Variant="AlertVariant.Danger" TestId="register-unavailable">@Pl.Register.Unavailable</Alert>
+}
+else
+{
+    <FormSummary Problems="_problems" />
+    @if (_message is not null)
+    {
+        <Alert Variant="AlertVariant.Danger" TestId="register-error">@_message</Alert>
+    }
+    <EditForm Model="Model!" FormName="register" OnSubmit="SubmitAsync" class="form form-narrow" novalidate>
+        <input type="hidden" name="Model.TermsVersion" value="@Model!.TermsVersion" />
+        <input type="hidden" name="Model.PrivacyVersion" value="@Model!.PrivacyVersion" />
+        <div class="field @Invalid(RegisterModel.EmailId)">
+            <label class="field__label" for="@RegisterModel.EmailId">@Pl.Register.Email</label>
+            <InputText id="@RegisterModel.EmailId" class="field__control" type="email" @bind-Value="Model!.Email" autocomplete="email" inputmode="email"
+                       aria-invalid="@AriaInvalid(RegisterModel.EmailId)" aria-describedby="@Describe(RegisterModel.EmailId)" />
+            <FieldError FieldId="@RegisterModel.EmailId" Problem="_problems.For(RegisterModel.EmailId)" />
+        </div>
+        <div class="field @Invalid(RegisterModel.PasswordId)">
+            <label class="field__label" for="@RegisterModel.PasswordId">@Pl.Register.Password</label>
+            <p class="field__hint" id="@(RegisterModel.PasswordId)-hint">@Pl.Register.PasswordHint</p>
+            <InputText id="@RegisterModel.PasswordId" class="field__control" type="password" @bind-Value="Model!.Password" autocomplete="new-password"
+                       aria-invalid="@AriaInvalid(RegisterModel.PasswordId)" aria-describedby="@Describe(RegisterModel.PasswordId, hint: true)" />
+            <FieldError FieldId="@RegisterModel.PasswordId" Problem="_problems.For(RegisterModel.PasswordId)" />
+        </div>
+        <div class="field @Invalid(RegisterModel.ConsentId)">
+            <label class="option" for="@RegisterModel.ConsentId">
+                <InputCheckbox id="@RegisterModel.ConsentId" @bind-Value="Model!.Consent" aria-invalid="@AriaInvalid(RegisterModel.ConsentId)" aria-describedby="@Describe(RegisterModel.ConsentId)" />
+                <span>@Pl.Register.ConsentPrefix<a href="/regulamin" title="@VersionTitle(Model!.TermsVersion)">@Pl.Register.Terms</a>@Pl.Register.ConsentAnd<a href="/polityka-prywatnosci" title="@VersionTitle(Model!.PrivacyVersion)">@Pl.Register.Privacy</a>@Pl.Register.ConsentSuffix</span>
+            </label>
+            <FieldError FieldId="@RegisterModel.ConsentId" Problem="_problems.For(RegisterModel.ConsentId)" />
+        </div>
+        <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.Register.Submit</button></div>
+    </EditForm>
+    <div class="divider"><span>@Pl.Login.Or</span></div>
+    <p><a class="btn btn--secondary" href="@GithubHref">@Pl.Login.Github</a></p>
+}
+<p>@Pl.Register.HaveAccount <a href="@ReturnTarget.LoginUrl(ReturnTarget.Safe(Redirect))">@Pl.Register.SignInLink</a></p>
+
+@code {
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = ReturnTarget.Parameter)] public string? Redirect { get; set; }
+
+    [SupplyParameterFromForm] RegisterModel? Model { get; set; }
+
+    FormProblems _problems = new();
+    string? _message;
+    bool _available = true;
+
+    string Back => ReturnTarget.Safe(Redirect);
+    string GithubHref => OAuthEndpoints.StartPath + (Back == "/" ? "" : $"?{ReturnTarget.Parameter}={Uri.EscapeDataString(Back)}");
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.User.Identity?.IsAuthenticated == true) { Navigation.NavigateTo(Back); return; }
+        var posted = Model is not null; // a post carries its own versions; the page only asks the identity service when it is first shown
+        Model ??= new();
+        if (!posted)
+        {
+            // The versions come from the identity service, never from this repository (F-07: they are not printed, they only travel with the form).
+            if (await Identity.ConsentVersionsAsync(HttpContext.RequestAborted) is { } v) (Model.TermsVersion, Model.PrivacyVersion) = (v.Terms, v.Privacy);
+            else _available = false;
+        }
+    }
+
+    async Task SubmitAsync()
+    {
+        _problems = Model!.Validate();
+        if (_problems.Any) { Model.Password = null; return; }
+        var outcome = await SignIn.RegisterAsync(HttpContext, Model.Email!.Trim(), Model.Password!, Model.TermsVersion, Model.PrivacyVersion, Back, HttpContext.RequestAborted);
+        switch (outcome)
+        {
+            case SignInOutcome.SignedIn: Navigation.NavigateTo(Back); return;
+            case SignInOutcome.ConfirmationPending: Navigation.NavigateTo(ReturnTarget.CheckInboxPath); return;
+            case SignInOutcome.TwoFactor: Navigation.NavigateTo(ReturnTarget.TwoFactorUrl(Back)); return;
+        }
+        _message = outcome switch
+        {
+            SignInOutcome.RateLimited => Pl.Register.RateLimited,
+            SignInOutcome.Rejected or SignInOutcome.InvalidCredentials or SignInOutcome.LockedOut => Pl.Register.Failed,
+            _ => Pl.Register.Unavailable,
+        };
+        Model = new RegisterModel { Email = Model.Email, TermsVersion = Model.TermsVersion, PrivacyVersion = Model.PrivacyVersion }; // the password and the consent are asked for again, the password never echoed
+    }
+
+    string Invalid(string id) => _problems.For(id) is null ? "" : "field--invalid";
+    string? AriaInvalid(string id) => _problems.For(id) is null ? null : "true";
+    string? Describe(string id, bool hint = false) => string.Join(' ', new[] { hint ? id + "-hint" : null, _problems.For(id) is null ? null : id + "-error" }.Where(x => x is not null)) is { Length: > 0 } d ? d : null;
+    static string? VersionTitle(string? version) => string.IsNullOrEmpty(version) ? null : string.Format(Pl.Register.VersionTitle, version);
+}

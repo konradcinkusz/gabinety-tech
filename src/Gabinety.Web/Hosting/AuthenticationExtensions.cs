@@ -25,6 +25,7 @@ public static class AuthenticationExtensions
         services.AddScoped<CircuitHandler, SessionCircuitHandler>();
         services.AddSingleton<ITokenVerifier, JwksTokenVerifier>();
         services.AddScoped<SignInService>();
+        services.AddSingleton<TwoFactorChallenge>();
         services.AddScoped<UserTokens>();
         services.AddScoped<IAccessTokenSource>(sp => sp.GetRequiredService<UserTokens>());
         services.Configure<CircuitRevalidationOptions>(builder.Configuration.GetSection("Circuit:Revalidation"));

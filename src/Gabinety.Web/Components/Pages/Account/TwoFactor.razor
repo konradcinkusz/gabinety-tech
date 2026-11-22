@@ -1,0 +1,77 @@
+@page "/logowanie/kod"
+@attribute [AllowAnonymous]
+@using Gabinety.Web.Hosting
+@inject SignInService SignIn
+@inject TwoFactorChallenge Challenge
+@inject NavigationManager Navigation
+@* The second step of a two-factor sign-in. The first step (password or GitHub) left the identity service's challenge in a sealed, short-lived cookie; without it this page sends the visitor back to /logowanie. *@
+
+<PageTitle>@Pl.TwoFactor.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@Pl.TwoFactor.Title</h1>
+<p>@(Recovery ? Pl.TwoFactor.RecoveryLead : Pl.TwoFactor.Lead)</p>
+
+<FormSummary Problems="_problems" />
+@if (_message is not null)
+{
+    <Alert Variant="AlertVariant.Danger" TestId="two-factor-error">@_message</Alert>
+}
+
+<EditForm Model="Model!" FormName="two-factor" OnSubmit="SubmitAsync" class="form form-narrow" novalidate>
+    <div class="field @(_problems.For(TwoFactorModel.CodeId) is null ? "" : "field--invalid")">
+        <label class="field__label" for="@TwoFactorModel.CodeId">@(Recovery ? Pl.TwoFactor.RecoveryLabel : Pl.TwoFactor.CodeLabel)</label>
+        @if (!Recovery) { <p class="field__hint" id="@(TwoFactorModel.CodeId)-hint">@Pl.TwoFactor.CodeHint</p> }
+        <InputText id="@TwoFactorModel.CodeId" class="field__control" type="text" @bind-Value="Model!.Code" autocomplete="one-time-code" inputmode="@(Recovery ? "text" : "numeric")" autofocus
+                   aria-invalid="@(_problems.For(TwoFactorModel.CodeId) is null ? null : "true")"
+                   aria-describedby="@(_problems.For(TwoFactorModel.CodeId) is null ? (Recovery ? null : TwoFactorModel.CodeId + "-hint") : TwoFactorModel.CodeId + "-error")" />
+        <FieldError FieldId="@TwoFactorModel.CodeId" Problem="_problems.For(TwoFactorModel.CodeId)" />
+    </div>
+    <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.TwoFactor.Submit</button></div>
+</EditForm>
+<p>
+    @if (Recovery) { <a href="@UrlFor(recovery: false)">@Pl.TwoFactor.UseApp</a> }
+    else { <a href="@UrlFor(recovery: true)">@Pl.TwoFactor.UseRecovery</a> }
+</p>
+<p><a href="@ReturnTarget.LoginUrl(Back)">@Pl.TwoFactor.Back</a></p>
+
+@code {
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = ReturnTarget.Parameter)] public string? Redirect { get; set; }
+
+    /// <summary><c>?recovery=1</c>: the form takes a recovery code instead of the authenticator's.</summary>
+    [SupplyParameterFromQuery(Name = "recovery")] public string? RecoveryFlag { get; set; }
+
+    [SupplyParameterFromForm] TwoFactorModel? Model { get; set; }
+
+    FormProblems _problems = new();
+    string? _message;
+
+    bool Recovery => RecoveryFlag == "1";
+    string Back => ReturnTarget.Safe(Redirect);
+    string UrlFor(bool recovery) => ReturnTarget.TwoFactorPath + (Back == "/" && !recovery ? "" : "?" + string.Join('&', new[] { Back == "/" ? null : $"{ReturnTarget.Parameter}={Uri.EscapeDataString(Back)}", recovery ? "recovery=1" : null }.Where(x => x is not null)));
+
+    protected override void OnInitialized()
+    {
+        Model ??= new();
+        if (HttpContext.User.Identity?.IsAuthenticated == true) { Navigation.NavigateTo(Back); return; }
+        if (Challenge.Read(HttpContext) is null) Navigation.NavigateTo($"{ReturnTarget.LoginUrl(Back)}{(Back == "/" ? "?" : "&")}error=session_expired");
+    }
+
+    async Task SubmitAsync()
+    {
+        _problems = Model!.Validate();
+        if (_problems.Any) return;
+        var code = Model.Normalised;
+        var outcome = await SignIn.CompleteTwoFactorAsync(HttpContext, Recovery ? null : code, Recovery ? code : null, HttpContext.RequestAborted);
+        if (outcome == SignInOutcome.SignedIn) { Navigation.NavigateTo(Challenge.Read(HttpContext)?.Redirect ?? Back); return; }
+        if (outcome == SignInOutcome.InvalidCredentials && Challenge.Read(HttpContext) is null) { Navigation.NavigateTo($"{ReturnTarget.LoginUrl(Back)}{(Back == "/" ? "?" : "&")}error=session_expired"); return; }
+        _message = outcome switch
+        {
+            SignInOutcome.InvalidCredentials or SignInOutcome.Rejected => Pl.TwoFactor.Invalid,
+            SignInOutcome.RateLimited => Pl.TwoFactor.RateLimited,
+            _ => Pl.TwoFactor.Unavailable,
+        };
+        Model = new TwoFactorModel(); // a code is never echoed back
+    }
+}

@@ -36,7 +36,10 @@ public class IdentityShapeTests
     [InlineData(403, "{}", IdentityOutcome.Rejected)]
     [InlineData(400, "{\"errors\":[\"x\"]}", IdentityOutcome.Rejected)]
     [InlineData(202, "{\"userId\":\"u\",\"email\":\"a@b\",\"message\":\"m\",\"emailVerificationRequired\":true}", IdentityOutcome.Accepted)]
-    [InlineData(429, "{\"message\":\"Too many requests\"}", IdentityOutcome.Unavailable)]
+    [InlineData(429, "{\"message\":\"Too many requests\"}", IdentityOutcome.RateLimited)]
+    [InlineData(401, "{\"error\":\"Account is temporarily locked\",\"lockedOut\":true,\"lockoutEnd\":\"2026-12-01T10:00:00Z\"}", IdentityOutcome.LockedOut)]
+    [InlineData(401, "{\"error\":\"Invalid\",\"lockedOut\":false}", IdentityOutcome.Unauthorized)]
+    [InlineData(401, "not json", IdentityOutcome.Unauthorized)]
     [InlineData(500, "oops", IdentityOutcome.Unavailable)]
     [InlineData(503, "", IdentityOutcome.Unavailable)]
     [InlineData(200, "not json", IdentityOutcome.Unavailable)]
@@ -80,7 +83,7 @@ public class IdentityShapeTests
     [Fact] public async Task A_429_on_refresh_does_not_end_the_session()
     {
         var (c, _) = Rig(_ => FakeBackend.Raw("{}", (HttpStatusCode)429));
-        Assert.Equal(IdentityOutcome.Unavailable, (await c.RefreshAsync("r")).Outcome); // UserTokens closes a session only on Unauthorized/Rejected
+        Assert.Equal(IdentityOutcome.RateLimited, (await c.RefreshAsync("r")).Outcome); // UserTokens closes a session only on Unauthorized/Rejected
     }
 
     [Fact] public async Task A_down_identity_service_is_unavailable() => Assert.Equal(IdentityOutcome.Unavailable, (await Rig(FakeBackend.Throw(new HttpRequestException("x"))).Client.LoginAsync("a", "b")).Outcome);

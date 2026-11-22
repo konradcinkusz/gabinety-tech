@@ -174,7 +174,7 @@ public class PasswordPagesTests
         Assert.All(page.All("[href], [src], [action]"), e => Assert.DoesNotContain(Token, string.Join(" ", e.Attributes.Select(a => a.Value))));
         Assert.Equal(1, page.Html.Split(Token).Length - 1); // exactly one occurrence: the hidden field
         Assert.Equal("noindex,nofollow", page.One("meta[name=robots]")!.GetAttribute("content"));
-        Assert.Equal("no-referrer", page.One("meta[name=referrer]")!.GetAttribute("content"));
+        Assert.Equal("strict-origin", page.One("meta[name=referrer]")!.GetAttribute("content"));
         Assert.Equal(["co najmniej 8 znaków", "mała i wielka litera", "cyfra", "znak specjalny"], page.All("#reset-password-rules li").Select(li => li.TextContent));
         Assert.Equal("password", form.QuerySelector("#reset-password")!.GetAttribute("type"));
         Assert.Equal("password", form.QuerySelector("#reset-confirmation")!.GetAttribute("type"));

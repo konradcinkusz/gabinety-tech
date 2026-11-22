@@ -147,6 +147,7 @@ public static class PlPractitioner
         public const string BadWeekday = "Nieprawidłowy dzień tygodnia.", BadDate = "Wpisz prawdziwą datę dnia wolnego.", RowIssue = "Przedział {0}: {1}";
         public const string ServerRow = "sprawdź dzień i godziny", Failed = "Nie udało się zapisać dostępności. Spróbuj ponownie.", SummaryTitle = "Popraw godziny przed zapisem";
         public const string Unsaved = "Zmiany w liście godzin są zapisane dopiero po kliknięciu „Zapisz”.";
+        public const string CopyToWeekdays = "Skopiuj na pozostałe dni robocze", DayEmpty = "Brak godzin tego dnia.";
     }
 
     public static class Payments

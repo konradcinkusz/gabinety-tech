@@ -32,6 +32,10 @@ public static class Pl
         public const string GenericTitle = "Coś poszło nie tak", GenericBody = "Wystąpił nieoczekiwany błąd. Spróbuj ponownie za chwilę.";
         public const string NotFoundTitle = "Nie znaleziono strony", NotFoundBody = "Strona, której szukasz, nie istnieje lub została przeniesiona.";
         public const string Reconnecting = "Łączenie z serwerem…", ReconnectFailed = "Utracono połączenie z serwerem. Odśwież stronę.";
+        // V-12: the 404 search and category links (DESIGN-CONTRACT 5.10).
+        public const string NotFoundSearchRegion = "Wyszukiwarka programistów", NotFoundSearchLabel = "Czego szukasz?", NotFoundSearchButton = "Szukaj";
+        // V-12: the error page's way back and retry.
+        public const string RetryLink = "Spróbuj ponownie", HomeLink = "Wróć na stronę główną";
     }
 
     /// <summary>Flash messages are looked up by a fixed key (<c>?flash=signed-out</c>); text from a query string is never rendered.</summary>

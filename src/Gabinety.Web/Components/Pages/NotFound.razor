@@ -19,8 +19,17 @@ else
 {
     <PageTitle>@Pl.Errors.NotFoundTitle</PageTitle>
     <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
-    <h1>@Pl.Errors.NotFoundTitle</h1>
-    <p>@Pl.Errors.NotFoundBody</p>
+    <div class="empty-state" data-testid="page-not-found">
+        <h1>@Pl.Errors.NotFoundTitle</h1>
+        <p>@Pl.Errors.NotFoundBody</p>
+        <form method="get" action="/programisci" role="search" aria-label="@Pl.Errors.NotFoundSearchRegion" class="not-found-search">
+            <div class="field">
+                <label for="not-found-q">@Pl.Errors.NotFoundSearchLabel</label>
+                <input id="not-found-q" class="field__control" name="q" type="text" maxlength="60" autocomplete="off" />
+            </div>
+            <button class="btn btn--primary" type="submit">@Pl.Errors.NotFoundSearchButton</button>
+        </form>
+    </div>
 }
 
 @code {

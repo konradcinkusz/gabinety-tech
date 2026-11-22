@@ -44,6 +44,19 @@ public class SlotPickerLayoutTests : BunitContext
     }
 
     [Fact]
+    public void Each_time_carries_its_utc_instant_and_a_hidden_local_time_note_waits_for_the_script()
+    {
+        // UX-062: enhance.js reads data-utc and fills the note only for a visitor outside Warsaw; the link text stays the Warsaw HH:MM
+        var cut = Render([At(24, 9)]);
+        Assert.Equal("2026-11-24T08:00:00Z", cut.Find("a.slot").GetAttribute("data-utc"));
+        Assert.Equal("09:00", cut.Find("a.slot").TextContent);
+        var note = cut.Find("[data-enhance=local-time-note]");
+        Assert.True(note.HasAttribute("hidden"));
+        Assert.Contains("{zone}", note.GetAttribute("data-template"));
+        Assert.Contains("{local}", note.GetAttribute("data-title"));
+    }
+
+    [Fact]
     public void The_booking_href_of_a_time_is_unchanged()
     {
         var cut = Render([At(24, 9)]);

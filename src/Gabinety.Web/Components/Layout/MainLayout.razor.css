@@ -2,4 +2,9 @@
 .site-main:focus { outline: none; }
 /* The status region is in the page from the first render (a screen reader announces what appears in a region that already existed); empty, it takes no room. */
 .flash { max-width: var(--content-width); margin: 0 auto; padding: 0 var(--gutter); }
-.flash:not(:empty) { margin-top: var(--space-3); padding-block: var(--space-2); background: var(--color-success-soft); border-left: 4px solid var(--color-success); }
+.flash:not(:empty) { margin-top: var(--space-3); padding-block: var(--space-2); background: var(--color-success-soft); border-left: 4px solid var(--color-success); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+/* The dismiss control has no text (the live region's text stays exactly the message); the cross is drawn here. It exists only when enhance.js reveals it. */
+.flash__dismiss { flex: none; width: var(--tap); height: var(--tap); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text); cursor: pointer; font-size: var(--text-xl); line-height: 1; }
+.flash__dismiss::before { content: "\00d7"; }
+.flash__dismiss:hover { background: var(--color-surface-sunken); }
+.flash--dismissed { display: none !important; }

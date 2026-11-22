@@ -167,7 +167,8 @@ public static class PlPages
         public const string Unavailable = "Nie możemy teraz pokazać terminów. Spróbuj ponownie za chwilę.";
         public const string Nearest = "Najbliższy wolny termin: {0}", Today = "dziś", Tomorrow = "jutro";
         public const string Morning = "Rano", Afternoon = "Po południu", Evening = "Wieczorem", PrevWeek = "Poprzedni tydzień", NextWeek = "Następny tydzień", Week = "Tydzień";
-        public const string More = "Pokaż kolejne dni", Retry = "Spróbuj ponownie", TimeZone = "Godziny w czasie polskim (Europe/Warsaw).";
+        public const string More = "Pokaż kolejne dni", Retry = "Spróbuj ponownie", TimeZone = "Godziny w czasie polskim (Europe/Warsaw).",
+            LocalNote = "Twoja strefa czasowa: {zone}. Na przykład {pl} w Polsce to {local} u Ciebie.", LocalTitle = "{local} w Twojej strefie ({zone})";
     }
 
     public static class Nav

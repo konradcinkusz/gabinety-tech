@@ -217,6 +217,8 @@ Status: **UX-001, UX-002, UX-003 and UX-005 are done** (UX-005: `wwwroot/enhance
 
 ### Wave 2: cross-cutting (after wave 1)
 
+Status: **UX-060 (partly) and UX-062 are done; UX-061 and UX-063 are deferred.** UX-060: the flash gets a dismiss control and a thin progress bar shows while a link or form is followed (`enhance.js`, `app.css`); a styled reconnect state was not needed (the only circuit is the checkout clock). UX-062: slot times keep the Warsaw `HH:MM`, a visitor in another zone gets a note with an example and each time's local equivalent in its title. UX-061 (theme switch) is deferred: the public pages are output-cached, so a server-rendered theme needs a cache variation on the cookie, and without it the theme flashes (a blocking head script would be a second script file, against D-1's one script). UX-063 (skeletons for interactive islands) does not apply: no island was built, UX-015 and UX-041 stayed static.
+
 | ID | Task | Owns | Depends | Size |
 |---|---|---|---|---|
 | UX-060 | Feedback layer: flash as a dismissible toast region that also stays in the page, navigation progress bar for enhanced navigation, styled reconnect state | `Components/Layout/MainLayout.razor(.css)`, `FlashKey.cs`, reconnect markup in `App.razor` | UX-002, UX-005 | M |

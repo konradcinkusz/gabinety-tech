@@ -73,6 +73,7 @@ public class ProfileHostTests
         var after = await browser.GetAsync(response.Location!);
         Assert.Equal("Zapisano.", after.TextOf("[data-testid=flash]")); // J2: getByText("Zapisano.")
         Assert.Equal(1, after.ExactText("Zapisano."));
+        Assert.NotNull(after.One("[data-testid=flash] button[data-enhance=dismiss][hidden][aria-label]")); // UX-060: shown by enhance.js only; no text, so the live region's text is the message
         Assert.Equal("Testy end to end dla zespołów", after.One("#headline")!.GetAttribute("value"));
     }
 

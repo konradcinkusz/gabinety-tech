@@ -46,7 +46,7 @@
                     <ul class="slot-times">
                         @foreach (var s in slots)
                         {
-                            <li><a class="chip slot" href="@SlotPickerModel.BookingHref(Offering.Id, s.StartUtc, Slug)">@PlFormat.Time(s.StartUtc)</a></li>
+                            <li><a class="chip slot" href="@SlotPickerModel.BookingHref(Offering.Id, s.StartUtc, Slug)" data-utc="@s.StartUtc.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture)">@PlFormat.Time(s.StartUtc)</a></li>
                         }
                     </ul>
                 </div>
@@ -54,6 +54,8 @@
         </section>
         @MoreLink
         <p class="muted">@PlPages.Slots.TimeZone</p>
+        @* Shown by enhance.js only when the visitor's zone differs from Warsaw; the wording is the template here, filled with the zone and one example time. *@
+        <p class="muted" data-enhance="local-time-note" data-template="@PlPages.Slots.LocalNote" data-title="@PlPages.Slots.LocalTitle" hidden></p>
     }
 </div>
 

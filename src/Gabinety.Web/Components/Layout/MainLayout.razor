@@ -4,7 +4,7 @@
 <a class="skip-link" href="#main">@Pl.A11y.SkipToContent</a>
 <SiteHeader />
 @* The flash area: messages are looked up by a fixed key, never rendered from the query string. *@
-<div class="flash" role="status" aria-live="polite" aria-label="@Pl.A11y.Flash" data-testid="flash">@FlashText</div>
+<div class="flash" role="status" aria-live="polite" aria-label="@Pl.A11y.Flash" data-testid="flash">@if (FlashText is not null) {<span>@FlashText</span><button type="button" class="flash__dismiss" data-enhance="dismiss" data-target=".flash" aria-label="@Pl.A11y.DismissFlash" hidden></button>}</div>
 <main id="main" tabindex="-1" class="site-main">
     <ErrorBoundary>
         <ChildContent>@Body</ChildContent>

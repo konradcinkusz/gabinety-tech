@@ -1,7 +1,5 @@
-/* Progressive enhancement of the web host (DESIGN-CONTRACT rule 1, ADR-0010; UX-005). Same-origin, no dependency, no network, no framework.
-   Every page works without this file: it only adds what a static page cannot do (live counters, a pending button, a modal dialog, show-password, copy, auto-submit).
-   Behaviours are keyed on markup the pages already render or on data-enhance attributes; each has a no-script fallback that is the current behaviour.
-   A page that must not be touched by it carries data-enhance="off" on the element. */
+/* Progressive enhancement (DESIGN-CONTRACT rule 1, ADR-0010). Same-origin, no dependency. Every page works without this file; each behaviour has a no-script
+   fallback that is the page as served. Keyed on existing markup or data-enhance attributes; data-enhance="off" opts an element out. */
 (function () {
   "use strict";
   var doc = document;
@@ -9,7 +7,19 @@
   function closest(el, selector) { return el && el.closest ? el.closest(selector) : null; }
   function off(el) { return !!closest(el, '[data-enhance="off"]'); }
 
-  /* (a) the character counter under a control follows what is typed. The server counts the trimmed text with a newline as CR LF (what a browser posts): so does this. */
+  /* progress bar while a link or form is followed: html.is-navigating (app.css); cleared on pageshow, enhanced load, after 10 s */
+  var navTimer;
+  function navigating() { doc.documentElement.classList.add("is-navigating"); clearTimeout(navTimer); navTimer = setTimeout(idle, 10000); }
+  function idle() { doc.documentElement.classList.remove("is-navigating"); }
+  doc.addEventListener("click", function (e) {
+    var a = closest(e.target, "a[href]");
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || off(a)) return;
+    if ((a.target && a.target !== "_self") || a.hasAttribute("download") || a.origin !== location.origin) return;
+    if (a.pathname === location.pathname && a.search === location.search) return; /* a hash jump or the same page */
+    navigating();
+  });
+
+  /* (a) the counter under a control follows the text; newline counts as CR LF like the server */
   doc.addEventListener("input", function (e) {
     var control = e.target;
     if (!control || !control.classList || !control.classList.contains("field__control") || off(control)) return;
@@ -22,18 +32,18 @@
     counter.textContent = length + " / " + max[1];
   });
 
-  /* (b) a submitting form marks the clicked button busy and ignores a second submit. The button is NOT disabled: a disabled submitter does not post its name and value, which the
-     pages use to tell the assistant, apply and pay buttons apart. */
+  /* (b) a submitting form marks the clicked button busy and refuses a second submit; NOT disabled: a disabled submitter would not post its name and value */
   doc.addEventListener("submit", function (e) {
     var form = e.target;
     if (!form || form.tagName !== "FORM" || off(form) || (form.method || "").toLowerCase() !== "post") return;
     if (form.getAttribute("data-submitting") === "true") { e.preventDefault(); return; }
     form.setAttribute("data-submitting", "true");
+    navigating();
     var button = e.submitter;
     if (button && button.classList.contains("btn")) button.setAttribute("aria-busy", "true");
   });
-  /* the back button restores a page from the cache with the busy state still on it */
   window.addEventListener("pageshow", function (e) {
+    idle();
     if (!e.persisted) return;
     doc.querySelectorAll('form[data-submitting="true"]').forEach(function (f) { f.removeAttribute("data-submitting"); });
     doc.querySelectorAll('.btn[aria-busy="true"]').forEach(function (b) { b.removeAttribute("aria-busy"); });
@@ -46,12 +56,15 @@
     if (select.form.requestSubmit) select.form.requestSubmit(); else select.form.submit();
   });
 
-  /* (e) show or hide a password; (f) copy a link. Both buttons are rendered with the hidden attribute and shown here, so without this file they are simply not there. */
+  /* (e) show/hide a password, (f) copy a link, dismiss a flash: buttons rendered hidden and shown here */
   doc.addEventListener("click", function (e) {
     var button = closest(e.target, "button[data-enhance]");
     if (!button || off(button)) return;
     var kind = button.getAttribute("data-enhance");
-    if (kind === "reveal") {
+    if (kind === "dismiss") {
+      var region = closest(button, button.getAttribute("data-target") || "");
+      if (region) region.classList.add("flash--dismissed");
+    } else if (kind === "reveal") {
       var input = doc.querySelector(button.getAttribute("data-target") || "");
       if (!input) return;
       var show = input.type === "password";
@@ -69,8 +82,7 @@
     }
   });
 
-  /* (c) a dialog the server renders OPEN (visible without this file, as a block in the page) becomes a real modal: focus trap, backdrop, Esc. The state of such a dialog lives in the URL
-     (?action=cancel), so closing it follows the link marked data-dialog-dismiss. */
+  /* (c) a server-rendered OPEN dialog becomes a modal; its state lives in the URL, so closing follows the a[data-dialog-dismiss] link */
   function upgradeDialogs() {
     doc.querySelectorAll('dialog[data-enhance="dialog"][open]').forEach(function (dialog) {
       if (dialog.getAttribute("data-upgraded") === "true" || off(dialog) || typeof dialog.showModal !== "function") return;
@@ -85,16 +97,38 @@
     });
   }
 
-  /* reveal and copy buttons appear only when the script can serve them */
   function showControls() {
-    doc.querySelectorAll('button[data-enhance="reveal"][hidden]').forEach(function (b) { b.hidden = false; });
+    doc.querySelectorAll('button[data-enhance="reveal"][hidden], button[data-enhance="dismiss"][hidden]').forEach(function (b) { b.hidden = false; });
     if (navigator.clipboard) doc.querySelectorAll('button[data-enhance="copy"][hidden]').forEach(function (b) { b.hidden = false; });
   }
 
-  function init() { upgradeDialogs(); showControls(); }
+  /* (g) slot times are Warsaw times: a visitor in another zone gets a note and each time's local equivalent as a title */
+  function hm(date, zone) { return new Intl.DateTimeFormat("pl-PL", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: zone }).format(date); }
+  function localTimes() {
+    var zone; try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { return; }
+    if (!zone || zone === "Europe/Warsaw") return;
+    doc.querySelectorAll('[data-enhance="local-time-note"]').forEach(function (note) {
+      if (off(note) || note.getAttribute("data-done") === "true") return;
+      var picker = closest(note, ".slot-picker") || doc;
+      var slots = picker.querySelectorAll("a[data-utc]");
+      if (!slots.length) return;
+      var any = false;
+      slots.forEach(function (a) {
+        var at = new Date(a.getAttribute("data-utc")), pl = hm(at, "Europe/Warsaw"), local = hm(at, zone);
+        if (pl === local) return;
+        any = true;
+        a.title = (note.getAttribute("data-title") || "").replace("{local}", local).replace("{zone}", zone);
+      });
+      if (!any) return;
+      var first = new Date(slots[0].getAttribute("data-utc"));
+      note.textContent = (note.getAttribute("data-template") || "").replace("{zone}", zone).replace("{pl}", hm(first, "Europe/Warsaw")).replace("{local}", hm(first, zone));
+      note.hidden = false; note.setAttribute("data-done", "true");
+    });
+  }
+
+  function init() { idle(); upgradeDialogs(); showControls(); localTimes(); }
 
   if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", init); else init();
-  /* Blazor enhanced navigation swaps the page body without a load event */
   if (window.Blazor && window.Blazor.addEventListener) window.Blazor.addEventListener("enhancedload", init);
   else doc.addEventListener("enhancedload", init);
 })();

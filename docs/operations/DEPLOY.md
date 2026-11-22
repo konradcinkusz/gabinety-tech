@@ -64,3 +64,18 @@ Secrets are set with `fly secrets set --stage` and take effect with the deploy t
 - **Private apps' smoke** uses `fly ssh console` and a bash `/dev/tcp` HTTP GET (the backend images have bash, no curl or wget: the Dockerfile HEALTHCHECK does the same); PostgreSQL uses `pg_isready`.
 - **The called workflow's secrets.** `_deploy-app.yml` reads the environment's secrets through `secrets: inherit` and `toJSON(secrets)`. That is the documented behaviour but it was not run.
 - **Not validated here:** `flyctl` flags (`apps create --org`, `volumes create --yes`, `secrets set --stage`, `deploy --ha=false --no-public-ips --yes`, `ips allocate-v6 --private`, `ssh console --command`) against v0.5.12, the staged-secret behaviour on an app with no machine, and the `fly.toml` files against `fly config validate`.
+
+## 5. The Blazor web app (`web-blazor`, ADR-0010): ready, dormant until the cutover
+
+`deploy/fly/web-blazor.fly.toml` is the Fly config of `src/Gabinety.Web`; its row in `deploy/estate.conf` is commented out (`#cutover# web-blazor ...`) and the job `deploy-web-blazor` of `deploy.yml` runs only when that row exists, so **a tag deploys exactly what it deployed before**. The cutover PR uncomments the row (`docs/operations/CUTOVER.md`). `scripts/tests/deploy.test.sh` checks the row as if it were enabled (well formed, selected by a change in `src/Gabinety.Web/` and by a shared path, its secrets rows, the workflow wiring); `scripts/check-fly-toml.sh` pins the settings a stateful frontend needs.
+
+What differs from the Next web app, and why (BLAZOR-WEB-APP section 14):
+
+- **A stateful app.** Every open interactive page is a circuit in the machine's memory behind a websocket. `min_machines_running = 1`, `auto_stop_machines = "off"`: **there is no scale to zero** for this app, so its cost is the always-on figure of `COST.md` (no saving from idle). A deploy or a restart ends every circuit; the pages reconnect and re-read from the API.
+- **One machine** (`--ha=false`, already the workflow's default). A circuit and its follow-up requests must reach the same machine and the session store is in process memory. To scale out later: session affinity and a shared session store in one change, not before.
+- **A volume for the Data Protection keys**: `webdata` (1 GB), mounted at `/data`, `DataProtection__KeysPath = /data/keys`. Without it each deploy invalidates antiforgery tokens (open forms fail) and the session cookie. The workflow creates it (`ensure-app.sh <app> webdata 1 fra`) and, after the deploy, runs `chown -R app /data` once per deploy (idempotent) because a Fly volume is root-owned and the image runs as the non-root user `app`.
+- **Health is `/alive`** (the Fly check and the smoke); the Next app's was `/api/health`. Websockets pass the Fly proxy; the circuit's keep-alive (15 s) is inside the proxy's idle timeout.
+- **Forwarded headers and origin.** `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` (the scheme behind Fly's proxy) and `Site__BaseUrl` = the public https address: the origin guard allows exactly that origin. A wrong `Site__BaseUrl` shows as `403 cross_site_request` on every form and on the circuit's websocket.
+- **Secrets**: `RateLimit__TrustedProxyKey` only (optional, the same value as the backends and the Next app). No internal key, no signing secret.
+- **App name.** `gabinety-web-blazor-staging`, a new app beside `gabinety-web-staging` (the rollback target), not a rename of it. The public host moves in `CUTOVER.md` section 3.
+- **Rollback of an image**: as section 3 (`fly releases --app gabinety-web-blazor-staging --image`, `fly deploy --image ...`); the keys on the volume survive, so open forms of the previous release keep working, but circuits and sessions end.

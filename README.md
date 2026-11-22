@@ -37,7 +37,7 @@ dotnet run --project src/Gabinety.AppHost --launch-profile fake
 scripts/check-fake-profile.sh   # sprawdza wszystkie usługi
 ```
 
-Aplikacja: <http://localhost:3000>. Pełny przewodnik (logowanie, ścieżki, zegar testowy, warstwy testów): [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
+Dwa frontendy działają obok siebie do przełączenia (ADR-0010): **Next.js** na <http://localhost:3000> (`web/`, kompletny) i **Blazor Web App** na <http://localhost:3001> (`src/Gabinety.Web`, strony przenoszone; lista postępu: [docs/operations/PARITY.md](docs/operations/PARITY.md)). Oba używają tych samych usług i tych samych użytkowników demo. Ścieżki użytkownika J1-J7 przechodzą na obu: `HOST=next|blazor pnpm --dir tests/e2e test` (kroki ze stronami, których Blazor jeszcze nie ma, są pomijane z nazwą gałęzi właściciela). Pełny przewodnik (logowanie, ścieżki, zegar testowy, warstwy testów): [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
 
 ## Architektura
 
@@ -48,8 +48,8 @@ Aplikacja: <http://localhost:3000>. Pełny przewodnik (logowanie, ścieżki, zeg
 | `Gabinety.Reputation` | opinie i oceny | 5103 |
 | `Gabinety.Assistant` | asystent (model językowy) | 5104 |
 | `Gabinety.DevIdentity` | zamiennik dostawcy tożsamości | 5100 |
-| `web/` | aplikacja webowa z BFF | 3000 |
-| `src/Gabinety.Web` | port frontendu na Blazor Web App obok `web/` (propozycja ADR-0010: `docs/adr-proposals/0010-blazor-web-app-frontend.md`) | 3001 |
+| `web/` | aplikacja webowa z BFF (Next.js; do przełączenia) | 3000 |
+| `src/Gabinety.Web` | frontend jako Blazor Web App obok `web/` (propozycja ADR-0010: `docs/adr-proposals/0010-blazor-web-app-frontend.md`); po przełączeniu zajmie port 3000 (`docs/operations/CUTOVER.md`) | 3001 |
 
 Usługi .NET 10 (minimal API, EF Core, PostgreSQL) uruchamia Aspire AppHost. Autoryzacja: tokeny RS256 z [authservice](https://github.com/konradcinkusz/authservice). Pieniądze to `long` w groszach, czas pochodzi z `TimeProvider`.
 

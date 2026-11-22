@@ -16,7 +16,6 @@ export const webBaseUrl = (process.env.BASE_URL || process.env.E2E_WEB_URL || (i
 export const webHealthPath = isBlazor ? "/health" : "/api/health";
 
 /**
- * The spec files the Blazor host supports TODAY. Each port session adds its journey here once its pages exist.
- * With HOST=blazor ONLY these run; with HOST=next everything except `*.blazor.spec.ts` runs, exactly as before.
+ * Which specs run where is decided by `playwright.config.ts`: both hosts run every journey; `*.blazor.spec.ts` is Blazor-only, `*.next.spec.ts` (and the original j7) Next-only.
+ * A journey step that needs a page the Blazor host has not got yet skips itself with the owning branch named (`harness/parity.ts`); `PARITY_STRICT=1` makes that a failure.
  */
-export const BLAZOR_SPECS: readonly string[] = ["journeys/j7-foreign-origin.blazor.spec.ts"];

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { gotoInteractive } from "./circuit";
 
 /** Page objects of the booking detail (/moje/rezerwacje/{id}) and the administrator's disputes list (/admin/spory), for J5 and J6. Role and label locators only. */
 export class BookingDetailPage {
@@ -7,7 +8,7 @@ export class BookingDetailPage {
   async goto(bookingId: string) {
     const heading = this.page.getByRole("heading", { level: 2 }).first();
     for (let attempt = 1; ; attempt++) {
-      await this.page.goto(`/moje/rezerwacje/${bookingId}?role=client`);
+      await gotoInteractive(this.page, `/moje/rezerwacje/${bookingId}?role=client`);
       try {
         await expect(heading).toBeVisible({ timeout: 8_000 });
         return;
@@ -52,7 +53,7 @@ export class BookingDetailPage {
 export class AdminDisputesPage {
   constructor(readonly page: Page) {}
   async goto() {
-    await this.page.goto("/admin/spory");
+    await gotoInteractive(this.page, "/admin/spory");
     await expect(this.page.getByRole("heading", { level: 1, name: "Spory" })).toBeVisible();
   }
   /** One dispute card: the list item that names the booking id. */

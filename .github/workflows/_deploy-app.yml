@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       key:
-        description: App key of deploy/estate.conf (postgres, authservice, directory, booking, reputation, assistant, web)
+        description: App key of deploy/estate.conf (postgres, authservice, directory, booking, reputation, assistant, web, web-blazor at the cutover)
         required: true
         type: string
 permissions:
@@ -42,7 +42,12 @@ jobs:
         run: scripts/deploy/check-placeholders.sh "deploy/fly/$KEY.fly.toml"
       - name: Ensure the Fly app exists (cold estate)
         run: |
-          if [ "$KEY" = postgres ]; then scripts/deploy/ensure-app.sh "$FLY_APP" pgdata 5 fra; else scripts/deploy/ensure-app.sh "$FLY_APP"; fi
+          # postgres and web-blazor own a volume (the database; the Data Protection keys of the Blazor host)
+          case "$KEY" in
+            postgres) scripts/deploy/ensure-app.sh "$FLY_APP" pgdata 5 fra;;
+            web-blazor) scripts/deploy/ensure-app.sh "$FLY_APP" webdata 1 fra;;
+            *) scripts/deploy/ensure-app.sh "$FLY_APP";;
+          esac
         env:
           FLY_APP: ${{ steps.app.outputs.fly }}
       - name: Stage the secrets (names only are printed; values are masked)
@@ -63,6 +68,11 @@ jobs:
           KIND: ${{ steps.app.outputs.kind }}
           IMAGE: ${{ steps.app.outputs.image }}
           NETWORK: ${{ steps.app.outputs.network }}
+      - name: Volume owner (the Blazor host runs as the non-root user app; a Fly volume is root-owned; idempotent)
+        if: ${{ inputs.key == 'web-blazor' }}
+        run: flyctl ssh console --app "$FLY_APP" --command "chown -R app /data"
+        env:
+          FLY_APP: ${{ steps.app.outputs.fly }}
       - name: No public address on a private app (F-03)
         if: ${{ steps.app.outputs.network != 'public' }}
         run: scripts/deploy/assert-no-public-ip.sh "$FLY_APP"

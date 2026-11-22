@@ -62,3 +62,9 @@ roughly 10 s, set the Assistant to `min_machines_running = 1` (about +5.92 USD/m
 
 Two mechanics the table depends on (not shown against a real Fly account): `.flycast` needs `fly ips allocate-v6 --private --app gabinety-assistant-staging` once, and the
 private apps are deployed with `--no-public-ips`. Without the private IPv6 the `.flycast` name does not resolve and both calls degrade.
+
+## 4. The Blazor web app (ADR-0010): no scale to zero, memory budget
+
+`gabinety-web-blazor-staging` (`deploy/fly/web-blazor.fly.toml`) replaces `gabinety-web-staging` at the cutover. It is a stateful frontend: `min_machines_running = 1`, auto stop off, one machine, so **it costs the always-on figure and can never be idle-stopped** (a stop ends every open page). Size 512 MB shared-cpu-1x: 3.32 USD a month at the assumed rates of section 1, the same as the Next app. Add a 1 GB volume for the Data Protection keys: 1 x 0.15 = **0.15 USD**. The estate ceiling of section 2 therefore rises by 0.15 (27.89 to 28.04), and **by another 3.32 for the fortnight or so while the old app stays as the rollback** (`CUTOVER.md` section 3).
+
+Memory budget (measured in a CI-like container, **not on Fly**, `PERFORMANCE.md` section 8): idle host 143 MB RSS, 269 MB with 150 idle interactive pages, 512 MB machine. About 100 to 150 simultaneous active pages per machine; the proxy sheds above 150 connections. If real use exceeds that, 1 GB is 5.92 USD (+2.60 a month); a second machine needs session affinity and a shared session store first, not just a count.

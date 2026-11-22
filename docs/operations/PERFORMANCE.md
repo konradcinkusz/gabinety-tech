@@ -109,3 +109,20 @@ BASELINE_WEB_URL=http://localhost:3001 scripts/measure-performance.sh       # ab
 ```
 
 The AppHost's own fake profile can be measured too (`dotnet run --project src/Gabinety.AppHost --launch-profile fake`), but its rate limit is 6000 a minute (the read rows will hit 429 and the script reports them as `invalid`), it is in-memory, and its web app is `next dev`: not the numbers of this file.
+
+## 8. Blazor circuits: memory per open interactive page (ADR-0010)
+
+**Measured in a CI-like container (4 cores, 15.7 GiB, Linux 6.18), not on Fly.** `ONLY_CIRCUITS=1 scripts/measure-performance.sh` publishes a **Release** build of `src/Gabinety.Web`, runs it as Production with the circuit limits of `deploy/fly/web-blazor.fly.toml` and a GC heap cap of 75 % of 512 MB (how the runtime reads a cgroup limit; there is no container here), signs in N times through the form (N sessions), opens `/moje/rezerwacje` (an interactive page) in N Chromium pages, waits for each circuit, lets RSS settle, and reads `/proc/<pid>`. The pages are idle after load: a user typing into the booking form or using the assistant costs more than this. Date 2026-11-22, services on the in-memory fake profile.
+
+| Open circuits | RSS (MB) | RssAnon (MB) | Pss (MB) | MB per circuit (vs 0) | Marginal MB per added circuit |
+|---|---|---|---|---|---|
+| 0 (idle, warmed) | 143.2 | 28.0 | 68.2 | - | - |
+| 10 | 173.8 | 49.2 | 97.7 | 3.1 | 3.1 |
+| 25 | 206.0 | 77.0 | 129.9 | 2.5 | 2.1 |
+| 50 | 217.9 | 86.3 | 141.8 | 1.5 | 0.5 |
+| 100 | 245.3 | 112.0 | 169.1 | 1.0 | 0.5 |
+| 150 | 269.4 | 136.0 | 193.2 | 0.8 | 0.5 |
+
+**Conclusion for the 512 MB machine.** 150 idle interactive pages fit at 269 MB RSS, under the 384 MB left after 25 % headroom. The cost is not linear (the GC grows the heap in steps): about 3 MB per circuit for the first ten, about 0.5 MB for each further one. Extrapolating the first-level slope gives a conservative 78 pages and the late slope about 500; only the 150 measured are proven. Plan on roughly 100 to 150 simultaneous active users per machine, and set the proxy limits (soft 100, hard 150 connections) there. About 115 MB of the RSS is shared file-backed runtime pages (RSS minus RssAnon); the anonymous memory is 136 MB at 150 circuits.
+
+**Not shown:** Fly itself (shared CPU, its memory accounting, the proxy), a Debug build (the AppHost's own Blazor resource: do not measure that), circuits doing work (typing, the assistant, live pages), disconnected-circuit retention churn, GC pauses and CPU under load, more than 150 circuits, real backends with data at scale.

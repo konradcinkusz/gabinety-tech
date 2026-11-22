@@ -67,8 +67,15 @@ public class ProfilePageTests
     {
         await using var web = PublicSupport.Host();
         await Get(web);
-        Assert.All(web.Booking.Requests, r => Assert.Null(r.Authorization));
-        Assert.StartsWith($"/api/v1/practitioners/{PublicSupport.PractitionerId}/slots?offeringId={PublicSupport.OfferA}&from=", web.Booking.Requests[0].PathAndQuery);
+        // The page reads every offer's slots concurrently, so the ORDER of the recorded requests is not defined: assert each one is a bearer-less slot read, and that offer A's is among them.
+        var requests = web.Booking.Requests.ToList();
+        Assert.NotEmpty(requests);
+        Assert.All(requests, r =>
+        {
+            Assert.Null(r.Authorization);
+            Assert.StartsWith($"/api/v1/practitioners/{PublicSupport.PractitionerId}/slots?offeringId=", r.PathAndQuery);
+        });
+        Assert.Contains(requests, r => r.PathAndQuery.StartsWith($"/api/v1/practitioners/{PublicSupport.PractitionerId}/slots?offeringId={PublicSupport.OfferA}&from=", StringComparison.Ordinal));
     }
 
     [Fact]

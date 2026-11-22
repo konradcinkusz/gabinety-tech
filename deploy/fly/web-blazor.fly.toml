@@ -1,0 +1,85 @@
+# web-blazor (ADR-0010, T-09.02 for the Blazor host): src/Gabinety.Web, the Blazor Web App that replaces the Next.js BFF (deploy/fly/web.fly.toml) at the cutover.
+# NOT DEPLOYED YET: its row in deploy/estate.conf is a commented "#cutover#" row; the cutover PR uncomments it (docs/operations/CUTOVER.md). Until then this file is only checked
+# (scripts/check-fly-toml.sh, scripts/tests/deploy.test.sh) so that the cutover flips a switch and writes no new config.
+# Deploy (the workflow does it):  fly deploy --config deploy/fly/web-blazor.fly.toml --ha=false    (from the repository root; the context is the repository root)
+# Nothing secret and no real hostname lives in this file. Placeholders in <angle brackets> are filled by the owner with the Next app's (web.fly.toml).
+#
+# A STATEFUL frontend (BLAZOR-WEB-APP section 14; ADR-0010 "Hosting"). Every open interactive page is a circuit in this machine's memory behind a websocket:
+#  - min_machines_running = 1 and NO idle stop. This app is on the synchronous path of every page (SPEC 4.3), and a stopped machine ends every circuit: scale to zero (P7) is NOT available.
+#  - ONE machine (--ha=false). A circuit and its follow-up requests must reach the same machine and the server-side session store is in process memory; a second machine would be a
+#    second set of sessions. To scale out later: session affinity (fly-replay / `fly-force-instance-id` or a sticky cookie) AND a shared session store, in one change.
+#  - A volume holds the Data Protection keys (DataProtection__KeysPath), so antiforgery tokens and the session cookie survive a restart and a deploy. A volume binds the app to one
+#    machine, which agrees with the point above. First use: `fly volumes create webdata --app gabinety-web-blazor-staging --region fra --size 1` (scripts/deploy/ensure-app.sh does it),
+#    then once `fly ssh console -C "chown -R app /data"`: the volume is root-owned and the image runs as the non-root user `app` (the deploy workflow does this step too).
+#  - Websockets pass the Fly proxy untouched. The proxy closes an idle connection after a minute without traffic; the circuit's SignalR keep-alive (15 s) is well inside that.
+#  - Memory: 512 MB shared-cpu-1x. The circuit limits below bound the cost of each open page; the measured MB per circuit and the conclusion are in docs/operations/PERFORMANCE.md (section
+#    "Blazor circuits") and docs/operations/COST.md. A deploy or a restart ends every circuit and, until the session cookie is stateless (ADR-0010 cutover preconditions), every session.
+
+app = "gabinety-web-blazor-staging"
+primary_region = "fra"
+
+[build]
+  # Paths relative to THIS file. The Dockerfile copies src/ and the root props, so the context is the repository root.
+  dockerfile = "../../src/Gabinety.Web/Dockerfile"
+  context = "../.."
+
+[env]
+  ASPNETCORE_HTTP_PORTS = "8080"
+  TZ = "Europe/Warsaw"
+  # Behind Fly's TLS-terminating proxy the scheme is https only with forwarded headers; the origin guard allows exactly Site__BaseUrl (and AllowedOrigins).
+  ASPNETCORE_FORWARDEDHEADERS_ENABLED = "true"
+  Site__BaseUrl = "https://<web-public-host>"
+  # Same on-disk path as [mounts] destination below (scripts/check-fly-toml.sh asserts it).
+  DataProtection__KeysPath = "/data/keys"
+  # No Payments__Provider here, on purpose (security review F-01): the mock checkout page exists only in the fake profile.
+  # Runtime configuration. Always-on backends over the private network (the same addresses as the Next web app):
+  Backend__Directory = "http://gabinety-directory-staging.internal:8080"
+  Backend__Booking = "http://gabinety-booking-staging.internal:8080"
+  Backend__Reputation = "http://gabinety-reputation-staging.internal:8080"
+  # Assistant may be stopped (min 0): .flycast goes through the proxy, which starts it.
+  Backend__Assistant = "http://gabinety-assistant-staging.flycast"
+  # authservice is the JWT issuer and is browser-facing (login redirect, OAuth): its public URL.
+  Backend__Auth = "https://<authservice-public-host>"
+  Identity__Issuer = "gabinety-staging"
+  Identity__Audience = "gabinety"
+  Identity__PublicUrl = "https://<authservice-public-host>"
+  # Bounded cost of an open page (Gabinety.Web hosting; defaults shown so that a change is a visible change of this file).
+  Circuit__DisconnectedMaxRetained = "20"
+  Circuit__DisconnectedRetentionSeconds = "120"
+  Circuit__MaxBufferedRenderBatches = "5"
+  Circuit__MaxReceiveBytes = "32768"
+
+# Secrets (NOT here), set with `fly secrets set --app gabinety-web-blazor-staging` (the workflow does it from deploy/secrets.map, rows `web-blazor`):
+#   RateLimit__TrustedProxyKey (optional, T-10.03): the SAME value as the four backends and the Next web app. NOT an internal key; it opens no route. The host forwards the visitor's address with it
+#   (X-Client-Address / X-Edge-Key, ADR-0010 decision 4) so the per-visitor limits key on the visitor. The Blazor host holds no internal key and no signing secret.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # On the synchronous path of every page and holding every open circuit (see the top of this file).
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Circuits are connections: cap them below what 512 MB holds (PERFORMANCE.md "Blazor circuits": measured up to 150 open interactive pages; the hard limit is a margin over the planning
+  # figure, not the proven capacity), so the proxy sheds load instead of the machine running out of memory. soft_limit is where the proxy prefers another machine (there is none),
+  # hard_limit is where it refuses. Browsers also hold ordinary keep-alive connections, which count here, so the limits are connections and not pages.
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 100
+    hard_limit = 150
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/alive"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "30s"
+
+[mounts]
+  source = "webdata"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

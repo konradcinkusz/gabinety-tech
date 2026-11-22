@@ -45,6 +45,7 @@ jobs:
       reputation: ${{ steps.detect.outputs.reputation }}
       assistant: ${{ steps.detect.outputs.assistant }}
       web: ${{ steps.detect.outputs.web }}
+      web-blazor: ${{ steps.detect.outputs.web-blazor }} # empty until the cutover row of deploy/estate.conf is enabled: the job below then runs, before that it never does
       build_matrix: ${{ steps.detect.outputs.build_matrix }}
     steps:
       - uses: actions/checkout@v4
@@ -195,10 +196,20 @@ jobs:
     secrets: inherit
     with:
       key: web
+  # The Blazor Web App (ADR-0010). Dormant: its output exists only when the `#cutover# web-blazor` row of deploy/estate.conf is uncommented (docs/operations/CUTOVER.md).
+  deploy-web-blazor:
+    needs: [detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation, deploy-assistant]
+    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.detect-changes.outputs.web-blazor == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_deploy-app.yml
+    secrets: inherit
+    with:
+      key: web-blazor
 
   # 5. One table for the run: what was deployed and healthy, what was not selected, what failed. Fails the run when any job failed.
   summary:
-    needs: [verify-tag, detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation, deploy-assistant, deploy-web]
+    needs: [verify-tag, detect-changes, build, deploy-postgres, deploy-authservice, deploy-directory, deploy-booking, deploy-reputation, deploy-assistant, deploy-web, deploy-web-blazor]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

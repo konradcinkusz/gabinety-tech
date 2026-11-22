@@ -156,7 +156,7 @@ if (authservice is not null) web.WaitFor(authservice);
 
 // The Blazor Web App frontend (ADR-0010 proposal) runs beside the Next.js one until a cutover PR: same backend addresses, port 3001, the kernel's /health. It is given NO internal key: that is for
 // services calling services (ADR-0007). Not in the default profile's WaitFor chain of anything: nothing depends on a frontend.
-builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchProfileName: null)
+var webBlazor = builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchProfileName: null)
     .WithHttpEndpoint(port: 3001, isProxied: false)
     .WithHttpHealthCheck("/health")
     // Aspire starts a project WITHOUT ASPNETCORE_ENVIRONMENT here (launchProfileName: null), so it would run as Production from an unpublished build, where the pre-compressed static assets
@@ -174,5 +174,8 @@ builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchProfileName: null)
     // The journeys change data and read the public pages straight after (approve, then open the profile): the five-minute output cache of the public pages is off in this host.
     .WithEnvironment("OutputCache__Enabled", "false")
     .WaitFor(directory);
+// The mock checkout (/checkout/mock/{id}) exists only in the fake profile (security review F-01): the host decides that with the Booking service's own rule (GABINETY_FAKE=1 or Environment:Kind=Development,
+// and no real payment provider), so the fake profile must say so, or the booking form ends in "Nie udało się przejść do płatności" and journeys J3 and J4 cannot reach the checkout.
+if (fake) webBlazor.WithEnvironment("GABINETY_FAKE", "1");
 
 builder.Build().Run();

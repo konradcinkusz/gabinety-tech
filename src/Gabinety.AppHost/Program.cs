@@ -19,7 +19,7 @@ var identityAuthority = fake ? "http://localhost:5100" : $"http://localhost:{Aut
 const string IdentityAudience = "gabinety";
 // The real authservice, pinned by digest: tag v0.3.4, multi-platform index digest (docs/spikes/authservice.md section 4; the same string as deploy/fly/authservice.fly.toml and ThinSliceTests).
 const string AuthserviceImage = "ghcr.io/konradcinkusz/authservice";
-const string AuthserviceSha256 = "d0309a94f6b6300d4b8091381786c160ae7717a022416debaaa6d8d19a244645";
+const string AuthserviceDigest = "sha256:d0309a94f6b6300d4b8091381786c160ae7717a022416debaaa6d8d19a244645";
 
 IResourceBuilder<ProjectResource> Service<TProject>(string name, int port) where TProject : IProjectMetadata, new()
 {
@@ -87,7 +87,7 @@ else
     var adminPassword = builder.AddParameter("initial-admin-password", () => "Demo-Dev-Passw0rd!", secret: true);
 
     authservice = builder.AddContainer("authservice", AuthserviceImage)
-        .WithImageSHA256(AuthserviceSha256) // pinned by digest (repository@sha256:...), never a floating tag
+        .WithImageSHA256(AuthserviceDigest["sha256:".Length..]) // pinned by digest (repository@sha256:...), never a floating tag
         .WithHttpEndpoint(port: AuthservicePort, targetPort: 8080, name: "http", isProxied: false)
         .WithReference(authDb, "DefaultConnection") // ConnectionStrings__DefaultConnection, host = the postgres container
         .WithEnvironment("DATABASE_PROVIDER", "PostgreSQL")

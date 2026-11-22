@@ -12,7 +12,7 @@
 }
 else if (Profile is not null)
 {
-    <FormSummary Errors="Summary" />
+    <ErrorSummary Errors="Summary" />
     @if (_general is not null) {<Alert Variant="AlertVariant.Danger" TestId="profile-error">@_general</Alert>}
     <form method="post" @onsubmit="SaveAsync" @formname="profile" class="form stack form-narrow" novalidate>
         <AntiforgeryToken />

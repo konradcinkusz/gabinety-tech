@@ -1,5 +1,6 @@
 using Gabinety.Billing;
 using Gabinety.Booking.Features.Internal.Reviewability;
+using Gabinety.Booking.Features.Lifecycle.Cancel;
 using Gabinety.Booking.Features.Lifecycle.Dispute;
 using Gabinety.Booking.Features.Lifecycle.NoShow;
 using BookingEntity = Gabinety.Booking.Features.Bookings.Entities.Booking;
@@ -15,8 +16,7 @@ public readonly record struct BookingFlags(bool CanCancel, bool CanDispute, bool
 /// <summary>
 /// The four <c>BookingView</c> flags for one caller at <c>time.GetUtcNow()</c>. Pure: no I/O, no clock of its own. Each flag asks the same rule the endpoint
 /// enforces, so the two cannot drift: the state table (<see cref="BookingStateMachine"/>), <see cref="DisputeFeature.InWindow"/>,
-/// <see cref="ReportClientNoShowFeature.InWindow"/> and <see cref="ReviewabilityFeature.Window"/>. The one rule with no shared home is the
-/// practitioner's "before the end" for a cancel: it is a lambda inside the cancel endpoint, so it is repeated here as <c>now &lt; EndUtc</c>.
+/// <see cref="ReportClientNoShowFeature.InWindow"/> and <see cref="ReviewabilityFeature.Window"/>. The cancel rules, and the outcome of a cancel, are in <see cref="CancelPlanner"/>.
 /// <para><c>CanReview</c> is an upper bound: Reputation owns "already reviewed", which Booking cannot see.</para>
 /// An admin who is not a party gets no flag; a stranger neither.
 /// </summary>
@@ -31,7 +31,7 @@ public static class BookingPermissions
         var s = b.Status;
 
         var canCancel = isClient && Allowed(s, BookingTrigger.ClientCancels, b, now)
-            || isPractitioner && Allowed(s, BookingTrigger.PractitionerCancels, b, now) && now < b.EndUtc;
+            || isPractitioner && Allowed(s, BookingTrigger.PractitionerCancels, b, now) && CancelPlanner.TimeRuleAllows(b, byClient: false, now);
         // "Can open a dispute of some kind": the practitioner_no_show kind has the widest window, the other kinds' window lies inside it or ends with it.
         var canDispute = isClient && Allowed(s, BookingTrigger.ClientDisputes, b, now) && DisputeFeature.InWindow(b, "practitioner_no_show", now);
         var canReportNoShow = isPractitioner && Allowed(s, BookingTrigger.ClientNoShowReported, b, now) && ReportClientNoShowFeature.InWindow(b, now);

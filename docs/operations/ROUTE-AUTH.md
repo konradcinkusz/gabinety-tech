@@ -50,6 +50,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Directory | DELETE | `/api/v1/admin/moderators/{userId}` | Admin+Role:SuperAdmin | all | |
 | Directory | GET | `/internal/v1/offerings/{id}` | Internal | all | callers: Booking, Reputation |
 | Directory | GET | `/internal/v1/practitioners/by-user/{userId}` | Internal | all | callers: Booking, Reputation |
+| Directory | GET | `/internal/v1/practitioners/{id}` | Internal | all | caller: Booking (display name and slug for the booking views, ADR-0012 section 6) |
 | Directory | GET | `/internal/v1/practitioners/{userId}/contact` | Internal | all | caller: Booking (T-03.09, notifications): the e-mail snapshot of the practitioner, `404` when none is held. Booking already holds `Internal__Keys__Directory`: no new key |
 | Directory | PUT | `/internal/v1/practitioners/{id}/reputation` | Internal | all | caller: Reputation |
 | Directory | PUT | `/internal/v1/practitioners/{id}/booking-stats` | Internal | all | caller: Booking |
@@ -144,10 +145,15 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | GET | `/sitemap.xml` | Anonymous | all | approved practitioners and indexable categories; 503 when the Directory does not answer |
 | Web | GET | `/robots.txt` | Anonymous | all | same rules as the Next.js app |
 | Web | PAGE | `/logowanie` | Anonymous | all | sign-in form (the POST is handled by the page, antiforgery) |
+| Web | PAGE | `/logowanie/kod` | Anonymous | all | second step of a two-factor sign-in; needs the sealed `gt_2fa` challenge cookie, else back to `/logowanie` |
+| Web | PAGE | `/rejestracja` | Anonymous | all | registration form (the POST is handled by the page, antiforgery) |
+| Web | PAGE | `/rejestracja/sprawdz-skrzynke` | Anonymous | all | "confirm your e-mail" state after a `202` registration |
 | Web | PAGE | `/wyloguj` | Anonymous | all | sign-out form |
 | Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |
 | Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect, state checked against the cookie, code exchanged |
 | Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings, interactive server rendering |
+| Web | PAGE | `/konto` | Authenticated | all | account: e-mail, consents, data export link, account deletion (static rendering, forms with antiforgery) |
+| Web | GET | `/konto/export` | Authenticated | all | the user's data as a no-store JSON attachment (the identity service's export, passed through) |
 | Web | PAGE | `/gabinet-programisty` | Authenticated | all | practitioner dashboard and onboarding, static server rendering; any signed-in account may become a practitioner (ADR-0012, "Practitioner area") |
 | Web | PAGE | `/gabinet-programisty/profil` | Authenticated | all | practitioner profile form |
 | Web | PAGE | `/gabinet-programisty/oferty` | Authenticated | all | offers: list, confirmation before disabling, re-enable, form |

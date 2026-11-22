@@ -13,6 +13,8 @@ public sealed record DirectoryPractitioner(Guid PractitionerId, PractitionerStat
 public sealed record DirectoryOffering(Guid OfferingId, Guid PractitionerId, string PractitionerUserId, PractitionerStatus PractitionerStatus,
     string Title, int DurationMinutes, MoneyDto Price, string? MeetingUrl, bool IsActive);
 
+/// <summary>GET /internal/v1/practitioners/{id}: display name and slug for the booking views (ADR-0012 section 6).</summary>
+public sealed record DirectoryPractitionerName(Guid PractitionerId, string DisplayName, string Slug);
 /// <summary>GET /internal/v1/practitioners/{userId}/contact: the practitioner's e-mail, a snapshot of the token they last used on their profile. Personal data: never logged.</summary>
 public sealed record DirectoryContact(string? Email);
 
@@ -25,6 +27,8 @@ public interface IDirectoryClient
     Task<DirectoryOffering?> GetOfferingAsync(Guid offeringId, CancellationToken ct);
     /// <summary>Null when the user is not a practitioner (404).</summary>
     Task<DirectoryPractitioner?> GetPractitionerByUserAsync(string userId, CancellationToken ct);
+    /// <summary>Null when the practitioner is unknown (404).</summary>
+    Task<DirectoryPractitionerName?> GetPractitionerNameAsync(Guid practitionerId, CancellationToken ct);
     /// <summary>The e-mail snapshot of a practitioner's user. Null when Directory answers 404 (unknown user, or no address held yet).</summary>
     Task<DirectoryContact?> GetPractitionerContactAsync(string userId, CancellationToken ct);
     /// <summary>One probe of /alive, no retry; false on any failure or non-200.</summary>
@@ -46,6 +50,8 @@ public sealed class DirectoryClient(HttpClient http, string? internalKey, TimeSp
     public Task<DirectoryPractitioner?> GetPractitionerByUserAsync(string userId, CancellationToken ct) =>
         GetAsync<DirectoryPractitioner>($"internal/v1/practitioners/by-user/{Uri.EscapeDataString(userId)}", ct);
 
+    public Task<DirectoryPractitionerName?> GetPractitionerNameAsync(Guid practitionerId, CancellationToken ct) =>
+        GetAsync<DirectoryPractitionerName>($"internal/v1/practitioners/{practitionerId}", ct);
     public Task<DirectoryContact?> GetPractitionerContactAsync(string userId, CancellationToken ct) =>
         GetAsync<DirectoryContact>($"internal/v1/practitioners/{Uri.EscapeDataString(userId)}/contact", ct);
 

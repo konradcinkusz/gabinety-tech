@@ -69,7 +69,7 @@ else if (_loaded)
         <h2 id="offer-form-title">@(_editing is null ? PlPractitioner.Offers.FormTitleNew : PlPractitioner.Offers.FormTitleEdit)</h2>
         @if (_editing is not null) {<p class="muted">@PlPractitioner.Offers.PriceChangeNote</p>}
         @if (_taxonomy is null) {<Alert Variant="AlertVariant.Danger" TestId="taxonomy-unavailable">@PlPractitioner.Offers.TaxonomyUnavailable</Alert>}
-        <FormSummary Errors="Summary" />
+        <ErrorSummary Errors="Summary" />
         @if (_general is not null) {<Alert Variant="AlertVariant.Danger" TestId="offer-error">@_general</Alert>}
         <form method="post" @onsubmit="SaveAsync" @formname="offer" class="form stack form-narrow" novalidate>
             <AntiforgeryToken />

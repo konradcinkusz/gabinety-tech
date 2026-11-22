@@ -62,8 +62,8 @@ public class AreaComponentTests : BunitContext
     [Fact]
     public void The_summary_is_an_alert_that_counts_and_links_every_error_and_is_absent_without_errors()
     {
-        Assert.Empty(Render<FormSummary>(p => p.Add(s => s.Errors, [])).Markup.Trim());
-        var cut = Render<FormSummary>(p => p.Add(s => s.Errors, [KeyValuePair.Create("title", "Zły tytuł"), KeyValuePair.Create("price", "Zła cena")]));
+        Assert.Empty(Render<ErrorSummary>(p => p.Add(s => s.Errors, [])).Markup.Trim());
+        var cut = Render<ErrorSummary>(p => p.Add(s => s.Errors, [KeyValuePair.Create("title", "Zły tytuł"), KeyValuePair.Create("price", "Zła cena")]));
         var box = cut.Find("[role=alert]");
         Assert.Equal("Popraw 2 pola", box.QuerySelector("h2")!.TextContent);
         Assert.Equal([("#title", "Zły tytuł"), ("#price", "Zła cena")], box.QuerySelectorAll("a").Select(a => (a.GetAttribute("href")!, a.TextContent)));
@@ -71,7 +71,7 @@ public class AreaComponentTests : BunitContext
 
     [Theory]
     [InlineData(1, "pole")] [InlineData(2, "pola")] [InlineData(4, "pola")] [InlineData(5, "pól")] [InlineData(11, "pól")] [InlineData(12, "pól")] [InlineData(14, "pól")] [InlineData(21, "pól")] [InlineData(22, "pola")] [InlineData(25, "pól")]
-    public void The_polish_plural_of_pole(int n, string word) => Assert.Equal(word, FormSummary.Noun(n));
+    public void The_polish_plural_of_pole(int n, string word) => Assert.Equal(word, ErrorSummary.Noun(n));
 
     [Theory]
     [InlineData("success")] [InlineData("warning")] [InlineData("danger")] [InlineData("neutral")] [InlineData("info")]

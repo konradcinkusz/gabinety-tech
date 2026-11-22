@@ -22,6 +22,7 @@ public static class ApiResilience
         Add<ReputationClient>(services, Backend.Reputation);
         Add<AssistantClient>(services, Backend.Assistant); // status reads only; the 35 s brief call (SPEC 5.1) gets its own timeout when the booking flow is ported
         Add<Auth.IdentityClient>(services, Backend.Auth);
+        Add<AccountClient>(services, Backend.Auth); // the signed-in user's own account calls (me, consents, export, delete)
         Add<PractitionerClient>(services, Backend.Directory);              // the practitioner's own profile and offers (port 4)
         Add<PractitionerSchedulingClient>(services, Backend.Booking);      // availability and the payments account (port 4)
         // The options of the ONE handler the kernel added to every client. All backends share the SPEC 5.1 profile of a read: 5 s per attempt, ONE retry, and only for a GET or HEAD, so a login,

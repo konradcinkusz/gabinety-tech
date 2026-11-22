@@ -68,6 +68,10 @@ sealed class CreateHost : WebApplicationFactory<Program>
     public bool Active = true;
     public string? MeetingUrl;
     public Action<IServiceCollection>? Configure;
+    public string PractitionerName = "Demo Practitioner", PractitionerSlug = "demo-practitioner";
+    /// <summary>The <c>name</c> claim the tokens carry (authservice puts the e-mail there); null: no such claim.</summary>
+    public string? NameClaim;
+    public bool DirectoryDown;
     /// <summary>The <c>email</c> claim of a user's token. A user without an entry gets <c>{sub}@demo.invalid</c>; an empty string leaves the claim out.</summary>
     public Dictionary<string, string> Emails { get; } = new();
 
@@ -92,6 +96,9 @@ sealed class CreateHost : WebApplicationFactory<Program>
                 title = Title, durationMinutes = Minutes, price = new { amountMinor = PriceMinor, currency = "PLN" },
                 meetingUrl = MeetingUrl, isActive = Active,
             })
+            : r.RequestUri!.AbsolutePath == $"/internal/v1/practitioners/{Practitioner}"
+                ? (DirectoryDown ? new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable)
+                    : FakeDirectory.Json(new { practitionerId = Practitioner, displayName = PractitionerName, slug = PractitionerSlug }))
             : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
     }
 
@@ -106,6 +113,7 @@ sealed class CreateHost : WebApplicationFactory<Program>
     string Token(string sub, string[] roles)
     {
         var claims = new Dictionary<string, object> { ["sub"] = sub };
+        if (NameClaim is not null) claims["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] = NameClaim;
         var email = Emails.TryGetValue(sub, out var e) ? e : $"{sub}@demo.invalid";
         if (email.Length > 0) claims["email"] = email;
         if (roles.Length > 0) claims["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] = roles.Length == 1 ? roles[0] : roles;

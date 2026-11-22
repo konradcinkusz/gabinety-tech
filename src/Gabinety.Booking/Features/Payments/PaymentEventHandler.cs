@@ -24,7 +24,7 @@ public readonly record struct PaymentEventResult(WebhookOutcome? Outcome)
 /// Provider calls (the meeting URL lookup, the refund of a late payment) happen BEFORE the transaction, so no database lock is held across a network call.
 /// </summary>
 public sealed class PaymentEventHandler(BookingDbContext db, IDirectoryClient directory, IPaymentProvider provider, TimeProvider time,
-    ILogger<PaymentEventHandler> log)
+    IEnumerable<IBookingTransitionHook> hooks, ILogger<PaymentEventHandler> log)
 {
     const string UniqueViolation = "23505";
     public const string Currency = "PLN";
@@ -100,6 +100,13 @@ public sealed class PaymentEventHandler(BookingDbContext db, IDirectoryClient di
             {
                 case WebhookEventKind.PaymentSucceeded:
                     outcome = ApplySucceeded(booking, payment, e, IsLate(booking, now), lateAtRead, meetingUrl, now);
+                    // PendingPayment -> Confirmed is a transition like any other: the hooks (the notification rows of T-04.09b) run in this same transaction.
+                    // Without this no confirmation e-mail was ever scheduled for a paid booking.
+                    if (outcome == WebhookOutcome.Applied && booking.Status == BookingStatus.Confirmed)
+                    {
+                        var context = new BookingTransitionContext(db, booking, payment, BookingStatus.PendingPayment, BookingStatus.Confirmed, BookingTrigger.PaymentSucceeded, now);
+                        foreach (var hook in hooks) await hook.OnTransitionAsync(context, ct);
+                    }
                     break;
                 case WebhookEventKind.PaymentFailed:
                     if (booking.Status == BookingStatus.PendingPayment && payment.Status == PaymentStatus.Created)

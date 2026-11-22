@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Gabinety.Booking.Persistence.Migrations
 {
     [DbContext(typeof(BookingDbContext))]
-    [Migration("20261122100115_T-12.01_ClientDisplayName")]
+    [Migration("20261122100703_T-12.01_ClientDisplayName")]
     partial class T1201_ClientDisplayName
     {
         /// <inheritdoc />
@@ -140,6 +140,11 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
                         .HasColumnName("client_display_name");
+
+                    b.Property<string>("ClientEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("client_email");
 
                     b.Property<string>("ClientUserId")
                         .IsRequired()

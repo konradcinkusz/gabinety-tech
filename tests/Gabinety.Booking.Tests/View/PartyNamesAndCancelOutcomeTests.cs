@@ -45,21 +45,26 @@ public class PartyNamesTests
         await using var h = Life.Host(new RecordingProvider());
         h.NameClaim = "demo-client-1@example.test";
         var id = await Life.Seed(h, BookingStatus.Confirmed, H24 * 3);
-        await h.Seed(db => db.Bookings.Single(b => b.Id == id).ClientDisplayName = "Klient D.");
+        // unique parties: the in-memory database is shared by the hosts of one test process and the list shows 12 rows a page
+        var client = "demo-client-" + Guid.NewGuid().ToString("n");
+        var practitioner = "demo-practitioner-" + Guid.NewGuid().ToString("n");
+        await h.Seed(db => { var b = db.Bookings.Single(x => x.Id == id); b.ClientDisplayName = "Klient D."; b.ClientUserId = client; b.PractitionerUserId = practitioner; });
 
-        var asClient = await Get(h.ClientFor(Life.Client), $"/api/v1/bookings/{id}");
+        var asClient = await Get(h.ClientFor(client), $"/api/v1/bookings/{id}");
         Assert.Equal("Demo Practitioner", asClient.GetProperty("practitioner").GetProperty("displayName").GetString());
         Assert.Equal("demo-practitioner", asClient.GetProperty("practitioner").GetProperty("slug").GetString());
         Assert.Equal(JsonValueKind.Null, asClient.GetProperty("client").ValueKind); // a client is not shown to themself
 
-        var asPractitioner = await Get(h.ClientFor(Life.Practitioner), $"/api/v1/bookings/{id}");
+        var asPractitioner = await Get(h.ClientFor(practitioner), $"/api/v1/bookings/{id}");
         Assert.Equal("Klient D.", asPractitioner.GetProperty("client").GetProperty("displayName").GetString());
         Assert.DoesNotContain("example.test", asPractitioner.GetRawText());
 
-        var list = await Get(h.ClientFor(Life.Client), "/api/v1/me/bookings?role=client");
-        Assert.Equal("Demo Practitioner", list.GetProperty("items")[0].GetProperty("practitioner").GetProperty("displayName").GetString());
-        var plist = await Get(h.ClientFor(Life.Practitioner), "/api/v1/me/bookings?role=practitioner");
-        Assert.Equal("Klient D.", plist.GetProperty("items")[0].GetProperty("client").GetProperty("displayName").GetString());
+        var list = await Get(h.ClientFor(client), "/api/v1/me/bookings?role=client");
+        // the in-memory database is shared by the hosts of one test process: find the row by id
+        JsonElement Mine(JsonElement page) => page.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("id").GetGuid() == id);
+        Assert.Equal("Demo Practitioner", Mine(list).GetProperty("practitioner").GetProperty("displayName").GetString());
+        var plist = await Get(h.ClientFor(practitioner), "/api/v1/me/bookings?role=practitioner");
+        Assert.Equal("Klient D.", Mine(plist).GetProperty("client").GetProperty("displayName").GetString());
     }
 
     [Fact]
@@ -99,7 +104,7 @@ public class PartyNamesTests
     }
 
     [Fact]
-    public async Task Erasing_the_client_clears_the_snapshot()
+    public void Erasing_the_client_clears_the_snapshot()
     {
         var b = new BookingEntity { ClientUserId = "demo-u", ClientDisplayName = "Klient D.", PractitionerUserId = "demo-p" };
         var method = typeof(ErasureFeature).GetMethod("Anonymise", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;

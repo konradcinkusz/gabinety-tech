@@ -72,6 +72,8 @@ sealed class CreateHost : WebApplicationFactory<Program>
     /// <summary>The <c>name</c> claim the tokens carry (authservice puts the e-mail there); null: no such claim.</summary>
     public string? NameClaim;
     public bool DirectoryDown;
+    /// <summary>The <c>email</c> claim of a user's token. A user without an entry gets <c>{sub}@demo.invalid</c>; an empty string leaves the claim out.</summary>
+    public Dictionary<string, string> Emails { get; } = new();
 
     /// <summary>
     /// A deployed profile (not fake, optionally an <c>Environment:Kind</c>). Mock cannot run there and no vendor adapter exists yet (T-09.05), so the host is given a
@@ -112,6 +114,8 @@ sealed class CreateHost : WebApplicationFactory<Program>
     {
         var claims = new Dictionary<string, object> { ["sub"] = sub };
         if (NameClaim is not null) claims["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] = NameClaim;
+        var email = Emails.TryGetValue(sub, out var e) ? e : $"{sub}@demo.invalid";
+        if (email.Length > 0) claims["email"] = email;
         if (roles.Length > 0) claims["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] = roles.Length == 1 ? roles[0] : roles;
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {

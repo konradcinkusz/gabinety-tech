@@ -36,7 +36,9 @@ public sealed class NotificationsFeature : IServiceFeature
         }
         else builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
 
-        builder.Services.TryAddSingleton<IContactResolver, NullContactResolver>();
+        // The practitioner's address is a Directory fact, so the real resolver needs Backend:Directory (the fake profile sets it too, and delivers to the log sender).
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["Backend:Directory"])) builder.Services.TryAddSingleton<IContactResolver, ContactResolver>();
+        else builder.Services.TryAddSingleton<IContactResolver, NullContactResolver>();
         builder.Services.AddScoped<INotificationWriter, NotificationWriter>();
         builder.Services.AddSingleton<NotificationDispatcher>();
         builder.Services.AddHostedService<NotificationDispatcherHostedService>();

@@ -138,6 +138,11 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasColumnType("character varying(60)")
                         .HasColumnName("client_display_name");
 
+                    b.Property<string>("ClientEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("client_email");
+
                     b.Property<string>("ClientUserId")
                         .IsRequired()
                         .HasMaxLength(64)

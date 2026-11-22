@@ -22,9 +22,10 @@ public class NotificationFeatureTests
     [InlineData(null)]
     [InlineData("Log")]
     [InlineData("log")]
-    public void The_default_is_the_log_sender_and_the_null_resolver(string? provider)
+    public void The_default_is_the_log_sender_and_without_a_Directory_the_null_resolver(string? provider)
     {
         using var host = new CreateHost();
+        host.Settings["Backend:Directory"] = ""; // no Directory: no practitioner address can be found, so the null resolver
         if (provider != null) host.Settings["Notifications:Provider"] = provider;
         Assert.IsType<LogEmailSender>(host.Services.GetRequiredService<IEmailSender>());
         Assert.IsType<NullContactResolver>(host.Services.GetRequiredService<IContactResolver>());

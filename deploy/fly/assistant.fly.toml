@@ -29,13 +29,14 @@ primary_region = "fra"
   Assistant__DailyBudgetUsd = "5"
   Assistant__BriefTimeoutSeconds = "30"
   Assistant__TriageTimeoutSeconds = "25"
-  # Custom (bring-your-own-key) models: Llm__CustomModels__0__* ids/endpoints are added by T-09.07 once the owner picks a provider.
+  # Safe default: Copilot with no credentials = the gateway reports NotAuthenticated/Unavailable, the Assistant answers "unavailable" and the web shows the plain form (P8).
+  # Bring-your-own-key model: Llm__CustomModels__0__* are staged from GitHub secrets LLM_CUSTOM_* by deploy/secrets.map (all or nothing), not set here.
 # Secrets (NOT here), set once with `fly secrets set --app gabinety-assistant-staging`:
 #   ConnectionStrings__assistantdb
 #   Internal__Callers__Reputation   (the key Reputation sends for the triage call; F-03)
 #   optional Internal__Callers__Owner
-#   Llm__CustomModels__0__ApiKey   (T-09.07; the model account of D-08)
-#   optional Copilot__GitHubToken  (A-04: only after the owner records the terms decision)
+#   optional Llm__CustomModels__0__Id/Model/BaseUrl/ProviderType/WireApi/ApiKey   (GitHub secrets LLM_CUSTOM_ENDPOINT, LLM_CUSTOM_MODEL, LLM_CUSTOM_PROVIDER_TYPE, LLM_CUSTOM_WIRE_API, LLM_CUSTOM_API_KEY)
+#   optional Copilot__GitHubToken  (GitHub secret COPILOT_GITHUB_TOKEN; A-04: only after the owner records the terms decision)
 
 [http_service]
   internal_port = 8080

@@ -18,6 +18,14 @@ while read -r a name need template; do
   case "$a" in ''|'#'*) continue;; esac
   [ "$a" = "$key" ] || continue
   rest="$template" out="" skip=0
+  # a leading @if(NAME,NAME) gate: the row is skipped (silently, not "missing") unless every named GitHub secret is set; the names are not part of the value.
+  # It keeps a group of keys all-or-nothing (a half-set group would stop the host at startup, or claim a feature that is not there).
+  if [[ "$rest" == '@if('* ]]; then
+    gate="${rest#@if(}"; gate="${gate%%)*}"; rest="${rest#*)}"
+    IFS=, read -r -a gates <<< "$gate"
+    for g in "${gates[@]}"; do [ -n "$(secret "$g")" ] || { skip=2; break; }; done
+    if [ "$skip" = 2 ]; then echo "skip $name: gated on ${gate//,/ and }, not all set"; continue; fi
+  fi
   # expand ${NAME} left to right without eval
   # shellcheck disable=SC2016  # a literal ${ is what we look for
   while [[ "$rest" == *'${'* ]]; do

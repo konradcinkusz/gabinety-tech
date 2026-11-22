@@ -174,7 +174,7 @@ else if (_offering is not null)
         var result = await Bookings.CreateAsync(key, new CreateBookingRequestDto(_offering.Id, _start.ToUniversalTime(), new BriefDto(text, applied, applied is not null)));
         if (result.IsOk)
         {
-            if (CheckoutTarget.Safe(result.Value!.CheckoutUrl, Site.SiteBaseUrl) is { } target) { Navigation.NavigateTo(target); return; }
+            if (CheckoutTarget.Safe(result.Value!.CheckoutUrl, Site.SiteBaseUrl, Site.MockPayments) is { } target) { Navigation.NavigateTo(target); return; }
             _failure = new BookFailure(BookFlowText.Errors.BadTarget, false);
             return;
         }

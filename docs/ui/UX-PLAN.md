@@ -114,6 +114,12 @@ Severity: **B** blocks a task, **M** hurts conversion, trust or a clear usabilit
 
 **Decided by the owner on 2026-11-22: all four recommendations accepted** (D-1 yes, D-2 practitioners only, D-3 initials now, D-4 after wave 1).
 
+**Decided on 2026-11-22 after wave 2 (owner: "decide yourself, merge when green"):**
+- The header's `GET /api/v1/me` once per signed-in session per minute (cached 60 s, 10 s on failure, failing soft to "not a practitioner") is **accepted**.
+- **UX-061 (theme switch) is dropped.** The system setting already works, and a server-rendered choice needs a cookie-varying output cache on every public page plus a second script file against D-1. Revisit only if users ask.
+- **Wave 3 stays open** and each item starts in `gabinety-tech-spec` (contract first); nothing in this repository can start it. Order of value for conversion: UX-071 (sort, next free time and technologies on the list card), UX-072 (password reset), UX-073 (reschedule), then UX-070, 074, 075, 076.
+- Before spending on wave 3, measure the funnel (list, profile, slot, form, paid): the product has no analytics yet.
+
 ## 5. Rules for every task (so the sessions do not collide)
 
 1. One task, one branch, one PR. A task changes **only the files it owns** (column "Owns"). If it needs a change elsewhere it stops and says so in the PR; it does not edit another task's file.

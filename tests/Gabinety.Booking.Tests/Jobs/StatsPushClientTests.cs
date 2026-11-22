@@ -39,6 +39,16 @@ public class StatsPushClientTests
     }
 
     [Fact]
+    public async Task The_next_free_slot_is_sent_in_utc_and_omitted_when_there_is_none()
+    {
+        var slot = new DateTimeOffset(2026, 11, 17, 8, 0, 0, TimeSpan.Zero);
+        await Client().PushAsync(Id, Body with { NextFreeSlotUtc = slot }, default);
+        await Client().PushAsync(Id, Body, default);
+        Assert.Equal(slot, JsonDocument.Parse(handler.Bodies[0]).RootElement.GetProperty("nextFreeSlotUtc").GetDateTimeOffset());
+        Assert.False(JsonDocument.Parse(handler.Bodies[1]).RootElement.TryGetProperty("nextFreeSlotUtc", out _)); // a push without it clears it in Directory
+    }
+
+    [Fact]
     public async Task A_failing_directory_is_tried_three_times_with_bounded_backoff_then_false_without_throwing()
     {
         handler.Answer = _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);

@@ -6,8 +6,8 @@ using BookingStatus = Gabinety.Billing.BookingStatus;
 
 namespace Gabinety.Booking.Jobs.StatsPush;
 
-/// <summary>The four values Directory keeps per practitioner (CONTRACTS 3.6).</summary>
-public sealed record BookingStats(int CompletedCount, int PractitionerCancelCount, int NoShowUpheldCount, int OpenSlots14d);
+/// <summary>The values Directory keeps per practitioner (CONTRACTS 3.6). <paramref name="NextFreeSlotUtc"/> is the start of the earliest bookable slot of the window, null when there is none.</summary>
+public sealed record BookingStats(int CompletedCount, int PractitionerCancelCount, int NoShowUpheldCount, int OpenSlots14d, DateTimeOffset? NextFreeSlotUtc = null);
 
 /// <summary>
 /// Computes <see cref="BookingStats"/> for every practitioner that has bookings or availability rules.
@@ -20,6 +20,7 @@ public sealed record BookingStats(int CompletedCount, int PractitionerCancelCoun
 /// <item><c>no_show_upheld_count</c> = <c>Resolved</c> with <c>refund_full</c> and <c>dispute_kind = 'practitioner_no_show'</c>.</item>
 /// <item><c>open_slots_14d</c> = bookable slots from today (Warsaw date) for 14 days, by <see cref="SlotCalculator"/>, for the shortest duration seen in the
 /// practitioner's booking snapshots (Directory has no list-offerings lookup); 30 minutes (the grid minimum) when there is no booking.</item>
+/// <item><c>next_free_slot_utc</c> = the earliest of those same slots (so the lead time, buffers and active bookings count), null when the window has none.</item>
 /// </list>
 /// </summary>
 public sealed class StatsCalculator(BookingDbContext db, IConfiguration config, TimeProvider time)
@@ -46,13 +47,16 @@ public sealed class StatsCalculator(BookingDbContext db, IConfiguration config, 
             var upheld = mine.Where(g => g.Status == BookingStatus.Resolved && g.DisputeResolution == "refund_full" && g.DisputeKind == "practitioner_no_show").Sum(g => g.N);
 
             var slots = 0;
+            DateTimeOffset? next = null;
             if (withRules.Contains(id))
             {
                 var shortest = mine.Count == 0 ? 0 : mine.Min(g => g.Shortest);
                 var minutes = shortest > 0 ? shortest : DefaultSlotMinutes;
-                slots = (await calculator.ComputeAsync(id, TimeSpan.FromMinutes(minutes), today, today.AddDays(WindowDays - 1), ct)).Count;
+                var open = await calculator.ComputeAsync(id, TimeSpan.FromMinutes(minutes), today, today.AddDays(WindowDays - 1), ct);
+                slots = open.Count;
+                if (open.Count > 0) next = open.Min();
             }
-            result[id] = new BookingStats(completed, cancelled, upheld, slots);
+            result[id] = new BookingStats(completed, cancelled, upheld, slots, next);
         }
         return result;
     }

@@ -4,7 +4,7 @@ using Gabinety.ServiceDefaults;
 namespace Gabinety.Booking.Jobs.StatsPush;
 
 /// <summary>
-/// One cycle of the stats push (CONTRACTS 3.6, 4.2, 8.1): computes the stats of every practitioner and pushes those whose four values differ from the last
+/// One cycle of the stats push (CONTRACTS 3.6, 4.2, 8.1): computes the stats of every practitioner and pushes those whose values differ from the last
 /// successful push of this process. The version is unix milliseconds of <see cref="TimeProvider"/>, bumped to stay strictly increasing, so it needs no table and
 /// survives a restart (after one, each practitioner is pushed once more; Directory ignores equal data and takes the higher version). Idempotent.
 /// </summary>
@@ -41,7 +41,7 @@ public sealed class StatsPushJob(IServiceScopeFactory scopes, IDirectoryStatsCli
                 var version = _lastVersion = Math.Max(time.GetUtcNow().ToUnixTimeMilliseconds(), _lastVersion + 1);
                 try
                 {
-                    if (!await client.PushAsync(id, new BookingStatsPush(stats.CompletedCount, stats.PractitionerCancelCount, stats.NoShowUpheldCount, stats.OpenSlots14d, version), ct))
+                    if (!await client.PushAsync(id, new BookingStatsPush(stats.CompletedCount, stats.PractitionerCancelCount, stats.NoShowUpheldCount, stats.OpenSlots14d, version, stats.NextFreeSlotUtc), ct))
                     {
                         log.LogWarning("StatsPush gave up on practitioner {PractitionerId} until the next cycle", id);
                         continue;

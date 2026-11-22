@@ -54,6 +54,33 @@ public class StatsPushJobTests : IDisposable
     }
 
     [Fact]
+    public async Task A_change_of_only_the_next_free_slot_is_pushed_with_the_new_value()
+    {
+        await h.WorkWeek();
+        await StatsFx.Seed(h, BookingStatus.Completed, minutes: 30);
+        var job = StatsFx.Job(h, client);
+        await job.RunOnceAsync(default);
+        var first = Assert.Single(client.For(h.Practitioner));
+        Assert.NotNull(first.NextFreeSlotUtc);
+
+        // the first slot gets booked: the earliest start moves on (the count drops as well, but the slot is what is asserted)
+        await StatsFx.Seed(h, BookingStatus.Confirmed, minutes: 30, startIn: first.NextFreeSlotUtc!.Value - h.Clock.GetUtcNow());
+        h.Clock.Advance(TimeSpan.FromMinutes(1));
+        await job.RunOnceAsync(default);
+        var pushes = client.For(h.Practitioner);
+        Assert.Equal(2, pushes.Count);
+        Assert.Equal(first.NextFreeSlotUtc!.Value.AddHours(1), pushes[1].NextFreeSlotUtc);
+    }
+
+    [Fact]
+    public async Task A_practitioner_without_availability_is_pushed_without_a_next_free_slot()
+    {
+        await StatsFx.Seed(h, BookingStatus.Completed);
+        await StatsFx.Job(h, client).RunOnceAsync(default);
+        Assert.Null(Assert.Single(client.For(h.Practitioner)).NextFreeSlotUtc);
+    }
+
+    [Fact]
     public async Task Versions_strictly_increase_even_when_the_clock_does_not_move_and_are_unix_milliseconds()
     {
         await StatsFx.Seed(h, BookingStatus.Completed);

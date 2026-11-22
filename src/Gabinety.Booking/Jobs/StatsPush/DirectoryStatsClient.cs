@@ -1,11 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 using Gabinety.ServiceDefaults;
 
 namespace Gabinety.Booking.Jobs.StatsPush;
 
 /// <summary>Body of <c>PUT /internal/v1/practitioners/{id}/booking-stats</c> (CONTRACTS 3.6). A version not greater than the stored one is ignored by Directory.</summary>
-public sealed record BookingStatsPush(int CompletedCount, int PractitionerCancelCount, int NoShowUpheldCount, int OpenSlots14d, long Version);
+/// <summary><see cref="NextFreeSlotUtc"/> is omitted from the JSON when null: Directory reads a push without it as "none" and clears the stored value.</summary>
+public sealed record BookingStatsPush(int CompletedCount, int PractitionerCancelCount, int NoShowUpheldCount, int OpenSlots14d, long Version,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? NextFreeSlotUtc = null);
 
 public interface IDirectoryStatsClient
 {

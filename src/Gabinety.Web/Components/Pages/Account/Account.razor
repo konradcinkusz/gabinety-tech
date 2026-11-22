@@ -75,19 +75,19 @@
                 <EditForm Model="Change!" FormName="change-password" OnSubmit="ChangePasswordAsync" class="form stack" novalidate>
                     <div class="field @Invalid(ChangePasswordForm.CurrentId)">
                         <label class="field__label" for="@ChangePasswordForm.CurrentId">@Pl.Account.CurrentPassword</label>
-                        <input id="@ChangePasswordForm.CurrentId" name="Change.CurrentPassword" class="field__control" type="password" autocomplete="current-password" value="@Change!.CurrentPassword"
+                        <input id="@ChangePasswordForm.CurrentId" name="Change.CurrentPassword" class="field__control" type="password" autocomplete="current-password"
                                aria-invalid="@AriaInvalid(ChangePasswordForm.CurrentId)" aria-describedby="@Describe(ChangePasswordForm.CurrentId)" />
                         <FieldError FieldId="@ChangePasswordForm.CurrentId" Problem="_changeProblems.For(ChangePasswordForm.CurrentId)" />
                     </div>
                     <div class="field @Invalid(ChangePasswordForm.NewId)">
                         <label class="field__label" for="@ChangePasswordForm.NewId">@Pl.Account.NewPassword</label>
-                        <input id="@ChangePasswordForm.NewId" name="Change.NewPassword" class="field__control" type="password" autocomplete="new-password" value="@Change!.NewPassword"
+                        <input id="@ChangePasswordForm.NewId" name="Change.NewPassword" class="field__control" type="password" autocomplete="new-password"
                                aria-invalid="@AriaInvalid(ChangePasswordForm.NewId)" aria-describedby="@Describe(ChangePasswordForm.NewId)" />
                         <FieldError FieldId="@ChangePasswordForm.NewId" Problem="_changeProblems.For(ChangePasswordForm.NewId)" />
                     </div>
                     <div class="field @Invalid(ChangePasswordForm.ConfirmationId)">
                         <label class="field__label" for="@ChangePasswordForm.ConfirmationId">@Pl.Account.ChangeConfirmation</label>
-                        <input id="@ChangePasswordForm.ConfirmationId" name="Change.Confirmation" class="field__control" type="password" autocomplete="new-password" value="@Change!.Confirmation"
+                        <input id="@ChangePasswordForm.ConfirmationId" name="Change.Confirmation" class="field__control" type="password" autocomplete="new-password"
                                aria-invalid="@AriaInvalid(ChangePasswordForm.ConfirmationId)" aria-describedby="@Describe(ChangePasswordForm.ConfirmationId)" />
                         <FieldError FieldId="@ChangePasswordForm.ConfirmationId" Problem="_changeProblems.For(ChangePasswordForm.ConfirmationId)" />
                     </div>
@@ -153,7 +153,7 @@
         _acceptFailed = true;
     }
 
-    /// <summary>The change: every problem of the form first (nothing is sent while one is open). A wrong current password marks that field alone and keeps the typed values.</summary>
+    /// <summary>The change: every problem of the form first (nothing is sent while one is open). A refusal marks the field at fault alone; no password is rendered back, so every password input comes back empty.</summary>
     async Task ChangePasswordAsync()
     {
         var form = Change!;

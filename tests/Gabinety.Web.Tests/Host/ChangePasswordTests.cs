@@ -73,7 +73,7 @@ public class ChangePasswordTests
     }
 
     [Fact]
-    public async Task A_wrong_current_password_marks_that_field_alone_keeps_the_typed_values_and_changes_nothing()
+    public async Task A_wrong_current_password_marks_that_field_alone_renders_no_password_and_changes_nothing()
     {
         var (web, browser) = await SignedIn();
         await using var __ = web;
@@ -85,7 +85,11 @@ public class ChangePasswordTests
         var error = page.All(".field__error");
         Assert.Single(error);
         Assert.Contains("Obecne hasło jest nieprawidłowe.", error[0].TextContent);
-        Assert.Equal(NewPassword, page.One("#change-new")!.GetAttribute("value")); // the typed values stay in the form
+        Assert.Equal("", page.One("#change-current")!.GetAttribute("value") ?? "");
+        Assert.Equal("", page.One("#change-new")!.GetAttribute("value") ?? "");
+        Assert.Equal("", page.One("#change-confirmation")!.GetAttribute("value") ?? "");
+        Assert.DoesNotContain("Wrong-Passw0rd-xyz", page.Html); // no password is rendered back
+        Assert.DoesNotContain(NewPassword, page.Html);
         Assert.Empty(web.Identity.SupersededRefreshTokens);
         Assert.Null(page.One("[data-testid=password-changed]"));
     }
@@ -100,6 +104,8 @@ public class ChangePasswordTests
 
         Assert.Equal("Popraw 3 pola", page.TextOf("[data-testid=form-summary] h2"));
         Assert.Equal(3, page.All(".field__error").Count);
+        Assert.All(new[] { "#change-current", "#change-new", "#change-confirmation" }, id => Assert.Equal("", page.One(id)!.GetAttribute("value") ?? "")); // no password is rendered back
+        Assert.DoesNotContain("\"short\"", page.Html);
         Assert.DoesNotContain(web.Identity.Backend.Requests, r => r.PathAndQuery == ChangePath);
     }
 

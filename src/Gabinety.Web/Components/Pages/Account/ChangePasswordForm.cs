@@ -5,7 +5,8 @@ namespace Gabinety.Web.Components.Pages.Account;
 
 /// <summary>
 /// The change-password section of <c>/konto</c> (T-11.08): the current password, the new one and its repetition. The rules of the new password are those of registration
-/// (<see cref="RegisterModel"/>) and every problem is reported at once. The passwords are never logged and never travel in a link; they go to the identity service in the body only.
+/// (<see cref="RegisterModel"/>) and every problem is reported at once. The passwords are never logged and never travel in a link; they go to the identity service in the body only,
+/// and they are never rendered back: every password input comes back empty after a refusal.
 /// </summary>
 public sealed class ChangePasswordForm
 {

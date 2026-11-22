@@ -76,7 +76,7 @@
                     }
                     else
                     {
-                        <div class="admin-actions">
+                        <div class="cluster row-actions">
                             @foreach (var verb in VerificationRules.Allowed(row.Status))
                             {
                                 if (VerificationRules.NeedsReason(verb))
@@ -98,7 +98,7 @@
         </ul>
         @if (_next is not null)
         {
-            <p class="admin-more"><a class="btn" href="@ListUrl(cursor: _next)">@PlAdmin.Verification.Next</a></p>
+            <p class="admin-more"><a class="btn btn--secondary" href="@ListUrl(cursor: _next)">@PlAdmin.Verification.Next</a></p>
         }
     }
     <StaleFormGuard Rendered="RenderedForms" OnStale="StaleAsync" />
@@ -118,7 +118,7 @@
     (string Verb, Guid Id)? _open;
     ApiFailure? _failure;
 
-    IReadOnlyList<SegmentedLinks.Item> Filters => [.. VerificationRules.QueueStatuses.Select(s => new SegmentedLinks.Item(PlAdmin.Verification.Filters[s], AdminQuery.Url("/admin/weryfikacja", ("status", s)), s == _status))];
+    IReadOnlyList<SegmentedLinks.Item> Filters => [.. VerificationRules.QueueStatuses.Select(s => new SegmentedLinks.Item(PlAdmin.Verification.Filters[s], AdminQuery.Url("/admin/weryfikacja", ("status", s)), s == _status, s == _status ? AdminQuery.ChipCount(_failure is null, _cursor, _next, _items.Count) : null))];
     IEnumerable<KeyValuePair<string, string>> Kept => _cursor is null ? [new("status", _status)] : [new("status", _status), new("cursor", _cursor)];
     string ListUrl(string? cursor = null) => AdminQuery.Url("/admin/weryfikacja", ("status", _status), ("cursor", cursor ?? _cursor));
     bool IsOpen(AdminPractitionerRowDto row) => _open is { } open && open.Id == row.Id && VerificationRules.Allowed(row.Status).Contains(open.Verb);

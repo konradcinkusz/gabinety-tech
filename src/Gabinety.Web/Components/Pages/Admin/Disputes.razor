@@ -73,7 +73,7 @@
         </ul>
         @if (_next is not null)
         {
-            <p class="admin-more"><a class="btn" href="@ListUrl(cursor: _next)">@PlAdmin.Disputes.Next</a></p>
+            <p class="admin-more"><a class="btn btn--secondary" href="@ListUrl(cursor: _next)">@PlAdmin.Disputes.Next</a></p>
         }
     }
     <StaleFormGuard Rendered="RenderedForms" OnStale="StaleAsync" />
@@ -112,27 +112,27 @@
                         <ul>@foreach (var p in problems) {<li>@p.Message</li>}</ul>
                     </div>
                 }
-                <fieldset class="@($"admin-options{(pickProblem is null ? "" : " admin-field--invalid")}")">
+                <fieldset class="@($"option-group{(pickProblem is null ? "" : " field--invalid")}")">
                     <legend>@PlAdmin.Disputes.Legend</legend>
                     @foreach (var (value, label, hint) in Options)
                     {
-                        <label class="admin-option">
+                        <label class="option">
                             <input type="radio" name="resolution" value="@value" checked="@(form.Resolution == value)" />
                             <span>@label<small>@hint</small></span>
                         </label>
                     }
                 </fieldset>
-                <div class="@($"field admin-amount{(amountProblem is null ? "" : " admin-field--invalid")}")">
-                    <label for="amount-@id">@PlAdmin.Disputes.Amount</label>
-                    <p class="admin-hint" id="amount-@id-hint">@(card.PriceGrosz is { } max ? string.Format(PlAdmin.Disputes.AmountHintMax, AdminFormat.Pln(max)) : PlAdmin.Disputes.AmountHint)</p>
-                    <input id="amount-@id" name="amount" type="text" inputmode="decimal" autocomplete="off" value="@form.Amount" aria-describedby="amount-@id-hint@(amountProblem is null ? "" : " amount-" + id + "-error")" aria-invalid="@(amountProblem is null ? null : "true")" />
-                    @if (amountProblem is not null) {<p class="admin-error" id="amount-@id-error"><span class="visually-hidden">@PlAdmin.Common.ErrorPrefix </span>@amountProblem.Message</p>}
+                <div class="@($"field admin-amount{(amountProblem is null ? "" : " field--invalid")}")">
+                    <label class="field__label" for="amount-@id">@PlAdmin.Disputes.Amount</label>
+                    <p class="field__hint" id="amount-@id-hint">@(card.PriceGrosz is { } max ? string.Format(PlAdmin.Disputes.AmountHintMax, AdminFormat.Pln(max)) : PlAdmin.Disputes.AmountHint)</p>
+                    <input class="field__control" id="amount-@id" name="amount" type="text" inputmode="decimal" autocomplete="off" value="@form.Amount" aria-describedby="amount-@id-hint@(amountProblem is null ? "" : " amount-" + id + "-error")" aria-invalid="@(amountProblem is null ? null : "true")" />
+                    @if (amountProblem is not null) {<p class="field__error" id="amount-@id-error"><span class="visually-hidden">@PlAdmin.Common.ErrorPrefix </span>@amountProblem.Message</p>}
                 </div>
-                <div class="@($"field{(noteProblem is null ? "" : " admin-field--invalid")}")">
-                    <label for="note-@id">@PlAdmin.Disputes.NoteLabel</label>
-                    <p class="admin-hint" id="note-@id-hint">@PlAdmin.Disputes.NoteHint</p>
-                    <textarea id="note-@id" name="note" rows="4" maxlength="500" aria-describedby="note-@id-hint@(noteProblem is null ? "" : " note-" + id + "-error")" aria-invalid="@(noteProblem is null ? null : "true")">@form.Note</textarea>
-                    @if (noteProblem is not null) {<p class="admin-error" id="note-@id-error"><span class="visually-hidden">@PlAdmin.Common.ErrorPrefix </span>@noteProblem.Message</p>}
+                <div class="@($"field{(noteProblem is null ? "" : " field--invalid")}")">
+                    <label class="field__label" for="note-@id">@PlAdmin.Disputes.NoteLabel</label>
+                    <p class="field__hint" id="note-@id-hint">@PlAdmin.Disputes.NoteHint</p>
+                    <textarea class="field__control" id="note-@id" name="note" rows="4" maxlength="500" aria-describedby="note-@id-hint@(noteProblem is null ? "" : " note-" + id + "-error")" aria-invalid="@(noteProblem is null ? null : "true")">@form.Note</textarea>
+                    @if (noteProblem is not null) {<p class="field__error" id="note-@id-error"><span class="visually-hidden">@PlAdmin.Common.ErrorPrefix </span>@noteProblem.Message</p>}
                 </div>
                 <div class="admin-actions">
                     <button type="submit" name="step" value="review" class="btn btn--primary">@PlAdmin.Disputes.Review</button>
@@ -166,9 +166,11 @@
 
     IReadOnlyList<SegmentedLinks.Item> Filters =>
     [
-        new(PlAdmin.Disputes.Open, AdminQuery.Url("/admin/spory", ("status", DisputeRules.Open)), _status == DisputeRules.Open),
-        new(PlAdmin.Disputes.Resolved, AdminQuery.Url("/admin/spory", ("status", DisputeRules.Resolved)), _status == DisputeRules.Resolved),
+        new(PlAdmin.Disputes.Open, AdminQuery.Url("/admin/spory", ("status", DisputeRules.Open)), _status == DisputeRules.Open, Count(DisputeRules.Open)),
+        new(PlAdmin.Disputes.Resolved, AdminQuery.Url("/admin/spory", ("status", DisputeRules.Resolved)), _status == DisputeRules.Resolved, Count(DisputeRules.Resolved)),
     ];
+    /// <summary>Only the chip of the status on screen has a count, from the page already loaded: the other status would cost a backend call, and a count must never fail the page.</summary>
+    string? Count(string status) => status == _status ? AdminQuery.ChipCount(_failure is null, _cursor, _next, _cards.Count) : null;
     IEnumerable<KeyValuePair<string, string>> Kept => _cursor is null ? [new("status", _status)] : [new("status", _status), new("cursor", _cursor)];
     string ListUrl(string? cursor = null) => AdminQuery.Url("/admin/spory", ("status", _status), ("cursor", cursor ?? _cursor));
     /// <summary>The one form this page renders (the open card's): a post for any other form is a stale one.</summary>

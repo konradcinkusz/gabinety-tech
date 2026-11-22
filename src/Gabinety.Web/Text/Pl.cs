@@ -113,6 +113,34 @@ public static class Pl
         public const string EmailRequired = "Podaj adres e-mail.", PasswordRequired = "Podaj hasło.", EmailInvalid = "Podaj poprawny adres e-mail.";
         public const string SessionExpired = "Sesja wygasła. Zaloguj się ponownie.";
         public const string BookingContext = "Zaloguj się, aby dokończyć rezerwację.", ShowPassword = "Pokaż hasło";
+        public const string ForgotLink = "Nie pamiętasz hasła?";
+    }
+
+    /// <summary>/zapomniane-haslo: one answer for every address.</summary>
+    public static class Forgot
+    {
+        public const string Title = "Nie pamiętasz hasła?", MetaTitle = "Zapomniane hasło | Gabinety Tech";
+        public const string Lead = "Podaj adres e-mail konta. Jeśli takie konto istnieje, wyślemy wiadomość z linkiem do ustawienia nowego hasła.";
+        public const string Email = "Adres e-mail", Submit = "Wyślij link";
+        public const string Answer = "Jeśli konto o tym adresie istnieje, wysłaliśmy wiadomość z linkiem.";
+        public const string OAuthOnly = "Jeśli to konto korzysta z logowania przez GitHub, nie ma hasła: zaloguj się przez GitHub.";
+        public const string RateLimited = "Zbyt wiele prób. Spróbuj ponownie za minutę.";
+        public const string Unavailable = "Nie udało się teraz wysłać wiadomości. Spróbuj ponownie za chwilę.";
+        public const string BackToLogin = "Wróć do logowania";
+    }
+
+    /// <summary>/reset-password: the new password after the mailed link.</summary>
+    public static class Reset
+    {
+        public const string Title = "Ustaw nowe hasło", MetaTitle = "Nowe hasło | Gabinety Tech";
+        public const string Password = "Nowe hasło", Confirmation = "Powtórz nowe hasło", Submit = "Zmień hasło", ShowPassword = "Pokaż hasło";
+        public const string ConfirmationRequired = "Powtórz nowe hasło.", Mismatch = "Hasła nie są takie same.";
+        public const string PasswordRejected = "Hasło nie spełnia wymagań. Wybierz inne hasło.";
+        public const string BadToken = "Link do zmiany hasła jest nieprawidłowy, został już użyty albo wygasł.";
+        public const string RequestNew = "Poproś o nowy link";
+        public const string Flash = "Hasło zostało zmienione. Zaloguj się.";
+        public const string RateLimited = "Zbyt wiele prób. Spróbuj ponownie za minutę.";
+        public const string Unavailable = "Nie udało się teraz zmienić hasła. Spróbuj ponownie za chwilę.";
     }
 
     /// <summary>The second step of a two-factor sign-in (<c>/logowanie/kod</c>). The challenge itself is a sealed cookie; nothing of it is shown.</summary>

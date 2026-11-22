@@ -11,6 +11,14 @@ namespace Gabinety.Web.Auth;
 /// </summary>
 public enum IdentityOutcome { Tokens, Accepted, TwoFactor, VerificationRequired, Unauthorized, LockedOut, Rejected, RateLimited, Unavailable }
 
+/// <summary>The answer of <c>forgot-password</c>. <c>Sent</c> is the same for a known and an unknown address (the service answers both alike); <c>IsOAuthOnly</c> only says the account has no password. <c>InvalidEmail</c> is a malformed address (400).</summary>
+public enum ForgotOutcome { Sent, InvalidEmail, RateLimited, Unavailable }
+
+public sealed record ForgotResult(ForgotOutcome Outcome, bool IsOAuthOnly = false);
+
+/// <summary>The answer of <c>reset-password</c>. <c>InvalidToken</c>: the token or the address is wrong, used or expired (one outcome, the person is told nothing more). <c>PasswordRejected</c>: the password breaks a rule (the token stays usable).</summary>
+public enum ResetOutcome { Done, InvalidToken, PasswordRejected, RateLimited, Unavailable }
+
 public sealed record IdentityResult(IdentityOutcome Outcome, string? AccessToken = null, string? RefreshToken = null, int ExpiresInSeconds = 3600, string? ChallengeToken = null);
 
 /// <summary>
@@ -59,6 +67,79 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
             (termsVersion, privacyVersion) = (termsVersion ?? v.Terms, privacyVersion ?? v.Privacy);
         }
         return await PostAsync("/api/v1/auth/register", new { email, password, acceptedTermsVersion = termsVersion, acceptedPrivacyVersion = privacyVersion, locale }, null, ct);
+    }
+
+    /// <summary>
+    /// Asks authservice to mail a reset link. The answer for a known and an unknown address is the same (<c>200 {message, isOAuthOnly}</c>), and this method keeps it that way: nothing of the body but
+    /// <c>isOAuthOnly</c> is read. The address is sent in the body only, never put in a URL or a log line.
+    /// </summary>
+    public async Task<ForgotResult> ForgotPasswordAsync(string email, CancellationToken ct = default)
+    {
+        using var request = Request("/api/v1/auth/forgot-password", new { email }, null);
+        try
+        {
+            using var response = await http.SendAsync(request, ct);
+            var status = (int)response.StatusCode;
+            if (status == 200)
+            {
+                try
+                {
+                    using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                    return new ForgotResult(ForgotOutcome.Sent, doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("isOAuthOnly", out var o) && o.ValueKind == JsonValueKind.True);
+                }
+                catch (JsonException) { return new ForgotResult(ForgotOutcome.Sent); }
+            }
+            return new ForgotResult(status switch { 429 => ForgotOutcome.RateLimited, 400 => ForgotOutcome.InvalidEmail, _ => ForgotOutcome.Unavailable });
+        }
+        catch (Exception) when (!ct.IsCancellationRequested) { return new ForgotResult(ForgotOutcome.Unavailable); }
+    }
+
+    /// <summary>
+    /// Sets the new password with the token of the mailed link. A 400 comes in two shapes and both are handled: the <c>[ApiController]</c> problem document (<c>errors</c> is an OBJECT keyed by field: <c>NewPassword</c>
+    /// is a password problem, <c>Token</c> and <c>Email</c> a bad link) and Identity's own failures (<c>errors</c> is an ARRAY of strings: one that talks about the password is a password problem, anything else a bad token).
+    /// The token and the address travel in the body only; no message of the service is kept.
+    /// </summary>
+    public async Task<ResetOutcome> ResetPasswordAsync(string email, string token, string newPassword, CancellationToken ct = default)
+    {
+        using var request = Request("/api/v1/auth/reset-password", new { email, token, newPassword }, null);
+        try
+        {
+            using var response = await http.SendAsync(request, ct);
+            var status = (int)response.StatusCode;
+            if (status == 200) return ResetOutcome.Done;
+            if (status == 429) return ResetOutcome.RateLimited;
+            if (status != 400) return ResetOutcome.Unavailable;
+            try
+            {
+                using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                return ClassifyResetFailure(doc.RootElement);
+            }
+            catch (JsonException) { return ResetOutcome.InvalidToken; }
+        }
+        catch (Exception) when (!ct.IsCancellationRequested) { return ResetOutcome.Unavailable; }
+    }
+
+    static ResetOutcome ClassifyResetFailure(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("errors", out var errors)) return ResetOutcome.InvalidToken;
+        var passwordProblem = false;
+        if (errors.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var field in errors.EnumerateObject())
+            {
+                if (field.Name.Equals("NewPassword", StringComparison.OrdinalIgnoreCase)) passwordProblem = true;
+                else return ResetOutcome.InvalidToken; // Token or Email: the link is bad, whatever else is wrong
+            }
+        }
+        else if (errors.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in errors.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String && item.GetString()!.Contains("password", StringComparison.OrdinalIgnoreCase)) passwordProblem = true;
+                else return ResetOutcome.InvalidToken; // Identity's "Invalid token." and anything we do not recognise
+            }
+        }
+        return passwordProblem ? ResetOutcome.PasswordRejected : ResetOutcome.InvalidToken;
     }
 
     /// <summary>The GitHub leg's one-time code, exchanged for tokens (PR #118).</summary>

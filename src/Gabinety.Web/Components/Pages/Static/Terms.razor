@@ -1,0 +1,10 @@
+@page "/regulamin"
+@attribute [AllowAnonymous]
+@attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = Gabinety.Web.Hosting.PublicPageCachePolicy.Name)]
+
+<PageMeta Title="@PlPages.Legal.TermsMetaTitle" Description="@PlPages.Legal.TermsMetaDescription" Path="/regulamin" />
+<LegalPage Title="@PlPages.Legal.TermsTitle" Doc="_doc" />
+
+@code {
+    readonly LegalDoc _doc = LegalMarkdown.Load("regulamin");
+}

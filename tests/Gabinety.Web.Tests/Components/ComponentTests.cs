@@ -23,8 +23,9 @@ public class PresentationalComponentTests : BunitContext
         var link = cut.Find("h2 a");
         Assert.Equal(("Anna Demowska", "/gabinet/demo-anna-demowska"), (link.TextContent, link.GetAttribute("href")));
         Assert.Equal("Audyty kodu .NET i konsultacje architektury", cut.Find("p").TextContent);
-        Assert.Equal(["E-mail zweryfikowany", "Zatwierdzony", "Ocena 4,5 (12)"], cut.FindAll("li .badge").Select(b => b.TextContent));
-        Assert.Contains("badge--success", cut.FindAll("li .badge")[1].ClassName);
+        Assert.Equal(["Zweryfikowany", "★ 4,5 (12)"], cut.FindAll("li .badge").Select(b => b.TextContent)); // P-LIST-2: one badge, the checks are on the profile
+        Assert.Contains("badge--success", cut.FindAll("li .badge")[0].ClassName);
+        Assert.Equal("Ocena 4,5 (12)", cut.FindAll("li .badge")[1].GetAttribute("aria-label"));
         Assert.Equal("od 250,00 zł 30 min, 60 min", System.Text.RegularExpressions.Regex.Replace(cut.Find("p.cluster").TextContent.Replace('\u00A0', ' '), @"\s+", " "));
     }
 

@@ -6,7 +6,7 @@ namespace Gabinety.Web.Components.Pages.Practitioners;
 
 public sealed record FilterItem(string Label, string Href, bool Current);
 
-public sealed record FilterGroup(string Title, IReadOnlyList<FilterItem> Items);
+public sealed record FilterGroup(string Title, IReadOnlyList<FilterItem> Items, bool Segmented = false);
 
 /// <summary>
 /// What a list page says about itself, from its state and what the Directory returned: titles, counts, the filter links and the SEO verdict. Plain C#: the component only renders it.
@@ -28,7 +28,26 @@ public sealed class ListView(ListState state, TaxonomyDto taxonomy, SitemapDto s
 
     SitemapCategoryDto? Category => sitemap.Categories.FirstOrDefault(c => c.Path == State.Path);
     public int Count => Category?.PractitionerCount ?? 0;
-    public string CountText => string.Format(Pl.ListPage.Count, Count);
+
+    /// <summary>
+    /// The count line (F-05): it must never contradict the list. The unfiltered first page of a category is counted by the sitemap; a filtered variant or a later page has no total (the
+    /// Directory pages by cursor), so its count is the page's own items only when that page is the whole result (first page, no next cursor), and is omitted otherwise.
+    /// </summary>
+    public string? CountText(int itemsOnPage, bool hasNextPage) =>
+        !State.IsVariant ? (itemsOnPage == 0 && !hasNextPage ? string.Format(Pl.ListPage.Count, 0) : string.Format(Pl.ListPage.Count, Count))
+        : State.Cursor is null && !hasNextPage ? string.Format(Pl.ListPage.Count, itemsOnPage) : null;
+
+    /// <summary>The number of active narrowing filters: the "Filtry (2)" of the phone disclosure.</summary>
+    public int ActiveFilters => (State.Problem is null ? 0 : 1) + (State.Tech is null ? 0 : 1) + (State.Duration is null ? 0 : 1) + (State.MaxPriceMinor is null ? 0 : 1) + (string.IsNullOrEmpty(State.Q) ? 0 : 1);
+
+    /// <summary>The path to this category: Programiści, the problem, the technology (the last is the current page).</summary>
+    public IReadOnlyList<(string Label, string? Href)> Breadcrumb()
+    {
+        if (ProblemName is null) return [];
+        var crumbs = new List<(string, string?)> { (Pl.ListPage.AllTitle, "/programisci"), (ProblemName, TechName is null ? null : $"/programisci/{State.Problem}") };
+        if (TechName is not null) crumbs.Add((TechName, null));
+        return crumbs;
+    }
     public bool IsIndexable => !State.IsVariant && (Category?.Indexable ?? false);
     public string Robots => IsIndexable ? "index,follow" : "noindex,follow";
 
@@ -54,10 +73,10 @@ public sealed class ListView(ListState state, TaxonomyDto taxonomy, SitemapDto s
         }
         var durations = new List<FilterItem> { new(any, State.WithDuration(null).Href(), State.Duration is null) };
         durations.AddRange(ListState.Durations.Select(d => new FilterItem(string.Format(Pl.Filters.Minutes, d), State.WithDuration(d).Href(), State.Duration == d)));
-        groups.Add(new FilterGroup(Pl.Filters.Duration, durations));
+        groups.Add(new FilterGroup(Pl.Filters.Duration, durations, Segmented: true));
         var prices = new List<FilterItem> { new(Pl.Filters.AnyPrice, State.WithMaxPrice(null).Href(), State.MaxPriceMinor is null) };
         prices.AddRange(ListState.PricePresets.Select(p => new FilterItem(string.Format(Pl.Filters.UpTo, Money.Pln(p)), State.WithMaxPrice(p).Href(), State.MaxPriceMinor == p)));
-        groups.Add(new FilterGroup(Pl.Filters.Price, prices));
+        groups.Add(new FilterGroup(Pl.Filters.Price, prices, Segmented: true));
         return groups;
     }
 

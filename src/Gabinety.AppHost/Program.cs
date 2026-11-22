@@ -168,6 +168,8 @@ builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchProfileName: null)
     .WithEnvironment("Backend__Assistant", AssistantUrl)
     .WithEnvironment("Backend__Auth", identityAuthority)
     .WithEnvironment("Site__BaseUrl", "http://localhost:3001")
+    // The journeys change data and read the public pages straight after (approve, then open the profile): the five-minute output cache of the public pages is off in this host.
+    .WithEnvironment("OutputCache__Enabled", "false")
     .WaitFor(directory);
 
 builder.Build().Run();

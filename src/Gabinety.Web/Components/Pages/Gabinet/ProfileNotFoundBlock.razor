@@ -1,0 +1,15 @@
+@* F-09, P-PROF-3: the 404 of a profile names what is missing and offers the way on: all programmers, or a category. *@
+<div class="empty-state" data-testid="profile-not-found">
+    <h1>@PlPages.Profile.NotFoundTitle</h1>
+    <p>@PlPages.Profile.NotFoundBody</p>
+    <p><a class="btn btn--primary" href="/programisci">@PlPages.Profile.NotFoundAll</a></p>
+    @if (Suggestions.Count > 0)
+    {
+        <h2>@PlPages.Profile.NotFoundCategories</h2>
+        <ul class="link-list">@foreach (var c in Suggestions) {<li><a class="chip" href="@($"/programisci/{Uri.EscapeDataString(c.Slug)}")">@c.NamePl</a></li>}</ul>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<CategoryDto> Suggestions { get; set; } = [];
+}

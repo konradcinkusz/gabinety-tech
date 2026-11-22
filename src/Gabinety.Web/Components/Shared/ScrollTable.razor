@@ -1,0 +1,14 @@
+@* A table that may be wider than the screen scrolls INSIDE this wrapper, never the page; the wrapper is a labelled, keyboard-reachable region (F-12, P-STAT-1, axe scrollable-region-focusable). *@
+<div class="table-wrap" tabindex="0" role="region" aria-label="@Label">
+    <table>
+        <caption>@Caption</caption>
+        @ChildContent
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Caption { get; set; } = "";
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+
+    string Label => string.Format(PlPages.Ranking.ScrollRegion, Caption);
+}

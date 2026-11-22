@@ -23,7 +23,7 @@
 
 @media (min-width: 52rem) {
   .filters > summary { pointer-events: none; }
-  .filters:not([open]) > :not(summary) { display: grid; }
+  .filters:not([open]) > :not(summary) { display: block; } /* block, not grid: a grid made the nav as wide as its widest chip (368 px in a 256 px column) and the panel slid under the results */
   .filters__group .link-list { flex-direction: column; flex-wrap: nowrap; gap: var(--space-1); }
   .filters__group .link-list .chip { width: 100%; justify-content: flex-start; border-radius: var(--radius-md); }
 }

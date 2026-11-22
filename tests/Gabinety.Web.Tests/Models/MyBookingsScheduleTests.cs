@@ -51,6 +51,16 @@ public class MyBookingsScheduleTests
         Assert.Equal(["Wygasła", "Późno odwołana", "Odwołana", "Anulowana", "Zakończona"], past.Select(b => b.OfferingTitle));
     }
 
+    [Theory]
+    [InlineData("Completed")] [InlineData("NoShow")] [InlineData("Disputed")] [InlineData("DisputeResolved")] [InlineData("CancelledByClientNoRefund")]
+    public void Only_a_booking_awaiting_payment_or_confirmed_is_upcoming_whatever_its_start_says(string status)
+    {
+        // seeded data made with a moved test clock has a completed booking that starts in the future of the real clock
+        var (upcoming, past) = MyBookingsSchedule.Split([At(Now.AddDays(2), status, "Z przyszłością")], Now);
+        Assert.Empty(upcoming);
+        Assert.Single(past);
+    }
+
     [Fact]
     public void A_booking_starting_exactly_now_is_past_and_nothing_is_lost_in_the_split()
     {

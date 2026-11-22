@@ -83,7 +83,7 @@ public class FilterNavTests : BunitContext
     {
         var css = File.ReadAllText(Path.Combine(Repo.Web, "Components", "Pages", "Practitioners", "FilterNav.razor.css"));
         Assert.Contains("@media (min-width: 52rem)", css);
-        Assert.Contains(".filters:not([open]) > :not(summary) { display: grid; }", css);
+        Assert.Contains(".filters:not([open]) > :not(summary) { display: block; }", css); // block, not grid: a grid sized the nav by its widest chip and the panel slid under the results
         Assert.Contains(".filters > summary { pointer-events: none; }", css);
         Assert.Contains(".filters:not([open])::details-content { content-visibility: visible; }", css); // the slot a closed disclosure hides its content in
         Assert.DoesNotContain("inline-flex", css); // the joined rows are the shared equal-column grid of app.css, not an inline flow

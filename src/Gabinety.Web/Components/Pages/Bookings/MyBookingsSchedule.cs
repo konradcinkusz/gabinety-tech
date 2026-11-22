@@ -11,10 +11,10 @@ namespace Gabinety.Web.Components.Pages.Bookings;
 /// </summary>
 public static class MyBookingsSchedule
 {
-    /// <summary>Statuses that end a booking before its start, so it is never "upcoming" whatever its start time says.</summary>
-    static readonly string[] Ended = ["CancelledByClient", "LateCancelledByClient", "CancelledByPractitioner", "Expired"];
+    /// <summary>Only a booking that is still to happen is upcoming: awaiting payment or confirmed. Anything else (completed, cancelled, expired, no-show, in dispute) is past whatever its start time says: a completed booking can carry a start in the future of this clock when the seeded data was made with a moved test clock.</summary>
+    static readonly string[] Pending = ["PendingPayment", "Confirmed"];
 
-    public static bool IsUpcoming(BookingViewDto booking, DateTimeOffset now) => booking.StartUtc > now && !Ended.Contains(booking.Status);
+    public static bool IsUpcoming(BookingViewDto booking, DateTimeOffset now) => booking.StartUtc > now && Pending.Contains(booking.Status);
 
     /// <summary>Upcoming: the soonest first. Everything else: the newest first.</summary>
     public static (List<BookingViewDto> Upcoming, List<BookingViewDto> Past) Split(IEnumerable<BookingViewDto> items, DateTimeOffset now)

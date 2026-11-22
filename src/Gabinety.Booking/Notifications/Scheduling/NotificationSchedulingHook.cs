@@ -12,7 +12,7 @@ namespace Gabinety.Booking.Notifications.Scheduling;
 /// to the client (due 24 h and 1 h before the start), <c>ReviewRequest</c> to the client (due 2 h after the end). A reminder whose time has already passed is
 /// not scheduled: a booking made 20 h before the start has no "24 h" reminder, and a reminder sent after the start would be wrong.</item>
 /// <item>A cancellation (any of the three) or a reported client no-show: the unsent reminders and the review request are removed (no review after a
-/// cancellation or a no-show, CONTRACTS 8.1); sent rows and the confirmations stay.</item>
+/// cancellation or a no-show, CONTRACTS 8.1); sent rows and the confirmations stay. A cancellation by the practitioner also schedules <c>Cancelled</c> to the client, due now.</item>
 /// </list>
 /// Rows go through <see cref="INotificationWriter.ScheduleAsync"/>, which checks saved rows too, so a replay never duplicates (unique per booking, kind, user).
 /// </summary>
@@ -30,6 +30,9 @@ public sealed class NotificationSchedulingHook(INotificationWriter writer) : IBo
                 break;
             case BookingStatus.CancelledByClient or BookingStatus.LateCancelledByClient or BookingStatus.CancelledByPractitioner or BookingStatus.ClientNoShow:
                 await writer.CancelUnsentAsync(context.Booking.Id, RemovedWhenNotHeld, ct);
+                // the practitioner's cancel (their own, or the cascade of a suspension) is news to the client: the Cancelled template of T-04.09a; the client's own cancel is not
+                if (context.To == BookingStatus.CancelledByPractitioner)
+                    await writer.ScheduleAsync(context.Booking, NotificationKind.Cancelled, context.Booking.ClientUserId, context.Now, ct);
                 break;
         }
     }

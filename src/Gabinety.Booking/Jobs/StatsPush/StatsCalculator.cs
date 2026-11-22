@@ -1,3 +1,4 @@
+using Gabinety.Booking.Features.Internal.PractitionerCancellation;
 using Gabinety.Booking.Features.Slots;
 using Gabinety.Booking.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +15,8 @@ public sealed record BookingStats(int CompletedCount, int PractitionerCancelCoun
 /// <list type="bullet">
 /// <item><c>completed_count</c> = rows in <c>Completed</c> + rows in <c>Resolved</c> with <c>dispute_resolution = 'release'</c> ("as Completed").
 /// <c>ClientNoShow</c> and <c>LateCancelledByClient</c> count as completed "for money" only, and <c>Resolved/refund_partial</c> has no stats line: none of them is counted.</item>
-/// <item><c>practitioner_cancel_count</c> = rows in <c>CancelledByPractitioner</c>.</item>
+/// <item><c>practitioner_cancel_count</c> = rows in <c>CancelledByPractitioner</c>, except those cancelled by the suspension or erasure cascade (<c>status_reason = practitioner_suspended</c>):
+/// an administrator's action must not lower the reliability of a practitioner who is reinstated (ADR-0012, a deviation from the CONTRACTS 8.1 text).</item>
 /// <item><c>no_show_upheld_count</c> = <c>Resolved</c> with <c>refund_full</c> and <c>dispute_kind = 'practitioner_no_show'</c>.</item>
 /// <item><c>open_slots_14d</c> = bookable slots from today (Warsaw date) for 14 days, by <see cref="SlotCalculator"/>, for the shortest duration seen in the
 /// practitioner's booking snapshots (Directory has no list-offerings lookup); 30 minutes (the grid minimum) when there is no booking.</item>
@@ -27,8 +29,8 @@ public sealed class StatsCalculator(BookingDbContext db, IConfiguration config, 
     public async Task<Dictionary<Guid, BookingStats>> ComputeAsync(CancellationToken ct)
     {
         var groups = await db.Bookings.AsNoTracking()
-            .GroupBy(b => new { b.PractitionerId, b.Status, b.DisputeResolution, b.DisputeKind })
-            .Select(g => new { g.Key.PractitionerId, g.Key.Status, g.Key.DisputeResolution, g.Key.DisputeKind, N = g.Count(), Shortest = g.Min(b => (int)b.DurationMinutes) })
+            .GroupBy(b => new { b.PractitionerId, b.Status, b.DisputeResolution, b.DisputeKind, Cascade = b.StatusReason == FutureBookingCanceller.Reason })
+            .Select(g => new { g.Key.PractitionerId, g.Key.Status, g.Key.DisputeResolution, g.Key.DisputeKind, g.Key.Cascade, N = g.Count(), Shortest = g.Min(b => (int)b.DurationMinutes) })
             .ToListAsync(ct);
         var withRules = (await db.Rules.AsNoTracking().Select(r => r.PractitionerId).Distinct().ToListAsync(ct)).ToHashSet();
 
@@ -40,7 +42,7 @@ public sealed class StatsCalculator(BookingDbContext db, IConfiguration config, 
             ct.ThrowIfCancellationRequested();
             var mine = groups.Where(g => g.PractitionerId == id).ToList();
             var completed = mine.Where(g => g.Status == BookingStatus.Completed || (g.Status == BookingStatus.Resolved && g.DisputeResolution == "release")).Sum(g => g.N);
-            var cancelled = mine.Where(g => g.Status == BookingStatus.CancelledByPractitioner).Sum(g => g.N);
+            var cancelled = mine.Where(g => g.Status == BookingStatus.CancelledByPractitioner && !g.Cascade).Sum(g => g.N);
             var upheld = mine.Where(g => g.Status == BookingStatus.Resolved && g.DisputeResolution == "refund_full" && g.DisputeKind == "practitioner_no_show").Sum(g => g.N);
 
             var slots = 0;

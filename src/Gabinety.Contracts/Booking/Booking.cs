@@ -14,10 +14,10 @@ public enum BookingStatus
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum PaymentStatus { Created, Succeeded, Failed, Refunded, PartiallyRefunded }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(Gabinety.Contracts.Common.SnakeCaseLowerEnumConverter))]
 public enum DisputeKind { NotAsDescribed, PractitionerNoShow, Other }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(Gabinety.Contracts.Common.SnakeCaseLowerEnumConverter))]
 public enum Resolution { Release, RefundFull, RefundPartial }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

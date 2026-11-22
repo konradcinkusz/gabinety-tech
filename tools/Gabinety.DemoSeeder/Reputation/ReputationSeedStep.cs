@@ -4,8 +4,8 @@ namespace Gabinety.DemoSeeder;
 /// The Reputation data (T-08.01c): one synthetic review on each Completed demo booking, written by the client who made the booking through the public
 /// <c>POST /api/v1/reviews</c>. Reputation asks Booking whether the booking is reviewable, runs its publication rules and updates the rating summary itself, so the seeder
 /// writes nothing else. Idempotent: Reputation allows one review per booking (409 already_reviewed), which this step reads as "already there".
-/// Why only three: the Booking step makes three Completed bookings, and a review needs one. The Directory baseline (DemoCatalog stats) keeps the larger counts of the display cases;
-/// Reputation's own summaries push with version 1 for a practitioner's first review, which the Directory ignores because its baseline is version 1 too (T-03.08 is monotonic).
+/// Why only three: the Booking step makes three Completed bookings, and a review needs one. The Directory baseline (DemoCatalog stats) is derived from exactly these three,
+/// so a profile never shows more reviews than exist; Reputation's own summaries push with version 1 for a practitioner's first review, which the Directory ignores because its baseline is version 1 too (T-03.08 is monotonic), and says the same.
 /// </summary>
 public sealed class ReputationSeedStep : ISeedStep
 {

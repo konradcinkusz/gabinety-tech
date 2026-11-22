@@ -77,6 +77,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | POST | `/api/v1/admin/bookings/{id}/resolve` | Admin | all | |
 | Booking | GET | `/api/v1/admin/ledger.csv` | Admin | all | |
 | Booking | GET | `/internal/v1/bookings/{id}/reviewability` | Internal | all | caller: Reputation |
+| Booking | POST | `/internal/v1/practitioners/{id}/cancel-future-bookings` | Internal | all | caller: Directory (suspension and erasure, ADR-0012); idempotent |
 | Booking | DELETE | `/internal/v1/subjects/{userId}` | Internal | all | owner runbook (erasure) |
 | Booking | GET | `/internal/v1/analytics/pair-counts` | Internal | all | caller: Reputation (T-10.03) |
 | Booking | GET | `/internal/v1/test/clock` | Internal | fake | owner / seeder |

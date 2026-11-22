@@ -73,8 +73,12 @@ absorbed by the platform (D-23) and are **not** returned by Stripe on a refund *
   For a 30 or 60 minute consultation the result is always `start + 72 h`.
 - `Resolved`: `payout_due_at = resolved_at`, now stored at the resolution (before, the payout job fell back to `resolved_at`; the fallback stays for older rows).
 - Unchanged: `LateCancelledByClient` = `start_utc`, `ClientNoShow` = the report time (neither has a dispute transition, so no window to wait for).
-- **Observation for the supervisor, not changed here (CONTRACTS 8.1):** `Confirmed -> Completed` happens at `end + 48 h`, and a dispute is only possible from `Confirmed`. So the `practitioner_no_show` claim, described as open until
-  `start + 72 h`, effectively ends at `end + 48 h` (`start + 49 h` for a one-hour session). The new `payout_due_at` is therefore a margin, not a fix; making auto-complete wait for `max(end + 48 h, start + 72 h)` would make the contract true.
+- **Decision (supervisor, on PR 127): the dispute right lasts to `start + 72 h`, as CONTRACTS 4.2 says.** Before, a dispute was only possible from `Confirmed`, and `Confirmed -> Completed` happens at `end + 48 h`, so the right
+  ended at `start + 49 h` for a one-hour session. Now `Completed -> Disputed` (trigger `ClientDisputes`) is allowed while `now < start + 72 h`, any kind, client only (`DisputeFeature.InWindow`). No money has moved by then: the payout is due
+  at `max(end + 48 h, start + 72 h)` and is never made for a `Disputed` booking. Completion had already set `fee_minor`, `payout_minor`, `payout_due_at` and claimed the pair's `PlatformFee` row; the dispute clears the three amounts and
+  removes that unpaid fee row in the same transaction (the one deliberate delete of a ledger row; it frees the pair), and the resolution computes fee and payout again (`release`: fee and payout as for completion; `refund_full`: none;
+  `refund_partial`: on the kept part). Tests: `DisputeFromCompletedTests` (start + 60 h succeeds, 71 h 59 min succeeds, 72 h and 73 h refused, payout held while disputed, release pays once, refund leaves no fee row).
+  CONTRACTS 8.1 needs the row `Completed` + dispute (client, before `start + 72 h`) -> `Disputed`.
 - **The payout job's retry bound is durable.** Migration `T-09.05_StripeConnect` adds `payouts.attempt_count` (int, default 0) and `payouts.next_attempt_at` (timestamptz null). A run takes a payout up under
   `SELECT ... FOR UPDATE SKIP LOCKED` on the booking row (a row held by another instance is skipped, not waited for), sets `Pending`, increments `attempt_count` and sets `next_attempt_at = now + lease`
   (`Jobs:Payout:StalePendingSeconds`, 120) — the lease keeps other instances off and a crashed owner's lease just runs out; a failure sets `Failed` and `next_attempt_at = now + backoff` (60 s, doubling);

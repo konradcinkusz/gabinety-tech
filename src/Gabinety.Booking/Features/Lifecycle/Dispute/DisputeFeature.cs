@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Gabinety.Billing;
+using Gabinety.Contracts.Booking;
 using Gabinety.Booking.Features.Lifecycle.Core;
 using Gabinety.Booking.Features.Payments;
 using Gabinety.Booking.Persistence;
@@ -32,9 +33,24 @@ public sealed class DisputeFeature : IServiceFeature
     /// <summary>The lower edge is inclusive and the upper exclusive: at end + 48 h the booking auto-completes (T-04.08), so the two never both hold.</summary>
     public static bool InWindow(BookingEntity b, string kind, DateTimeOffset now)
     {
+        // A completed booking can still be disputed until start + 72 h (CONTRACTS 4.2): its payout is not due before max(end + 48 h, start + 72 h), so no money has moved (ADR proposal 0011).
+        if (b.Status == Gabinety.Billing.BookingStatus.Completed) return now < b.StartUtc + NoShowWindow;
         var end = b.EndedAt ?? b.EndUtc;
         if (now >= end && now < end + Window) return true;
         return kind == "practitioner_no_show" && now >= b.StartUtc && now < b.StartUtc + NoShowWindow;
+    }
+
+    /// <summary>
+    /// A disputed booking was money-complete: completion had set <c>fee_minor</c>, <c>payout_minor</c>, <c>payout_due_at</c> and claimed the pair's <c>PlatformFee</c> row. Nothing was paid out
+    /// (the payout is due after the dispute window), so the money decision is taken again at the resolution: the amounts are cleared and the unpaid fee row is removed, which frees the pair for
+    /// the booking that really earns the fee (the one deliberate delete of a ledger row, in this transaction only, never after a payout).
+    /// </summary>
+    static void ReopenMoney(BookingTransitionContext c)
+    {
+        c.Booking.FeeMinor = null;
+        c.Booking.PayoutMinor = null;
+        c.Booking.PayoutDueAt = null;
+        c.Db.LedgerEntries.RemoveRange(c.Db.LedgerEntries.Where(l => l.BookingId == c.Booking.Id && l.Kind == LedgerKind.PlatformFee).ToList());
     }
 
     static async Task<IResult> DisputeAsync(Guid id, DisputeRequest? body, ClaimsPrincipal user, BookingDbContext db, BookingTransitions transitions,
@@ -62,6 +78,7 @@ public sealed class DisputeFeature : IServiceFeature
                 c.Booking.DisputeOpenedAt = now;
                 c.Booking.DisputeKind = kind;
                 c.Booking.DisputeText = text;
+                if (c.From == Gabinety.Billing.BookingStatus.Completed) ReopenMoney(c);
             },
         }, ct);
         return result.ToErrorResult() ?? Results.Ok(BookingViewFeature.ToView(result.Booking!, result.Payment, sub, admin: false));

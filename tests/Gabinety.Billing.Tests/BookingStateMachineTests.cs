@@ -25,6 +25,7 @@ public class BookingStateMachineTests
         (S.Confirmed, T.CompletionWindowElapsed, Early, S.Completed),
         (S.Confirmed, T.ClientNoShowReported, Early, S.ClientNoShow),
         (S.Confirmed, T.ClientDisputes, Early, S.Disputed),
+        (S.Completed, T.ClientDisputes, Early, S.Disputed), // the caller bounds it by start + 72 h
         (S.Disputed, T.AdminResolves, Early, S.Resolved),
     ];
 

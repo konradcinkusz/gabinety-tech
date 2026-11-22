@@ -2,6 +2,7 @@ using Gabinety.Directory.Features.Health;
 using Gabinety.Directory.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -98,11 +99,16 @@ public class SkeletonMigrationIntegrationTests
         return rows;
     }
 
-    /// <summary>The ids of every migration declared in the Directory assembly, in order. The history table must equal this list exactly: nothing missing, nothing twice.</summary>
-    static string[] DeclaredMigrationIds() =>
-        typeof(Gabinety.Directory.Persistence.DirectoryDbContext).Assembly.GetTypes()
-            .Select(t => (Attribute.GetCustomAttribute(t, typeof(Microsoft.EntityFrameworkCore.Migrations.MigrationAttribute)) as Microsoft.EntityFrameworkCore.Migrations.MigrationAttribute)?.Id)
-            .OfType<string>().Order(StringComparer.Ordinal).ToArray();
+    // The migrations already released, in order. Never edit or reorder these; a new migration is NOT added here: the applied history must equal the assembly's own list
+    // (a missing, extra or reordered migration fails) and must start with this pinned prefix (an edited, renamed or reordered released one fails).
+    static readonly string[] Shipped = ["20261116000000_T-03.01_Baseline", "20261116100000_T-03.02_Practitioners", "20261116120000_T-03.03_Taxonomy", "20261116140000_T-03.04_Offerings", "20261116150000_T-03.05_Verification", "20261122100000_T-03.09_ContactEmail"];
+    static readonly string[] Expected = [.. new DirectoryDbContextFactory().CreateDbContext([]).Database.GetMigrations()];
+
+    static void AssertHistory(IReadOnlyList<string> applied)
+    {
+        Assert.Equal(Expected, applied);                                  // everything in the assembly, applied once, in order
+        Assert.Equal(Shipped, applied.Take(Shipped.Length).ToArray());    // the released part is untouched
+    }
 
     [Fact]
     public async Task Migration_runs_once_and_a_second_start_is_a_no_op()
@@ -118,7 +124,7 @@ public class SkeletonMigrationIntegrationTests
             await state.WaitForCompletionAsync(TimeSpan.FromSeconds(30));
             Assert.Equal(MigrationStatus.Done, state.Status);
         }
-        Assert.Equal(DeclaredMigrationIds(), await History(cs)); // every migration of the assembly, each exactly once
+        AssertHistory(await History(cs));
 
         using (var second = Host(cs))
         {
@@ -127,6 +133,6 @@ public class SkeletonMigrationIntegrationTests
             await state.WaitForCompletionAsync(TimeSpan.FromSeconds(30));
             Assert.Equal(MigrationStatus.Done, state.Status);
         }
-        Assert.Equal(DeclaredMigrationIds(), await History(cs)); // every migration of the assembly, each exactly once
+        AssertHistory(await History(cs));
     }
 }

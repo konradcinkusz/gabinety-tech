@@ -29,6 +29,17 @@ public class SkeletonMigrationIntegrationTests
     static readonly string[] ContractColumns =
         ["ai_credits", "at", "feature", "id", "input_tokens", "latency_ms", "model_id", "outcome", "output_tokens", "provider_kind", "usd_estimate", "user_hash"];
 
+    // The migrations already released, in order. Never edit or reorder these; a new migration is NOT added here: the applied history must equal the assembly's own list
+    // (a missing, extra or reordered migration fails) and must start with this pinned prefix (an edited, renamed or reordered released one fails).
+    static readonly string[] Shipped = ["20261116130000_T-06.01_Usage"];
+    static readonly string[] Expected = [.. new AssistantDbContextFactory().CreateDbContext([]).Database.GetMigrations()];
+
+    static void AssertHistory(IReadOnlyList<string> applied)
+    {
+        Assert.Equal(Expected, applied);                                  // everything in the assembly, applied once, in order
+        Assert.Equal(Shipped, applied.Take(Shipped.Length).ToArray());    // the released part is untouched
+    }
+
     static WebApplicationFactory<Program> Host(string cs) => new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
     {
         b.UseSetting("Llm:Provider", "Fake");
@@ -64,16 +75,10 @@ public class SkeletonMigrationIntegrationTests
         var cs = pg.GetConnectionString();
         const string history = """select "MigrationId" from "__EFMigrationsHistory" order by "MigrationId" collate "C" """;
 
-        // The ids of every migration declared in the assembly (a DbContext without a provider cannot list them, so read the attribute).
-        var declared = typeof(AssistantDbContext).Assembly.GetTypes()
-            .Select(t => (Attribute.GetCustomAttribute(t, typeof(Microsoft.EntityFrameworkCore.Migrations.MigrationAttribute)) as Microsoft.EntityFrameworkCore.Migrations.MigrationAttribute)?.Id)
-            .OfType<string>().Order(StringComparer.Ordinal).ToList();
-        Assert.Equal(["20261116130000_T-06.01_Usage"], declared);
-
         await MigrateOnce(cs);
-        Assert.Equal(declared, await Query(cs, history));
+        AssertHistory(await Query(cs, history));
         await MigrateOnce(cs);
-        Assert.Equal(declared, await Query(cs, history));
+        AssertHistory(await Query(cs, history));
 
         Assert.Equal(ContractColumns, await Query(cs,
             "select column_name from information_schema.columns where table_schema='public' and table_name='assistant_usage' order by 1"));

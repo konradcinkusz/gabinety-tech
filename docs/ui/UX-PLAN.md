@@ -130,7 +130,7 @@ Waves: **0** foundation (merge first), **1** pages (all parallel once wave 0 is 
 
 ### Wave 0: foundation
 
-Status: **UX-001 and UX-002 are done** (same PR as this document). What UX-002 left to the page tasks, because the rules live in scoped sheets it does not own: the filters' segmented controls still wrap (UX-013), the header sits on the sunken surface (UX-010), the administrator area still carries its `admin-*` copies (UX-050), `.flash` stays in `MainLayout.razor.css` (UX-060). Remaining tap targets under 44 px are inline links and 24 px checkboxes inside 44 px label rows, per page.
+Status: **UX-001, UX-002 and UX-003 are done** (same PR as this document). UX-003: the audit signs in through the host's form post, covers `/rejestracja/sprawdz-skrzynke` and `/gabinet-programisty/platnosci`, runs the review flow before the dispute flow (the dispute consumed the only completed booking), `docs/ui/audit/` holds 99 captures of the Blazor host, and `journeys/ui-gate.spec.ts` asserts no horizontal scroll and no serious axe violation at 390 px in both schemes in the `e2e` job (tap targets are not asserted yet; `/logowanie/kod` needs a pending challenge and is not covered). What UX-002 left to the page tasks, because the rules live in scoped sheets it does not own: the filters' segmented controls still wrap (UX-013), the header sits on the sunken surface (UX-010), the administrator area still carries its `admin-*` copies (UX-050), `.flash` stays in `MainLayout.razor.css` (UX-060). Remaining tap targets under 44 px are inline links and 24 px checkboxes inside 44 px label rows, per page.
 
 | ID | Task | Owns | Depends | Size |
 |---|---|---|---|---|

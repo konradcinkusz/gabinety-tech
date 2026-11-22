@@ -1,6 +1,6 @@
 # ui-audit
 
-Visits every route of `web/src/app` as visitor, client, practitioner and administrator at 1440x900 and 390x844, light and dark, drives the booking, review,
+Visits every route of the Blazor host (`src/Gabinety.Web`) as visitor, client, practitioner and administrator at 1440x900 and 390x844, light and dark, drives the booking, review,
 onboarding and dispute-resolution flows through the UI, records mechanical findings and writes screenshots. Result: `docs/ui/audit/findings.json` and
 `docs/ui/audit/<role>/<route>-<viewport>-<scheme>.png`; the reading of it is `docs/ui/UI-AUDIT.md`.
 
@@ -16,3 +16,5 @@ python3 tests/e2e/tools/ui-audit/contrast.py                                    
 
 Env: `E2E_WEB_URL` (default `http://localhost:3000`), `AUDIT_OUT` (default `docs/ui/audit`), `PW_CHROMIUM_PATH`.
 The inert-button probe clicks buttons, so it runs only on public read-only pages (it once disabled a practitioner's offer; see UI-AUDIT.md section 7). Do not widen it.
+
+The read-only subset runs in CI as `tests/e2e/journeys/ui-gate.spec.ts` (every route at 390 px, both schemes: no horizontal scroll, no serious or critical axe violation). The audit itself writes, so it is run by hand on a throw-away stack; sign-in is the host's form post (`harness/auth.ts` `signInViaFormPost`).

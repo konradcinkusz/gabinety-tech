@@ -12,7 +12,7 @@ namespace Gabinety.Booking.Features.Internal.Erasure;
 /// <summary>
 /// DELETE /internal/v1/subjects/{userId} (CONTRACTS 4.3, SPEC 5 rule 4), behind the "Internal" policy, called when a user is deleted. For every booking where the
 /// user is the client or the practitioner's user it replaces <c>brief_text</c> with <see cref="ErasedBrief"/>, clears <c>dispute_text</c> and the free-text
-/// <c>status_reason</c>, and, when the user is the practitioner, clears <c>meeting_url_snapshot</c> and replaces <c>offering_title</c> with the placeholder; and replaces the user id with <see cref="Token"/>: deterministic, one-way, distinct per user, so the unique index
+/// <c>status_reason</c>, and, when the user is the client, nulls <c>client_email</c> (the e-mail snapshot of T-04.09c); and, when the user is the practitioner, clears <c>meeting_url_snapshot</c> and replaces <c>offering_title</c> with the placeholder; and replaces the user id with <see cref="Token"/>: deterministic, one-way, distinct per user, so the unique index
 /// <c>(client_user_id, idempotency_key)</c> stays valid. The same token replaces <c>idempotency_records.client_user_id</c> and the client id inside the
 /// <c>pair_key</c> of the client's ledger rows (the only ledger column that carries a user id). It KEEPS ledger amounts and kinds, payments, payouts (none
 /// carries a user id), and the booking's amounts, statuses and times: accounting. The counterparty still sees the booking, with the placeholder brief.
@@ -101,7 +101,7 @@ public sealed class ErasureFeature : IServiceFeature
         b.BriefText = ErasedBrief;
         b.DisputeText = null;
         b.StatusReason = null;
-        if (b.ClientUserId == userId) b.ClientUserId = token;
+        if (b.ClientUserId == userId) { b.ClientUserId = token; b.ClientEmail = null; } // the e-mail snapshot is the client's own
         if (b.PractitionerUserId == userId)
         {   // the practitioner's own data: a personal meeting link and the offering title; a client's erasure must not touch them
             b.PractitionerUserId = token;

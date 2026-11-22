@@ -115,6 +115,11 @@ namespace Gabinety.Directory.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("completed_count");
 
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("contact_email");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

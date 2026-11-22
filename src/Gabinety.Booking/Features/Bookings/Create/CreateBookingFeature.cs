@@ -7,6 +7,7 @@ using System.Text.Json;
 using Gabinety.Billing;
 using Gabinety.Booking.Clients;
 using Gabinety.Booking.Features.Slots;
+using Gabinety.Booking.Notifications;
 using Gabinety.Booking.Payments.Abstractions;
 using Gabinety.Booking.Persistence;
 using Gabinety.Contracts.Booking;
@@ -108,7 +109,7 @@ public sealed class CreateBookingFeature : IServiceFeature
                 var body = JsonSerializer.Serialize(response, Json);
                 db.Bookings.Add(new BookingEntity
                 {
-                    Id = bookingId, ClientUserId = sub, PractitionerId = offering.PractitionerId, PractitionerUserId = offering.PractitionerUserId,
+                    Id = bookingId, ClientUserId = sub, ClientEmail = UserEmail.From(user), PractitionerId = offering.PractitionerId, PractitionerUserId = offering.PractitionerUserId,
                     OfferingId = offering.OfferingId, OfferingTitle = offering.Title, DurationMinutes = (short)offering.DurationMinutes,
                     PriceMinor = offering.Price.AmountMinor, StartUtc = startUtc, EndUtc = startUtc + duration, Status = BookingStateMachine.Create(),
                     BriefText = text, BriefProblemSlug = req.Brief.ProblemSlug, BriefAiAssisted = req.Brief.AiAssisted,

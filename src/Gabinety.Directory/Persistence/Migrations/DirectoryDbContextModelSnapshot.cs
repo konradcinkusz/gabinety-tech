@@ -120,6 +120,26 @@ namespace Gabinety.Directory.Persistence.Migrations
                         .HasColumnType("character varying(254)")
                         .HasColumnName("contact_email");
 
+                    b.Property<DateOnly?>("ContractAvailableFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("contract_available_from");
+
+                    b.Property<short?>("ContractHoursPerWeek")
+                        .HasColumnType("smallint")
+                        .HasColumnName("contract_hours_per_week");
+
+                    b.Property<long?>("ContractRateMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("contract_rate_minor");
+
+                    b.Property<string>("ContractStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("NotAvailable")
+                        .HasColumnName("contract_status");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

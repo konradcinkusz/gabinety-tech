@@ -39,6 +39,8 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Directory | POST | `/api/v1/me/practitioner/offerings/{id}/activate` | Authenticated | all | undo of deactivate; 422 `too_many_offerings` at 5 active |
 | Directory | POST | `/api/v1/me/practitioner/github-link` | Authenticated | all | |
 | Directory | POST | `/api/v1/me/practitioner/github-link/verify` | Authenticated | all | |
+| Directory | GET | `/api/v1/me/practitioner/contract-availability` | Authenticated | all | ADR proposal 0013 (T-13.01): own contract availability |
+| Directory | PUT | `/api/v1/me/practitioner/contract-availability` | Authenticated | all | replaces the four contract columns; a separate route because the profile PUT replaces every field it knows |
 | Directory | GET | `/api/v1/admin/practitioners` | Admin | all | |
 | Directory | GET | `/api/v1/admin/practitioners/{id}` | Admin | all | |
 | Directory | GET | `/api/v1/admin/practitioners/{id}/verification-events` | Admin | all | |
@@ -52,6 +54,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Directory | GET | `/internal/v1/practitioners/by-user/{userId}` | Internal | all | callers: Booking, Reputation |
 | Directory | GET | `/internal/v1/practitioners/{id}` | Internal | all | caller: Booking (display name and slug for the booking views, ADR-0012 section 6) |
 | Directory | GET | `/internal/v1/practitioners/{userId}/contact` | Internal | all | caller: Booking (T-03.09, notifications): the e-mail snapshot of the practitioner, `404` when none is held. Booking already holds `Internal__Keys__Directory`: no new key |
+| Directory | GET | `/internal/v1/practitioners/{id}/contract` | Internal | all | caller: Booking (ADR proposal 0013): user id, display name, slug and whether collaboration proposals are accepted. Booking already holds `Internal__Keys__Directory`: no new key |
 | Directory | PUT | `/internal/v1/practitioners/{id}/reputation` | Internal | all | caller: Reputation |
 | Directory | PUT | `/internal/v1/practitioners/{id}/booking-stats` | Internal | all | caller: Booking |
 | Directory | DELETE | `/internal/v1/subjects/{userId}` | Internal | all | owner runbook (erasure) |

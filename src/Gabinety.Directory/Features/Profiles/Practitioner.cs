@@ -43,6 +43,13 @@ public sealed class Practitioner
     public string? GithubChallengeCode { get; set; }
     public string? GithubChallengeLogin { get; set; }
     public DateTimeOffset? GithubChallengeExpiresAt { get; set; }
+    /// <summary>Contract availability (ADR proposal 0013, T-13.01): whether the practitioner takes collaboration proposals. Edited through its own endpoint, never through the profile PUT.</summary>
+    public ContractStatus ContractStatus { get; set; } = ContractStatus.NotAvailable;
+    /// <summary>Warsaw calendar date; null, or a date that has passed, reads as available now. Only meaningful for <see cref="ContractStatus.AvailableFrom"/>.</summary>
+    public DateOnly? ContractAvailableFrom { get; set; }
+    public short? ContractHoursPerWeek { get; set; }
+    /// <summary>Indicative hourly rate in grosz; optional, not a price list.</summary>
+    public long? ContractRateMinor { get; set; }
 }
 
 public sealed class PractitionerConfiguration : IEntityTypeConfiguration<Practitioner>
@@ -83,6 +90,10 @@ public sealed class PractitionerConfiguration : IEntityTypeConfiguration<Practit
         b.Property(x => x.GithubChallengeCode).HasColumnName("github_challenge_code").HasMaxLength(40);
         b.Property(x => x.GithubChallengeLogin).HasColumnName("github_challenge_login").HasMaxLength(39);
         b.Property(x => x.GithubChallengeExpiresAt).HasColumnName("github_challenge_expires_at");
+        b.Property(x => x.ContractStatus).HasColumnName("contract_status").HasConversion<string>().HasMaxLength(20).HasDefaultValue(ContractStatus.NotAvailable);
+        b.Property(x => x.ContractAvailableFrom).HasColumnName("contract_available_from");
+        b.Property(x => x.ContractHoursPerWeek).HasColumnName("contract_hours_per_week");
+        b.Property(x => x.ContractRateMinor).HasColumnName("contract_rate_minor");
         // ux on lower(github_login) where github_linked is raw SQL in migration T-03.05 (EF cannot model an expression index)
         b.HasIndex(x => x.UserId).IsUnique();
         b.HasIndex(x => x.Slug).IsUnique();

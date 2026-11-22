@@ -1,5 +1,6 @@
 using Gabinety.Contracts.Common;
 using Gabinety.Contracts.Directory;
+using Gabinety.Directory.Features.ContractAvailability;
 using Gabinety.Directory.Features.Offerings;
 using Offering = Gabinety.Directory.Features.Offerings.Offering;
 using Gabinety.Directory.Features.Profiles;
@@ -32,7 +33,7 @@ public sealed class SearchFeature : IServiceFeature
 
     // ---- list
 
-    static async Task<IResult> List(HttpContext ctx, DirectoryDbContext db, CancellationToken ct)
+    static async Task<IResult> List(HttpContext ctx, DirectoryDbContext db, TimeProvider time, CancellationToken ct)
     {
         var s = SearchQuery.Parse(ctx.Request.Query);
         if (s.Error is { } e) return PublicJson.Invalid(ctx, e.Field, e.Message);
@@ -40,6 +41,7 @@ public sealed class SearchFeature : IServiceFeature
         var offerings = s.Filter.Apply(db.Offerings);
         var q = db.Practitioners.AsNoTracking()
             .Where(p => p.Status == PractitionerStatus.Approved && offerings.Any(o => o.PractitionerId == p.Id));
+        if (s.Contract) q = q.Where(p => p.ContractStatus != ContractStatus.NotAvailable); // ADR proposal 0013: only those who take collaboration proposals
         if (s.Q is { } text)
         {
             var needle = text.ToLowerInvariant(); // Contains escapes % and _ itself on both providers: the user's text is always literal
@@ -58,12 +60,13 @@ public sealed class SearchFeature : IServiceFeature
         var all = ids.Count == 0 ? [] : await db.Offerings.AsNoTracking().Where(o => ids.Contains(o.PractitionerId) && o.IsActive).ToListAsync(ct); // one query for the page
         var byPractitioner = all.ToLookup(o => o.PractitionerId);
 
-        var items = page.Select(p => Card(p, byPractitioner[p.Id].ToList(), s.Filter)).ToList();
+        var today = ContractAvailabilityRules.TodayWarsaw(time);
+        var items = page.Select(p => Card(p, byPractitioner[p.Id].ToList(), s.Filter, today)).ToList();
         var next = rows.Count > s.Limit ? new Cursor(page[^1].RankingScore, page[^1].ApprovedAt ?? DateTimeOffset.MinValue, page[^1].Id).Encode() : null;
         return PublicJson.Respond(ctx, new Page<PractitionerCard>(items, next), "public, max-age=60");
     }
 
-    static PractitionerCard Card(Practitioner p, List<Offering> active, OfferingFilter? filter)
+    static PractitionerCard Card(Practitioner p, List<Offering> active, OfferingFilter? filter, DateOnly today)
     {
         var pool = filter is null ? active : active.Where(filter.Matches).ToList();
         var rating = Display.Rating(p.RatingCount, (double)p.RatingAvg);
@@ -75,19 +78,19 @@ public sealed class SearchFeature : IServiceFeature
             rating.IsNew ? null : new RatingDto(rating.Average!.Value, rating.Count), rating.IsNew,
             new MoneyDto(pool.Count == 0 ? 0 : pool.Min(o => o.PriceMinor), "PLN"),
             active.Select(o => o.ProblemSlug).Distinct().Order(StringComparer.Ordinal).ToList(),
-            active.Select(o => (int)o.DurationMinutes).Distinct().Order().ToList());
+            active.Select(o => (int)o.DurationMinutes).Distinct().Order().ToList(), ContractAvailabilityRules.Public(p, today));
     }
 
     // ---- profile
 
-    static async Task<IResult> Profile(string slug, HttpContext ctx, DirectoryDbContext db, CancellationToken ct)
+    static async Task<IResult> Profile(string slug, HttpContext ctx, DirectoryDbContext db, TimeProvider time, CancellationToken ct)
     {
         var p = await db.Practitioners.AsNoTracking().SingleOrDefaultAsync(x => x.Slug == slug && x.Status == PractitionerStatus.Approved, ct);
         if (p is null) return PublicJson.NotFound(ctx);
         var active = await db.Offerings.AsNoTracking().Where(o => o.PractitionerId == p.Id && o.IsActive).OrderBy(o => o.CreatedAt).ThenBy(o => o.Id).ToListAsync(ct);
         var offerings = active.Select(o => new Gabinety.Contracts.Directory.Offering(o.Id, o.Title, o.Description, o.DurationMinutes, new MoneyDto(o.PriceMinor, o.Currency),
             o.ProblemSlug, o.TechSlugs.ToList())).ToList();
-        var body = ProfileWire.Of(new PractitionerProfile(Card(p, active, null), p.Bio, p.PortfolioUrl, offerings, p.CompletedCount, p.ApprovedAt ?? p.CreatedAt));
+        var body = ProfileWire.Of(new PractitionerProfile(Card(p, active, null, ContractAvailabilityRules.TodayWarsaw(time)), p.Bio, p.PortfolioUrl, offerings, p.CompletedCount, p.ApprovedAt ?? p.CreatedAt));
         return PublicJson.Respond(ctx, body, "public, max-age=300, stale-while-revalidate=3600", etag: true);
     }
 
@@ -122,11 +125,11 @@ public sealed class SearchFeature : IServiceFeature
 /// <summary>The wire shape of `PractitionerProfile` (CONTRACTS 3.2): the card's fields and the extras side by side (flat), not the card nested under `card`.</summary>
 internal sealed record ProfileWire(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin,
     IReadOnlyList<Badge> Badges, RatingDto? Rating, bool IsNew, MoneyDto FromPrice,
-    IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations,
+    IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations, ContractAvailabilityDto? Contract,
     string Bio, string? PortfolioUrl, IReadOnlyList<Gabinety.Contracts.Directory.Offering> Offerings, int CompletedCount,
     [property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantConverter))] DateTimeOffset MemberSince)
 {
     public static ProfileWire Of(PractitionerProfile p) => new(p.Card.Id, p.Card.Slug, p.Card.DisplayName, p.Card.Headline, p.Card.GithubLogin,
-        p.Card.Badges, p.Card.Rating, p.Card.IsNew, p.Card.FromPrice, p.Card.ProblemSlugs, p.Card.Durations,
+        p.Card.Badges, p.Card.Rating, p.Card.IsNew, p.Card.FromPrice, p.Card.ProblemSlugs, p.Card.Durations, p.Card.Contract,
         p.Bio, p.PortfolioUrl, p.Offerings, p.CompletedCount, p.MemberSince);
 }

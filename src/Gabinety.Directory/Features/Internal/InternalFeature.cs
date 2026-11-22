@@ -1,6 +1,7 @@
 using Gabinety.Contracts.Common;
 using Gabinety.Contracts.Directory;
 using Gabinety.Directory.Clients;
+using Gabinety.Directory.Features.ContractAvailability;
 using Gabinety.Directory.Features.Offerings;
 using Gabinety.Directory.Features.Profiles;
 using Gabinety.Directory.Features.Ranking;
@@ -40,6 +41,7 @@ public sealed class InternalFeature : IServiceFeature
         g.MapGet("practitioners/by-user/{userId}", GetByUser);
         g.MapGet("practitioners/{id:guid}", GetNames);
         g.MapGet("practitioners/{userId}/contact", GetContact);
+        g.MapGet("practitioners/{id:guid}/contract", GetContractTarget);
         g.MapPut("practitioners/{id:guid}/reputation", PutReputation);
         g.MapPut("practitioners/{id:guid}/booking-stats", PutStats);
         g.MapDelete("subjects/{userId}", Erase);
@@ -69,6 +71,14 @@ public sealed class InternalFeature : IServiceFeature
     {
         var row = await db.Practitioners.AsNoTracking().Where(p => p.Id == id).Select(p => new { p.Id, p.DisplayName, p.Slug }).SingleOrDefaultAsync(ct);
         return row is null ? Problem(404, ErrorCodes.NotFound, "Not found") : Results.Ok(new InternalPractitionerNameDto(row.Id, row.DisplayName, row.Slug));
+    }
+
+    /// <summary>ADR proposal 0013: who a collaboration proposal goes to and whether it may be sent (approved and advertising contract availability).</summary>
+    static async Task<IResult> GetContractTarget(Guid id, DirectoryDbContext db, CancellationToken ct)
+    {
+        var p = await db.Practitioners.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
+        return p is null ? Problem(404, ErrorCodes.NotFound, "Not found")
+            : Results.Ok(new InternalContractTargetDto(p.Id, p.UserId, p.Status, p.DisplayName, p.Slug, ContractAvailabilityRules.Accepts(p)));
     }
 
     /// <summary>404 for an unknown user and for a practitioner whose address is not held yet (they have not used their profile since the snapshot exists): the caller retries later.</summary>
@@ -141,6 +151,7 @@ public sealed class InternalFeature : IServiceFeature
         p.DisplayName = ErasedName; p.Headline = ""; p.Bio = "";
         p.GithubLogin = null; p.GithubLinked = false; p.Nip = null; p.NipValid = false; p.PortfolioUrl = null; p.MeetingUrlDefault = null; p.StatusReason = null;
         p.GithubChallengeCode = null; p.GithubChallengeLogin = null; p.GithubChallengeExpiresAt = null; p.ContactEmail = null;
+        p.ContractStatus = ContractStatus.NotAvailable; p.ContractAvailableFrom = null; p.ContractHoursPerWeek = null; p.ContractRateMinor = null;
         p.Status = PractitionerStatus.Suspended;
         p.UserId = "erased-" + Guid.NewGuid().ToString("n");
         p.Slug = "removed-" + Guid.NewGuid().ToString("n")[..16];

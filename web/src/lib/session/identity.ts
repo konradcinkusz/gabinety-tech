@@ -8,6 +8,7 @@ export type IdentityResult =
   | { kind: "two_factor" }
   | { kind: "verification_required" }
   | { kind: "unauthorized" }
+  | { kind: "rate_limited" }
   | { kind: "rejected"; status: number }
   | { kind: "unavailable" };
 
@@ -49,6 +50,8 @@ async function classify(res: Response | null): Promise<IdentityResult> {
   if (res.status === 200) return readTokens(res);
   if (res.status === 202) return { kind: "accepted" };
   if (res.status === 401) return { kind: "unauthorized" };
+  // authservice limits its auth endpoints to 20 requests a minute per client address and answers 429 {error, retryAfter} (observed on v0.3.4, tests/Gabinety.Integration.Tests/RealAuth).
+  if (res.status === 429) return { kind: "rate_limited" };
   if (res.status === 403) {
     const b = (await res.json().catch(() => null)) as { emailVerificationRequired?: boolean } | null;
     if (b?.emailVerificationRequired) return { kind: "verification_required" };

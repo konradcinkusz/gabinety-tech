@@ -19,7 +19,23 @@ public abstract class AuthContractSuite(HttpClient http) : IDisposable
     protected HttpClient Http { get; } = http;
 
     /// <summary>A client for a real base URL (the real authservice image).</summary>
-    protected static HttpClient ForBaseUrl(string baseUrl) => new() { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(30) };
+    protected static HttpClient ForBaseUrl(string baseUrl)
+    {
+        var http = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(30) };
+        // authservice rate-limits its auth endpoints to 20 a minute per client address (Program.cs). Every test runs from this one machine, so each client names a
+        // distinct address in the header an authservice configured with Network__ClientIpHeader=X-Test-Client-Ip trusts; one without that setting ignores it.
+        http.DefaultRequestHeaders.Add(ClientIpHeader, UniqueClientIp());
+        return http;
+    }
+
+    public const string ClientIpHeader = "X-Test-Client-Ip";
+    private static int _clientIps;
+    /// <summary>A distinct private address (10.x.y.z) per call, so a client gets its own rate-limit bucket.</summary>
+    public static string UniqueClientIp()
+    {
+        var n = Interlocked.Increment(ref _clientIps);
+        return $"10.{(n >> 16) & 255}.{(n >> 8) & 255}.{n & 255}";
+    }
 
     public void Dispose() => Http.Dispose();
 
@@ -167,6 +183,192 @@ public abstract class AuthContractSuite(HttpClient http) : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(tokens.GetProperty("refreshToken").GetString()!)).StatusCode);
+    }
+
+    // ---- the parts the account pages and the registration form depend on (T: real-authservice). Each was read from, and observed against, authservice v0.3.4. ----
+
+    protected async Task<HttpResponseMessage> RegisterRawAsync(object body) => await Http.PostAsJsonAsync("api/v1/auth/register", body);
+
+    protected async Task<(string Terms, string Privacy)> VersionsAsync()
+    {
+        var v = await ReadJson(await Http.GetAsync("api/v1/auth/consents/versions"));
+        return (v.GetProperty("terms").GetString()!, v.GetProperty("privacy").GetString()!);
+    }
+
+    [ContractFact]
+    public async Task Consent_versions_are_three_non_empty_strings()
+    {
+        var response = await Http.GetAsync("api/v1/auth/consents/versions");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var v = await ReadJson(response);
+        foreach (var name in new[] { "terms", "privacy", "cookies" }) Assert.False(string.IsNullOrWhiteSpace(v.GetProperty(name).GetString()), name);
+    }
+
+    [ContractFact]
+    public async Task Register_with_a_version_that_is_not_the_required_one_is_400_with_an_errors_list()
+    {
+        var (terms, privacy) = await VersionsAsync();
+
+        var response = await RegisterRawAsync(new { email = NewEmail(), password = Password, acceptedTermsVersion = terms + "-old", acceptedPrivacyVersion = privacy });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.True((await ReadJson(response)).GetProperty("errors").GetArrayLength() > 0);
+    }
+
+    [ContractFact]
+    public async Task Register_with_a_weak_password_is_400_with_an_errors_list()
+    {
+        var (terms, privacy) = await VersionsAsync();
+
+        var response = await RegisterRawAsync(new { email = NewEmail(), password = "password", acceptedTermsVersion = terms, acceptedPrivacyVersion = privacy });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.True((await ReadJson(response)).GetProperty("errors").GetArrayLength() > 0);
+    }
+
+    [ContractFact]
+    public async Task Register_the_same_address_twice_is_400_with_an_errors_list()
+    {
+        var email = NewEmail();
+        await RegisterAsync(email);
+        var (terms, privacy) = await VersionsAsync();
+
+        var response = await RegisterRawAsync(new { email, password = Password, acceptedTermsVersion = terms, acceptedPrivacyVersion = privacy });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.True((await ReadJson(response)).GetProperty("errors").GetArrayLength() > 0);
+    }
+
+    [ContractFact]
+    public async Task An_unknown_address_and_a_wrong_password_are_the_same_401()
+    {
+        var email = NewEmail();
+        await RegisterAsync(email);
+
+        var wrong = await LoginAsync(email, Password + "-wrong");
+        var unknown = await LoginAsync(NewEmail(), Password);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, unknown.StatusCode);
+        Assert.Equal(await wrong.Content.ReadAsStringAsync(), await unknown.Content.ReadAsStringAsync()); // no account-existence oracle
+    }
+
+    [ContractFact]
+    public async Task Five_wrong_passwords_lock_the_account_and_only_the_right_password_is_told_so()
+    {
+        var email = NewEmail();
+        await RegisterAsync(email);
+        for (var i = 0; i < 5; i++) Assert.Equal(HttpStatusCode.Unauthorized, (await LoginAsync(email, Password + "-wrong")).StatusCode);
+
+        var right = await LoginAsync(email, Password);
+        var wrong = await LoginAsync(email, Password + "-wrong");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, right.StatusCode); // locked: the right password does not open it either
+        var body = await ReadJson(right);
+        Assert.True(body.GetProperty("lockedOut").GetBoolean());
+        Assert.Equal(JsonValueKind.String, body.GetProperty("lockoutEnd").ValueKind);
+        Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+        Assert.False((await ReadJson(wrong)).TryGetProperty("lockedOut", out _)); // a guesser learns nothing about the lock
+    }
+
+    [ContractFact]
+    public async Task Refresh_without_a_token_is_400()
+    {
+        var response = await RefreshAsync("");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [ContractFact]
+    public async Task Replaying_a_refresh_token_also_revokes_the_one_it_was_rotated_into()
+    {
+        var first = await RegisterAsync(NewEmail());
+        var rotated = await ReadJson(await RefreshAsync(first.GetProperty("refreshToken").GetString()!));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(first.GetProperty("refreshToken").GetString()!)).StatusCode); // the replay
+        Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(rotated.GetProperty("refreshToken").GetString()!)).StatusCode); // the family is gone
+    }
+
+    [ContractFact]
+    public async Task Consents_report_the_required_and_accepted_versions()
+    {
+        var (terms, privacy) = await VersionsAsync();
+        var access = (await RegisterAsync(NewEmail())).GetProperty("accessToken").GetString()!;
+
+        var response = await AuthorizedAsync(HttpMethod.Get, "api/v1/auth/consents", access);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var status = await ReadJson(response);
+        Assert.Equal(terms, status.GetProperty("terms").GetProperty("requiredVersion").GetString());
+        Assert.Equal(terms, status.GetProperty("terms").GetProperty("acceptedVersion").GetString());
+        Assert.True(status.GetProperty("terms").GetProperty("accepted").GetBoolean());
+        Assert.Equal(privacy, status.GetProperty("privacy").GetProperty("acceptedVersion").GetString());
+        Assert.False(status.GetProperty("requiresConsent").GetBoolean());
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Http.GetAsync("api/v1/auth/consents")).StatusCode);
+    }
+
+    [ContractFact]
+    public async Task Me_has_the_fields_the_account_page_reads()
+    {
+        var access = (await RegisterAsync(NewEmail())).GetProperty("accessToken").GetString()!;
+
+        var me = await ReadJson(await AuthorizedAsync(HttpMethod.Get, "api/v1/auth/me", access));
+
+        Assert.True(me.GetProperty("hasPassword").GetBoolean());
+        Assert.True(me.GetProperty("emailConfirmed").GetBoolean());
+        Assert.False(me.GetProperty("twoFactorEnabled").GetBoolean());
+        Assert.False(me.GetProperty("requiresConsent").GetBoolean());
+    }
+
+    [ContractFact]
+    public async Task Export_holds_the_profile_and_the_accepted_consents()
+    {
+        var email = NewEmail();
+        var access = (await RegisterAsync(email)).GetProperty("accessToken").GetString()!;
+
+        var response = await AuthorizedAsync(HttpMethod.Get, "api/v1/auth/export", access);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var export = await ReadJson(response);
+        Assert.Equal(email, export.GetProperty("profile").GetProperty("email").GetString(), ignoreCase: true);
+        Assert.Equal(JsonValueKind.Array, export.GetProperty("consents").ValueKind);
+        Assert.True(export.GetProperty("consents").GetArrayLength() >= 2);
+        foreach (var name in new[] { "externalLogins", "organizations", "sessions" }) Assert.Equal(JsonValueKind.Array, export.GetProperty(name).ValueKind);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Http.GetAsync("api/v1/auth/export")).StatusCode);
+    }
+
+    [ContractFact]
+    public async Task Deleting_the_account_needs_the_word_and_the_password_and_then_ends_every_way_back_in()
+    {
+        var email = NewEmail();
+        var tokens = await RegisterAsync(email);
+        var access = tokens.GetProperty("accessToken").GetString()!;
+        async Task<HttpResponseMessage> Delete(object body)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Delete, "api/v1/auth/account") { Content = JsonContent.Create(body) };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access);
+            return await Http.SendAsync(request);
+        }
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await Delete(new { password = Password, confirmation = "delete" })).StatusCode); // the word is DELETE
+        Assert.Equal(HttpStatusCode.BadRequest, (await Delete(new { confirmation = "DELETE" })).StatusCode); // an account with a password needs it
+        Assert.Equal(HttpStatusCode.BadRequest, (await Delete(new { password = Password + "-wrong", confirmation = "DELETE" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await LoginAsync(email, Password)).StatusCode); // nothing happened yet
+
+        Assert.Equal(HttpStatusCode.OK, (await Delete(new { password = Password, confirmation = "DELETE" })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LoginAsync(email, Password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(tokens.GetProperty("refreshToken").GetString()!)).StatusCode);
+    }
+
+    [ContractFact]
+    public async Task The_provider_list_is_an_array()
+    {
+        var response = await Http.GetAsync("api/v1/external-auth/providers");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(JsonValueKind.Array, (await ReadJson(response)).GetProperty("providers").ValueKind);
     }
 
     [ContractFact]

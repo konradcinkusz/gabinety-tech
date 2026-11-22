@@ -35,6 +35,7 @@ export function LoginForm({ returnTo, notice, navigate = defaultNavigate }: { re
       setError(
         code === "email_verification_required" ? at("login.verificationRequired")
         : code === "two_factor_not_supported" ? at("login.twoFactor")
+        : res.status === 429 ? at("login.rateLimited")
         : res.status === 401 ? at("login.invalidCredentials")
         : at("login.unavailable"),
       );

@@ -33,3 +33,12 @@ RS256 key generated in memory for the run, `Jwt__Issuer=gabinety-thinslice`, `Jw
 - A token of an administrator (the role claim on the wire) and of a user with several roles.
 - Behaviour with e-mail confirmation required.
 - The image on `linux/arm64` (the job ran on `linux/amd64`).
+
+## Observed since (real-authservice change; details in `docs/operations/AUTH.md` section 9)
+
+The "Not shown" items above were closed by the Testcontainers tests in `tests/Gabinety.Integration.Tests/RealAuth` (CI `integration` job; each prints its `OBSERVED ...` line):
+
+- **Administrator token**: `InitialAdmin` is seeded as `SuperAdmin` (not `Admin`); its role claim is the long URI name with a JSON **string** value `SuperAdmin`. A user given `Admin` carries the string `Admin`; a user with two roles (`Admin`, `User`) carries a JSON **array** of both. The spike's conclusion about the array is confirmed by observation (on a build of the v0.3.4 source, run as a process: the image's own CI output is the authority).
+- **E-mail confirmation required** (`Auth__RequireConfirmedEmail=true`): register answers `202 {userId, email, message, emailVerificationRequired}` without tokens; sign-in before confirming is the generic `401 {error}`, **not** the `403 {emailVerificationRequired}` the spike read in the controller (Identity refuses first).
+- The GitHub start redirects to GitHub with `redirect_uri=<authservice>/signin-github`; the spike's `/api/external-auth/callback` is the step after.
+- Still not shown: the `linux/arm64` image; a real GitHub round trip; e-mail delivery.

@@ -64,6 +64,16 @@ describe("login", () => {
     expect(await res.json()).toMatchObject({ code: "invalid_credentials" });
     expect(setCookies(res)).toEqual([]);
   });
+  it("maps authservice's 429 (its per-address auth limit) to 429 rate_limited with Retry-After, not to bad credentials", async () => {
+    fakeBackend(() => Response.json({ error: "Too many requests. Please try again later.", retryAfter: 42 }, { status: 429 }));
+    const res = await login(json("/api/auth/login", { email: "a@example.test", password: "x" }));
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ code: "rate_limited" });
+    expect(res.headers.get("retry-after")).toBe("60");
+    expect(setCookies(res)).toEqual([]);
+    fakeBackend(() => new Response("{}", { status: 429 }));
+    expect((await register(json("/api/auth/register", { email: "a@example.test", password: "x", acceptedTermsVersion: "t", acceptedPrivacyVersion: "p" }))).status).toBe(429);
+  });
   it("maps a 2FA challenge to two_factor_not_supported without cookies", async () => {
     fakeBackend(() => Response.json({ requiresTwoFactor: true, challengeToken: "c" }));
     const res = await login(json("/api/auth/login", { email: "a@example.test", password: "x" }));

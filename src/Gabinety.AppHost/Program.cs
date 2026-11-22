@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 // Composition root for development (P1, SPEC 4.1). Not the production topology.
 var builder = DistributedApplication.CreateBuilder(args);
 var fake = Environment.GetEnvironmentVariable("GABINETY_FAKE") == "1";
@@ -11,7 +13,13 @@ var internalKey = fake
 
 // The four services and where they listen. Every service learns the others (Backend:*) and the keys to call them (Internal:Keys:*), as CONTRACTS 10.3 names them.
 const string DirectoryUrl = "http://localhost:5101", BookingUrl = "http://localhost:5102", ReputationUrl = "http://localhost:5103", AssistantUrl = "http://localhost:5104";
-var identityAuthority = fake ? "http://localhost:5100" : "http://localhost:5105";
+const int AuthservicePort = 5105;
+var identityAuthority = fake ? "http://localhost:5100" : $"http://localhost:{AuthservicePort}";
+// The audience every service validates; authservice issues it (Jwt__Audience). Same string as deploy/fly/authservice.fly.toml.
+const string IdentityAudience = "gabinety";
+// The real authservice, pinned by digest: tag v0.3.4, multi-platform index digest (docs/spikes/authservice.md section 4; the same string as deploy/fly/authservice.fly.toml and ThinSliceTests).
+const string AuthserviceImage = "ghcr.io/konradcinkusz/authservice";
+const string AuthserviceSha256 = "d0309a94f6b6300d4b8091381786c160ae7717a022416debaaa6d8d19a244645";
 
 IResourceBuilder<ProjectResource> Service<TProject>(string name, int port) where TProject : IProjectMetadata, new()
 {
@@ -34,10 +42,20 @@ IResourceBuilder<ProjectResource> Service<TProject>(string name, int port) where
              .WithEnvironment("Notifications__Provider", "Log")
              .WithEnvironment("Identity__Authority", "http://localhost:5100");
     }
+    else
+    {
+        // Default profile: real PostgreSQL (one database per service, the connection string comes from the reference) and the real authservice as the identity authority.
+        p = p.WithEnvironment("Identity__Authority", identityAuthority)
+             .WithEnvironment("Identity__Audience", IdentityAudience)
+             .WithEnvironment("Database__Provider", "PostgreSQL")
+             .WithEnvironment("Notifications__Provider", "Log");
+    }
     return p;
 }
 
 IResourceBuilder<ProjectResource>? identity = null;
+IResourceBuilder<ContainerResource>? authservice = null;
+IResourceBuilder<PostgresDatabaseResource>? directoryDb = null, bookingDb = null, reputationDb = null, assistantDb = null;
 if (fake)
 {
     identity = builder.AddProject<Projects.Gabinety_DevIdentity>("devidentity", launchProfileName: null)
@@ -47,8 +65,45 @@ if (fake)
 }
 else
 {
-    // Default profile: PostgreSQL in Docker. The pinned authservice image is added once T-01.01 records its name, tag and digest.
-    builder.AddPostgres("postgres").WithDataVolume("gabinety-pg").WithHostPort(5432);
+    // Default profile: PostgreSQL in Docker with the five databases of deploy/fly/init-databases.sql, and the pinned authservice image. Needs a Docker daemon.
+    // The superuser password is fixed on purpose: the data volume keeps the password of its first start, and a password generated on every start would lock you out of it.
+    // It is a development value (the server is on localhost, the data is synthetic), as the fake profile's internal key.
+    var pgPassword = builder.AddParameter("postgres-password", () => "demo-development-postgres-not-a-secret", secret: true);
+    var postgres = builder.AddPostgres("postgres", password: pgPassword).WithDataVolume("gabinety-pg").WithHostPort(5432);
+    var authDb = postgres.AddDatabase("authdb");
+    directoryDb = postgres.AddDatabase("directorydb");
+    bookingDb = postgres.AddDatabase("bookingdb");
+    reputationDb = postgres.AddDatabase("reputationdb");
+    assistantDb = postgres.AddDatabase("assistantdb");
+
+    // The RS256 signing key (PKCS#8, RSA 2048) is a secret, so it is never a file in this repository. Give your own as the parameter authservice-jwt-key
+    // (user secrets of the AppHost or Parameters__authservice-jwt-key; scripts/gen-authservice-key.sh makes one outside the work tree), or the AppHost generates one in memory
+    // for this run. A new key per run is harmless: the services re-read the JWKS, and tokens of an earlier run are simply refused, so sign in again.
+    var configuredKey = builder.Configuration["Parameters:authservice-jwt-key"];
+    var signingKey = !string.IsNullOrWhiteSpace(configuredKey) ? configuredKey : RSA.Create(2048).ExportPkcs8PrivateKeyPem();
+    // The first administrator: authservice seeds ONE account from InitialAdmin and gives it the platform role SuperAdmin (DbSeeder.SeedInitialAdminAsync), not Admin.
+    // Directory, Booking and Reputation treat SuperAdmin as an administrator (role Admin or SuperAdmin). Same address and development password as the stand-in's demo-admin.
+    var adminEmail = builder.Configuration["InitialAdmin:Email"] ?? "demo-admin@demo.example";
+    var adminPassword = builder.AddParameter("initial-admin-password", () => "Demo-Dev-Passw0rd!", secret: true);
+
+    authservice = builder.AddContainer("authservice", AuthserviceImage)
+        .WithImageSHA256(AuthserviceSha256) // pinned by digest (repository@sha256:...), never a floating tag
+        .WithHttpEndpoint(port: AuthservicePort, targetPort: 8080, name: "http", isProxied: false)
+        .WithReference(authDb, "DefaultConnection") // ConnectionStrings__DefaultConnection, host = the postgres container
+        .WithEnvironment("DATABASE_PROVIDER", "PostgreSQL")
+        .WithEnvironment("Database__SchemaMode", "EnsureCreated")
+        .WithEnvironment("Jwt__Algorithm", "RS256")
+        .WithEnvironment("Jwt__PrivateKeyPem", signingKey.Replace("\r", "").Replace("\n", "\\n")) // one line; authservice repairs the escaped \n
+        .WithEnvironment("Jwt__Issuer", "gabinety-development")
+        .WithEnvironment("Jwt__Audience", IdentityAudience)
+        .WithEnvironment("Jwt__PublicBaseUrl", identityAuthority)
+        .WithEnvironment("Auth__RequireConfirmedEmail", "false") // local development: there is no sender, so registration answers 200 with tokens (not 202)
+        .WithEnvironment("InitialAdmin__Email", adminEmail)
+        .WithEnvironment("InitialAdmin__Password", adminPassword)
+        .WithEnvironment("Cors__AllowedOrigins__0", "http://localhost:3000")
+        // GitHub sign-in stays off here: it needs a real OAuth app (OAuth__GitHub__ClientId and __ClientSecret). docs/operations/AUTH.md.
+        .WithHttpHealthCheck("/health/ready")
+        .WaitFor(authDb);
 }
 
 var directory = Service<Projects.Gabinety_Directory>("directory", 5101);
@@ -58,6 +113,15 @@ var assistant = Service<Projects.Gabinety_Assistant>("assistant", 5104); // neve
 
 if (identity is not null)
     foreach (var s in new[] { directory, booking, reputation, assistant }) s.WaitFor(identity);
+if (authservice is not null)
+    foreach (var s in new[] { directory, booking, reputation, assistant }) s.WaitFor(authservice);
+if (directoryDb is not null)
+{
+    directory.WithReference(directoryDb).WaitFor(directoryDb);
+    booking.WithReference(bookingDb!).WaitFor(bookingDb!);
+    reputation.WithReference(reputationDb!).WaitFor(reputationDb!);
+    assistant.WithReference(assistantDb!).WaitFor(assistantDb!);
+}
 
 // The demo seeder (T-08.01, tools/Gabinety.DemoSeeder): runs once after the services are healthy. In the fake profile it starts by itself; in the default profile only on request
 // (start "seeder" in the dashboard). "seeder-reset" removes the demo- data of all services and seeds again. Neither is waited for: the web app and the journeys read what is there.
@@ -71,6 +135,7 @@ IResourceBuilder<ProjectResource> Seeder(string name, params string[] args)
         .WithEnvironment("Identity__Authority", identityAuthority)
         .WaitFor(directory).WaitFor(booking).WaitFor(reputation);
     if (identity is not null) seeder.WaitFor(identity);
+    if (authservice is not null) seeder.WaitFor(authservice);
     return fake && name == "seeder" ? seeder : seeder.WithExplicitStart();
 }
 Seeder("seeder");
@@ -86,5 +151,6 @@ var web = builder.AddJavaScriptApp("web", "../../web", "dev")
     .WithEnvironment("Backend__Auth", identityAuthority)
     .WithEnvironment("Site__BaseUrl", "http://localhost:3000")
     .WaitFor(directory);
+if (authservice is not null) web.WaitFor(authservice);
 
 builder.Build().Run();

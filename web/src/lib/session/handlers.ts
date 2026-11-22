@@ -46,6 +46,8 @@ function finish(r: IdentityResult, uniform: { status: number; code: string }): R
       return problem(400, "two_factor_not_supported");
     case "verification_required":
       return problem(403, "email_verification_required");
+    case "rate_limited":
+      return problem(429, "rate_limited", { "Retry-After": "60" });
     case "unauthorized":
     case "rejected":
       return problem(uniform.status, uniform.code);

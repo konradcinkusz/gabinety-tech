@@ -101,13 +101,23 @@ describe("LoginForm", () => {
   });
 });
 
+describe("LoginForm rate limit", () => {
+  it("says to wait on 429 instead of calling the password wrong", async () => {
+    fakeBackend(() => Response.json({ error: "Too many requests", retryAfter: 30 }, { status: 429 }));
+    browserToBff();
+    render(<LoginForm returnTo="/" navigate={() => {}} />);
+    await signIn("demo@example.test", "Pw-demo-1234!");
+    expect($("[role=alert]").textContent).toBe(at("login.rateLimited"));
+  });
+});
+
 describe("RegisterForm", () => {
   const versions = { terms: "2026-01-01", privacy: "2026-02-01" };
 
-  async function fill(consent: boolean) {
+  async function fill(consent: boolean, password = "Pw-demo-1234!") {
     const user = userEvent.setup();
     await user.type(byLabel(/e-mail/i), "demo-new@example.test");
-    await user.type(byLabel(/^hasło/i), "pw-demo-1234");
+    await user.type(byLabel(/^hasło/i), password);
     if (consent) await user.click(byLabel(/regulamin/i));
     await user.click($("button[type=submit]"));
   }
@@ -119,6 +129,22 @@ describe("RegisterForm", () => {
     await fill(false);
     expect(f).not.toHaveBeenCalled();
     expect($("[role=alert]").textContent).toContain(at("register.consentRequired"));
+  });
+
+  it.each(["pw-demo-1234!", "PW-DEMO-1234!", "Pw-demo-abcd!", "Pwdemo1234"])("refuses %s before sending: authservice needs a digit, both cases and a special character", async (weak) => {
+    const f = vi.fn();
+    vi.stubGlobal("fetch", f);
+    render(<RegisterForm versions={versions} returnTo="/" navigate={() => {}} />);
+    await fill(true, weak);
+    expect(f).not.toHaveBeenCalled();
+    expect($("[role=alert]").textContent).toBe(at("register.passwordWeak"));
+  });
+
+  it("says to wait, not that the data is wrong, when authservice's limit answers 429", async () => {
+    vi.stubGlobal("fetch", async () => Response.json({ code: "rate_limited" }, { status: 429 }));
+    render(<RegisterForm versions={versions} returnTo="/" navigate={() => {}} />);
+    await fill(true);
+    expect($("[role=alert]").textContent).toBe(at("register.rateLimited"));
   });
 
   it("sends the consent versions it was given, and shows the verification notice on 202", async () => {

@@ -42,7 +42,7 @@ Other apps need `Identity__Authority=https://<authservice-public-host>` and `Ide
 
 - `Jwt__PublicBaseUrl` = the public origin of authservice (`https://<authservice-public-host>`, `<app>.fly.dev` until a domain exists). It becomes `jwks_uri` in `/.well-known/openid-configuration`; without it authservice uses the request origin, which behind Fly's proxy is usually right but not guaranteed.
 - GitHub sign-in is **optional** and off unless both `OAuth__GitHub__ClientId` and `OAuth__GitHub__ClientSecret` are set. Note DECISIONS 2026-11-16 (GitHub verification by bio code, no OAuth app); the OAuth app of T-09.01 item 5 is only for sign-in.
-- If enabled: register the callback `https://<authservice-public-host>/api/external-auth/callback` (unversioned path, spike section 3) at GitHub, set `OAuth__CallbackBaseUrl` to `https://<authservice-public-host>`, and `OAuth__PostLoginRedirectBaseUrl` plus `__PostLoginRedirectAllowedBaseUrls__0` to the web origin. Then `fly secrets set --app gabinety-authservice-staging OAuth__GitHub__ClientId=<id> OAuth__GitHub__ClientSecret=<secret>`.
+- If enabled: register the callback `https://<authservice-public-host>/signin-github` at GitHub (**not** `/api/external-auth/callback`, which the spike named: observed on v0.3.4, the redirect to GitHub carries `redirect_uri=<origin>/signin-github`, the GitHub handler's own callback path, and authservice then moves on to `/api/external-auth/callback` itself; `RealAuthFlowTests.GitHub_sign_in_start_...` asserts it). The `redirect_uri` origin is the one authservice sees on the request (behind Fly's proxy that depends on its forwarded-headers settings), so check the first redirect before the first real sign-in. Set `OAuth__CallbackBaseUrl` to `https://<authservice-public-host>`, and `OAuth__PostLoginRedirectBaseUrl` plus `__PostLoginRedirectAllowedBaseUrls__0` to the web origin. Then `fly secrets set --app gabinety-authservice-staging OAuth__GitHub__ClientId=<id> OAuth__GitHub__ClientSecret=<secret>`.
 
 ## 6. Deploy assertion: exactly one key
 
@@ -57,3 +57,56 @@ The backend Dockerfiles carry a bash `/dev/tcp` `HEALTHCHECK` on `/alive` for pl
 - Needs T-09.01 (Fly organisation, deploy token): creating the apps, volume, secrets, first deploy, the staging JWKS evidence, the token-accepted-by-Directory check and the assertion failing on the real app.
 - `fly.toml` syntax (the `[[files]]` injection and a `[[services]]` block with no public port) was not validated by `fly config validate` (no CLI or account here). Verify on first deploy.
 - The domain (hostnames) is undecided; every `<...-public-host>` is a placeholder.
+
+## 9. The real authservice, proven against the product (T: real-authservice)
+
+CI job `integration` (`.github/workflows/ci.yml`) runs the image pinned by digest (v0.3.4) on PostgreSQL 17 with RS256 and exercises it through the product's own pieces. Everything marked **proven** is a test that passes there; the same tests were also run on a machine without Docker against the v0.3.4 source built as a process (section 10), which is evidence about the tests, not about the image.
+
+| Flow | Proof | Where |
+|---|---|---|
+| Consent versions, register `200` with tokens, wrong consent version / weak password / duplicate address `400 {errors}`, login, wrong password and unknown address the same `401`, lockout (5 wrong passwords, then the right one gets `401 {lockedOut, lockoutEnd}`, a guesser learns nothing), refresh rotation, replay revokes the whole family, empty refresh `400`, logout revokes refresh tokens, `/auth/me`, consents, export, delete account (needs `DELETE` and the password, then login and refresh are `401`), JWKS (one key) and discovery | one contract suite, run against **DevIdentity** (unit tier) and the **real image** (`AUTH_BASE_URL`) | `tests/Gabinety.Integration.Tests/AuthContract` |
+| Register `202` without tokens when e-mail confirmation is required | proven (second instance, `Auth__RequireConfirmedEmail=true`) | `RealAuthFlowTests` |
+| Role claim on the wire | observed and asserted: one role is a JSON **string** (`SuperAdmin` for the seeded `InitialAdmin`, `Admin` for an assigned one), two roles are a JSON **array** (`["Admin","User"]`), the long URI claim name, never `role`. No `iat`, `nbf`, `email_verified` | `RealAuthFlowTests` |
+| Admin role reaching the services | proven: Directory, Booking and Reputation (in process, real JWKS over HTTP, `Identity__Authority` and `__Audience` only) answer `/api/v1/admin/*` with `401` without a token, `403` to a plain user and to the platform role `User`, `200` to `Admin`, to `SuperAdmin` and to a user with two roles | `RealAuthProductTests` |
+| Directory's own client of authservice | proven: `HttpEmailVerifiedLookup` reads `emailConfirmed` from the real `/api/v1/auth/me` | `RealAuthProductTests` |
+| Erasure (RUNBOOK section 8) | proven for a real account: authservice soft delete, then the three hooks (`204`, idempotent, refused without the internal key), Directory no longer finds the profile under the old id. Nothing orchestrates this in code: the owner calls the hooks by hand | `RealAuthProductTests` |
+| Administrator-initiated erasure | proven: `GET /api/v1/admin/users?search=`, `DELETE /api/v1/admin/users/{id}`, `GET /api/v1/admin/users/deleted` | `RealAuthFlowTests` |
+| Two-factor | proven: `200 {requiresTwoFactor:true, challengeToken, expiresIn:300}` with no token, `2fa/login` with a TOTP code, a wrong code `401`, a recovery code once | `RealAuthFlowTests`, and the web maps it to `two_factor_not_supported` |
+| GitHub sign-in, **start only** | proven with dummy credentials: `302` to `https://github.com/login/oauth/authorize` with `client_id`, `state`, `redirect_uri=<authservice>/signin-github`; the web's own `returnUrl` (its origin, `/oauth/callback`, a query) is accepted; another origin or path, another provider, or an unconfigured instance is `400` | `RealAuthFlowTests`, `web/src/lib/session/real-authservice.test.ts` |
+| Rate limit | proven: a burst from one address gets `429 {error, retryAfter}` | `RealAuthFlowTests` |
+| Key rotation | proven: `Jwt__PrivateKeyPem` new, `Jwt__PreviousPublicKeyPem` old: the JWKS has two keys, a token signed before the rotation verifies against it and Directory accepts it, a new login is signed with the new `kid` | `RealAuthProductTests` |
+| The web's handlers (`web/src/lib/session`, `components/auth/account.server.ts`) | proven: register (the web fetches the consent versions), login, uniform `401`/`400`, session cookies, refresh rotation and replay (cookies cleared), logout, account page data, export, delete with a wrong and the right password, 2FA account, the seeded administrator's `isAdmin`, the GitHub callback with a code that was never issued, the GitHub start URL accepted by authservice | `web/src/lib/session/real-authservice.test.ts` (Vitest, runs when `AUTH_BASE_URL` is set) |
+
+### What is NOT proven
+
+- **A real GitHub round trip** (the callback, the exchange code of a real sign-in, linking by e-mail): needs a real OAuth app (T-09.01). Only the start is tested; `POST /external-auth/exchange` is tested with a code that was never issued.
+- **E-mail confirmation delivery and `POST /auth/verify-email`**: no mail sender exists (no SendGrid). The `202` is proven, the e-mailed link and the confirmation are not.
+- **The AppHost default profile itself** (`dotnet run --project src/Gabinety.AppHost --launch-profile default`): it needs Docker and has never been started; no CI job runs it (section 11).
+- The image on `linux/arm64`; behaviour behind Fly's proxy (forwarded headers, the `redirect_uri` origin).
+
+### Findings that changed code or need a decision
+
+1. **GitHub callback URL** is `<authservice>/signin-github` (section 5), not `/api/external-auth/callback`.
+2. **`InitialAdmin` is a `SuperAdmin`**, not an `Admin` (`DbSeeder`). The product treats both as administrator, so it works; to get an `Admin` assign the role through `POST /api/v1/admin/users/{id}/roles` (SuperAdmin only; it also revokes that user's refresh tokens, so they sign in again).
+3. **The `403 {emailVerificationRequired}` of login never appears** with `Auth__RequireConfirmedEmail=true`: ASP.NET Identity refuses the unconfirmed account first, and the answer is the generic `401 {error}` (observed). The web's `verification_required` branch for `403` is therefore dead; after a `202` the person sees the "check your inbox" text only at registration. A later sign-in attempt before confirming reads as "wrong e-mail or password". Fixing it needs authservice (or a different setting), not the web.
+4. **Rate limit shared by every user of the web app.** authservice limits `register`, `login`, `refresh`, `2fa/login`, the GitHub start and exchange to **20 a minute per client address** (queue of 5, then `429`). The web calls authservice from its server, so unless authservice is told the real client address (`Network__ClientIpHeader`, set only where a trusted proxy sets that header and strips client copies, or `Network__TrustAllProxies` with a private authservice) all visitors share one bucket. **Decision for the owner before staging goes live:** how the web forwards the visitor's address and which header authservice trusts. Not changed here. The web now answers `429 rate_limited` (login and registration forms say to wait) instead of "wrong password"; a `429` on **refresh** still ends the session (cookies cleared), which is wrong under a shared bucket and is reported, not fixed.
+5. **Password rules** (digit, lower-case, upper-case, special character, 8 or more): the web form and DevIdentity now enforce and show them; before, a plain 8-character password was refused with a generic error.
+6. **DevIdentity differences fixed** (the stand-in must mimic reality): error bodies are `{error}`, the consent version is `2026-01-01` and must match, password rules, duplicate-address wording, lockout, `/consents`, `/export`, `DELETE /account` (soft delete), `/external-auth/providers`, an empty refresh token is `400`. Remaining differences are listed in `tools/Gabinety.DevIdentity/README.md`.
+7. A soft-deleted account keeps its address: registering it again is `400` until authservice purges it (retention period unknown, RUNBOOK section 11 question 4).
+
+## 10. Running the same tests without Docker (local verification only)
+
+CI never uses this; the containers are the proof. On a machine with a PostgreSQL but no Docker you can run the tests against a published `AuthService.dll` of the same tag:
+
+```bash
+git clone --depth 1 --branch v0.3.4 https://github.com/konradcinkusz/authservice && cd authservice
+dotnet publish src/AuthService -c Release -o /tmp/auth-out
+export REALAUTH_LOCAL_DLL=/tmp/auth-out/AuthService.dll REALAUTH_LOCAL_PG="Host=localhost;Port=5432;Username=postgres;Password=..."
+dotnet test tests/Gabinety.Integration.Tests --filter "FullyQualifiedName~RealAuth"
+```
+
+The fixture then starts the DLL as a process per instance (ports and databases of its own). The contract suite and the web tests take `AUTH_BASE_URL` of an instance started with `Network__ClientIpHeader=X-Test-Client-Ip` (and, for the web file, `InitialAdmin__*` and dummy `OAuth__GitHub__*`, see the `integration` job).
+
+## 11. Why there is no `e2e-real-auth` job
+
+A Playwright job with the real authservice, PostgreSQL, the four services and the web (register, sign in, `/moje/rezerwacje`; administrator, `/admin`) was considered and **not added**. It would need the AppHost default profile to run in CI: Docker-in-AppHost, PostgreSQL migrations of all four services (never run in this repository's CI), the first-ever start of that profile, and a cold `next dev` compile, in a job of 15 to 25 minutes whose first run cannot be rehearsed here (no Docker). A red first run would teach nothing about authentication. What it would add beyond the tests of section 9 is only the wiring of the AppHost, which is a short, reviewed file. To run the journeys by hand against that profile: start it (`docs/GETTING-STARTED.md` section 7), then `E2E_DEMO_PASSWORD=Demo-Dev-Passw0rd! E2E_WAIT_FOR_SEEDER=0 pnpm --dir tests/e2e test -- --grep "J2"`; they register with a password that satisfies authservice's rules.

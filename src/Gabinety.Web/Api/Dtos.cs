@@ -13,8 +13,13 @@ public sealed record TaxonomyDto(string Version, IReadOnlyList<CategoryDto> Prob
 
 public sealed record RatingDto(double Average, int Count);
 
+/// <summary>
+/// A list card (CONTRACTS 3.2). <c>TechSlugs</c> (the union over the active offerings, at most 6) and <c>NextFreeSlotUtc</c> (start of the earliest bookable slot in the next 14 days) are
+/// wave 3 additions: absent from an older Directory, so they default to none.
+/// </summary>
 public sealed record PractitionerCardDto(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin, IReadOnlyList<string> Badges,
-    RatingDto? Rating, bool IsNew, MoneyDto FromPrice, IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations);
+    RatingDto? Rating, bool IsNew, MoneyDto FromPrice, IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations,
+    IReadOnlyList<string>? TechSlugs = null, DateTimeOffset? NextFreeSlotUtc = null);
 
 /// <summary>A cursor page (CONTRACTS 0); <c>NextCursor</c> is absent on the last page.</summary>
 public sealed record PageDto<T>(IReadOnlyList<T> Items, string? NextCursor);

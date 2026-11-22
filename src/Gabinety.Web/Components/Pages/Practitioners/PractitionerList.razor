@@ -6,6 +6,7 @@
 @inject DirectoryClient Directory
 @inject NavigationManager Navigation
 @inject Gabinety.Web.Hosting.WebOptions Site
+@inject TimeProvider Clock
 @* Static server rendering with the state in the URL (route values and query): the list, the filters and the pagination are plain links and a GET form, so the page is complete HTML. *@
 
 @if (_view is { } view)
@@ -42,6 +43,21 @@
                 <span class="muted" data-testid="count">@string.Format(Pl.ListPage.Count, count)</span>
             </p>
         }
+        @* The order of the list (T-11.05). A GET form: the filters ride along as hidden fields and the cursor is dropped, because a cursor belongs to the order it was made for.
+           The select applies on change where scripts run (data-enhance="autosubmit"); the button is for a page without script. The default is not written to the URL. *@
+        <form method="get" action="@view.State.Path" class="sort-form" data-testid="sort">
+            @if (view.State.Duration is { } duration) {<input type="hidden" name="duration" value="@duration" />}
+            @if (view.State.MaxPriceMinor is { } price) {<input type="hidden" name="maxPriceMinor" value="@price" />}
+            @if (!string.IsNullOrEmpty(view.State.Q)) {<input type="hidden" name="q" value="@view.State.Q" />}
+            <label for="sortuj" class="sort-form__label">@Pl.ListPage.SortLabel</label>
+            <select id="sortuj" name="sortuj" class="sort-form__select" data-enhance="autosubmit">
+                @foreach (var option in view.SortOptions())
+                {
+                    <option value="@option.Value" selected="@option.Selected">@option.Label</option>
+                }
+            </select>
+            <noscript><button class="btn" type="submit">@Pl.ListPage.SortSubmit</button></noscript>
+        </form>
     </header>
     <div class="list-layout">
         <FilterNav State="view.State" Groups="view.Filters()" ActiveCount="view.ActiveFilters" />
@@ -69,7 +85,7 @@
                 <ul class="results" data-testid="practitioner-list">
                     @foreach (var p in _page.Items)
                     {
-                        <li><PractitionerCard Practitioner="p" CategoryNames="view.ProblemNames" /></li>
+                        <li><PractitionerCard Practitioner="p" CategoryNames="view.ProblemNames" TechNames="view.TechNames" Now="_now" /></li>
                     }
                 </ul>
             }
@@ -94,14 +110,17 @@ else
     [SupplyParameterFromQuery(Name = "maxPriceMinor")] public string? MaxPriceParam { get; set; }
     [SupplyParameterFromQuery(Name = "q")] public string? QueryParam { get; set; }
     [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+    [SupplyParameterFromQuery(Name = "sortuj")] public string? SortParam { get; set; }
 
     ListView? _view;
     PageDto<PractitionerCardDto>? _page;
+    DateTimeOffset _now;
 
     protected override async Task OnParametersSetAsync()
     {
-        var state = ListState.Parse(Problem, Tech, DurationParam, MaxPriceParam, QueryParam, CursorParam);
-        var query = new PractitionerQuery(state.Problem, state.Tech, state.Q, state.Duration, state.MaxPriceMinor, state.Cursor);
+        var state = ListState.Parse(Problem, Tech, DurationParam, MaxPriceParam, QueryParam, CursorParam, SortParam);
+        var query = new PractitionerQuery(state.Problem, state.Tech, state.Q, state.Duration, state.MaxPriceMinor, state.Cursor, state.ApiSort);
+        _now = Clock.GetUtcNow();
         // Three independent reads: a failure of any is an error state of this page, never an exception (BLAZOR-WEB-APP section 5).
         var taxonomyTask = Directory.TaxonomyAsync();
         var sitemapTask = Directory.SitemapAsync();

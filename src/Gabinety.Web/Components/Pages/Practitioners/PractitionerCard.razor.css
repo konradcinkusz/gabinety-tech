@@ -23,6 +23,10 @@
 
 .practitioner-card__categories span + span::before { content: "·"; margin-right: var(--space-3); }
 
+.practitioner-card__techs { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.practitioner-card__next { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.practitioner-card__next time { font-weight: 600; color: var(--color-text); }
+
 /* Right-aligned, below the body on the phone as well: the price is read after the name and the checks. */
 .practitioner-card__price { grid-column: 2; grid-row: 2; justify-self: end; margin: 0; text-align: right; }
 .practitioner-card__from { display: block; font-size: var(--text-lg); font-weight: 600; color: var(--color-text); }

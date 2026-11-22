@@ -85,6 +85,7 @@ public class FilterNavTests : BunitContext
         Assert.Contains("@media (min-width: 52rem)", css);
         Assert.Contains(".filters:not([open]) > :not(summary) { display: grid; }", css);
         Assert.Contains(".filters > summary { pointer-events: none; }", css);
+        Assert.Contains(".filters:not([open])::details-content { content-visibility: visible; }", css); // the slot a closed disclosure hides its content in
         Assert.DoesNotContain("inline-flex", css); // the joined rows are the shared equal-column grid of app.css, not an inline flow
         Assert.DoesNotContain("border-radius: 0", css); // the per-position corners are the shared sheet's
     }

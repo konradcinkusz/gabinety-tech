@@ -27,3 +27,8 @@
   .filters__group .link-list { flex-direction: column; flex-wrap: nowrap; gap: var(--space-1); }
   .filters__group .link-list .chip { width: 100%; justify-content: flex-start; border-radius: var(--radius-md); }
 }
+
+/* Current Chromium hides a closed disclosure's content in its ::details-content slot, so the rule above does not reach it there. Separate block: an engine without the pseudo-element drops only this rule. */
+@media (min-width: 52rem) {
+  .filters:not([open])::details-content { content-visibility: visible; }
+}

@@ -26,7 +26,7 @@ Seeder with `--factor 200` (`tools/Gabinety.DemoSeeder/README.md`, "Scaled datas
 | | Count (read from PostgreSQL after the seed) |
 |---|---|
 | Practitioners | **2000** (1996 Approved, 1 Submitted, 1 Draft, 1 Suspended, 1 Rejected) |
-| Reviews | **20000 as rating counts on the Directory** (`sum(rating_count)` = 19996 on the Approved + 4 on the Suspended). **No review rows were written to Reputation** except the three of the ordinary demo: a review needs a Completed booking and the seeder cannot make thousands. A row that reads reviews from Reputation itself (the profile's review list) is therefore not measured at this size. |
+| Reviews | **20000 as rating counts on the Directory** (`sum(rating_count)` = 19996 on the Approved + 4 on the Suspended as measured; since the catalog was made honest, ADR-0012 item 3, the catalog carries only the 3 reviews the seeder creates and the scale extras carry the rest, all on Approved practitioners). **No review rows were written to Reputation** except the three of the ordinary demo: a review needs a Completed booking and the seeder cannot make thousands. A row that reads reviews from Reputation itself (the profile's review list) is therefore not measured at this size. |
 | Offerings | 2998 |
 | Bookings | 12 of the ordinary demo, plus those the measurement itself created |
 | Seeding time | about 4 min (the whole seeder run including the ordinary demo, 12935 changes in the scale step); log: `performance/2026-11-18/seed-factor-200.log` |

@@ -30,7 +30,7 @@ else
     <form method="post" @onsubmit="SubmitAsync" @formname="review" class="form" novalidate>
         <AntiforgeryToken />
         <p>@ReviewsText.Form.Intro</p>
-        <FormProblems Items="_problems" />
+        <BookingFormProblems Items="_problems" />
         <fieldset class="option-group @(_ratingError is not null ? "field--invalid" : "")" aria-describedby="@(_ratingError is not null ? "rating-hint rating-error" : "rating-hint")">
             <legend>@ReviewsText.Form.RatingLegend</legend>
             <p class="field__hint" id="rating-hint">@ReviewsText.Form.ScaleHint</p>

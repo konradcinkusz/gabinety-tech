@@ -52,7 +52,7 @@ else if (_page is not null)
                         <form method="post" @onsubmit="ReplyAsync" @formname="reply" class="form" novalidate>
                             <AntiforgeryToken />
                             <input type="hidden" name="Model.ReviewId" value="@r.Id" />
-                            <FormProblems Items="_problems" />
+                            <BookingFormProblems Items="_problems" />
                             <CounterTextArea Id="reply" Name="Model.Text" Label="@ReviewsText.Reply.Label" Hint="@ReviewsText.Reply.Hint" Value="@Model!.Text" Rows="3" Error="@_replyError" Autofocus="@(_problems.Count == 1)" />
                             @if (_replyNote is not null) {<div class="callout callout--danger" role="alert">@_replyNote</div>}
                             <div class="form-actions">

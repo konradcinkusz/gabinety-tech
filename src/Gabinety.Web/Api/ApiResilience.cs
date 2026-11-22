@@ -26,6 +26,7 @@ public static class ApiResilience
         Add<ReviewsClient>(services, Backend.Reputation);         // write a review, reply
         Add<MeClient>(services, Backend.Directory);               // who am I
         Add<Auth.IdentityClient>(services, Backend.Auth);
+        Add<AccountClient>(services, Backend.Auth); // the signed-in user's own account calls (me, consents, export, delete)
         // The options of the ONE handler the kernel added to every client. All backends share the SPEC 5.1 profile of a read: 5 s per attempt, ONE retry, and only for a GET or HEAD, so a login,
         // a refresh and every later write are never retried automatically (SPEC 5 rule 8), whatever the client. The wait before the retry follows Retry-After (the services answer 429 under
         // their per-client limit), at most 2 s. (Per-client names such as "directory-standard" are not what the kernel's default registration reads: ConfigureAll is.)

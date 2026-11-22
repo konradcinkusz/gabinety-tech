@@ -64,7 +64,7 @@ public class RouteAuditTests
         await using var web = new WebFactory();
         web.CreateClient();
         var (rows, _) = Actual(web.Services);
-        Assert.Equal(["/bookings/{BookingId}", "/checkout/mock/{BookingId}", "/moje/opinie", "/moje/opinie/{BookingId}", "/moje/rezerwacje", "/moje/rezerwacje/{BookingId}", "/rezerwacja/potwierdzenie/{BookingId}", "/rezerwacja/{OfferingId}"],
+        Assert.Equal(["/bookings/{BookingId}", "/checkout/mock/{BookingId}", "/konto", "/konto/export", "/moje/opinie", "/moje/opinie/{BookingId}", "/moje/rezerwacje", "/moje/rezerwacje/{BookingId}", "/rezerwacja/potwierdzenie/{BookingId}", "/rezerwacja/{OfferingId}"],
             rows.Where(r => r.Policy != "Anonymous").Select(r => r.Pattern).Order(StringComparer.Ordinal));
         Assert.DoesNotContain(rows, r => r.Pattern.StartsWith("/api") || r.Pattern.StartsWith("/internal")); // the host serves no API of its own: the browser talks to no backend
     }

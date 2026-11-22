@@ -62,7 +62,7 @@ else if (_booking is { } b)
                 @if (_outcome is not null && _role == BookingClient.ClientRole) {<p class="muted">@BookingsText.Cancel.ClientRule</p>}
                 <form method="post" @onsubmit="CancelAsync" @formname="cancel" class="form" novalidate>
                     <AntiforgeryToken />
-                    <FormProblems Items="_problems" />
+                    <BookingFormProblems Items="_problems" />
                     <CounterTextArea Id="reason" Name="Model.Reason" Label="@BookingsText.Cancel.ReasonLabel" Hint="@BookingsText.Cancel.ReasonHint" Value="@CancelModel!.Reason" Rows="3" Error="@_reasonError" />
                     <ActionError Failure="_actionFailure" Href="@DetailHref()" />
                     <div class="form-actions">
@@ -79,7 +79,7 @@ else if (_booking is { } b)
                 <p>@BookingsText.Dispute.Intro</p>
                 <form method="post" @onsubmit="DisputeAsync" @formname="dispute" class="form" novalidate>
                     <AntiforgeryToken />
-                    <FormProblems Items="_problems" />
+                    <BookingFormProblems Items="_problems" />
                     <div class="field">
                         <label class="field__label" for="kind">@BookingsText.Dispute.KindLabel</label>
                         <select id="kind" name="Model.Kind" class="field__control">

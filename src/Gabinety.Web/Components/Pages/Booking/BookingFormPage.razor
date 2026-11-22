@@ -39,7 +39,7 @@ else if (_offering is not null)
             <input type="hidden" name="Model.AttemptFingerprint" value="@_attemptFingerprint" />
             <input type="hidden" name="Model.AppliedSlug" value="@Model!.AppliedSlug" />
             <input type="hidden" name="Model.SuggestedSlug" value="@Model!.SuggestedSlug" />
-            <FormProblems Items="_problems" />
+            <BookingFormProblems Items="_problems" />
             <CounterTextArea Id="brief" Name="Model.Brief" Label="@BookFlowText.Brief.Label" Hint="@BookFlowText.Brief.Hint" Value="@Model!.Brief" Rows="8" CounterFormat="@BookFlowText.Brief.Counter"
                              Error="@_briefError" Autofocus="@(_problems.Count == 1)" />
 

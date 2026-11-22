@@ -1,4 +1,5 @@
 using Bunit;
+using Gabinety.Web.Components.Shared;
 using Gabinety.Web.Components.Pages.Booking;
 using Gabinety.Web.Components.Pages.Bookings;
 using Microsoft.Extensions.DependencyInjection;
@@ -138,16 +139,16 @@ public class BookingComponentsTests : BunitContext
     public void The_form_summary_lists_every_problem_as_a_link_and_takes_focus_only_when_there_are_several()
     {
         FormProblem[] two = [new("brief", "Opis jest za krótki."), new("rating-1", "Wybierz ocenę.")];
-        var cut = Render<FormProblems>(p => p.Add(c => c.Items, two));
+        var cut = Render<BookingFormProblems>(p => p.Add(c => c.Items, two));
         var summary = cut.Find(".form-summary");
         Assert.Equal(("alert", "Popraw 2 pola"), (summary.GetAttribute("role")!, cut.Find("h2").TextContent));
         Assert.Equal([("#brief", "Opis jest za krótki."), ("#rating-1", "Wybierz ocenę.")], cut.FindAll("a").Select(a => (a.GetAttribute("href")!, a.TextContent)));
         Assert.True(summary.HasAttribute("autofocus"));
         Assert.Equal("-1", summary.GetAttribute("tabindex"));
 
-        var one = Render<FormProblems>(p => p.Add(c => c.Items, two[..1]));
+        var one = Render<BookingFormProblems>(p => p.Add(c => c.Items, two[..1]));
         Assert.False(one.Find(".form-summary").HasAttribute("autofocus")); // one problem: the control itself takes focus
-        Assert.Empty(Render<FormProblems>(p => p.Add(c => c.Items, [])).FindAll(".form-summary"));
+        Assert.Empty(Render<BookingFormProblems>(p => p.Add(c => c.Items, [])).FindAll(".form-summary"));
     }
 
     [Theory]

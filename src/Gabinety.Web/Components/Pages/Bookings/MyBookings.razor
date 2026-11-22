@@ -33,7 +33,14 @@
     <button type="submit" class="btn btn--secondary">@BookingsText.Filter</button>
 </form>
 
-@if (_failure is { } failure)
+@if (_failure is { IsUnauthenticated: true })
+{
+    @* The session ended while the cookie was still sent (a revoked refresh token): said here, with the way back; the host deletes the dead cookie with this response. *@
+    <div class="callout callout--danger" role="alert" data-testid="bookings-signed-out">
+        <p>@Pl.Bookings.SignedOut <a href="@ReturnTarget.LoginUrl(ReturnTarget.Safe(Href(_role, _status, _cursor)))">@Pl.Bookings.SignInAgain</a></p>
+    </div>
+}
+else if (_failure is { } failure)
 {
     <div class="callout callout--danger" role="alert" data-testid="unavailable">
         <p>@BookingFormat.FailureText(failure)</p>
@@ -84,7 +91,6 @@ else if (_page is not null)
         (_page, _failure) = (null, null);
         var result = await Bookings.MyBookingsAsync(_role, _status, _cursor);
         if (result.IsOk) { _page = result.Value; return; }
-        if (result.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe("/" + Navigation.ToBaseRelativePath(Navigation.Uri)))); return; }
         _failure = result.Failure;
     }
 

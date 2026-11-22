@@ -122,9 +122,13 @@ public class LayoutTests : BunitContext
     {
         var auth = AddAuthorization();
         auth.SetNotAuthorized();
-        Assert.Equal(["/programisci", "/logowanie"], Render<MainLayout>(p => p.Add(l => l.Body, Body())).FindAll("header nav a").Select(a => a.GetAttribute("href")));
+        var visitor = Render<MainLayout>(p => p.Add(l => l.Body, Body()));
+        Assert.Equal(["/programisci"], visitor.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/logowanie", "/rejestracja"], visitor.FindAll("header .site-account a").Select(a => a.GetAttribute("href")));
         auth.SetAuthorized("demo-client@demo.example");
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/wyloguj"], Render<MainLayout>(p => p.Add(l => l.Body, Body())).FindAll("header nav a").Select(a => a.GetAttribute("href")));
+        var member = Render<MainLayout>(p => p.Add(l => l.Body, Body()));
+        Assert.Equal(["/programisci", "/moje/rezerwacje", "/gabinet-programisty"], member.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/konto", "/wyloguj"], member.FindAll("header .site-account a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]
@@ -321,5 +325,15 @@ public class MyBookingsTests : BunitContext
         Assert.DoesNotContain("SERVER-TITLE-MUST-NOT-APPEAR", cut.Markup);
         Assert.Equal("Moje rezerwacje", cut.Find("h1").TextContent);
         Assert.NotNull(cut.Find("nav.tabs")); // the rest of the page renders
+    }
+
+    [Fact]
+    public void A_401_says_the_session_ended_with_a_link_back_to_the_same_view_and_not_a_redirect()
+    {
+        _booking.Respond = _ => FakeBackend.Problem(System.Net.HttpStatusCode.Unauthorized, "unauthenticated");
+        var alert = Open("practitioner", "Confirmed").Find("[data-testid=bookings-signed-out]");
+        Assert.Equal("alert", alert.GetAttribute("role"));
+        Assert.Contains("Sesja wygasła", alert.TextContent);
+        Assert.Equal("/logowanie?redirect=%2Fmoje%2Frezerwacje%3Frole%3Dpractitioner%26status%3DConfirmed", alert.QuerySelector("a")!.GetAttribute("href"));
     }
 }

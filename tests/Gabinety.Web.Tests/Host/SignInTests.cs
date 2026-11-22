@@ -83,7 +83,8 @@ public class SignInTests
         Assert.StartsWith("Bearer eyJ", seen.Authorization);
         Assert.DoesNotContain("eyJ", page.Html); // and no token anywhere in the page, prerendered state included
         Assert.DoesNotContain(web.Identity.Backend.Requests[0].Body ?? "", page.Html);
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/wyloguj"], page.All("header nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/programisci", "/moje/rezerwacje", "/gabinet-programisty"], page.All("header .site-nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/konto", "/wyloguj"], page.All("header .site-account a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]
@@ -143,7 +144,10 @@ public class SignInTests
         await using var web = Web();
         var response = await web.NewBrowser().PostFormAsync("/logowanie", Form("", ""));
         Assert.Equal(HttpStatusCode.OK, response.Status);
-        Assert.Contains("Podaj adres e-mail i hasło.", response.Text);
+        Assert.Contains("Podaj adres e-mail.", response.TextOf("[data-testid=form-summary]")); // every problem at once, with a link to its field
+        Assert.Contains("Podaj hasło.", response.TextOf("[data-testid=form-summary]"));
+        Assert.Equal("Popraw 2 pola", response.TextOf("[data-testid=form-summary] h2"));
+        Assert.Equal("true", response.One("#login-email")!.GetAttribute("aria-invalid"));
         Assert.DoesNotContain(web.Identity.Backend.Requests, r => r.PathAndQuery.Contains("/auth/login"));
     }
 

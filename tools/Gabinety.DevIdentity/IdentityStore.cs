@@ -5,7 +5,16 @@ namespace Gabinety.DevIdentity;
 public sealed record DevUser(string Id, string Email, byte[] Salt, byte[] Hash, string[] Roles, DateTimeOffset CreatedAt)
 {
     public DateTimeOffset? LastLoginAt { get; set; }
+    /// <summary>Consecutive wrong passwords; reaches <see cref="IdentityStore.MaxFailedAttempts"/> and locks the account, as ASP.NET Identity does in authservice.</summary>
+    public int FailedAttempts { get; set; }
+    public DateTimeOffset? LockoutEnd { get; set; }
+    /// <summary>Soft delete (authservice keeps the row for a retention period). A deleted account cannot sign in or refresh.</summary>
+    public DateTimeOffset? DeletedAt { get; set; }
+    public (string Version, DateTimeOffset At)? Terms { get; set; }
+    public (string Version, DateTimeOffset At)? Privacy { get; set; }
 }
+
+public enum SignInStatus { Succeeded, Failed, LockedOut }
 
 /// <summary>In-memory user list and refresh-token ledger. Everything is lost on restart; that is the point of a stand-in.</summary>
 public sealed class IdentityStore(TimeProvider time)
@@ -13,6 +22,8 @@ public sealed class IdentityStore(TimeProvider time)
     // Fixed development value; stated in the README of this tool. Not a secret.
     public const string SeedPassword = "Demo-Dev-Passw0rd!";
     public const string SeedEmailDomain = "demo.example";
+    public const int MaxFailedAttempts = 5; // authservice: Lockout.MaxFailedAccessAttempts
+    public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(5); // authservice: Lockout.DefaultLockoutTimeSpan
     public static readonly TimeSpan RefreshLifetime = TimeSpan.FromDays(7); // authservice default (spike section 1)
 
     private sealed class RefreshEntry(string userId, string family, DateTimeOffset expires)
@@ -63,16 +74,51 @@ public sealed class IdentityStore(TimeProvider time)
         }
     }
 
-    public DevUser? Authenticate(string email, string password)
+    /// <summary>
+    /// The decision of authservice's SignInFlow: an unknown or deleted account and a wrong password are one generic failure; lockout is disclosed only to a caller
+    /// who knows the password (a wrong guess on a locked account is the same generic failure); five wrong passwords lock the account for five minutes.
+    /// </summary>
+    public (SignInStatus Status, DevUser? User) Authenticate(string email, string password)
     {
         lock (_gate)
         {
-            if (!_byEmail.TryGetValue(email, out var user)) return null;
-            if (!CryptographicOperations.FixedTimeEquals(user.Hash, Hash(password, user.Salt))) return null;
-            user.LastLoginAt = time.GetUtcNow();
-            return user;
+            if (!_byEmail.TryGetValue(email, out var user) || user.DeletedAt is not null) return (SignInStatus.Failed, null);
+            var now = time.GetUtcNow();
+            var valid = CryptographicOperations.FixedTimeEquals(user.Hash, Hash(password, user.Salt));
+            if (user.LockoutEnd is { } end && end > now) return valid ? (SignInStatus.LockedOut, user) : (SignInStatus.Failed, null);
+            if (!valid)
+            {
+                if (++user.FailedAttempts >= MaxFailedAttempts) { user.LockoutEnd = now + LockoutDuration; user.FailedAttempts = 0; }
+                return (SignInStatus.Failed, null);
+            }
+            user.FailedAttempts = 0;
+            user.LockoutEnd = null;
+            user.LastLoginAt = now;
+            return (SignInStatus.Succeeded, user);
         }
     }
+
+    public void Accept(DevUser user, string? terms, string? privacy)
+    {
+        lock (_gate)
+        {
+            var now = time.GetUtcNow();
+            if (terms is not null) user.Terms = (terms, now);
+            if (privacy is not null) user.Privacy = (privacy, now);
+        }
+    }
+
+    /// <summary>Soft delete: revokes every refresh token; the account can no longer sign in.</summary>
+    public void SoftDelete(DevUser user)
+    {
+        lock (_gate)
+        {
+            user.DeletedAt = time.GetUtcNow();
+            foreach (var e in _refresh.Values.Where(e => e.UserId == user.Id)) e.Revoked = true;
+        }
+    }
+
+    public bool PasswordMatches(DevUser user, string password) => CryptographicOperations.FixedTimeEquals(user.Hash, Hash(password, user.Salt));
 
     public DevUser? Find(string id) { lock (_gate) return _byId.GetValueOrDefault(id); }
 
@@ -97,7 +143,7 @@ public sealed class IdentityStore(TimeProvider time)
                 foreach (var e in _refresh.Values.Where(e => e.Family == entry.Family)) e.Revoked = true;
                 return null;
             }
-            if (entry.Expires <= time.GetUtcNow() || !_byId.TryGetValue(entry.UserId, out var user)) return null;
+            if (entry.Expires <= time.GetUtcNow() || !_byId.TryGetValue(entry.UserId, out var user) || user.DeletedAt is not null) return null;
             entry.Used = true;
             return (user, IssueRefresh(user, entry.Family));
         }

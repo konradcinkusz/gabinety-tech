@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using Gabinety.Billing;
 using Gabinety.Booking.Features.Payments;
@@ -15,23 +14,26 @@ using BookingStatus = Gabinety.Billing.BookingStatus;
 namespace Gabinety.Booking.Jobs.Payout;
 
 /// <summary>
-/// Pays the practitioner for every money-complete booking whose <c>payout_due_at</c> has passed (CONTRACTS 8.1, 9.2; ADR-0005: the platform never holds a balance,
-/// the provider moves the money). Money-complete: <c>Completed</c>, <c>ClientNoShow</c>, <c>LateCancelledByClient</c>, <c>Resolved</c> with <c>release</c> or <c>refund_partial</c>.
-/// A <c>Resolved</c> booking carries no <c>payout_due_at</c> today (T-04.07c sets none); it falls due at <c>resolved_at</c>.
+/// Pays the practitioner for every money-complete booking whose <c>payout_due_at</c> has passed (CONTRACTS 8.1, 9.2; ADR-0005: the provider moves the money).
+/// Money-complete: <c>Completed</c>, <c>ClientNoShow</c>, <c>LateCancelledByClient</c>, <c>Resolved</c> with <c>release</c> or <c>refund_partial</c>.
+/// A <c>Completed</c> booking falls due at <c>max(end + 48 h, start + 72 h)</c> (ADR proposal 0011: the dispute window always closes before money moves);
+/// a <c>Resolved</c> booking at <c>resolved_at</c>.
 /// <para>Per booking, three steps, never one transaction around the network call:</para>
 /// <list type="number">
-/// <item><b>Short transaction.</b> Under the booking's row lock, re-read the status (a disputed or otherwise ineligible booking is skipped) and insert the <c>payouts</c> row <c>Pending</c>.
-/// The unique index on <c>booking_id</c> decides a race: the loser's insert fails and it skips. A <c>Failed</c> row, or a <c>Pending</c> row older than
-/// <c>Jobs:Payout:StalePendingSeconds</c> (120; its owner crashed), is taken up again with the same row.</item>
+/// <item><b>Short transaction.</b> The booking row is locked with <c>FOR UPDATE SKIP LOCKED</c> (a row another instance holds is skipped, not waited for), its status is re-read (a disputed or otherwise
+/// ineligible booking is skipped) and the <c>payouts</c> row is created or taken up: <c>Pending</c>, <c>attempt_count</c> + 1, and <c>next_attempt_at</c> = now + the lease
+/// (<c>Jobs:Payout:StalePendingSeconds</c>, 120). The lease is what keeps the other instances off while this one is at the provider; a crashed owner's lease just runs out.
+/// The unique index on <c>booking_id</c> decides a race on the insert: the loser skips.</item>
 /// <item><b>No transaction, no database context:</b> <see cref="IPaymentProvider.PayoutAsync"/> with the stable key <c>payout:&lt;bookingId:N&gt;</c> and a 10 s budget (SPEC 5.1).
 /// The key makes a repeated call (a retry, a crash recovery, two instances) one payout at the provider.</item>
 /// <item><b>Second short transaction.</b> Under the payout row's lock: <c>Sent</c> with <c>provider_ref</c> and <c>sent_at</c>, and the <c>PractitionerPayout</c> ledger entry written
 /// exactly once (a row already <c>Sent</c> writes nothing).</item>
 /// </list>
-/// A provider failure sets the row <c>Failed</c> and is retried by a later run with the same key, with backoff (<c>Jobs:Payout:RetryBackoffSeconds</c> 60, doubling)
-/// up to <c>Jobs:Payout:MaxAttempts</c> (5) attempts. The attempt counter lives in this process: <c>payouts</c> has no attempts column and this task has no migration,
-/// so a restart starts counting again (bounded per process, never silent: giving up is logged as an error once).
+/// A provider failure sets the row <c>Failed</c> with <c>next_attempt_at</c> = now + backoff (<c>Jobs:Payout:RetryBackoffSeconds</c> 60, doubling); a later run takes it up with the same key,
+/// up to <c>Jobs:Payout:MaxAttempts</c> (5) attempts. The bound is the row's own <c>attempt_count</c>, so a restart or a second instance neither resets nor doubles it. A payout that used up its
+/// attempts is logged as an error once (the run that used the last one) and is not taken up again until an operator resets <c>attempt_count</c> (docs/operations/RUNBOOK.md).
 /// Logs carry the booking id only: never the key, the practitioner or any user data. Idempotent, and safe in two processes at once.
+/// </para>
 /// </summary>
 public class PayoutJob(IServiceScopeFactory scopes, IPaymentProvider provider, TimeProvider time, IConfiguration config, JobMetrics metrics, ILogger<PayoutJob> log)
     : PeriodicJob(time, config, metrics, log)
@@ -51,9 +53,7 @@ public class PayoutJob(IServiceScopeFactory scopes, IPaymentProvider provider, T
 
     static DateTimeOffset? DueAt(BookingEntity b) => b.PayoutDueAt ?? (b.Status == BookingStatus.Resolved ? b.ResolvedAt : null);
 
-    readonly ConcurrentDictionary<Guid, Attempt> _attempts = new();
-    sealed record Attempt(int Count, DateTimeOffset NotBefore);
-    sealed record Prepared(Guid PayoutId, Guid PractitionerId, long AmountMinor);
+    sealed record Prepared(Guid PayoutId, Guid BookingId, Guid PractitionerId, long AmountMinor, int Attempt, string? DestinationAccountId, string? ProviderPaymentId);
     enum Outcome { Paid, Skipped, Failed }
 
     public override string Name => JobName;
@@ -61,7 +61,7 @@ public class PayoutJob(IServiceScopeFactory scopes, IPaymentProvider provider, T
     public override async Task RunOnceAsync(DateTimeOffset now, CancellationToken ct) => await PayDueAsync(now, ct);
 
     int MaxAttempts => ReadPositiveInt(Configuration, "Jobs:Payout:MaxAttempts", DefaultMaxAttempts);
-    TimeSpan StaleAfter => TimeSpan.FromSeconds(ReadPositiveInt(Configuration, "Jobs:Payout:StalePendingSeconds", DefaultStaleSeconds));
+    TimeSpan Lease => TimeSpan.FromSeconds(ReadPositiveInt(Configuration, "Jobs:Payout:StalePendingSeconds", DefaultStaleSeconds));
 
     /// <summary>Pays every due booking up to the per-run cap and returns how many payouts this call completed. Failures are counted, every other booking is still handled, then <see cref="JobFailedException"/> is thrown.</summary>
     public async Task<int> PayDueAsync(DateTimeOffset now, CancellationToken ct)
@@ -97,16 +97,15 @@ public class PayoutJob(IServiceScopeFactory scopes, IPaymentProvider provider, T
 
     async Task<List<Guid>> SelectDueAsync(DateTimeOffset now, List<Guid> seen, int take, CancellationToken ct)
     {
-        // what is backing off or has used up its attempts must not take a place in the batch (it would starve the others every run)
-        var skip = seen.Concat(_attempts.Where(a => a.Value.Count >= MaxAttempts || a.Value.NotBefore > now).Select(a => a.Key)).ToList();
-        var staleBefore = now - StaleAfter;
+        // what is backing off, leased to a run or out of attempts must not take a place in the batch (it would starve the others every run)
+        var maxAttempts = MaxAttempts;
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
         var due = from b in Scope(db.Bookings.AsNoTracking()).Where(MoneyCompleteExpr)
-                  where b.PayoutMinor > 0 && !skip.Contains(b.Id) && (b.PayoutDueAt ?? (b.Status == BookingStatus.Resolved ? b.ResolvedAt : null)) <= now
+                  where b.PayoutMinor > 0 && !seen.Contains(b.Id) && (b.PayoutDueAt ?? (b.Status == BookingStatus.Resolved ? b.ResolvedAt : null)) <= now
                   join p in db.Payouts.AsNoTracking() on b.Id equals p.BookingId into rows
                   from p in rows.DefaultIfEmpty()
-                  where p == null || p.Status == PayoutStatus.Failed || (p.Status == PayoutStatus.Pending && p.CreatedAt <= staleBefore)
+                  where p == null || (p.Status != PayoutStatus.Sent && p.AttemptCount < maxAttempts && (p.NextAttemptAt == null || p.NextAttemptAt <= now))
                   orderby b.EndUtc, b.Id
                   select b.Id;
         return await due.Take(take).ToListAsync(ct);
@@ -136,8 +135,6 @@ public class PayoutJob(IServiceScopeFactory scopes, IPaymentProvider provider, T
 
     async Task<Outcome> PayOneAsync(Guid id, DateTimeOffset now, CancellationToken ct)
     {
-        if (_attempts.TryGetValue(id, out var attempt) && (attempt.Count >= MaxAttempts || attempt.NotBefore > now)) return Outcome.Skipped;
-
         var prepared = await PrepareAsync(id, now, ct);
         if (prepared is null) return Outcome.Skipped;
 
@@ -147,18 +144,17 @@ public class PayoutJob(IServiceScopeFactory scopes, IPaymentProvider provider, T
         {
             using var budget = new CancellationTokenSource(ProviderBudget);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, budget.Token);
-            result = await provider.PayoutAsync(new PayoutRequest(prepared.PractitionerId, prepared.AmountMinor, "PLN", $"payout:{id:N}"), linked.Token);
+            result = await provider.PayoutAsync(new PayoutRequest(prepared.PractitionerId, prepared.AmountMinor, "PLN", $"payout:{id:N}", prepared.DestinationAccountId, prepared.ProviderPaymentId, id), linked.Token);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            await MarkFailedAsync(id, prepared.PayoutId, now, ct);
+            await MarkFailedAsync(id, prepared, now, ct);
             log.LogError("Payout request failed for booking {BookingId}: {ExceptionType}", id, ex.GetType().Name);
             return Outcome.Failed;
         }
 
         // Step 3. If this fails the row stays as it was (Pending or Failed) and a later run repeats the call: same key, one payout at the provider.
         var completed = await CompleteAsync(prepared, result, now, ct);
-        _attempts.TryRemove(id, out _);
         if (completed) log.LogInformation("Payout sent for booking {BookingId}", id);
         return completed ? Outcome.Paid : Outcome.Skipped;
     }
@@ -166,27 +162,32 @@ public class PayoutJob(IServiceScopeFactory scopes, IPaymentProvider provider, T
     /// <summary>Step 1. Null when there is nothing to pay or somebody else is on it.</summary>
     async Task<Prepared?> PrepareAsync(Guid id, DateTimeOffset now, CancellationToken ct)
     {
-        var stale = now - StaleAfter;
+        var maxAttempts = MaxAttempts;
         try
         {
             return await InTransactionAsync(async db =>
             {
-                var booking = await LoadForUpdateAsync(db, id, ct);
+                var booking = await LoadForUpdateAsync(db, id, ct); // SKIP LOCKED: null also when another instance has the row
                 // re-read under the lock: disputed (or anything else that is not money-complete) since the selection means no payout
                 if (booking is null || !IsMoneyComplete(booking) || booking.PayoutMinor is not > 0 || DueAt(booking) is not { } due || due > now) return null;
 
                 var row = await db.Payouts.SingleOrDefaultAsync(p => p.BookingId == id, ct);
                 if (row is null)
-                {
                     db.Payouts.Add(row = new Features.Payouts.Payout
                     {
                         Id = Guid.CreateVersion7(), BookingId = id, PractitionerId = booking.PractitionerId, AmountMinor = booking.PayoutMinor.Value,
                         Status = PayoutStatus.Pending, CreatedAt = now,
                     });
-                    await db.SaveChangesAsync(ct);
-                }
-                else if (row.Status == PayoutStatus.Sent || (row.Status == PayoutStatus.Pending && row.CreatedAt > stale)) return null; // done, or its owner is at work
-                return new Prepared(row.Id, row.PractitionerId, row.AmountMinor);
+                else if (row.Status == PayoutStatus.Sent || row.AttemptCount >= maxAttempts || row.NextAttemptAt > now) return null; // done, out of attempts, backing off, or its owner is at work
+
+                row.Status = PayoutStatus.Pending;
+                row.AttemptCount++;
+                row.NextAttemptAt = now + Lease;
+                await db.SaveChangesAsync(ct);
+
+                var account = await db.PaymentAccounts.AsNoTracking().SingleOrDefaultAsync(a => a.PractitionerId == row.PractitionerId, ct);
+                var payment = await db.Payments.AsNoTracking().SingleOrDefaultAsync(p => p.BookingId == id, ct);
+                return new Prepared(row.Id, id, row.PractitionerId, row.AmountMinor, row.AttemptCount, account?.ProviderAccountId, payment?.ProviderPaymentId);
             }, ct);
         }
         catch (DbUpdateException)
@@ -204,31 +205,27 @@ public class PayoutJob(IServiceScopeFactory scopes, IPaymentProvider provider, T
             row.Status = PayoutStatus.Sent;
             row.ProviderRef = result.ProviderPayoutId;
             row.SentAt = now;
+            row.NextAttemptAt = null;
             if (!await db.LedgerEntries.AnyAsync(l => l.BookingId == row.BookingId && l.Kind == LedgerKind.PractitionerPayout, ct))
                 db.LedgerEntries.Add(new LedgerEntry { Id = Guid.CreateVersion7(), BookingId = row.BookingId, Kind = LedgerKind.PractitionerPayout, AmountMinor = row.AmountMinor, CreatedAt = now });
             await db.SaveChangesAsync(ct);
             return true;
         }, ct);
 
-    async Task MarkFailedAsync(Guid bookingId, Guid payoutId, DateTimeOffset now, CancellationToken ct)
+    async Task MarkFailedAsync(Guid bookingId, Prepared prepared, DateTimeOffset now, CancellationToken ct)
     {
-        var count = _attempts.AddOrUpdate(bookingId, _ => Next(0), (_, a) => Next(a.Count)).Count;
-        if (count >= MaxAttempts) log.LogError("Payout for booking {BookingId} failed {Attempts} times and is not retried until the service restarts", bookingId, count);
+        var maxAttempts = MaxAttempts;
+        var backoff = TimeSpan.FromSeconds(ReadPositiveInt(Configuration, "Jobs:Payout:RetryBackoffSeconds", DefaultBackoffSeconds) * Math.Pow(2, Math.Min(prepared.Attempt - 1, 10)));
         await InTransactionAsync<bool>(async db =>
         {
-            var row = await LoadPayoutForUpdateAsync(db, payoutId, ct);
+            var row = await LoadPayoutForUpdateAsync(db, prepared.PayoutId, ct);
             if (row is null || row.Status == PayoutStatus.Sent) return false; // somebody else got it through
             row.Status = PayoutStatus.Failed;
+            row.NextAttemptAt = now + backoff;
             await db.SaveChangesAsync(ct);
             return true;
         }, ct);
-
-        Attempt Next(int before)
-        {
-            var n = before + 1;
-            var backoff = TimeSpan.FromSeconds(ReadPositiveInt(Configuration, "Jobs:Payout:RetryBackoffSeconds", DefaultBackoffSeconds) * Math.Pow(2, Math.Min(n - 1, 10)));
-            return new Attempt(n, now + backoff);
-        }
+        if (prepared.Attempt == maxAttempts) log.LogError("Payout for booking {BookingId} failed {Attempts} times and is not retried until an operator resets its attempt count", bookingId, prepared.Attempt);
     }
 
     async Task<bool> RowExistsAsync(Guid bookingId, CancellationToken ct)
@@ -239,7 +236,7 @@ public class PayoutJob(IServiceScopeFactory scopes, IPaymentProvider provider, T
 
     static async Task<BookingEntity?> LoadForUpdateAsync(BookingDbContext db, Guid id, CancellationToken ct) =>
         db.Database.IsNpgsql()
-            ? await db.Bookings.FromSql($"SELECT * FROM bookings WHERE id = {id} FOR UPDATE").SingleOrDefaultAsync(ct)
+            ? await db.Bookings.FromSql($"SELECT * FROM bookings WHERE id = {id} FOR UPDATE SKIP LOCKED").SingleOrDefaultAsync(ct)
             : await db.Bookings.SingleOrDefaultAsync(b => b.Id == id, ct);
 
     static async Task<Features.Payouts.Payout?> LoadPayoutForUpdateAsync(BookingDbContext db, Guid id, CancellationToken ct) =>

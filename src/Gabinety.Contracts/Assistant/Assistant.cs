@@ -6,13 +6,13 @@ namespace Gabinety.Contracts.Assistant;
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum AssistantState { Ready, Fake, NotAuthenticated, Unavailable, Disabled }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(Gabinety.Contracts.Common.SnakeCaseLowerEnumConverter))]
 public enum Confidence { Low, Medium, High }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(Gabinety.Contracts.Common.SnakeCaseLowerEnumConverter))]
 public enum TriageVerdict { None, Hold }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(Gabinety.Contracts.Common.SnakeCaseLowerEnumConverter))]
 public enum TriageReason { Spam, Abuse, PersonalData, OffTopic, Threat }
 
 public sealed record AssistantStatus(AssistantState State, IReadOnlyList<string> Features);

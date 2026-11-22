@@ -54,6 +54,12 @@ The owner has now asked for the frontend to be ported to a Blazor Web App and ha
 
 **What stays the same.** The browser talks to its own origin only and never holds a token or a backend address; authorization is on the server; cookies are `HttpOnly`/`SameSite=Lax`; the public site has no third-party script; the services are untouched (no new route, no change to the origin guard of the kernel).
 
+## Cutover preconditions (supervisor, 2026-11-22)
+
+- **Deploys must not sign users out.** The in-memory session store in this foundation is accepted for the foundation only. Wave 2 replaces it with a stateless encrypted session cookie: the refresh token sealed with Data Protection using the persisted, shared key ring, the access token re-minted on demand.
+- **Short output caching** (five minutes, by route and query, public anonymous pages only, never when a cookie or session is present) lands with the wave-2 public pages.
+- Wave-2 auth requirements from the authservice session: password rules shown on registration; the Playwright harness parametrised per host (`BASE_URL`, `HOST=next|blazor`) with a Blazor variant of J7 against `/logowanie`. Already in the gateway and tested: the visitor address in `Fly-Client-IP` on server-to-authservice calls, a 429 on refresh does not end the session, the role claim as a string or an array with `Admin` or `SuperAdmin` counting as admin.
+
 ## Alternatives considered
 
 - **Stay on Next.js (ADR-0001).** The standards' recommendation for a public, SEO-driven, horizontally scaled product, and stateless to host. Rejected by the owner's instruction; the Toolchain row is the reason.

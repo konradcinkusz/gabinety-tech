@@ -36,6 +36,7 @@ public class IdentityShapeTests
     [InlineData(403, "{}", IdentityOutcome.Rejected)]
     [InlineData(400, "{\"errors\":[\"x\"]}", IdentityOutcome.Rejected)]
     [InlineData(202, "{\"userId\":\"u\",\"email\":\"a@b\",\"message\":\"m\",\"emailVerificationRequired\":true}", IdentityOutcome.Accepted)]
+    [InlineData(429, "{\"message\":\"Too many requests\"}", IdentityOutcome.Unavailable)]
     [InlineData(500, "oops", IdentityOutcome.Unavailable)]
     [InlineData(503, "", IdentityOutcome.Unavailable)]
     [InlineData(200, "not json", IdentityOutcome.Unavailable)]
@@ -44,6 +45,42 @@ public class IdentityShapeTests
     {
         var (c, _) = Rig(_ => FakeBackend.Raw(body, (HttpStatusCode)status));
         Assert.Equal(expected, (await c.LoginAsync("a", "b")).Outcome);
+    }
+
+    [Fact]
+    public async Task The_visitors_validated_address_goes_to_authservice_in_Fly_Client_IP_and_never_a_forged_one()
+    {
+        var backend = new FakeBackend { Respond = _ => FakeBackend.Raw(Tokens) };
+        string? seen = null;
+        var capture = new HeaderProbe(h => seen = h);
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Headers["Fly-Client-IP"] = "203.0.113.7";
+        var accessor = new HttpContextAccessor { HttpContext = ctx };
+        var client = new IdentityClient(new HttpClient(capture) { BaseAddress = new Uri("http://auth.test") }, new VisitorAddressAccessor(accessor));
+        await client.LoginAsync("a", "b");
+        Assert.Equal("203.0.113.7", seen);
+        ctx.Request.Headers["Fly-Client-IP"] = "not-an-ip";
+        ctx.Request.Headers["X-Forwarded-For"] = "also bad";
+        seen = "unset";
+        await client.LoginAsync("a", "b");
+        Assert.True(seen is null or "unset" || System.Net.IPAddress.TryParse(seen, out _)); // never the garbage
+        Assert.NotEqual("not-an-ip", seen);
+        _ = backend;
+    }
+
+    sealed class HeaderProbe(Action<string?> look) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
+        {
+            look(r.Headers.TryGetValues(IdentityClient.ClientIpHeader, out var v) ? string.Join(",", v) : null);
+            return Task.FromResult(FakeBackend.Raw(Tokens));
+        }
+    }
+
+    [Fact] public async Task A_429_on_refresh_does_not_end_the_session()
+    {
+        var (c, _) = Rig(_ => FakeBackend.Raw("{}", (HttpStatusCode)429));
+        Assert.Equal(IdentityOutcome.Unavailable, (await c.RefreshAsync("r")).Outcome); // UserTokens closes a session only on Unauthorized/Rejected
     }
 
     [Fact] public async Task A_down_identity_service_is_unavailable() => Assert.Equal(IdentityOutcome.Unavailable, (await Rig(FakeBackend.Throw(new HttpRequestException("x"))).Client.LoginAsync("a", "b")).Outcome);

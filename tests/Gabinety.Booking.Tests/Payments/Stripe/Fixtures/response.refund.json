@@ -1,0 +1,14 @@
+{
+ "id": "re_3Qx0demo",
+ "object": "refund",
+ "amount": 10000,
+ "charge": "ch_3Qx0demo",
+ "created": 1790000100,
+ "currency": "pln",
+ "payment_intent": "pi_3Qx0demo",
+ "reason": null,
+ "status": "succeeded",
+ "metadata": {
+  "provider_payment_id": "cs_test_a1B2c3D4e5F6g7H8"
+ }
+}

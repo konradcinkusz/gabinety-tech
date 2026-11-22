@@ -68,6 +68,10 @@ public sealed class CreateBookingFeature : IServiceFeature
         if (offering.PractitionerUserId == sub) return Problem(ErrorCodes.OwnOffering, "Own offering", 422);
         if (offering.PractitionerStatus != PractitionerStatus.Approved) return Problem(ErrorCodes.PractitionerNotBookable, "Practitioner not bookable", 422);
         if (!offering.IsActive) return Problem(ErrorCodes.OfferingInactive, "Offering inactive", 422);
+        // A real provider pays the practitioner into a connected account: without a ready one the booking would be charged and could never be paid out (T-09.05). Mock needs none.
+        if (payments.RequiresPractitionerAccount
+            && !await db.PaymentAccounts.AsNoTracking().AnyAsync(a => a.PractitionerId == offering.PractitionerId && a.Provider == payments.Name && a.Ready, ct))
+            return Problem(ErrorCodes.PractitionerPaymentsNotReady, "Practitioner payments not ready", 422);
 
         // The provider call (a network call with a real vendor, SPEC 5.1: 10 s) happens BEFORE the lock and the transaction, with a
         // pre-allocated booking id, so no database lock is held across it. A request that then fails (slot gone) leaves an unused

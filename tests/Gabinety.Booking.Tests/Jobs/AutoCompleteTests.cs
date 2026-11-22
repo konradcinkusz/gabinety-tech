@@ -39,7 +39,7 @@ public class AutoCompleteTests : IDisposable
         var b = await Life.Row(h, id);
         Assert.Equal(BookingStatus.Completed, b.Status);
         Assert.Equal(b.EndUtc, b.EndedAt);
-        Assert.Equal(b.EndUtc + Auto.Window, b.PayoutDueAt);
+        Assert.Equal(b.StartUtc + TimeSpan.FromHours(72), b.PayoutDueAt); // max(end + 48 h, start + 72 h): the claim window has closed first (ADR proposal 0011)
         Assert.Equal(1500, b.FeeMinor);    // 15 % of 10000, first consultation of the pair
         Assert.Equal(8500, b.PayoutMinor);
         var fee = Assert.Single(await Life.Ledger(h, id), l => l.Kind == LedgerKind.PlatformFee);

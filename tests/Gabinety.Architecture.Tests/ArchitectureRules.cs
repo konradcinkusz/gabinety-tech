@@ -92,6 +92,36 @@ public partial class ArchitectureRules
         Assert.True(leaks.Count == 0, $"Gabinety.Booking exposes MailKit/MimeKit types: {string.Join("; ", leaks)}");
     }
 
+    /// <summary>T-09.05 (ADR proposal 0011): the Stripe adapter is plain HttpClient + System.Text.Json inside <c>Payments/Stripe</c>; nothing of it is public and nothing else names it.</summary>
+    [Fact]
+    public void The_Stripe_adapter_is_confined_to_its_namespace_and_exposes_no_vendor_type()
+    {
+        const string Ns = "Gabinety.Booking.Payments.Stripe";
+        var asm = typeof(Gabinety.Booking.Payments.Abstractions.IPaymentProvider).Assembly;
+        var inside = asm.GetTypes().Where(t => t.Namespace == Ns).ToList();
+        Assert.NotEmpty(inside); // the rule is looking at the right place
+        var exposed = inside.Where(t => t.IsPublic || t.IsNestedPublic).Select(t => t.FullName).ToList();
+        Assert.True(exposed.Count == 0, $"public types in {Ns}: {string.Join(", ", exposed)}");
+        var leaks = asm.GetTypes().Where(t => t.Namespace != Ns && (t.IsPublic || t.IsNestedPublic))
+            .SelectMany(t => t.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Select(m => (t, m, Type: m switch { MethodInfo mi => mi.ReturnType, PropertyInfo pi => pi.PropertyType, FieldInfo fi => fi.FieldType, _ => null })))
+            .Where(x => x.Type is { Namespace: Ns }).Select(x => $"{x.t.FullName}.{x.m.Name}").ToList();
+        Assert.True(leaks.Count == 0, $"public members that expose {Ns}: {string.Join(", ", leaks)}");
+
+        var dir = Path.Combine(Repo.Root, "src", "Gabinety.Booking", "Payments", "Stripe") + Path.DirectorySeparatorChar;
+        var composition = Path.Combine(Repo.Root, "src", "Gabinety.Booking", "Payments", "Mock", "MockPaymentProvider.cs"); // PaymentsFeature: the one registration
+        var named = Repo.Files("src", "*.cs").Concat(Repo.Files("tools", "*.cs")).Where(f => !f.StartsWith(dir) && f != composition)
+            .Where(f => StripeAdapterUse().IsMatch(File.ReadAllText(f))).Select(Repo.Rel).ToList();
+        Assert.True(named.Count == 0, $"the Stripe adapter is named outside Payments/Stripe and PaymentsFeature: {string.Join(", ", named)}");
+        Assert.Contains(Repo.Files("src", "*.cs"), f => f == composition && StripeAdapterUse().IsMatch(File.ReadAllText(f)));
+
+        var packages = Repo.Projects().Where(p => p.PackageRefs.Any(r => r.StartsWith("Stripe", StringComparison.OrdinalIgnoreCase))).Select(p => p.File).ToList();
+        Assert.True(packages.Count == 0, $"no vendor package for Stripe (ADR proposal 0011): {string.Join(", ", packages)}");
+    }
+
+    [GeneratedRegex(@"Payments\.Stripe\b|\bStripePaymentProvider\b|\bStripeApi\b|api\.stripe\.com")]
+    private static partial Regex StripeAdapterUse();
+
     [GeneratedRegex(@"\busing\s+(static\s+)?(\w+\s*=\s*)?(MailKit|MimeKit)\b")]
     private static partial Regex UsingMailKit();
 

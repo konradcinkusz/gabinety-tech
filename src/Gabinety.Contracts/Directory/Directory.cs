@@ -7,7 +7,7 @@ namespace Gabinety.Contracts.Directory;
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum PractitionerStatus { Draft, Submitted, Approved, Rejected, Suspended }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(Gabinety.Contracts.Common.SnakeCaseLowerEnumConverter))]
 public enum Badge { Email, Github, Nip, Approved }
 
 public sealed record CategoryDto(string Slug, string NamePl);

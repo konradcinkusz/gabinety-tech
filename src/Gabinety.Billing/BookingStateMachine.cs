@@ -31,6 +31,7 @@ public static class BookingStateMachine
         [(BookingStatus.Confirmed, BookingTrigger.CompletionWindowElapsed)] = BookingStatus.Completed,
         [(BookingStatus.Confirmed, BookingTrigger.ClientNoShowReported)] = BookingStatus.ClientNoShow,
         [(BookingStatus.Confirmed, BookingTrigger.ClientDisputes)] = BookingStatus.Disputed,
+        [(BookingStatus.Completed, BookingTrigger.ClientDisputes)] = BookingStatus.Disputed, // until start + 72 h (CONTRACTS 4.2), enforced by the caller; ADR proposal 0011
         [(BookingStatus.Disputed, BookingTrigger.AdminResolves)] = BookingStatus.Resolved,
     };
 

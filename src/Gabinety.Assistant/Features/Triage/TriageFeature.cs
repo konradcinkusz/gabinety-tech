@@ -166,7 +166,7 @@ public sealed class TriageFeature : IServiceFeature
 
         return await service.TriageAsync(body.Rating.Value, text, ct) switch
         {
-            TriageResult.Verdict v => Results.Json(Wire(v.Value)),
+            TriageResult.Verdict v => Results.Json(v.Value),
             _ => Problem(ErrorCodes.AssistantUnavailable, "Assistant unavailable", 503),
         };
     }
@@ -178,17 +178,6 @@ public sealed class TriageFeature : IServiceFeature
     }
 
     sealed record TriageRequestBody(int? Rating, string? Text);
-
-    /// <summary>
-    /// CONTRACTS 6 names the wire values in lower case with snake_case reasons (<c>personal_data</c>, <c>off_topic</c>). The
-    /// <c>Gabinety.Contracts</c> enums serialize as PascalCase, so the response is written from CONTRACTS, not from the DTO.
-    /// </summary>
-    static object Wire(TriageResponse r) => new
-    {
-        Flag = r.Flag == TriageVerdict.Hold ? "hold" : "none",
-        Reasons = r.Reasons.Select(x => TriageValidator.Reasons.First(p => p.Value == x).Key).ToArray(),
-        r.ModelId,
-    };
 
     static IResult Problem(string code, string title, int status) =>
         Results.Json(ApiProblem.Of(code, title, status, null, null), statusCode: status, contentType: "application/problem+json");

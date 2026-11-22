@@ -1,0 +1,12 @@
+{
+ "id": "acct_1Qx0demo",
+ "object": "account",
+ "charges_enabled": false,
+ "details_submitted": false,
+ "payouts_enabled": false,
+ "country": "PL",
+ "capabilities": {
+  "transfers": "inactive"
+ },
+ "type": "express"
+}

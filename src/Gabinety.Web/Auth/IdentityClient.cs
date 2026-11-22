@@ -15,6 +15,8 @@ public sealed record IdentityResult(IdentityOutcome Outcome, string? AccessToken
 /// </summary>
 public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visitor)
 {
+    public const string ClientIpHeader = "Fly-Client-IP";
+
     public Task<IdentityResult> LoginAsync(string email, string password, CancellationToken ct = default) =>
         PostAsync("/api/v1/auth/login", new { email, password }, null, ct);
 
@@ -78,7 +80,13 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
         var request = new HttpRequestMessage(method ?? HttpMethod.Post, path);
         if (body is not null) request.Content = new StringContent(JsonSerializer.Serialize(body, ApiClient.Json), Encoding.UTF8, "application/json");
         if (!string.IsNullOrEmpty(bearer)) request.Options.Set(RequestContext.AccessToken, bearer);
-        if (visitor.Current is { } address) request.Options.Set(RequestContext.VisitorAddress, address);
+        if (visitor.Current is { } address)
+        {
+            request.Options.Set(RequestContext.VisitorAddress, address);
+            // authservice is deployed with Network__ClientIpHeader=Fly-Client-IP (as the Next.js app, PR #124): it takes the visitor's address from this header, so visitors do not share
+            // this host's address and its rate limit. The address is the validated one of ClientAddress, never a copy of an incoming header.
+            request.Headers.TryAddWithoutValidation(ClientIpHeader, address);
+        }
         return request;
     }
 
@@ -102,6 +110,7 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
             catch (JsonException) { }
             return new IdentityResult(IdentityOutcome.Unavailable);
         }
+        if (status == 429) return new IdentityResult(IdentityOutcome.Unavailable); // rate limited: a refresh that is throttled is not a refused one, the session must not end
         if (status == 202) return new IdentityResult(IdentityOutcome.Accepted);
         if (status == 401) return new IdentityResult(IdentityOutcome.Unauthorized);
         if (status == 403)

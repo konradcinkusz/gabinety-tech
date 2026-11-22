@@ -71,6 +71,15 @@ public sealed class FakeIdentity
     public string KeyId { get; set; } = "kid-1";
     public int RefreshCalls { get; private set; }
     public bool RefuseRefresh { get; set; }
+    /// <summary>Sign-in behaviours authservice has and DevIdentity does not show: <c>LoginStatus</c> 429 (throttled), a locked account, a second factor, a registration that needs e-mail confirmation.</summary>
+    public int LoginStatus { get; set; }
+    public bool LockedOut { get; set; }
+    public bool RequireTwoFactor { get; set; }
+    public const string TwoFactorCode = "123456", RecoveryCode = "RECOVERY-0001", ConsentVersion = "2026-01-01";
+    public bool ConsentVersionsDown { get; set; }
+    public int RegisterStatus { get; set; }
+    /// <summary>The recovery code is single use, like authservice's.</summary>
+    bool _recoveryUsed;
     /// <summary>A status the refresh endpoint answers with instead of working (429, 503): the identity service throttling or failing.</summary>
     public int RefreshStatus { get; set; }
     /// <summary>The refresh tokens presented to <c>/refresh</c>, in order. A rotating service spends each once: a repeat here is a replay, which authservice answers by revoking the family.</summary>
@@ -124,7 +133,23 @@ public sealed class FakeIdentity
         {
             switch (path)
             {
+                case "/api/v1/auth/consents/versions":
+                    return ConsentVersionsDown ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) : FakeBackend.Json(new { terms = ConsentVersion, privacy = ConsentVersion });
+                case "/api/v1/auth/register":
+                    if (RegisterStatus != 0) return new HttpResponseMessage((HttpStatusCode)RegisterStatus);
+                    if (Field("acceptedTermsVersion") != ConsentVersion || Field("acceptedPrivacyVersion") != ConsentVersion) return FakeBackend.Json(new { errors = new[] { "consent" } }, HttpStatusCode.BadRequest);
+                    if (Field("email")!.StartsWith("taken", StringComparison.Ordinal)) return FakeBackend.Json(new { errors = new[] { "DuplicateEmail" } }, HttpStatusCode.BadRequest);
+                    if (Field("email")!.StartsWith("pending", StringComparison.Ordinal)) return FakeBackend.Json(new { userId = "u", email = Field("email"), message = "confirm", emailVerificationRequired = true }, HttpStatusCode.Accepted);
+                    return Tokens(Field("email")!);
+                case "/api/v1/auth/2fa/login":
+                    if (Field("challengeToken") != "challenge-1") return FakeBackend.Json(new { error = "Invalid or expired challenge." }, HttpStatusCode.Unauthorized);
+                    if (Field("code") == TwoFactorCode) return Tokens("demo-client@demo.example");
+                    if (Field("recoveryCode") == RecoveryCode && !_recoveryUsed) { _recoveryUsed = true; return Tokens("demo-client@demo.example"); }
+                    return FakeBackend.Json(new { error = "Invalid code." }, HttpStatusCode.Unauthorized);
                 case "/api/v1/auth/login":
+                    if (LoginStatus != 0) return new HttpResponseMessage((HttpStatusCode)LoginStatus);
+                    if (Field("password") == Password && LockedOut) return FakeBackend.Json(new { error = "locked", lockedOut = true, lockoutEnd = "2026-12-01T10:00:00Z" }, HttpStatusCode.Unauthorized);
+                    if (Field("password") == Password && RequireTwoFactor) return FakeBackend.Json(new { requiresTwoFactor = true, challengeToken = "challenge-1", expiresIn = 300 });
                     if (Field("password") != Password) return FakeBackend.Json(new { message = "Invalid email or password." }, HttpStatusCode.Unauthorized);
                     return Tokens(Field("email")!);
                 case "/api/v1/auth/refresh":

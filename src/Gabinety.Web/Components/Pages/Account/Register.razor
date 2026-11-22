@@ -26,20 +26,20 @@ else
         <input type="hidden" name="Model.PrivacyVersion" value="@Model!.PrivacyVersion" />
         <div class="field @Invalid(RegisterModel.EmailId)">
             <label class="field__label" for="@RegisterModel.EmailId">@Pl.Register.Email</label>
-            <InputText id="@RegisterModel.EmailId" class="field__control" type="email" @bind-Value="Model!.Email" autocomplete="email" inputmode="email"
+            <input id="@RegisterModel.EmailId" name="Model.Email" value="@Model!.Email" class="field__control" type="email" autocomplete="email" inputmode="email" maxlength="254"
                        aria-invalid="@AriaInvalid(RegisterModel.EmailId)" aria-describedby="@Describe(RegisterModel.EmailId)" />
             <FieldError FieldId="@RegisterModel.EmailId" Problem="_problems.For(RegisterModel.EmailId)" />
         </div>
         <div class="field @Invalid(RegisterModel.PasswordId)">
             <label class="field__label" for="@RegisterModel.PasswordId">@Pl.Register.Password</label>
             <p class="field__hint" id="@(RegisterModel.PasswordId)-hint">@Pl.Register.PasswordHint</p>
-            <InputText id="@RegisterModel.PasswordId" class="field__control" type="password" @bind-Value="Model!.Password" autocomplete="new-password"
+            <input id="@RegisterModel.PasswordId" name="Model.Password" class="field__control" type="password" autocomplete="new-password"
                        aria-invalid="@AriaInvalid(RegisterModel.PasswordId)" aria-describedby="@Describe(RegisterModel.PasswordId, hint: true)" />
             <FieldError FieldId="@RegisterModel.PasswordId" Problem="_problems.For(RegisterModel.PasswordId)" />
         </div>
         <div class="field @Invalid(RegisterModel.ConsentId)">
             <label class="option" for="@RegisterModel.ConsentId">
-                <InputCheckbox id="@RegisterModel.ConsentId" @bind-Value="Model!.Consent" aria-invalid="@AriaInvalid(RegisterModel.ConsentId)" aria-describedby="@Describe(RegisterModel.ConsentId)" />
+                <input type="checkbox" id="@RegisterModel.ConsentId" name="Model.Consent" value="true" checked="@Model!.Consent" aria-invalid="@AriaInvalid(RegisterModel.ConsentId)" aria-describedby="@Describe(RegisterModel.ConsentId)" />
                 <span>@Pl.Register.ConsentPrefix<a href="/regulamin" title="@VersionTitle(Model!.TermsVersion)">@Pl.Register.Terms</a>@Pl.Register.ConsentAnd<a href="/polityka-prywatnosci" title="@VersionTitle(Model!.PrivacyVersion)">@Pl.Register.Privacy</a>@Pl.Register.ConsentSuffix</span>
             </label>
             <FieldError FieldId="@RegisterModel.ConsentId" Problem="_problems.For(RegisterModel.ConsentId)" />

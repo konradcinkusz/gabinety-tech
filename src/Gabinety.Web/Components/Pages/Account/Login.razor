@@ -18,13 +18,13 @@
 <EditForm Model="Model!" FormName="login" OnSubmit="SubmitAsync" class="form form-narrow" novalidate>
     <div class="field @(_problems.For(LoginModel.EmailId) is null ? "" : "field--invalid")">
         <label class="field__label" for="@LoginModel.EmailId">@Pl.Login.Email</label>
-        <InputText id="@LoginModel.EmailId" class="field__control" type="email" @bind-Value="Model!.Email" autocomplete="username" inputmode="email"
+        <input id="@LoginModel.EmailId" name="Model.Email" value="@Model!.Email" class="field__control" type="email" autocomplete="username" inputmode="email" maxlength="254"
                    aria-invalid="@(_problems.For(LoginModel.EmailId) is null ? null : "true")" aria-describedby="@(_problems.For(LoginModel.EmailId) is null ? null : LoginModel.EmailId + "-error")" />
         <FieldError FieldId="@LoginModel.EmailId" Problem="_problems.For(LoginModel.EmailId)" />
     </div>
     <div class="field @(_problems.For(LoginModel.PasswordId) is null ? "" : "field--invalid")">
         <label class="field__label" for="@LoginModel.PasswordId">@Pl.Login.Password</label>
-        <InputText id="@LoginModel.PasswordId" class="field__control" type="password" @bind-Value="Model!.Password" autocomplete="current-password"
+        <input id="@LoginModel.PasswordId" name="Model.Password" class="field__control" type="password" autocomplete="current-password"
                    aria-invalid="@(_problems.For(LoginModel.PasswordId) is null ? null : "true")" aria-describedby="@(_problems.For(LoginModel.PasswordId) is null ? null : LoginModel.PasswordId + "-error")" />
         <FieldError FieldId="@LoginModel.PasswordId" Problem="_problems.For(LoginModel.PasswordId)" />
     </div>

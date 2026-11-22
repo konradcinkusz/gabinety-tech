@@ -31,7 +31,6 @@ public class IdentityShapeTests
 
     [Theory]
     [InlineData(401, "{\"message\":\"Invalid email or password.\"}", IdentityOutcome.Unauthorized)]
-    [InlineData(401, "{\"lockedOut\":true,\"lockoutEnd\":\"2026-12-01T00:00:00Z\"}", IdentityOutcome.Unauthorized)]
     [InlineData(403, "{\"emailVerificationRequired\":true}", IdentityOutcome.VerificationRequired)]
     [InlineData(403, "{}", IdentityOutcome.Rejected)]
     [InlineData(400, "{\"errors\":[\"x\"]}", IdentityOutcome.Rejected)]

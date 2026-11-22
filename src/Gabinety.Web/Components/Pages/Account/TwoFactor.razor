@@ -21,7 +21,7 @@
     <div class="field @(_problems.For(TwoFactorModel.CodeId) is null ? "" : "field--invalid")">
         <label class="field__label" for="@TwoFactorModel.CodeId">@(Recovery ? Pl.TwoFactor.RecoveryLabel : Pl.TwoFactor.CodeLabel)</label>
         @if (!Recovery) { <p class="field__hint" id="@(TwoFactorModel.CodeId)-hint">@Pl.TwoFactor.CodeHint</p> }
-        <InputText id="@TwoFactorModel.CodeId" class="field__control" type="text" @bind-Value="Model!.Code" autocomplete="one-time-code" inputmode="@(Recovery ? "text" : "numeric")" autofocus
+        <input id="@TwoFactorModel.CodeId" name="Model.Code" class="field__control" type="text" autocomplete="one-time-code" maxlength="64" inputmode="@(Recovery ? "text" : "numeric")" autofocus
                    aria-invalid="@(_problems.For(TwoFactorModel.CodeId) is null ? null : "true")"
                    aria-describedby="@(_problems.For(TwoFactorModel.CodeId) is null ? (Recovery ? null : TwoFactorModel.CodeId + "-hint") : TwoFactorModel.CodeId + "-error")" />
         <FieldError FieldId="@TwoFactorModel.CodeId" Problem="_problems.For(TwoFactorModel.CodeId)" />
@@ -60,9 +60,9 @@
 
     async Task SubmitAsync()
     {
-        _problems = Model!.Validate();
+        _problems = Model!.Validate(Recovery);
         if (_problems.Any) return;
-        var code = Model.Normalised;
+        var code = Model.Normalised(Recovery);
         var outcome = await SignIn.CompleteTwoFactorAsync(HttpContext, Recovery ? null : code, Recovery ? code : null, HttpContext.RequestAborted);
         if (outcome == SignInOutcome.SignedIn) { Navigation.NavigateTo(Challenge.Read(HttpContext)?.Redirect ?? Back); return; }
         if (outcome == SignInOutcome.InvalidCredentials && Challenge.Read(HttpContext) is null) { Navigation.NavigateTo($"{ReturnTarget.LoginUrl(Back)}{(Back == "/" ? "?" : "&")}error=session_expired"); return; }

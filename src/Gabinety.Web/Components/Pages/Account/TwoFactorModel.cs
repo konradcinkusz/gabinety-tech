@@ -9,14 +9,17 @@ public sealed class TwoFactorModel
     public const string CodeId = "two-factor-code";
     public string? Code { get; set; }
 
-    /// <summary>The code as the identity service wants it: no spaces, no dashes.</summary>
-    public string Normalised => new((Code ?? "").Where(c => !char.IsWhiteSpace(c) && c != '-').ToArray());
+    /// <summary>
+    /// The code as the identity service wants it (ASP.NET Identity's own normalisation): an authenticator code loses spaces and hyphens ("123 456", "123-456"), a recovery code loses only spaces
+    /// (its hyphen is part of the code).
+    /// </summary>
+    public string Normalised(bool recovery) => new((Code ?? "").Where(c => !char.IsWhiteSpace(c) && (recovery || c != '-')).ToArray());
 
-    public FormProblems Validate()
+    public FormProblems Validate(bool recovery = false)
     {
         var problems = new FormProblems();
-        if (Normalised.Length == 0) problems.Add(CodeId, Pl.TwoFactor.CodeRequired);
-        else if (Normalised.Length > 64) problems.Add(CodeId, Pl.TwoFactor.Invalid);
+        if (Normalised(recovery).Length == 0) problems.Add(CodeId, Pl.TwoFactor.CodeRequired);
+        else if (Normalised(recovery).Length > 64) problems.Add(CodeId, Pl.TwoFactor.Invalid);
         return problems;
     }
 }

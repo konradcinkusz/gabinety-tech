@@ -41,9 +41,10 @@ public static class SiteNavigation
     public static readonly NavItem MyBookings = new("/moje/rezerwacje", Pl.Nav.MyBookings), Account = new("/konto", Pl.Nav.Account), SignOut = new(ReturnTarget.LogoutPath, Pl.Nav.SignOut);
     public static readonly NavItem PractitionerArea = new("/gabinet-programisty", Pl.Nav.PractitionerArea), Admin = new("/admin/weryfikacja", Pl.Nav.Admin, "/admin");
 
-    public static HeaderModel For(ClaimsPrincipal? user, string currentPath)
+    /// <param name="back">The page the visitor is on, already filtered by <see cref="ReturnTarget.Safe"/>: the sign-in and registration links bring them back to it.</param>
+    public static HeaderModel For(ClaimsPrincipal? user, string currentPath, string back = "/")
     {
-        if (user?.Identity?.IsAuthenticated != true) return new HeaderModel(Primary, SignIn, Register, [], null, currentPath);
+        if (user?.Identity?.IsAuthenticated != true) return new HeaderModel(Primary, SignIn with { Href = ReturnTarget.LoginUrl(back) }, Register with { Href = ReturnTarget.RegisterUrl(back) }, [], null, currentPath);
         List<NavItem> links = [.. Primary, MyBookings, PractitionerArea];
         if (ClaimMapping.IsAdmin(user)) links.Add(Admin);
         return new HeaderModel(links, null, null, [Account, SignOut], ClaimMapping.Email(user.Claims), currentPath);

@@ -17,7 +17,7 @@ public static class Pl
     public static class Nav
     {
         public const string Label = "Menu główne", Search = "Programiści", SignIn = "Zaloguj się", Register = "Załóż konto", MyBookings = "Moje rezerwacje", SignOut = "Wyloguj się";
-        public const string Account = "Konto", PractitionerArea = "Panel programisty", Admin = "Administracja", Menu = "Menu", AccountMenu = "Twoje konto", AccountMenuLabel = "Menu konta";
+        public const string Account = "Konto", PractitionerArea = "Panel programisty", Admin = "Administracja", Menu = "Menu", AccountMenu = "Twoje konto";
     }
 
     public static class A11y

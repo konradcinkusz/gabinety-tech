@@ -6,6 +6,7 @@ Evidence for every rule: [`UI-AUDIT.md`](UI-AUDIT.md) (finding ids G-x, P-x, F-x
 Rules of the contract (from the guide, applied):
 
 1. Plain CSS in two places: `wwwroot/app.css` (tokens, element styles, the shared classes of section 4) and one scoped `Foo.razor.css` per component. No CSS framework, no web font, no icon font, no JS.
+   **Amended 2026-11-22 (owner decision D-1, UX-005):** one first-party script is allowed, `wwwroot/enhance.js` (same origin, no dependency, under 8 KB, covered by `script-src 'self'`). It is progressive enhancement only: every page works without it, and each behaviour (live counters, a pending submit button, a modal `<dialog>` for a state that also lives in the URL, show-password, copy link, auto-submit of a filter select) has a no-script fallback that is the page as served. Elements opt out with `data-enhance="off"`. No other script, no third-party script.
 2. **Colour only through tokens.** No hex, `rgb()`, `hsl()` or named colour outside the two token blocks of `tokens.css`. A `StyleContractTests` class reads `app.css` from disk and fails on a stray colour, on a missing token, on a missing dark block, and on a missing shared class name of section 4.
 3. Light is the default; dark is `@media (prefers-color-scheme: dark)` redefining colour tokens and **nothing else**. A user switch is out of scope; `data-theme="light"` on `<html>` is the one escape hatch the token block already honours.
 4. A polish task uses the class names of section 4 or stops and asks. It does not invent one.
@@ -31,6 +32,8 @@ What the current app gets wrong and the contract changes (summary): session-blin
 
 The authoritative block is [`tokens.css`](tokens.css) (light default, dark redefinition, both complete). Summary:
 
+**Names (UX-001).** The host kept the token names it was built with; the values are the contract's. Where this document says `--surface-page`, `--surface`, `--surface-sunken`, the files say `--color-bg`, `--color-surface-raised`, `--color-surface-sunken` (`--color-surface` is an older alias of the sunken surface that scoped sheets still use); every other colour token is the name below with the prefix `--color-` (`--text` is `--color-text`, `--accent-soft-text` is `--color-accent-soft-text`); `--font-body` is `--font-sans`, `--fs-*` is `--text-*`, `--lh-*` is `--leading-*`. The shipped file is `src/Gabinety.Web/wwwroot/tokens.css`; `docs/ui/tokens.css` is a byte-identical copy and a test compares them.
+
 ### 3.1 Colour tokens (redefined in dark)
 
 `--surface-page`, `--surface`, `--surface-sunken`; `--text`, `--text-secondary`, `--text-muted`; `--border`, `--border-strong`; `--accent`, `--accent-hover`, `--accent-contrast`, `--accent-soft`, `--accent-soft-text`; `--success`, `--success-soft`, `--warning`, `--warning-soft`, `--danger`, `--danger-soft`, `--danger-contrast`; `--focus`; `--shadow-sm`, `--shadow-md`, `--scrim`.
@@ -51,7 +54,7 @@ Use: page background `--surface-page`; cards, inputs, tables `--surface`; table 
 
 ### 3.3 Contrast, computed
 
-Computed by `python3 tests/e2e/tools/ui-audit/contrast.py` from `tokens.css` (WCAG 2.x relative luminance). Text pairs need 4.5, controls and the focus ring 3.0. All 28 pairs pass in both themes; a stylesheet test reruns the same arithmetic.
+Computed by `python3 tests/e2e/tools/ui-audit/contrast.py` from the shipped `tokens.css` (WCAG 2.x relative luminance). Text pairs need 4.5, controls and the focus ring 3.0. All 28 pairs pass in both themes; a stylesheet test reruns the same arithmetic.
 
 | Foreground on background | Use | Min | Light | Dark |
 |---|---|---|---|---|

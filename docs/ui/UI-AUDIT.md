@@ -1,5 +1,7 @@
 # UI/UX audit of the Next.js web app (input to the Blazor port)
 
+> **Historical.** This is the audit of the retired Next.js app; its findings drove the Blazor port. The current audit of `src/Gabinety.Web` and the task plan are in [`UX-PLAN.md`](UX-PLAN.md). The screenshots in `docs/ui/audit/` were regenerated from the Blazor host on 2026-11-22 (UX-003), so the file names and "Evidence" paths below now point at the new captures, not at the ones the text describes.
+
 Date of the run: 2026-11-22. Target: `web/` (Next.js) as served by the fake profile (`dotnet run --project src/Gabinety.AppHost --launch-profile fake`).
 Companion documents: [`DESIGN-CONTRACT.md`](DESIGN-CONTRACT.md) (what the port implements), [`tokens.css`](tokens.css) (the token block).
 Nothing in `web/` was changed: the app is replaced, so this is a list of what to **not** carry over and what to fix on the way.

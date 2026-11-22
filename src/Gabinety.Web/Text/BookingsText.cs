@@ -7,7 +7,7 @@ public static class BookingsText
     public const string TabsLabel = "Rezerwacje jako", Details = "Szczegóły", Back = "Wróć do listy rezerwacji", Review = "Wystaw opinię";
     public const string Loading = "Ładowanie rezerwacji…", NotFound = "Nie znaleziono takiej rezerwacji.";
     public const string EmptyTitle = "Brak rezerwacji", EmptyClient = "Gdy zarezerwujesz konsultację, zobaczysz ją tutaj.", EmptyPractitioner = "Gdy klient zarezerwuje Twoją konsultację, zobaczysz ją tutaj.", EmptyFiltered = "Brak rezerwacji o tym statusie.";
-    public const string FindPractitioner = "Znajdź programistę", ShowAll = "Pokaż wszystkie statusy", Next = "Pokaż kolejne rezerwacje", Filter = "Filtruj";
+    public const string FindPractitioner = "Znajdź programistę", ShowAll = "Pokaż wszystkie statusy", Next = "Pokaż kolejne rezerwacje";
     public const string ReloadHint = "Odśwież stronę", Retry = "Spróbuj ponownie";
     public const string PartyPractitioner = "Programista", PartyClient = "Klient";
 
@@ -15,8 +15,9 @@ public static class BookingsText
     {
         public const string When = "Termin", Duration = "Czas trwania", Minutes = "{0} min", Zone = "Godziny w czasie polskim (Europe/Warsaw).", Status = "Status", Price = "Cena", Payment = "Płatność";
         public const string Refunded = "Zwrócono: {0}", Fee = "Prowizja", Payout = "Wypłata dla programisty";
-        public const string Brief = "Opis problemu (klient)", BriefOwn = "Twój opis problemu", Meeting = "Link do spotkania";
+        public const string Brief = "Opis problemu (klient)", BriefOwn = "Twój opis problemu", Join = "Dołącz do spotkania";
         public const string MeetingHint = "Otwórz go w terminie konsultacji.";
+        public const string CompletedLine = "Konsultacja się odbyła.", RefundLine = "Zwrot za tę rezerwację: {0}.", NoRefundLine = "Rezerwacja anulowana mniej niż 24 godziny przed terminem: bez zwrotu.", Rebook = "Zarezerwuj ponownie";
     }
 
     public static class Payment

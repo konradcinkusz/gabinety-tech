@@ -1,15 +1,16 @@
-@* The status switch of a page (contract 5.9: the choice inside a page): links that keep the choice in the URL, so the view is shareable and works without JavaScript. aria-current marks the current one. *@
-<nav aria-label="@Label" class="admin-segmented">
-    <ul>
+@* The status switch of a page (contract 5.9: the choice inside a page): the shared .segmented of .chip links that keep the choice in the URL, so the view is shareable and works without JavaScript. aria-current="true" marks the current one. *@
+<nav aria-label="@Label" class="segmented-nav">
+    <ul class="segmented">
         @foreach (var item in Items)
         {
-            <li><a href="@item.Href" aria-current="@(item.Current ? "page" : null)">@item.Text</a></li>
+            <li><a class="chip" href="@item.Href" aria-current="@(item.Current ? "true" : null)">@item.Text@if (item.Count is not null) {<span class="chip__count">&nbsp;(@item.Count)</span>}</a></li>
         }
     </ul>
 </nav>
 
 @code {
-    public sealed record Item(string Text, string Href, bool Current);
+    /// <summary>Count: how many items the page already loaded for this status (null: unknown, nothing shown). The accessible name is "Otwarte (3)": it starts with the label.</summary>
+    public sealed record Item(string Text, string Href, bool Current, string? Count = null);
 
     [Parameter, EditorRequired] public string Label { get; set; } = "";
     [Parameter, EditorRequired] public IReadOnlyList<Item> Items { get; set; } = [];

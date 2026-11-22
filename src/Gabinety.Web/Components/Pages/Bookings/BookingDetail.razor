@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @inject BookingClient Bookings
 @inject NavigationManager Navigation
+@inject TimeProvider Clock
 @* Static server rendering. Every action is driven ONLY by the server's can* flags: the windows (24 h, 48 h, 72 h) are never recomputed here. An action opens as a state of the page (?action=), shown as a
    native dialog that is open in the markup (no script): a GET form's button opens it, a POST form confirms it, and the result is a redirect with a fixed key (?done=), so a reload never repeats it.
    The texts of users (the cancel reason, the dispute) are request bodies only: never logged, never echoed into a URL. *@
@@ -23,6 +24,28 @@ else if (_booking is { } b)
         @if (DoneText is { } done) {<div class="callout callout--success" role="status" data-testid="done">@done</div>}
         <section class="card" aria-labelledby="booking-title">
             <h2 id="booking-title">@b.OfferingTitle</h2>
+            @if (b.Status == "Confirmed")
+            {
+                <div class="head" data-testid="booking-head">
+                    <p class="head__when">@MyBookingsSchedule.Relative(Clock.GetUtcNow(), b.StartUtc)</p>
+                    @if (SafeUrl.Http(b.MeetingUrl) is { } meeting)
+                    {
+                        <a class="btn btn--primary" href="@meeting" rel="noopener noreferrer" target="_blank">@BookingsText.Detail.Join</a>
+                        <p class="muted">@BookingsText.Detail.MeetingHint</p>
+                    }
+                </div>
+            }
+            else if (b.Status == "Completed")
+            {
+                <div class="head" data-testid="booking-head">
+                    <p class="head__when">@BookingsText.Detail.CompletedLine</p>
+                    @if (b.CanReview) {<div class="form-actions"><a class="btn btn--primary" href="@($"/moje/opinie/{b.Id}")">@BookingsText.Review</a></div>}
+                </div>
+            }
+            else if (BookingFormat.IsCancelled(b.Status) && RefundLine(b) is { } refundLine)
+            {
+                <p class="callout callout--info" data-testid="booking-head">@refundLine</p>
+            }
             <dl class="dl">
                 @if (BookingFormat.Name(_role == BookingClient.ClientRole ? b.Practitioner.DisplayName : b.Client?.DisplayName) is { } party)
                 {
@@ -40,10 +63,6 @@ else if (_booking is { } b)
                 @if (b.Fee is { } fee) {<dt>@BookingsText.Detail.Fee</dt><dd class="num">@Money.Pln(fee.AmountMinor)</dd>}
                 @if (b.Payout is { } payout) {<dt>@BookingsText.Detail.Payout</dt><dd class="num">@Money.Pln(payout.AmountMinor)</dd>}
             </dl>
-            @if (SafeUrl.Http(b.MeetingUrl) is { } meeting)
-            {
-                <p><a href="@meeting" rel="noopener noreferrer" target="_blank">@BookingsText.Detail.Meeting</a> <span class="muted">@BookingsText.Detail.MeetingHint</span></p>
-            }
         </section>
 
         @if (b.Brief is { } brief)
@@ -56,10 +75,9 @@ else if (_booking is { } b)
 
         @if (Open == "cancel" && b.CanCancel)
         {
-            <dialog open role="alertdialog" aria-labelledby="cancel-title" class="dialog card" data-testid="cancel-dialog">
+            <dialog open data-enhance="dialog" role="alertdialog" aria-labelledby="cancel-title" class="dialog" data-testid="cancel-dialog">
                 <h2 id="cancel-title" tabindex="-1" autofocus>@BookingsText.Cancel.Title</h2>
-                <p><strong>@CancelOutcome.Sentence(_outcome, _role)</strong></p>
-                @if (_outcome is not null && _role == BookingClient.ClientRole) {<p class="muted">@BookingsText.Cancel.ClientRule</p>}
+                <p class="@(CancelOutcome.Warns(_outcome, _role) ? "callout callout--danger" : "callout callout--info")">@CancelOutcome.Sentence(_outcome, _role)</p>
                 <form method="post" @onsubmit="CancelAsync" @formname="cancel" class="form" novalidate>
                     <AntiforgeryToken />
                     <BookingFormProblems Items="_problems" />
@@ -67,15 +85,15 @@ else if (_booking is { } b)
                     <ActionError Failure="_actionFailure" Href="@DetailHref()" />
                     <div class="form-actions">
                         <button type="submit" class="btn btn--danger">@BookingsText.Cancel.Confirm</button>
-                        <a class="btn btn--secondary" href="@DetailHref()">@BookingsText.Cancel.Keep</a>
+                        <a class="btn btn--secondary" href="@DetailHref()" data-dialog-dismiss>@BookingsText.Cancel.Keep</a>
                     </div>
                 </form>
             </dialog>
         }
         else if (Open == "dispute" && b.CanDispute)
         {
-            <section class="card" aria-labelledby="dispute-title" data-testid="dispute-form">
-                <h2 id="dispute-title">@BookingsText.Dispute.Title</h2>
+            <dialog open data-enhance="dialog" role="alertdialog" aria-labelledby="dispute-title" class="dialog" data-testid="dispute-form">
+                <h2 id="dispute-title" tabindex="-1">@BookingsText.Dispute.Title</h2>
                 <p>@BookingsText.Dispute.Intro</p>
                 <form method="post" @onsubmit="DisputeAsync" @formname="dispute" class="form" novalidate>
                     <AntiforgeryToken />
@@ -91,14 +109,14 @@ else if (_booking is { } b)
                     <ActionError Failure="_actionFailure" Href="@DetailHref()" />
                     <div class="form-actions">
                         <button type="submit" class="btn btn--primary">@BookingsText.Dispute.Submit</button>
-                        <a class="btn btn--ghost" href="@DetailHref()">@BookingsText.Dispute.Close</a>
+                        <a class="btn btn--ghost" href="@DetailHref()" data-dialog-dismiss>@BookingsText.Dispute.Close</a>
                     </div>
                 </form>
-            </section>
+            </dialog>
         }
         else if (Open == "noshow" && b.CanReportNoShow)
         {
-            <dialog open role="alertdialog" aria-labelledby="noshow-title" class="dialog card" data-testid="noshow-dialog">
+            <dialog open data-enhance="dialog" role="alertdialog" aria-labelledby="noshow-title" class="dialog" data-testid="noshow-dialog">
                 <h2 id="noshow-title" tabindex="-1" autofocus>@BookingsText.NoShow.Title</h2>
                 <p>@BookingsText.NoShow.Body</p>
                 <form method="post" @onsubmit="NoShowAsync" @formname="noshow" class="form">
@@ -107,7 +125,7 @@ else if (_booking is { } b)
                     <ActionError Failure="_actionFailure" Href="@DetailHref()" />
                     <div class="form-actions">
                         <button type="submit" class="btn btn--danger">@BookingsText.NoShow.Confirm</button>
-                        <a class="btn btn--secondary" href="@DetailHref()">@BookingsText.NoShow.Keep</a>
+                        <a class="btn btn--secondary" href="@DetailHref()" data-dialog-dismiss>@BookingsText.NoShow.Keep</a>
                     </div>
                 </form>
             </dialog>
@@ -115,7 +133,8 @@ else if (_booking is { } b)
         else
         {
             <div class="form-actions">
-                @if (b.CanReview) {<a class="btn btn--primary" href="@($"/moje/opinie/{b.Id}")">@BookingsText.Review</a>}
+                @if (b.CanReview && b.Status != "Completed") {<a class="btn btn--primary" href="@($"/moje/opinie/{b.Id}")">@BookingsText.Review</a>}
+                @if (_role == BookingClient.ClientRole && BookingFormat.RebookHref(b.Status, b.Practitioner.Slug) is { } rebook) {<a class="btn btn--secondary" href="@rebook">@BookingsText.Detail.Rebook</a>}
                 @if (b.CanCancel || b.CanDispute || b.CanReportNoShow)
                 {
                     @* a GET form: the buttons open the action without a script and without a state change (a link would not be a button) *@
@@ -154,6 +173,11 @@ else if (_booking is { } b)
     string _role = BookingClient.ClientRole;
     string? _textError, _reasonError;
     List<FormProblem> _problems = [];
+
+    /// <summary>What happens to the money of a cancelled booking, from the payment view only: the refund when there is one; "bez zwrotu" only for the late cancellation the status itself names.</summary>
+    static string? RefundLine(BookingDetailDto b) =>
+        b.Payment.Refunded.AmountMinor > 0 ? string.Format(BookingsText.Detail.RefundLine, Money.Pln(b.Payment.Refunded.AmountMinor))
+        : b.Status == "LateCancelledByClient" ? BookingsText.Detail.NoRefundLine : null;
 
     string? Open => ActionParam is "cancel" or "dispute" or "noshow" ? ActionParam : null;
 

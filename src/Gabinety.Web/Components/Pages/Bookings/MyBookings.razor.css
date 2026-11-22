@@ -1,6 +1,12 @@
-.filter-form { margin-block: var(--space-4); align-items: end; }
-.booking-row { position: relative; }
-.booking-row__title { margin: 0; font-size: var(--text-lg); }
-/* The whole row is the link target (stretched link): the link keeps the accessible name and a 44 px high target. */
-.booking-row__link { display: inline-block; padding-block: var(--space-3); font-weight: 600; }
-.booking-row__link::after { content: ""; position: absolute; inset: 0; }
+/* The status chips wrap on the phone instead of scrolling the page (DESIGN-CONTRACT 6). */
+.status-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-4); }
+
+/* The title is plain text; the card's "Szczegóły" link is the target of the whole card (shared .card--link). */
+.booking-row__title { margin: 0; font-weight: 600; font-size: var(--text-md); overflow-wrap: anywhere; }
+.booking-row__price { color: var(--color-text); }
+.booking-row__link { display: inline-flex; align-items: center; min-height: var(--tap); font-weight: 600; }
+
+/* The lead card: the next consultation, larger, its relative start in the accent colour. */
+.booking-row--lead { border-color: var(--color-accent); }
+.booking-row--lead .booking-row__title { font-size: var(--text-xl); }
+.booking-lead__when { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--color-accent-soft-text); }

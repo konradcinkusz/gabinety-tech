@@ -49,7 +49,7 @@ export class PractitionerArea {
   }
 
   async addOffering(o: { title: string; description: string; price: string }) {
-    await gotoInteractive(this.page, "/gabinet-programisty/oferty");
+    await gotoInteractive(this.page, "/gabinet-programisty/oferty?nowa=1"); // the form is closed until "Dodaj ofertę" (UX-042)
     await this.page.getByLabel("Nazwa oferty").fill(o.title);
     await this.page.getByLabel("Opis oferty").fill(o.description);
     await this.page.getByLabel("Cena (zł)").fill(o.price);

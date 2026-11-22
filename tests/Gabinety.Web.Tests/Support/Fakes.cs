@@ -18,6 +18,8 @@ public sealed class FakeBackend : HttpMessageHandler
     public Func<HttpRequestMessage, HttpResponseMessage> Respond { get; set; } = _ => new HttpResponseMessage(HttpStatusCode.NotFound);
     public IReadOnlyList<Recorded> Requests { get { lock (_requests) return [.. _requests]; } }
     public int Calls => Requests.Count;
+    /// <summary>The calls except the header's own practitioner check (GET /api/v1/me), which is a shell read and not a page's call to its backend.</summary>
+    public int CallsExceptShellCheck => Requests.Count(r => r.PathAndQuery != "/api/v1/me");
     /// <summary>How long the backend takes before it answers, honouring cancellation (a timeout of the client's pipeline ends the wait).</summary>
     public TimeSpan Delay { get; set; }
 

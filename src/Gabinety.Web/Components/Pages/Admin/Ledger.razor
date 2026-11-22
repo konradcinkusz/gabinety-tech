@@ -33,7 +33,7 @@
     }
     else
     {
-        <p>@string.Format(PlAdmin.Ledger.Summary, _range.From, _range.To)</p>
+        <p>@string.Format(PlAdmin.Ledger.Summary, LedgerPeriod.Polish(_range.From, _range.To))</p>
         <p class="admin-actions"><a class="btn" href="@CsvHref" download>@PlAdmin.Ledger.Download</a></p>
         @if (_failure is { } failure)
         {
@@ -46,8 +46,25 @@
         else if (_preview is not null)
         {
             <p class="muted">@(_preview.HasMore ? string.Format(PlAdmin.Ledger.Showing, _preview.Rows.Count) : string.Format(PlAdmin.Ledger.ShowingAll, _preview.Rows.Count))</p>
-            <div class="table-wrap" role="region" aria-label="@PlAdmin.Ledger.TableLabel" tabindex="0">
-                <table class="admin-table">
+            @if (_preview.HasMore)
+            {
+                <p class="muted">@string.Format(PlAdmin.Ledger.TotalsPartial, PreviewRows)</p>
+            }
+            else if (_totals.Count > 0)
+            {
+                <section class="ledger-totals" aria-labelledby="ledger-totals-title">
+                    <h2 id="ledger-totals-title">@PlAdmin.Ledger.TotalsTitle</h2>
+                    <dl class="dl">
+                        @foreach (var total in _totals)
+                        {
+                            <dt>@AdminFormat.LedgerKind(total.Kind)</dt>
+                            <dd class="num">@AdminFormat.Pln(total.AmountMinor)</dd>
+                        }
+                    </dl>
+                </section>
+            }
+            <div class="table-wrap ledger-table" role="region" aria-label="@PlAdmin.Ledger.TableLabel" tabindex="0">
+                <table class="table table--cards">
                     <thead>
                         <tr>
                             <th scope="col">@PlAdmin.Ledger.ColDate</th>
@@ -62,7 +79,7 @@
                             <tr>
                                 <td data-label="@PlAdmin.Ledger.ColDate"><time datetime="@row.CreatedAt.ToString("O")">@AdminFormat.When(row.CreatedAt)</time></td>
                                 <td data-label="@PlAdmin.Ledger.ColKind">@AdminFormat.LedgerKind(row.Kind)</td>
-                                <td data-label="@PlAdmin.Ledger.ColBooking"><span class="admin-ref" title="@row.BookingId">@AdminFormat.ShortRef(row.BookingId)</span></td>
+                                <td data-label="@PlAdmin.Ledger.ColBooking"><span class="ledger-ref" title="@row.BookingId.ToString("D")">@AdminFormat.IdTail(row.BookingId)</span></td>
                                 <td data-label="@PlAdmin.Ledger.ColAmount" class="num">@AdminFormat.Pln(row.AmountMinor)</td>
                             </tr>
                         }
@@ -82,6 +99,7 @@
     LedgerRange _range = new("", "", PeriodProblem.Format);
     DateTimeOffset _now;
     LedgerPreviewDto? _preview;
+    IReadOnlyList<KindTotal> _totals = [];
     ApiFailure? _failure;
 
     string CsvHref => AdminQuery.Url(AdminEndpoints.LedgerCsvPath, ("from", _range.From), ("to", _range.To));
@@ -97,5 +115,6 @@
         if (_range.Problem != PeriodProblem.None) return;
         var result = await Api.LedgerPreview(_range.From, _range.To, PreviewRows);
         (_preview, _failure) = (result.Value, result.Failure);
+        _totals = _preview is { HasMore: false } ? LedgerTotals.Of(_preview.Rows) : [];
     }
 }

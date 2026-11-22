@@ -8,12 +8,53 @@ public static class PlPages
 {
     public static class HomeExtra
     {
-        public const string CategoryHint = "Zweryfikowani programiści i wolne terminy";
         public const string MoreHow = "Szczegóły: jak to działa", RulesLink = "Zasady rankingu", PricingLink = "Cennik";
+
+        // Hero: example queries, each a link to the list with that search (UX-011, V-1).
+        public const string ExamplesLead = "Na przykład:";
+        public const string ExampleAudit = "audyt kodu", ExampleMigration = "migracja .NET", ExampleAi = "integracja AI";
+
+        // Category tiles: one distinct sentence per seeded problem (slug -> text), a generic sentence for a slug this map does not know, and the count in Polish plural forms.
+        public static readonly IReadOnlyDictionary<string, string> CategoryDescriptions = new Dictionary<string, string>
+        {
+            ["audyt-kodu"] = "Przegląd istniejącego kodu: jakość, bezpieczeństwo i plan poprawek.",
+            ["migracja-legacy-dotnet"] = "Przeniesienie starszej aplikacji .NET na nowszą wersję, krok po kroku.",
+            ["integracja-ai"] = "Dołączenie modeli językowych i agentów AI do istniejącego systemu.",
+            ["automatyzacja-procesow"] = "Zautomatyzowanie powtarzalnych zadań i przepływów danych.",
+            ["architektura-systemu"] = "Ocena i projekt struktury systemu, granic usług i danych.",
+            ["code-review"] = "Druga para oczu na zmiany w kodzie przed wdrożeniem.",
+            ["wycena-projektu"] = "Oszacowanie zakresu, czasu i kosztów, zanim zaczniesz projekt.",
+            ["rozwiazanie-awarii"] = "Pilna pomoc przy awarii: diagnoza, przywrócenie działania i wnioski.",
+        };
+        public const string CategoryFallback = "Konsultacja z programistą w obszarze: {0}.";
+        public const string PractitionersOne = "{0} programista", PractitionersFew = "{0} programiści", PractitionersMany = "{0} programistów";
+
+        // Trust band: the verified count is the real number from the sitemap; the statements are the existing ones.
         public const string TrustLabel = "Dlaczego warto";
-        public const string TrustPractitioners = "Zweryfikowanych programistów: {0}";
+        public const string VerifiedOne = "{0} zweryfikowany programista", VerifiedFew = "{0} zweryfikowani programiści", VerifiedMany = "{0} zweryfikowanych programistów";
         public const string TrustPayment = "Płatność z góry, programista dostaje pieniądze po konsultacji";
         public const string TrustRanking = "Ranking bez płatnych miejsc";
+
+        // Featured row: a few practitioners from the first page of the list. A region that fails soft: no heading, no message, when there is nothing to show.
+        public const string FeaturedTitle = "Zweryfikowani programiści", FeaturedIntro = "Kilka osób z listy. Pełna lista jest na stronie programistów.";
+        public const string FeaturedFrom = "od {0}";
+
+        // Call to action for programmers.
+        public const string ForPractitionersTitle = "Jesteś programistą?";
+        public const string ForPractitionersBody = How.P1 + " " + How.P2;
+        public const string ForPractitionersLink = "Dołącz jako programista";
+
+        // Questions and answers. Every rule is the wording of the Pricing, How and Pl.Home texts; no amount is written here: the price list is /cennik.
+        public const string FaqTitle = "Pytania i odpowiedzi";
+        public const string FaqPayWhenQ = "Kiedy płacę?";
+        public const string FaqPayWhenA = "Płacisz z góry, przy rezerwacji. Termin jest zarezerwowany po potwierdzeniu płatności. Programista dostaje pieniądze dopiero po konsultacji.";
+        public const string FaqCancelQ = "Czy mogę odwołać konsultację?";
+        public const string FaqCancelA = How.Pay1 + " " + How.Pay2;
+        public const string FaqFeeQ = "Ile płacę platformie?";
+        public const string FaqFeeA = Pricing.Intro + " Prowizja platformy dotyczy tylko pierwszej zrealizowanej konsultacji danej pary klient i programista. " + Pricing.Later;
+        public const string FaqFeeLink = "Zobacz cennik";
+        public const string FaqDisputeQ = "Co, jeśli konsultacja się nie odbyła?";
+        public const string FaqDisputeA = How.Pay3;
     }
 
     public static class ListExtra
@@ -40,6 +81,7 @@ public static class PlPages
         public const string P2 = "Administrator sprawdza profil. Po zatwierdzeniu pojawiasz się na liście.";
         public const string P3 = "Wypłata następuje 48 godzin po zakończeniu konsultacji, o ile nikt nie zgłosił sporu.";
         public const string SeeAlso = "Zobacz też";
+        public const string CtaTitle = "Gotowy, żeby zacząć?", CtaBody = "Wybierz zweryfikowanego programistę i wolny termin. Płacisz z góry, a termin jest zarezerwowany po potwierdzeniu płatności.", Cta = "Zobacz programistów";
     }
 
     public static class Ranking
@@ -80,6 +122,8 @@ public static class PlPages
         public const string ExampleTitle = "Przykład", ExampleCaption = "Podział ceny pierwszej konsultacji", ColItem = "Pozycja", ColAmount = "Kwota";
         public const string Price = "Cena konsultacji", FeeRow = "Prowizja platformy", Payout = "Dla programisty";
         public const string RefundNote = "Po pełnym zwrocie prowizji nie ma. Przy częściowym zwrocie liczymy ją od kwoty, która zostaje.";
+        public const string Example2Title = "Drugi przykład", Example2Intro = "Ta sama zasada dla tańszej konsultacji: prowizja liczona od ceny i zaokrąglana do pełnego grosza.";
+        public const string Example2Caption = "Podział ceny konsultacji {0}", FindLink = "Zobacz programistów i ich ceny";
     }
 
     public static class Legal
@@ -108,6 +152,11 @@ public static class PlPages
         public const string NotFoundTitle = "Nie znaleziono programisty", NotFoundBody = "Ten profil nie istnieje albo programista nie jest już widoczny w serwisie.";
         public const string NotFoundAll = "Zobacz wszystkich programistów", NotFoundCategories = "Albo wybierz problem";
         public const string Unavailable = "Nie udało się teraz wczytać profilu. Spróbuj ponownie za chwilę.";
+        // UX-014: header checks, summary panel, review summary.
+        public const string ChecksTitle = "Co sprawdziliśmy", RatingShort = "★ {0} ({1})", TechLabel = "Technologie";
+        public const string SummaryTitle = "Podsumowanie", PriceFromLabel = "od", DurationRange = "{0}–{1} min", SeeTimes = "Zobacz terminy";
+        public const string PaymentNote = "Płatność z góry, programista dostaje pieniądze po konsultacji";
+        public const string ReviewsSummaryLine = "★ {0} · {1} {2}", OpinionOne = "opinia", OpinionFew = "opinie", OpinionMany = "opinii";
     }
 
     public static class Slots
@@ -116,7 +165,10 @@ public static class PlPages
         // F-16 / P-PROF-2: no offers, no times and times-unavailable are three different sentences.
         public const string Empty = "Brak wolnych terminów w najbliższych {0} dniach. Zajrzyj później.";
         public const string Unavailable = "Nie możemy teraz pokazać terminów. Spróbuj ponownie za chwilę.";
-        public const string More = "Pokaż kolejne dni", Retry = "Spróbuj ponownie", TimeZone = "Godziny w czasie polskim (Europe/Warsaw).";
+        public const string Nearest = "Najbliższy wolny termin: {0}", Today = "dziś", Tomorrow = "jutro";
+        public const string Morning = "Rano", Afternoon = "Po południu", Evening = "Wieczorem", PrevWeek = "Poprzedni tydzień", NextWeek = "Następny tydzień", Week = "Tydzień";
+        public const string More = "Pokaż kolejne dni", Retry = "Spróbuj ponownie", TimeZone = "Godziny w czasie polskim (Europe/Warsaw).",
+            LocalNote = "Twoja strefa czasowa: {zone}. Na przykład {pl} w Polsce to {local} u Ciebie.", LocalTitle = "{local} w Twojej strefie ({zone})";
     }
 
     public static class Nav

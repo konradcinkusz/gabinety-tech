@@ -35,7 +35,7 @@ public class ReviewsTests
         Assert.All(radios, r => Assert.Equal("LABEL", r.ParentElement!.TagName)); // the whole option is the label: a 44 px target
         Assert.Equal("Treść opinii", page.One("label[for=text]")!.TextContent);
         Assert.Equal(["Wyślij opinię"], page.All("form button").Select(b => b.TextContent));
-        Assert.Contains("1 oznacza „bardzo słabo”", page.TextOf("#rating-hint"));
+        Assert.Contains("1 oznacza „słabo”", page.TextOf("#rating-hint"));
         Assert.NotNull(page.One("form input[name=__RequestVerificationToken]"));
         Assert.Empty(f.Web.Reputation.Requests);
     }
@@ -72,7 +72,25 @@ public class ReviewsTests
         var page = await f.Post(Form, "review", ("Model.Rating", "4"), ("Model.Text", "krótko"));
         Assert.Equal("Popraw 1 pole", page.TextOf(".form-summary h2"));
         Assert.Equal(["4"], page.All("input[type=radio]:checked").Select(r => r.GetAttribute("value")));
-        Assert.Contains("Twoja ocena: Dobrze", page.Text);
+        Assert.Equal("Bardzo dobrze", page.TextOf(".rating-words .rating-word--4")); // CSS shows this one word of the five
+    }
+
+    [Fact]
+    public async Task The_rating_is_five_star_targets_each_named_n_z_5_and_all_five_words_are_rendered_in_order()
+    {
+        await using var f = await Open();
+        var page = await f.Browser.GetAsync(Form);
+        var options = page.All(".rating-scale > label.rating-scale__option").ToList();
+        Assert.Equal(5, options.Count);
+        Assert.All(options, o =>
+        {
+            var star = o.QuerySelector(".rating-scale__star")!;
+            Assert.Equal("true", star.GetAttribute("aria-hidden")); // decoration: the accessible name is the radio's "n z 5"
+            Assert.Equal("\u2605", star.TextContent); // U+2605 BLACK STAR
+        });
+        Assert.Equal(["Słabo", "Przeciętnie", "Dobrze", "Bardzo dobrze", "Świetnie"], page.All(".rating-words .rating-word").Select(w => w.TextContent));
+        Assert.Equal(["rating-word rating-word--1", "rating-word rating-word--2", "rating-word rating-word--3", "rating-word rating-word--4", "rating-word rating-word--5"], page.All(".rating-words .rating-word").Select(w => w.GetAttribute("class")));
+        Assert.Empty(page.All("input[type=radio]:checked")); // a first visit has no rating, so no word is shown
     }
 
     [Theory]

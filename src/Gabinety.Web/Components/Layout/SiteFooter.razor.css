@@ -1,5 +1,11 @@
+/* The footer (UX-010, finding 9 and S-6). Tokens only. One column per group of links from 40 rem; a single column with the copyright below it on the phone. Links are 44 px high. */
 .site-footer { border-top: 1px solid var(--color-border); color: var(--color-text-muted); font-size: var(--text-sm); }
-.site-footer__inner { width: 100%; max-width: var(--content-width); margin-inline: auto; padding: var(--space-4) var(--gutter); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-5); }
-.site-footer p { margin: 0; }
-.nav-list { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; padding: 0; }
-.nav-list a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--color-text-secondary); }
+.site-footer__inner { width: 100%; max-width: var(--content-width); margin-inline: auto; padding: var(--space-5) var(--gutter); display: grid; gap: var(--space-5); }
+.site-footer__columns { display: grid; gap: var(--space-5); }
+.site-footer__title { margin: 0 0 var(--space-1); font-weight: 600; color: var(--color-text-secondary); }
+.site-footer__column ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.site-footer__column a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--color-text-secondary); }
+.site-footer__copy { margin: 0; }
+@media (min-width: 40rem) {
+    .site-footer__columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

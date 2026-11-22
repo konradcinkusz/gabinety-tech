@@ -35,16 +35,33 @@
     <header class="page-header">
         <h1>@view.Heading</h1>
         <p class="lead">@view.Intro</p>
-        @if (view.CountText(_page?.Items.Count ?? 0, _page?.NextCursor is not null) is { } count) {<p data-testid="count">@count</p>}
+        @if (view.ResultCount(_page?.Items.Count ?? 0, _page?.NextCursor is not null) is { } count)
+        {
+            <p class="result-summary cluster">
+                <span class="result-summary__total">@ListFormat.PractitionerCount(count)</span>
+                <span class="muted" data-testid="count">@string.Format(Pl.ListPage.Count, count)</span>
+            </p>
+        }
     </header>
     <div class="list-layout">
         <FilterNav State="view.State" Groups="view.Filters()" ActiveCount="view.ActiveFilters" />
         <section aria-label="@Pl.ListPage.ResultsLabel">
             @if (_page is { Items.Count: 0 })
             {
-                <div class="empty-state">
-                    <Alert Variant="AlertVariant.Warning" TestId="empty">@Pl.ListPage.Empty</Alert>
-                    <a class="btn" href="@view.State.Cleared().Href()">@Pl.ListPage.ClearFilters</a>
+                <div class="empty-state" data-testid="empty">
+                    <h2 class="empty-state__title">@Pl.ListPage.EmptyTitle</h2>
+                    <p>@Pl.ListPage.EmptyBody</p>
+                    @* The active filters are removable chips (each link drops that one filter); the list is not a ul, so an empty list is never rendered. *@
+                    @if (view.ActiveChips() is { Count: > 0 } chips)
+                    {
+                        <div class="cluster" role="group" aria-label="@Pl.ListPage.ActiveFilters">
+                            @foreach (var chip in chips)
+                            {
+                                <a class="chip" href="@chip.Href">@chip.Label <span aria-hidden="true">×</span><span class="visually-hidden"> (@Pl.ListPage.RemoveFilter)</span></a>
+                            }
+                        </div>
+                        <a class="btn btn--ghost" href="@view.State.Cleared().Href()">@Pl.ListPage.ClearFilters</a>
+                    }
                 </div>
             }
             else if (_page is not null)
@@ -52,7 +69,7 @@
                 <ul class="results" data-testid="practitioner-list">
                     @foreach (var p in _page.Items)
                     {
-                        <li><PractitionerCard Practitioner="p" /></li>
+                        <li><PractitionerCard Practitioner="p" CategoryNames="view.ProblemNames" /></li>
                     }
                 </ul>
             }

@@ -39,6 +39,8 @@ public static class Fee
     public const string ConfigKey = "Billing:FirstConsultationFeeBps";
     /// <summary>An example price of 250,00 zł: the first published vector of CONTRACTS 9.1.</summary>
     public const long ExamplePriceMinor = 25_000;
+    /// <summary>The second example of <c>/cennik</c>: an illustrative consultation of 120,00 zł. It is not a published vector and not an owner's constant; the split is computed with the same rule and the same rate.</summary>
+    public const long SecondExamplePriceMinor = 12_000;
 
     /// <summary>An integer in 0..10000; anything else falls back to the default.</summary>
     public static int BpsFrom(string? raw) => raw?.Trim() is { Length: > 0 } t && t.All(char.IsAsciiDigit) && int.TryParse(t, out var bps) && bps <= 10_000 ? bps : DefaultBps;

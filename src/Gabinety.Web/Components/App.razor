@@ -8,11 +8,19 @@
     <link rel="stylesheet" href="@Assets["tokens.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["Gabinety.Web.styles.css"]" />
+    @* Brand assets (UX-004): the SVG favicon, PNG fallbacks, the web manifest and the theme colour of each scheme. All same-origin (CSP img-src 'self' data:). *@
+    <link rel="icon" href="@Assets["favicon.svg"]" type="image/svg+xml" />
+    <link rel="icon" href="@Assets["favicon-32.png"]" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="@Assets["apple-touch-icon.png"]" sizes="180x180" />
+    <link rel="manifest" href="@Assets["site.webmanifest"]" />
+    <meta name="theme-color" content="#1d4ed8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1218" media="(prefers-color-scheme: dark)" />
     <HeadOutlet />
 </head>
 <body>
     @* Static server rendering is the default (ADR-0010): NO @rendermode on Routes or HeadOutlet. A page that needs interaction says @rendermode InteractiveServer itself. *@
     <Routes />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["enhance.js"]" defer></script>
 </body>
 </html>

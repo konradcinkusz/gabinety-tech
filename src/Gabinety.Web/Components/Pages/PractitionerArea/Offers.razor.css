@@ -1,16 +1,22 @@
 .offer__title { margin: 0; font-size: var(--text-lg); }
-.cluster--between { justify-content: space-between; }
 .row-actions { margin-top: var(--space-2); }
-.offer-form__pair { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 48rem) { .offer-form__pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
-.option-group { border: 0; padding: 0; margin: 0; min-width: 0; }
-.option-group legend { font-weight: 600; padding: 0; margin-bottom: var(--space-1); }
-.chips { gap: var(--space-2); }
-.chip { min-height: 2.75rem; display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; }
+
+/* Duration and price share a row from 48 rem; below that they stack. The name and the description stay full width. */
+.offer-form__pair { display: grid; gap: var(--space-4); }
+@media (min-width: 48rem) { .offer-form__pair { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 .chip:has(input:checked) { background: var(--color-accent-soft); border-color: var(--color-accent); }
-.btn--ghost { background: transparent; border-color: transparent; color: var(--color-accent); }
-.btn--ghost-danger { background: transparent; border-color: transparent; color: var(--color-danger); }
-.btn--danger { background: var(--color-danger-soft); border: 2px solid var(--color-danger); color: var(--color-text); }
-.btn--secondary { background: var(--color-surface-raised); border-color: var(--color-accent); color: var(--color-accent); }
-.btn:disabled { background: var(--color-surface); color: var(--color-text-muted); cursor: not-allowed; }
+
+/* The form and the preview of the public card: side by side from 56 rem, the preview follows the form on a phone. */
+.offer-editor { display: grid; gap: var(--space-5); }
+@media (min-width: 56rem) {
+    .offer-editor { grid-template-columns: minmax(0, 1fr) 22rem; align-items: start; }
+    .offer-preview { position: sticky; top: var(--space-5); }
+}
+.offer-preview__label { margin: 0 0 var(--space-1); font-size: var(--text-lg); }
+.offer-preview__note { margin: 0 0 var(--space-4); font-size: var(--text-sm); }
+.offer-preview__title { margin: 0 0 var(--space-2); font-size: var(--text-lg); overflow-wrap: anywhere; }
+.offer-preview__desc { margin: 0 0 var(--space-3); white-space: pre-line; overflow-wrap: anywhere; }
+.offer-preview__meta { margin: 0; }
+
 .callout__title { font-size: var(--text-lg); margin-bottom: var(--space-2); }

@@ -1,6 +1,6 @@
 @* A table that may be wider than the screen scrolls INSIDE this wrapper, never the page; the wrapper is a labelled, keyboard-reachable region (F-12, P-STAT-1, axe scrollable-region-focusable). *@
 <div class="table-wrap" tabindex="0" role="region" aria-label="@Label">
-    <table>
+    <table class="@TableClass">
         <caption>@Caption</caption>
         @ChildContent
     </table>
@@ -9,6 +9,8 @@
 @code {
     [Parameter, EditorRequired] public string Caption { get; set; } = "";
     [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+    /// <summary>A shared class of the table itself, e.g. <c>table--cards</c> (DESIGN-CONTRACT 4.5): under 40 rem each row becomes a block labelled by its cells' data-label.</summary>
+    [Parameter] public string? TableClass { get; set; }
 
     string Label => string.Format(PlPages.Ranking.ScrollRegion, Caption);
 }

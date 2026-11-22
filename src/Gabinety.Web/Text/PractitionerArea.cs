@@ -77,6 +77,10 @@ public static class PlPractitioner
         public const string PaymentsBannerTitle = "Płatności nie są jeszcze gotowe";
         public const string PaymentsBannerBody = "Bez gotowego konta płatności nie możesz przyjmować rezerwacji: klienci nie zapłacą, a Ty nie dostaniesz wypłaty.";
         public const string PaymentsBannerLink = "Skonfiguruj płatności";
+        public const string ProgressAria = "Postęp uzupełniania profilu";
+        public const string PublicTitle = "Twój profil jest publiczny", PublicBody = "Klienci mogą go znaleźć i zarezerwować konsultację.", ViewPublic = "Zobacz profil publiczny", CopyLink = "Skopiuj link", Copied = "Skopiowano";
+        public const string UpcomingTitle = "Nadchodzące konsultacje", UpcomingEmpty = "Nie masz jeszcze zaplanowanych konsultacji.", UpcomingFailed = "Nie możemy teraz pokazać konsultacji.";
+        public const string Details = "Szczegóły", AllBookings = "Wszystkie rezerwacje";
     }
 
     public static class Checklist
@@ -109,6 +113,8 @@ public static class PlPractitioner
         public const string Nip = "NIP", NipHint = "10 cyfr. Sprawdzamy sumę kontrolną. Zmiana NIP zatwierdzonego profilu wymaga ponownej weryfikacji.";
         public const string NipChangeWarning = "Zmiana NIP wyśle zatwierdzony profil ponownie do weryfikacji.";
         public const string Slug = "Adres profilu";
+        /// <summary>The caption of the preview of the public header beside the form (UX-043); it shows the saved values, not the typed ones.</summary>
+        public const string PreviewTitle = "Podgląd profilu";
     }
 
     public static class Offers
@@ -126,6 +132,9 @@ public static class PlPractitioner
         public const string PriceFormat = "Wpisz cenę w złotych, na przykład 250 lub 250,50 (najwyżej dwa miejsca po przecinku).", PriceRange = "Cena musi mieścić się między 50 a 1500 zł.";
         public const string ConfirmTitle = "Wyłączyć ofertę „{0}”?", ConfirmBody = "Klienci nie zobaczą jej na profilu i nie zarezerwują nowych terminów. Istniejące rezerwacje zostają. Możesz ją włączyć z powrotem.";
         public const string ConfirmYes = "Tak, wyłącz ofertę", ConfirmNo = "Nie, zostaw aktywną", NotFound = "Nie znaleziono tej oferty.";
+        public const string AddNew = "Dodaj ofertę", TechCount = "Wybrano {0} z 4", Minutes = "{0} min";
+        public const string PreviewLabel = "Podgląd oferty", PreviewNote = "Tak zobaczą ją klienci na Twoim profilu. Podgląd pokazuje wartości zapisane w formularzu.";
+        public const string PreviewTitle = "Tytuł oferty", PreviewDescription = "Opis pojawi się tutaj.", PreviewPrice = "cena w zł";
     }
 
     public static class Availability
@@ -142,6 +151,7 @@ public static class PlPractitioner
         public const string BadWeekday = "Nieprawidłowy dzień tygodnia.", BadDate = "Wpisz prawdziwą datę dnia wolnego.", RowIssue = "Przedział {0}: {1}";
         public const string ServerRow = "sprawdź dzień i godziny", Failed = "Nie udało się zapisać dostępności. Spróbuj ponownie.", SummaryTitle = "Popraw godziny przed zapisem";
         public const string Unsaved = "Zmiany w liście godzin są zapisane dopiero po kliknięciu „Zapisz”.";
+        public const string CopyToWeekdays = "Skopiuj na pozostałe dni robocze", DayEmpty = "Brak godzin tego dnia.";
     }
 
     public static class Payments
@@ -153,6 +163,8 @@ public static class PlPractitioner
         public const string ReadyBody = "Konto płatności jest gotowe. Klienci mogą rezerwować Twoje terminy, a wypłaty trafiają na Twoje konto po konsultacji.";
         public const string PendingBody = "Konto płatności czeka na uzupełnienie danych u operatora płatności. Dokończ konfigurację, aby przyjmować rezerwacje.";
         public const string NoneBody = "Nie rozpocząłeś jeszcze konfiguracji konta płatności.";
+        /// <summary>What a client meets while the account is not ready: the booking is refused (Booking answers 422 without a ready account), so no payment is taken.</summary>
+        public const string ClientMeanwhile = "Co widzi klient w międzyczasie: nie może zarezerwować u Ciebie terminu ani zapłacić, dopóki konto płatności nie jest gotowe.";
         public const string Start = "Rozpocznij konfigurację płatności", Continue = "Dokończ konfigurację płatności";
         public const string LinkReady = "Link do konfiguracji jest gotowy. Jest jednorazowy i krótko ważny.", OpenLink = "Przejdź do konfiguracji w Stripe";
         public const string Returned = "Wróciłeś z konfiguracji. Poniżej jest aktualny status konta płatności.";

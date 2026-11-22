@@ -3,7 +3,7 @@
 @layout PractitionerLayout
 @inherits PractitionerPage
 @inject PractitionerSchedulingClient Scheduling
-@* One plain form holds the whole draft (rule-N-day/from/to, exception-N); "Dodaj godziny", "Usuń" and "Dodaj dzień wolny" change the draft and show it again, "Zapisz" validates it, sends it
+@* One plain form holds the whole draft (rule-N-day/from/to, exception-N); "+ Dodaj godziny" (per weekday), "Skopiuj na pozostałe dni robocze", "Usuń" and "Dodaj dzień wolny" change the draft and show it again, "Zapisz" validates it, sends it
    and redirects with the flash. A static page keeps no state between requests, so the draft travels in the form (AvailabilityDraft). *@
 <PageTitle>@PlPractitioner.Availability.MetaTitle</PageTitle>
 <h1>@PlPractitioner.Availability.Title</h1>
@@ -17,7 +17,7 @@ else if (_draft is not null)
     <p class="lead">@PlPractitioner.Availability.Intro</p>
     @if (_issues.Count > 0 || _serverRows.Count > 0)
     {
-        <div class="callout callout--danger" role="alert" data-testid="availability-issues">
+        <div class="callout callout--danger" role="alert" id="availability-issues" data-testid="availability-issues" tabindex="-1">
             <h2 class="callout__title">@PlPractitioner.Availability.SummaryTitle</h2>
             <ul>@foreach (var m in _issues.Select(i => i.Message).Concat(_serverRows)) {<li>@m</li>}</ul>
         </div>
@@ -31,34 +31,39 @@ else if (_draft is not null)
         <section class="card stack" aria-labelledby="weekly-title">
             <h2 id="weekly-title">@PlPractitioner.Availability.Weekly</h2>
             @if (_draft.Rules.Count == 0) {<p class="muted" data-testid="no-rules">@PlPractitioner.Availability.NoRules</p>}
-            @for (var i = 0; i < _draft.Rules.Count; i++)
+            @* Grouped by weekday for reading only: every interval keeps its position in the draft, so the posted shape (rule-N-day/from/to) is exactly the old one. *@
+            @for (var d = 1; d <= 7; d++)
             {
-                var index = i;
-                var rule = _draft.Rules[i];
-                var bad = _issues.Any(x => x.Row == index);
-                <div class="@($"rule cluster{(bad ? " rule--invalid" : "")}")" role="group" aria-label="@string.Format(PlPractitioner.Availability.Row, index + 1)" data-testid="rule">
-                    <div class="field">
-                        <label class="field__label" for="@($"rule-{index}-day")">@PlPractitioner.Availability.Day</label>
-                        <select id="@($"rule-{index}-day")" name="@($"rule-{index}-day")" aria-invalid="@(bad ? "true" : null)">
-                            @for (var d = 1; d <= 7; d++) {<option value="@d" selected="@(rule.IsoWeekday == d)">@PlPractitioner.Availability.Days[d - 1]</option>}
-                        </select>
+                var day = d;
+                var dayName = PlPractitioner.Availability.Days[day - 1];
+                var any = _draft.Rules.Any(r => r.IsoWeekday == day);
+                <div class="day" role="group" aria-labelledby="@($"day-{day}-title")" data-testid="day" data-day="@day">
+                    <div class="cluster cluster--between day__head">
+                        <h3 id="@($"day-{day}-title")" class="day__title">@dayName</h3>
+                        @if (day <= 5 && any) {<button class="btn btn--ghost" type="submit" name="cmd" value="@($"copy:{day}")" aria-label="@($"{PlPractitioner.Availability.CopyToWeekdays}: {dayName}")">@PlPractitioner.Availability.CopyToWeekdays</button>}
                     </div>
-                    <div class="field">
-                        <label class="field__label" for="@($"rule-{index}-from")">@PlPractitioner.Availability.From</label>
-                        <select id="@($"rule-{index}-from")" name="@($"rule-{index}-from")" aria-invalid="@(bad ? "true" : null)">
-                            @foreach (var t in Times(rule.StartLocal)) {<option value="@t" selected="@(rule.StartLocal == t)">@t</option>}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label class="field__label" for="@($"rule-{index}-to")">@PlPractitioner.Availability.To</label>
-                        <select id="@($"rule-{index}-to")" name="@($"rule-{index}-to")" aria-invalid="@(bad ? "true" : null)">
-                            @foreach (var t in Times(rule.EndLocal)) {<option value="@t" selected="@(rule.EndLocal == t)">@t</option>}
-                        </select>
-                    </div>
-                    <button class="btn btn--ghost-danger" type="submit" name="cmd" value="@($"remove:{index}")" aria-label="@($"{PlPractitioner.Common.Remove}: {string.Format(PlPractitioner.Availability.Row, index + 1)}")">@PlPractitioner.Common.Remove</button>
+                    @if (!any) {<p class="muted day__empty">@PlPractitioner.Availability.DayEmpty</p>}
+                    @for (var i = 0; i < _draft.Rules.Count; i++)
+                    {
+                        var index = i;
+                        var rule = _draft.Rules[i];
+                        if (rule.IsoWeekday != day) continue;
+                        var bad = _issues.Any(x => x.Row == index);
+                        <div class="@($"rule cluster{(bad ? " rule--invalid" : "")}")" role="group" aria-label="@string.Format(PlPractitioner.Availability.Row, index + 1)" data-testid="rule">
+                            <input type="hidden" name="@($"rule-{index}-day")" value="@rule.IsoWeekday" />
+                            <select id="@($"rule-{index}-from")" name="@($"rule-{index}-from")" aria-label="@($"{PlPractitioner.Availability.From}, {dayName}")" aria-invalid="@(bad ? "true" : null)" aria-describedby="@(bad ? "availability-issues" : null)">
+                                @foreach (var t in Times(rule.StartLocal)) {<option value="@t" selected="@(rule.StartLocal == t)">@t</option>}
+                            </select>
+                            <span class="rule__dash" aria-hidden="true">&ndash;</span>
+                            <select id="@($"rule-{index}-to")" name="@($"rule-{index}-to")" aria-label="@($"{PlPractitioner.Availability.To}, {dayName}")" aria-invalid="@(bad ? "true" : null)" aria-describedby="@(bad ? "availability-issues" : null)">
+                                @foreach (var t in Times(rule.EndLocal)) {<option value="@t" selected="@(rule.EndLocal == t)">@t</option>}
+                            </select>
+                            <button class="btn btn--ghost-danger" type="submit" name="cmd" value="@($"remove:{index}")" aria-label="@($"{PlPractitioner.Common.Remove}: {string.Format(PlPractitioner.Availability.Row, index + 1)}, {dayName}")">@PlPractitioner.Common.Remove</button>
+                        </div>
+                    }
+                    <div><button class="btn btn--ghost" type="submit" name="cmd" value="@($"add:{day}")" aria-label="@($"{PlPractitioner.Availability.AddRule}: {dayName}")">+ @PlPractitioner.Availability.AddRule</button></div>
                 </div>
             }
-            <div><button class="btn btn--secondary" type="submit" name="cmd" value="add">@PlPractitioner.Availability.AddRule</button></div>
         </section>
 
         <section class="card stack" aria-labelledby="exceptions-title">
@@ -72,8 +77,8 @@ else if (_draft is not null)
                         var index = i;
                         <li class="cluster">
                             <input type="hidden" name="@($"exception-{index}")" value="@_draft.Exceptions[index]" />
-                            <span class="num" data-testid="exception">@_draft.Exceptions[index]</span>
-                            <button class="btn btn--ghost-danger" type="submit" name="cmd" value="@($"remove-exception:{index}")" aria-label="@($"{PlPractitioner.Common.Remove}: {_draft.Exceptions[index]}")">@PlPractitioner.Common.Remove</button>
+                            <span data-testid="exception" data-date="@_draft.Exceptions[index]">@AvailabilityDraft.LongDate(_draft.Exceptions[index])</span>
+                            <button class="btn btn--ghost-danger" type="submit" name="cmd" value="@($"remove-exception:{index}")" aria-label="@($"{PlPractitioner.Common.Remove}: {AvailabilityDraft.LongDate(_draft.Exceptions[index])}")">@PlPractitioner.Common.Remove</button>
                         </li>
                     }
                 </ul>
@@ -87,8 +92,10 @@ else if (_draft is not null)
             </div>
         </section>
 
-        <p class="muted">@PlPractitioner.Availability.Unsaved</p>
-        <div class="form-actions"><button class="btn btn--primary" type="submit" name="cmd" value="save">@PlPractitioner.Common.Save</button></div>
+        <div class="save-bar" data-testid="save-bar">
+            <p class="muted save-bar__note">@PlPractitioner.Availability.Unsaved</p>
+            <button class="btn btn--primary" type="submit" name="cmd" value="save">@PlPractitioner.Common.Save</button>
+        </div>
     </form>
 }
 
@@ -119,6 +126,8 @@ else if (_draft is not null)
         switch (cmd)
         {
             case "add": _draft.AddRule(); return;
+            case var c when c.StartsWith("add:") && int.TryParse(c.AsSpan(4), out var addDay): _draft.AddRule(addDay); return;
+            case var c when c.StartsWith("copy:") && int.TryParse(c.AsSpan(5), out var copyDay): _draft.CopyToWeekdays(copyDay); return;
             case "add-exception": _draft.AddException(f.Get("new-exception")); return;
             case var c when c.StartsWith("remove:") && int.TryParse(c.AsSpan(7), out var rule): _draft.RemoveRule(rule); return;
             case var c when c.StartsWith("remove-exception:") && int.TryParse(c.AsSpan(17), out var day): _draft.RemoveException(day); return;

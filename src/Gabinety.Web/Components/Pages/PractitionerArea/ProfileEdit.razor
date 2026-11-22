@@ -14,28 +14,36 @@ else if (Profile is not null)
 {
     <ErrorSummary Errors="Summary" />
     @if (_general is not null) {<Alert Variant="AlertVariant.Danger" TestId="profile-error">@_general</Alert>}
-    <form method="post" @onsubmit="SaveAsync" @formname="profile" class="form stack form-narrow" novalidate>
-        <AntiforgeryToken />
-        <FormField Id="displayName" Label="@PlPractitioner.Profile.DisplayName" Error="@Error("displayName")" Max="80" Length="_v.DisplayName.Length">
-            <input id="@context.Id" name="displayName" value="@_v.DisplayName" maxlength="80" autocomplete="name" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
-        </FormField>
-        <FormField Id="headline" Label="@PlPractitioner.Profile.Headline" Hint="@PlPractitioner.Profile.HeadlineHint" Error="@Error("headline")" Max="120" Length="_v.Headline.Length">
-            <input id="@context.Id" name="headline" value="@_v.Headline" maxlength="120" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
-        </FormField>
-        <FormField Id="bio" Label="@PlPractitioner.Profile.Bio" Hint="@PlPractitioner.Profile.BioHint" Error="@Error("bio")" Max="2000" Length="_v.Bio.Length">
-            <textarea id="@context.Id" name="bio" rows="8" maxlength="2000" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">@_v.Bio</textarea>
-        </FormField>
-        <FormField Id="portfolioUrl" Label="@PlPractitioner.Profile.Portfolio" Hint="@PlPractitioner.Profile.PortfolioHint" Error="@Error("portfolioUrl")" Optional="true">
-            <input id="@context.Id" name="portfolioUrl" type="url" inputmode="url" value="@_v.PortfolioUrl" maxlength="300" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
-        </FormField>
-        <FormField Id="meetingUrlDefault" Label="@PlPractitioner.Profile.Meeting" Hint="@PlPractitioner.Profile.MeetingHint" Error="@Error("meetingUrlDefault")" Optional="true">
-            <input id="@context.Id" name="meetingUrlDefault" type="url" inputmode="url" value="@_v.MeetingUrl" maxlength="300" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
-        </FormField>
-        <FormField Id="nip" Label="@PlPractitioner.Profile.Nip" Hint="@(Profile.Status == "Approved" ? PlPractitioner.Profile.NipChangeWarning : PlPractitioner.Profile.NipHint)" Error="@Error("nip")" Optional="true">
-            <input id="@context.Id" name="nip" inputmode="numeric" value="@_v.Nip" maxlength="10" autocomplete="off" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
-        </FormField>
-        <div class="form-actions"><button class="btn btn--primary" type="submit">@PlPractitioner.Common.Save</button></div>
-    </form>
+    <div class="grid-2">
+        <form method="post" @onsubmit="SaveAsync" @formname="profile" class="form stack form-narrow" novalidate>
+            <AntiforgeryToken />
+            <FormField Id="displayName" Label="@PlPractitioner.Profile.DisplayName" Error="@Error("displayName")" Max="80" Length="_v.DisplayName.Length">
+                <input id="@context.Id" name="displayName" value="@_v.DisplayName" maxlength="80" autocomplete="name" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <FormField Id="headline" Label="@PlPractitioner.Profile.Headline" Hint="@PlPractitioner.Profile.HeadlineHint" Error="@Error("headline")" Max="120" Length="_v.Headline.Length">
+                <input id="@context.Id" name="headline" value="@_v.Headline" maxlength="120" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <FormField Id="bio" Label="@PlPractitioner.Profile.Bio" Hint="@PlPractitioner.Profile.BioHint" Error="@Error("bio")" Max="2000" Length="_v.Bio.Length">
+                <textarea id="@context.Id" name="bio" rows="8" maxlength="2000" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">@_v.Bio</textarea>
+            </FormField>
+            <FormField Id="portfolioUrl" Label="@PlPractitioner.Profile.Portfolio" Hint="@PlPractitioner.Profile.PortfolioHint" Error="@Error("portfolioUrl")" Optional="true">
+                <input id="@context.Id" name="portfolioUrl" type="url" inputmode="url" value="@_v.PortfolioUrl" maxlength="300" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <FormField Id="meetingUrlDefault" Label="@PlPractitioner.Profile.Meeting" Hint="@PlPractitioner.Profile.MeetingHint" Error="@Error("meetingUrlDefault")" Optional="true">
+                <input id="@context.Id" name="meetingUrlDefault" type="url" inputmode="url" value="@_v.MeetingUrl" maxlength="300" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <FormField Id="nip" Label="@PlPractitioner.Profile.Nip" Hint="@(Profile.Status == "Approved" ? PlPractitioner.Profile.NipChangeWarning : PlPractitioner.Profile.NipHint)" Error="@Error("nip")" Optional="true">
+                <input id="@context.Id" name="nip" inputmode="numeric" value="@_v.Nip" maxlength="10" autocomplete="off" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <div class="form-actions"><button class="btn btn--primary" type="submit">@PlPractitioner.Common.Save</button></div>
+        </form>
+        <section class="card profile-preview" aria-labelledby="profile-preview-title">
+            <p class="muted" id="profile-preview-title">@PlPractitioner.Profile.PreviewTitle</p>
+            <p class="profile-preview__name">@Profile.DisplayName</p>
+            @if (!string.IsNullOrEmpty(Profile.Headline)) {<p class="profile-preview__headline">@Profile.Headline</p>}
+            @if (!string.IsNullOrEmpty(Profile.Bio)) {<p class="profile-preview__bio">@Profile.Bio</p>}
+        </section>
+    </div>
 }
 
 @code {

@@ -29,6 +29,8 @@ The owner has now asked for the frontend to be ported to a Blazor Web App and ha
 
 7. **Styling** is a neutral token sheet (`wwwroot/tokens.css`, both themes), shared classes (`wwwroot/app.css`) and one scoped `Foo.razor.css` per component, pinned by a stylesheet test (colour only through tokens, both theme blocks, AA contrast of the text pairs, focus, reduced motion) and by a test that the scoped bundle is linked and served. The real design contract (`docs/ui/DESIGN-CONTRACT.md`, `docs/ui/tokens.css`, written in parallel) replaces `tokens.css` and nothing else.
 
+8. **Amendment (2026-11-22, owner decision D-1 of `docs/ui/UX-PLAN.md`): one first-party enhancement script.** `wwwroot/enhance.js` is allowed (same origin, no dependency, `script-src 'self'` already covers it). It only adds live character counters, a pending state on a submitted button, a modal dialog for states that also live in the URL, show-password, copy link and auto-submit of a filter select; every page works without it. Chosen over an interactive circuit per page, which costs a websocket per visitor and reacts with network latency.
+
 ## Consequences
 
 **Hosting** (`BLAZOR-WEB-APP` section 14). A stateful frontend keeps every open interactive page in server memory over a websocket.

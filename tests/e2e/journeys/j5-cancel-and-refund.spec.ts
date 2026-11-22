@@ -43,8 +43,8 @@ test.describe("J5 cancel: refund early, none late", () => {
     await expectNoSeriousA11yViolations(page);
 
     await detail.cancelButton().click();
-    // the rule is stated before the confirm button (both outcomes are named there); the outcome below is what proves it
-    await expect(detail.cancelDialog()).toContainText("co najmniej 24 godziny, zwrot wynosi 100% ceny");
+    // UX-031 (audit P-BKS-2, F-11): the dialog states the outcome for THIS booking, not the general rule; the outcome below is what proves it
+    await expect(detail.cancelDialog()).toContainText("Otrzymasz zwrot");
     await detail.confirmCancelAndWait();
     await expect(detail.value(/^Anulowana przez klienta$/)).toBeVisible();
     await expect(detail.value("Zwrócona w całości")).toBeVisible();
@@ -72,7 +72,7 @@ test.describe("J5 cancel: refund early, none late", () => {
     await detail.goto(b.id);
     await expect(detail.value("Opłacona")).toBeVisible();
     await detail.cancelButton().click();
-    await expect(detail.cancelDialog()).toContainText("mniej niż 24 godziny, brak zwrotu");
+    await expect(detail.cancelDialog()).toContainText("nie otrzymasz zwrotu"); // UX-031: the computed outcome of this booking
     await detail.confirmCancelAndWait();
     await expect(detail.value("Anulowana przez klienta (bez zwrotu)")).toBeVisible();
     await expect(detail.value("Opłacona")).toBeVisible(); // the payment line did not change ...

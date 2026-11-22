@@ -25,9 +25,6 @@ public static class ReviewRules
     /// <summary>Only an explicit Published is announced as published; Held and anything unknown get the held wording (never promise publication).</summary>
     public static bool IsPublished(string? status) => status == "Published";
 
-    /// <summary>The word for a rating, shown beside the stars: 1 "Bardzo słabo" ... 5 "Bardzo dobrze".</summary>
-    public static string Word(int rating) => ReviewsText.Scale[Math.Clamp(rating, RatingMin, RatingMax) - 1];
-
     public static string FailureText(ApiFailure f) => f switch
     {
         { Status: 0 } => ReviewsText.Errors.Network,

@@ -1,4 +1,6 @@
 using System.Globalization;
+using Gabinety.Web.Api;
+using Gabinety.Web.Text;
 
 namespace Gabinety.Web.Components.Pages.Admin;
 
@@ -50,4 +52,43 @@ public static class LedgerPeriod
 
     /// <summary>The name of the file the browser saves. Built here from the validated days, never copied from the backend's header.</summary>
     public static string FileName(string from, string to) => $"ledger-{from}-{to}.csv";
+
+    /// <summary>
+    /// The period in Polish, genitive months (CONTRACTS 4.3 days in, words out): <c>1–22 listopada 2026</c>, <c>1 października – 22 listopada 2026</c>,
+    /// <c>31 grudnia 2026 – 2 stycznia 2027</c>. Empty when either day is not a real date (the page shows the problem instead).
+    /// </summary>
+    public static string Polish(string from, string to)
+    {
+        if (Parse(from) is not { } a || Parse(to) is not { } b) return "";
+        var (monthA, monthB) = (Pl.Format.MonthsGenitive[a.Month - 1], Pl.Format.MonthsGenitive[b.Month - 1]);
+        if (a == b) return $"{a.Day} {monthA} {a.Year}";
+        if (a.Year == b.Year && a.Month == b.Month) return $"{a.Day}–{b.Day} {monthB} {b.Year}";
+        if (a.Year == b.Year) return $"{a.Day} {monthA} – {b.Day} {monthB} {b.Year}";
+        return $"{a.Day} {monthA} {a.Year} – {b.Day} {monthB} {b.Year}";
+    }
+}
+
+/// <summary>One line of the ledger's summary: the amount of every row of one kind in the preview, and how many rows it sums.</summary>
+public sealed record KindTotal(string Kind, long AmountMinor, int Count);
+
+/// <summary>
+/// Per-kind totals of ledger rows. Amounts are always positive and the kind gives the direction (SPEC: <c>LedgerEntry</c>), so the sums are per kind and there is no
+/// grand total: a net figure would need a sign convention the ledger does not state. Integer grosz arithmetic (SPEC 5 rule 3).
+/// </summary>
+public static class LedgerTotals
+{
+    /// <summary>The kinds in ledger order. A row of any other kind is listed in the table but not summed: its direction is unknown.</summary>
+    public static readonly IReadOnlyList<string> KnownKinds = ["ClientCharge", "Refund", "PlatformFee", "PractitionerPayout", "PayoutReversal"];
+
+    public static IReadOnlyList<KindTotal> Of(IEnumerable<LedgerRowDto> rows)
+    {
+        var sums = new Dictionary<string, (long Amount, int Count)>();
+        foreach (var row in rows)
+        {
+            if (!KnownKinds.Contains(row.Kind)) continue;
+            var sum = sums.GetValueOrDefault(row.Kind);
+            sums[row.Kind] = (sum.Amount + row.AmountMinor, sum.Count + 1);
+        }
+        return [.. KnownKinds.Where(sums.ContainsKey).Select(kind => new KindTotal(kind, sums[kind].Amount, sums[kind].Count))];
+    }
 }

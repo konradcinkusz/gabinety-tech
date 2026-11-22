@@ -1,5 +1,6 @@
 using System.Net;
 using Gabinety.Web.Api;
+using Gabinety.Web.Components.Pages.PractitionerArea;
 
 namespace Gabinety.Web.Tests.PractitionerAreaTests;
 
@@ -174,20 +175,133 @@ public class DashboardHostTests
         Assert.True(page.One("[data-testid=github-code]")!.HasAttribute("hidden")); // the form exists (Blazor dispatches by name) but shows no code
     }
 
+    static BookingViewDto Booking(string title, int days, string? client = "Demo Klient", string status = "Confirmed") =>
+        new(Guid.NewGuid(), status, DateTimeOffset.UtcNow.AddDays(days), DateTimeOffset.UtcNow.AddDays(days).AddHours(1), 60, title, new MoneyDto(18000, "PLN"), new PractitionerRefDto(Guid.NewGuid(), "Demo Programista", "demo-programista"),
+            client is null ? null : new ClientRefDto(client));
+
     [Fact]
-    public async Task The_next_steps_run_verification_offers_availability_payments_and_mark_the_first_open_one()
+    public async Task An_approved_dashboard_has_one_public_callout_with_the_profile_link_and_a_hidden_copy_button_and_no_cards_or_checklist()
     {
-        var (web, browser, world) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile("Approved"); w.CompleteProfile(); w.Rules.Add((1, "09:00", "12:00")); w.PaymentState = "pending"; });
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile("Approved"); w.CompleteProfile(); w.Rules.Add((1, "09:00", "12:00")); w.PaymentState = "pending"; });
         await using var _ = web;
         var page = await browser.GetAsync("/gabinet-programisty");
-        var steps = page.All("[data-testid=next-steps] [data-step]");
-        Assert.Equal(["verification", "offers", "availability", "payments"], steps.Select(s => s.GetAttribute("data-step")));
-        Assert.Equal(["true", "true", "true", "false"], steps.Select(s => s.GetAttribute("data-done")));
-        Assert.Contains("Następny krok", steps[3].TextContent);
-        Assert.DoesNotContain("Następny krok", string.Join(" ", steps.Take(3).Select(s => s.TextContent)));
-        Assert.Equal("/gabinet-programisty/platnosci", steps[3].QuerySelector("a")!.GetAttribute("href"));
+        var callout = page.One("[data-testid=public-profile]")!;
+        Assert.Contains("callout--success", callout.ClassName);
+        Assert.Equal("Twój profil jest publiczny", callout.QuerySelector("h2")!.TextContent);
+        Assert.Equal("/gabinet/demo-programista", callout.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("Zobacz profil publiczny", callout.QuerySelector("a")!.TextContent);
+        var copy = callout.QuerySelector("button")!;
+        Assert.Equal(("Skopiuj link", "copy", "/gabinet/demo-programista", "Skopiowano"), (copy.TextContent, copy.GetAttribute("data-enhance"), copy.GetAttribute("data-copy"), copy.GetAttribute("data-done")));
+        Assert.True(copy.HasAttribute("hidden")); // enhance.js shows it; without the script it is simply not there
+        Assert.Null(page.One("[data-testid=next-steps]")); // the four cards are gone
         Assert.Null(page.One("[data-item]")); // an approved profile has no submit checklist any more
+        Assert.Equal(0, page.All(".badge").Count(b => b.TextContent == "Gotowe"));
         Assert.Equal(1, page.ExactText("Zatwierdzony")); // J2: the panel agrees
+        var next = page.One("[data-testid=next-step]")!; // the one open step (payments) is still named, with its link
+        Assert.Equal("/gabinet-programisty/platnosci", next.QuerySelector("a")!.GetAttribute("href"));
+    }
+
+    [Fact]
+    public async Task An_approved_dashboard_lists_the_next_five_upcoming_consultations_of_the_practitioner_role_soonest_first()
+    {
+        var (web, browser, world) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile("Approved"); w.CompleteProfile(); });
+        await using var _ = web;
+        for (var i = 7; i >= 1; i--) world.Bookings.Add(Booking($"Konsultacja {i}", i, i == 1 ? null : $"Demo Klient {i}"));
+        world.Bookings.Add(Booking("Minione", -3, status: "Completed"));
+        world.Bookings.Add(Booking("Odwołane", 2, status: "CancelledByClient"));
+        var page = await browser.GetAsync("/gabinet-programisty");
+        var rows = page.All("[data-testid=upcoming] [data-booking]");
+        Assert.Equal(5, rows.Count);
+        Assert.Equal(["Konsultacja 1", "Konsultacja 2", "Konsultacja 3", "Konsultacja 4", "Konsultacja 5"], rows.Select(r => r.QuerySelector("strong")!.TextContent));
+        Assert.DoesNotContain("Demo Klient 1", rows[0].TextContent); // no client name in the DTO, no stray separator
+        Assert.Contains("Demo Klient 2", rows[1].TextContent);
+        var id = rows[1].GetAttribute("data-booking");
+        Assert.Equal($"/moje/rezerwacje/{id}?role=practitioner", rows[1].QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("Szczegóły", rows[1].QuerySelector("a")!.TextContent);
+        Assert.Contains(web.Booking.Requests, r => r.PathAndQuery == "/api/v1/me/bookings?role=practitioner");
+    }
+
+    [Fact]
+    public async Task An_approved_dashboard_with_no_consultations_says_so()
+    {
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile("Approved"); w.CompleteProfile(); });
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty");
+        Assert.Equal("Nie masz jeszcze zaplanowanych konsultacji.", page.TextOf("[data-testid=upcoming-empty]"));
+    }
+
+    [Theory]
+    [InlineData(true)] [InlineData(false)]
+    public async Task The_consultations_region_fails_soft_with_a_warning_and_a_retry_while_the_rest_of_the_page_stays(bool serviceDown)
+    {
+        var (web, browser, world) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile("Approved"); w.CompleteProfile(); w.BookingsFail = !serviceDown; w.BookingDown = serviceDown; });
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty");
+        Assert.Equal(HttpStatusCode.OK, page.Status);
+        var warn = page.One("[data-testid=upcoming-failed]")!;
+        Assert.Contains("callout--warning", warn.ClassName);
+        Assert.Contains("Nie możemy teraz pokazać konsultacji", warn.TextContent);
+        Assert.Equal("/gabinet-programisty", warn.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Null(page.One("[data-testid=upcoming-empty]"));
+        Assert.Equal("Panel programisty", page.TextOf("h1"));
+        Assert.NotNull(page.One("[data-testid=public-profile]")); // the rest of the page is there
+        Assert.DoesNotContain("SERVER-", page.Html);
+    }
+
+    [Fact]
+    public async Task A_draft_has_one_checklist_a_progress_element_and_marks_only_the_first_open_row_as_next_with_one_link_per_row()
+    {
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile(); w.CompleteProfile(github: false); w.EmailVerified = false; });
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty");
+        Assert.Single(page.All("ol.checklist")); // the "Co dalej" cards are merged into it
+        Assert.Null(page.One("[data-testid=next-steps]"));
+        Assert.DoesNotContain("Co dalej", page.Text);
+        var bar = page.One("progress")!;
+        Assert.Equal(("5", "7", "Postęp uzupełniania profilu"), (bar.GetAttribute("value"), bar.GetAttribute("max"), bar.GetAttribute("aria-label")));
+        Assert.Equal("Postęp: 5 z 7", page.TextOf("[data-testid=progress]")); // the text stays beside the bar
+        var github = page.One("[data-item=Github]")!;
+        Assert.Contains("Następny krok", github.TextContent);
+        Assert.Contains("Do zrobienia", github.TextContent);
+        Assert.Equal("#github-title", github.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("Uzupełnij", github.QuerySelector("a")!.TextContent);
+        Assert.Equal(1, page.All(".badge").Count(b => b.TextContent == "Następny krok"));
+        Assert.Contains("Gotowe", page.One("[data-item=Headline]")!.TextContent);
+        Assert.Null(page.One("[data-item=Headline] a")); // a done row has no link
+        Assert.Null(page.One("[data-item=Email] a")); // the e-mail link is outside the product
+        Assert.NotNull(page.One("#github-title")); // the anchor target
+    }
+
+    [Fact]
+    public async Task While_steps_are_open_the_submit_is_disabled_and_aria_disabled_with_the_reason_in_the_form_and_when_done_it_is_neither()
+    {
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile(); w.CompleteProfile(github: false); });
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty");
+        var submit = page.All("button").Single(b => b.TextContent == "Wyślij do weryfikacji");
+        Assert.True(submit.HasAttribute("disabled"));
+        Assert.Equal("true", submit.GetAttribute("aria-disabled"));
+        Assert.Equal("Uzupełnij jeszcze 1 krok, aby wysłać profil.", page.TextOf("#submit-help"));
+        Assert.Same(submit.ParentElement, page.One("#submit-help")!.ParentElement); // the reason is right next to the button
+
+        var (web2, browser2, _) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile(); w.CompleteProfile(); });
+        await using var _2 = web2;
+        var ready = (await browser2.GetAsync("/gabinet-programisty")).All("button").Single(b => b.TextContent == "Wyślij do weryfikacji");
+        Assert.False(ready.HasAttribute("disabled"));
+        Assert.Null(ready.GetAttribute("aria-disabled"));
+    }
+
+    [Fact]
+    public async Task A_submitted_profile_shows_the_same_single_checklist_read_only_without_a_next_badge_or_submit()
+    {
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile("Submitted"); w.CompleteProfile(); });
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty");
+        Assert.Equal(7, page.All("[data-item]").Count);
+        Assert.Equal("Postęp: 7 z 7", page.TextOf("[data-testid=progress]"));
+        Assert.Equal(0, page.All(".badge").Count(b => b.TextContent == "Następny krok"));
+        Assert.DoesNotContain(page.All("button"), b => b.TextContent == "Wyślij do weryfikacji");
+        Assert.Equal(1, page.ExactText("Czeka na weryfikację"));
     }
 
     [Theory]
@@ -213,8 +327,8 @@ public class DashboardHostTests
         var page = await browser.GetAsync("/gabinet-programisty");
         Assert.Equal(HttpStatusCode.OK, page.Status);
         Assert.Null(page.One("[data-testid=payments-banner]"));
-        Assert.Equal("false", page.One("[data-step=payments]")!.GetAttribute("data-done"));
-        Assert.DoesNotContain("Następny krok", page.One("[data-step=payments]")!.TextContent); // unreadable: never offered as next
+        Assert.DoesNotContain(PractitionerPaths.Payments, page.One("[data-testid=next-step]")?.InnerHtml ?? ""); // unreadable payments are never offered as the next step
+        Assert.NotNull(page.One("[data-testid=upcoming-failed]"));
     }
 
     [Fact]

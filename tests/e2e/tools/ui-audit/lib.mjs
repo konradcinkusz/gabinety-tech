@@ -25,8 +25,13 @@ export async function newContext(browser, { userName, vp, scheme }) {
     } catch { /* not supported */ }
   });
   if (userName) {
-    const res = await ctx.request.post("/api/auth/login", { data: { email: `${userName}@demo.example`, password: PASSWORD } });
-    if (res.status() !== 200) throw new Error(`sign-in as ${userName} failed: ${res.status()}`);
+    // The host has no login API: the same static form post as the harness (tests/e2e/harness/auth.ts signInViaFormPost): GET for the antiforgery token, POST the form, expect a redirect.
+    const html = await (await ctx.request.get("/logowanie")).text();
+    const token = /name="__RequestVerificationToken"[^>]*value="([^"]+)"/.exec(html)?.[1];
+    const handler = /name="_handler"[^>]*value="([^"]+)"/.exec(html)?.[1] ?? "login";
+    if (!token) throw new Error("no antiforgery token on /logowanie");
+    const res = await ctx.request.post("/logowanie", { form: { _handler: handler, __RequestVerificationToken: token, "Model.Email": `${userName}@demo.example`, "Model.Password": PASSWORD }, maxRedirects: 0 });
+    if (![302, 303].includes(res.status())) throw new Error(`sign-in as ${userName} failed: ${res.status()}`);
   }
   return ctx;
 }

@@ -20,39 +20,46 @@ else if (Profile is not null)
     @if (Refresh && _state != PaymentsState.Ready) {<Alert Variant="AlertVariant.Warning" TestId="payments-refresh">@PlPractitioner.Payments.Refresh</Alert>}
 
     <section class="card stack" aria-labelledby="payments-status-title">
-        <h2 id="payments-status-title">@PlPractitioner.Payments.StatusLabel</h2>
-        @if (_state is not (PaymentsState.NotApplicable or PaymentsState.Unknown))
-        {
-            <p><KindBadge Label="@PaymentsView.Label(_state)" Kind="@PaymentsView.Kind(_state)" TestId="payments-status" /></p>
-        }
-        @if (_state == PaymentsState.Unknown)
-        {
-            <Alert Variant="AlertVariant.Danger" TestId="unavailable">@PaymentsView.Body(_state) <a href="@PractitionerPaths.Payments">@PlPractitioner.Payments.Retry</a></Alert>
-        }
-        else
-        {
-            <p data-testid="payments-body">@PaymentsView.Body(_state)</p>
-        }
-        @if (_state is PaymentsState.None or PaymentsState.Pending)
-        {
-            <div class="callout callout--warning" data-testid="payments-must-be-ready"><p>@PlPractitioner.Payments.MustBeReady</p></div>
-        }
-        @if (_error is not null) {<Alert Variant="AlertVariant.Danger" TestId="payments-error">@_error</Alert>}
-        @if (_link is not null)
-        {
-            <div class="callout callout--success" role="status" data-testid="payments-link">
-                <p>@PlPractitioner.Payments.LinkReady</p>
-                <a class="btn btn--primary" href="@_link" rel="noopener noreferrer">@PlPractitioner.Payments.OpenLink</a>
-            </div>
-        }
+        <header class="card__header cluster cluster--between">
+            <h2 id="payments-status-title">@PlPractitioner.Payments.StatusLabel</h2>
+            @if (_state is not (PaymentsState.NotApplicable or PaymentsState.Unknown))
+            {
+                <KindBadge Label="@PaymentsView.Label(_state)" Kind="@PaymentsView.Kind(_state)" TestId="payments-status" />
+            }
+        </header>
+        <div class="card__body stack stack--tight">
+            @if (_state == PaymentsState.Unknown)
+            {
+                <Alert Variant="AlertVariant.Danger" TestId="unavailable">@PaymentsView.Body(_state) <a href="@PractitionerPaths.Payments">@PlPractitioner.Payments.Retry</a></Alert>
+            }
+            else
+            {
+                <p data-testid="payments-body">@PaymentsView.Body(_state)</p>
+            }
+            @if (_state is PaymentsState.None or PaymentsState.Pending)
+            {
+                <div class="callout callout--warning" data-testid="payments-must-be-ready"><p>@PlPractitioner.Payments.MustBeReady</p></div>
+                <p class="muted" data-testid="payments-client-view">@PlPractitioner.Payments.ClientMeanwhile</p>
+            }
+            @if (_error is not null) {<Alert Variant="AlertVariant.Danger" TestId="payments-error">@_error</Alert>}
+            @if (_link is not null)
+            {
+                <div class="callout callout--success" role="status" data-testid="payments-link">
+                    <p>@PlPractitioner.Payments.LinkReady</p>
+                    <a class="btn btn--primary" href="@_link" rel="noopener noreferrer">@PlPractitioner.Payments.OpenLink</a>
+                </div>
+            }
+        </div>
         @if (_state is not (PaymentsState.Ready or PaymentsState.NotApplicable))
         {
             @* The form exists whenever the account is not settled: Blazor dispatches a post to a form by name in the first render of that request, and the state read for it can differ from the page's
-               (a provider that was down a moment ago). The button shows only when there is an action. *@
-            <form method="post" @onsubmit="StartAsync" @formname="payments-start" hidden="@(PaymentsView.Action(_state) is null)">
-                <AntiforgeryToken />
-                <button class="@(_link is null ? "btn btn--primary" : "btn btn--secondary")" type="submit">@(PaymentsView.Action(_state) ?? PlPractitioner.Payments.Start)</button>
-            </form>
+               (a provider that was down a moment ago). The button shows only when there is an action, and it is the card's one primary action unless the link above is the primary one. *@
+            <footer class="card__footer">
+                <form method="post" @onsubmit="StartAsync" @formname="payments-start" hidden="@(PaymentsView.Action(_state) is null)">
+                    <AntiforgeryToken />
+                    <button class="@(_link is null ? "btn btn--primary" : "btn btn--secondary")" type="submit">@(PaymentsView.Action(_state) ?? PlPractitioner.Payments.Start)</button>
+                </form>
+            </footer>
         }
     </section>
 }

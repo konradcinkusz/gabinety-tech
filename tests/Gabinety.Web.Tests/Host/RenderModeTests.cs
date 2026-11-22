@@ -92,6 +92,6 @@ public partial class RenderModeTests
         // The client area is static too: no circuit for a list of bookings, and its HTML is complete.
         var mine = await browser.GetAsync("/moje/rezerwacje");
         Assert.DoesNotContain("<!--Blazor:", mine.Html);
-        Assert.Equal("Konsultacja z prerenderu", mine.TextOf("[data-testid=booking-row] h2"));
+        Assert.Equal("Konsultacja z prerenderu", mine.TextOf("[data-testid=booking-row] .booking-row__title"));
     }
 }

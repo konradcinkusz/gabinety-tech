@@ -7,7 +7,7 @@ public static class BookingsText
     public const string TabsLabel = "Rezerwacje jako", Details = "Szczegóły", Back = "Wróć do listy rezerwacji", Review = "Wystaw opinię";
     public const string Loading = "Ładowanie rezerwacji…", NotFound = "Nie znaleziono takiej rezerwacji.";
     public const string EmptyTitle = "Brak rezerwacji", EmptyClient = "Gdy zarezerwujesz konsultację, zobaczysz ją tutaj.", EmptyPractitioner = "Gdy klient zarezerwuje Twoją konsultację, zobaczysz ją tutaj.", EmptyFiltered = "Brak rezerwacji o tym statusie.";
-    public const string FindPractitioner = "Znajdź programistę", ShowAll = "Pokaż wszystkie statusy", Next = "Pokaż kolejne rezerwacje", Filter = "Filtruj";
+    public const string FindPractitioner = "Znajdź programistę", ShowAll = "Pokaż wszystkie statusy", Next = "Pokaż kolejne rezerwacje";
     public const string ReloadHint = "Odśwież stronę", Retry = "Spróbuj ponownie";
     public const string PartyPractitioner = "Programista", PartyClient = "Klient";
 

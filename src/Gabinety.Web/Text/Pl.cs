@@ -166,6 +166,7 @@ public static class Pl
     public static class Bookings
     {
         public const string Title = "Moje rezerwacje", MetaTitle = "Moje rezerwacje | Gabinety Tech";
+        public const string Upcoming = "Nadchodzące", Past = "Minione", Today = "dziś", Tomorrow = "jutro", InDays = "za {0} dni", StatusFilterLabel = "Filtruj według statusu";
         public const string RoleLabel = "Pokaż rezerwacje jako", Client = "Klient", Practitioner = "Programista";
         public const string StatusLabel = "Status", AllStatuses = "Wszystkie", Loading = "Ładowanie rezerwacji…", Empty = "Brak rezerwacji w tym widoku.", More = "Pokaż więcej";
         public const string PartyPractitioner = "Programista", PartyClient = "Klient";

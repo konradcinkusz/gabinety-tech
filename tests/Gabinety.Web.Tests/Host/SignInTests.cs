@@ -73,7 +73,7 @@ public class SignInTests
         var page = await browser.GetAsync("/moje/rezerwacje");
         Assert.Equal(HttpStatusCode.OK, page.Status);
         Assert.Equal("Moje rezerwacje", page.TextOf("h1"));
-        Assert.Equal(["Konsultacja demo", "Druga konsultacja"], page.All("[data-testid=booking-row] h2").Select(h => h.TextContent));
+        Assert.Equal(["Konsultacja demo", "Druga konsultacja"], page.All("[data-testid=booking-row] .booking-row__title").Select(h => h.TextContent));
         Assert.Contains("wtorek, 1 grudnia, 13:00–14:00", page.TextOf("[data-testid=booking-row]"));
         Assert.Contains("250,00 zł", page.TextOf("[data-testid=booking-row]"));
         Assert.Equal("Potwierdzona", page.One("[data-testid=booking-row] .badge")!.TextContent);

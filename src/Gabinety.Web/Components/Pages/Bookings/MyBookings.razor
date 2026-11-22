@@ -1,37 +1,35 @@
 @page "/moje/rezerwacje"
 @attribute [Authorize]
 @inject BookingClient Bookings
+@inject MeClient Me
+@inject TimeProvider Clock
 @inject NavigationManager Navigation
-@* Static server rendering: the role is a tab (a link), the status filter is a GET form and "more" is a link with the cursor, so the list is complete HTML and a URL reopens the same view (DESIGN-CONTRACT 5.9, G-2).
-   The rows keep the structure the journeys read (J3): a list item with the title, the state and a "Szczegóły" link. *@
+@* Static server rendering: the role is a tab (a link), the status is a row of chips (links) and "more" is a link with the cursor, so the list is complete HTML and a URL reopens the same view (DESIGN-CONTRACT 5.9, G-2).
+   The list is two sections by start time (Nadchodzące, Minione); the soonest consultation is the lead card. Each row is a card whose "Szczegóły" link is the whole card's target (DESIGN-CONTRACT 4.2). *@
 
 <PageTitle>@Pl.Bookings.MetaTitle</PageTitle>
 <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
 <h1>@Pl.Bookings.Title</h1>
 
-<nav class="tabs" aria-label="@BookingsText.TabsLabel">
-    <ul>
-        @foreach (var r in new[] { BookingClient.ClientRole, BookingClient.PractitionerRole })
-        {
-            <li><a class="tabs__link" href="@Href(r, _status, null)" aria-current="@(r == _role ? "page" : null)">@(r == BookingClient.ClientRole ? Pl.Bookings.Client : Pl.Bookings.Practitioner)</a></li>
-        }
-    </ul>
-</nav>
-
-<form method="get" action="/moje/rezerwacje" class="cluster filter-form">
-    <input type="hidden" name="role" value="@_role" />
-    <div class="field field--inline">
-        <label class="field__label" for="status">@Pl.Bookings.StatusLabel</label>
-        <select id="status" name="status" class="field__control" data-testid="status-filter">
-            <option value="">@Pl.Bookings.AllStatuses</option>
-            @foreach (var s in BookingFormat.Statuses)
+@if (_showRoleTabs)
+{
+    <nav class="tabs" aria-label="@BookingsText.TabsLabel">
+        <ul>
+            @foreach (var r in new[] { BookingClient.ClientRole, BookingClient.PractitionerRole })
             {
-                <option value="@s" selected="@(s == _status)">@BookingFormat.StatusLabel(s)</option>
+                <li><a class="tabs__link" href="@Href(r, _status, null)" aria-current="@(r == _role ? "page" : null)">@(r == BookingClient.ClientRole ? Pl.Bookings.Client : Pl.Bookings.Practitioner)</a></li>
             }
-        </select>
-    </div>
-    <button type="submit" class="btn btn--secondary">@BookingsText.Filter</button>
-</form>
+        </ul>
+    </nav>
+}
+
+<nav class="status-chips" aria-label="@Pl.Bookings.StatusFilterLabel" data-testid="status-filter">
+    <a class="chip" href="@Href(_role, "", null)" aria-current="@(_status.Length == 0 ? "true" : null)">@Pl.Bookings.AllStatuses</a>
+    @foreach (var s in _filterStatuses)
+    {
+        <a class="chip" href="@Href(_role, s, null)" aria-current="@(s == _status ? "true" : null)">@BookingFormat.StatusLabel(s)</a>
+    }
+</nav>
 
 @if (_failure is { IsUnauthenticated: true })
 {
@@ -58,19 +56,32 @@ else if (_page is { Items.Count: 0 })
 }
 else if (_page is not null)
 {
-    <ul class="stack bookings" data-testid="bookings">
-        @foreach (var b in _page.Items)
-        {
-            <li class="card booking-row" data-testid="booking-row">
-                <div class="cluster cluster--between">
-                    <h2 class="booking-row__title">@b.OfferingTitle</h2>
-                    <BookingBadge Badge="Badge.ForBooking(b.Status)" />
-                </div>
-                <p class="muted">@BookingFormat.MetaLine(BookingFormat.Name(_role == BookingClient.ClientRole ? b.Practitioner.DisplayName : b.Client?.DisplayName), BookingFormat.When(b), Money.Pln(b.Price.AmountMinor))</p>
-                <a class="booking-row__link" href="@($"/moje/rezerwacje/{b.Id}?role={_role}")">@BookingsText.Details<span class="sr-only">: @b.OfferingTitle</span></a>
-            </li>
-        }
-    </ul>
+    @foreach (var section in _sections)
+    {
+        <section class="stack" aria-labelledby="@section.Id" data-testid="@section.Id">
+            <h2 id="@section.Id">@section.Title</h2>
+            <ul class="stack bookings">
+                @foreach (var (b, lead) in section.Rows)
+                {
+                    <li class="card card--link booking-row @(lead ? "booking-row--lead" : "")" data-testid="booking-row">
+                        @if (lead)
+                        {
+                            <p class="booking-lead__when">@MyBookingsSchedule.Relative(_now, b.StartUtc)</p>
+                        }
+                        <div class="cluster cluster--between">
+                            <p class="booking-row__title" id="@($"booking-{b.Id:N}-title")">@b.OfferingTitle</p>
+                            <span class="num booking-row__price">@Money.Pln(b.Price.AmountMinor)</span>
+                        </div>
+                        <p class="muted">@BookingFormat.MetaLine(BookingFormat.Name(_role == BookingClient.ClientRole ? b.Practitioner.DisplayName : b.Client?.DisplayName), BookingFormat.When(b))</p>
+                        <div class="cluster cluster--between">
+                            <BookingBadge Badge="Badge.ForBooking(b.Status)" />
+                            <a class="booking-row__link" href="@($"/moje/rezerwacje/{b.Id}?role={_role}")" aria-describedby="@($"booking-{b.Id:N}-title")">@BookingsText.Details</a>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
     @if (_page.NextCursor is { } next) {<a class="btn btn--secondary" rel="next" href="@Href(_role, _status, next)">@BookingsText.Next</a>}
 }
 
@@ -80,18 +91,45 @@ else if (_page is not null)
     [SupplyParameterFromQuery(Name = "status")] public string? StatusParam { get; set; }
     [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
 
+    sealed record Section(string Id, string Title, IReadOnlyList<(BookingViewDto B, bool Lead)> Rows);
+
     string _role = BookingClient.ClientRole, _status = "";
     string? _cursor;
     PageDto<BookingViewDto>? _page;
     ApiFailure? _failure;
+    IReadOnlyList<Section> _sections = [];
+    IReadOnlyList<string> _filterStatuses = [];
+    DateTimeOffset _now;
+    // The role tabs are for an account with a practitioner profile. The answer is asked once per visit; when the directory cannot say, the tabs stay (fail soft).
+    bool _showRoleTabs = true, _profileAsked;
 
     protected override async Task OnParametersSetAsync()
     {
         (_role, _status, _cursor) = (BookingFormat.Role(RoleParam), BookingFormat.StatusFilter(StatusParam), string.IsNullOrWhiteSpace(CursorParam) ? null : CursorParam);
         (_page, _failure) = (null, null);
+        if (!_profileAsked)
+        {
+            var me = await Me.GetAsync();
+            _showRoleTabs = !me.IsOk || me.Value!.PractitionerId is not null;
+            _profileAsked = true;
+        }
+
+        _now = Clock.GetUtcNow();
         var result = await Bookings.MyBookingsAsync(_role, _status, _cursor);
-        if (result.IsOk) { _page = result.Value; return; }
-        _failure = result.Failure;
+        if (result.IsOk) _page = result.Value;
+        else _failure = result.Failure;
+
+        var items = _page?.Items ?? [];
+        var (upcoming, past) = MyBookingsSchedule.Split(items, _now);
+        _sections = new[]
+        {
+            new Section("bookings-upcoming", Pl.Bookings.Upcoming, [.. upcoming.Select((b, i) => (b, i == 0))]),
+            new Section("bookings-past", Pl.Bookings.Past, [.. past.Select(b => (b, false))]),
+        }.Where(s => s.Rows.Count > 0).ToList();
+
+        // The chips list the statuses the loaded role has, plus the active one, so a filter that matched nothing can still be left.
+        var present = items.Select(i => i.Status).ToHashSet();
+        _filterStatuses = BookingFormat.Statuses.Where(s => s == _status || present.Contains(s)).ToList();
     }
 
     static string Href(string role, string status, string? cursor) =>

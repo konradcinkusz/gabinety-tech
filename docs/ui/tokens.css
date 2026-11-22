@@ -1,0 +1,101 @@
+/* Gabinety Tech: design tokens (docs/ui/DESIGN-CONTRACT.md section 3). This block is FROZEN: it is the only place a colour may be written.
+   Light is the default; dark redefines the colour tokens and nothing else. Contrast of every pair in section 3.3 of the contract is checked by
+   tests/e2e/tools/ui-audit/contrast.py, which reads this file. */
+:root {
+  color-scheme: light dark;
+
+  /* surfaces */
+  --surface-page: #f6f7f9;      /* page background */
+  --surface: #ffffff;           /* card, input, table */
+  --surface-sunken: #eceff4;    /* table head, code, secondary panels */
+  /* text */
+  --text: #14181f;
+  --text-secondary: #3d4655;
+  --text-muted: #566072;
+  /* lines */
+  --border: #d3d9e2;            /* decorative dividers, card outline */
+  --border-strong: #7a8496;     /* control outline (>= 3:1 on surface) */
+  /* accent */
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-contrast: #ffffff;   /* text on --accent and --accent-hover */
+  --accent-soft: #e6edfd;       /* selected chip, info fill */
+  --accent-soft-text: #1e3a8a;  /* text on --accent-soft */
+  /* status: strong colour for text and icon, soft fill behind it */
+  --success: #0b6b3a;
+  --success-soft: #e3f4ea;
+  --warning: #8a4b00;
+  --warning-soft: #fff1d6;
+  --danger: #b42318;
+  --danger-soft: #fdeae7;
+  --danger-contrast: #ffffff;   /* text on a solid danger button */
+  /* focus */
+  --focus: #1d4ed8;
+  /* depth */
+  --shadow-sm: 0 1px 2px rgb(20 24 31 / 0.08);
+  --shadow-md: 0 6px 16px rgb(20 24 31 / 0.12);
+  --scrim: rgb(20 24 31 / 0.5);
+
+  /* shape and space (not redefined in dark) */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-pill: 999px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --gutter: 1rem;               /* page side padding: 16 px at every width */
+  --content-width: 72rem;       /* page container */
+  --prose-width: 42rem;         /* running text */
+  --form-width: 32rem;          /* single-column forms */
+  --tap: 2.75rem;               /* minimum interactive height: 44 px */
+
+  /* type: system stacks only, no web fonts */
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --fs-xs: 0.8125rem;           /* 13 px: captions, badges */
+  --fs-sm: 0.875rem;            /* 14 px: hints, table cells */
+  --fs-md: 1rem;                /* 16 px: body, inputs (never smaller: iOS zooms) */
+  --fs-lg: 1.125rem;            /* 18 px: lead, card title */
+  --fs-xl: 1.375rem;            /* 22 px: h2 */
+  --fs-2xl: 1.75rem;            /* 28 px: h1 on phone */
+  --fs-3xl: 2.25rem;            /* 36 px: h1 on desktop, home hero */
+  --lh-tight: 1.2;
+  --lh-body: 1.55;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-page: #0e1218;
+    --surface: #161b23;
+    --surface-sunken: #1e2530;
+    --text: #eef1f6;
+    --text-secondary: #c8cfdb;
+    --text-muted: #9ba5b6;
+    --border: #2b3442;
+    --border-strong: #6f7a8d;
+    --accent: #7ba3ff;
+    --accent-hover: #a2bdff;
+    --accent-contrast: #0a1020;
+    --accent-soft: #1b2745;
+    --accent-soft-text: #bdd0ff;
+    --success: #62d493;
+    --success-soft: #12301f;
+    --warning: #f2b765;
+    --warning-soft: #352609;
+    --danger: #ff9188;
+    --danger-soft: #3b1613;
+    --danger-contrast: #1a0806;
+    --focus: #a2bdff;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+    --shadow-md: 0 6px 16px rgb(0 0 0 / 0.55);
+    --scrim: rgb(0 0 0 / 0.65);
+  }
+}

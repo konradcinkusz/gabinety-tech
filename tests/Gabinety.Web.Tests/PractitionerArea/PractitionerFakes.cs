@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -26,6 +27,8 @@ public sealed class PractitionerWorld
     public bool BookingDown { get; set; }
     public bool BookingsFail { get; set; }
     public List<BookingViewDto> Bookings { get; } = [];
+    /// <summary>When set, the bookings of a call are answered in pages of this size with a cursor (the calendar follows them all).</summary>
+    public int? BookingPageSize { get; set; }
     public string OnboardingUrl { get; set; } = "https://connect.stripe.com/setup/e/acct_test/abc";
     public int OnboardingCalls { get; private set; }
 
@@ -57,6 +60,9 @@ public sealed class PractitionerWorld
     }
 
     static HttpResponseMessage Unit() => new(HttpStatusCode.NoContent);
+
+    static string? Query(Uri uri, string name) =>
+        uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries).Select(p => p.Split('=', 2)).Where(p => p[0] == name).Select(p => Uri.UnescapeDataString(p.Length > 1 ? p[1] : "")).FirstOrDefault();
 
     static JsonObject? Body(HttpRequestMessage r) => r.Content is null ? null : JsonNode.Parse(r.Content.ReadAsStringAsync().GetAwaiter().GetResult()) as JsonObject;
 
@@ -203,7 +209,17 @@ public sealed class PractitionerWorld
         if (path == "/api/v1/me/bookings" && r.Method == HttpMethod.Get)
         {
             if (BookingsFail) return Problem(HttpStatusCode.ServiceUnavailable, "dependency_unavailable");
-            return FakeBackend.Json(new PageDto<BookingViewDto>(Bookings, null));
+            // from and to are Warsaw days, both inclusive (CONTRACTS 4.4); the cursor is the offset of the next page when BookingPageSize is set
+            var uri = r.RequestUri!;
+            var from = Query(uri, "from");
+            var to = Query(uri, "to");
+            var warsaw = TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
+            string Day(BookingViewDto b) => TimeZoneInfo.ConvertTime(b.StartUtc, warsaw).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var matching = Bookings.Where(b => from is null || string.CompareOrdinal(Day(b), from) >= 0).Where(b => to is null || string.CompareOrdinal(Day(b), to) <= 0).ToList();
+            var skip = int.TryParse(Query(uri, "cursor"), NumberStyles.None, CultureInfo.InvariantCulture, out var offset) ? offset : 0;
+            var page = matching.Skip(skip).Take(BookingPageSize ?? int.MaxValue).ToList();
+            var next = BookingPageSize is { } size && skip + page.Count < matching.Count ? (skip + size).ToString(CultureInfo.InvariantCulture) : null;
+            return FakeBackend.Json(new PageDto<BookingViewDto>(page, next));
         }
         if (path == "/api/v1/me/payments/account")
         {

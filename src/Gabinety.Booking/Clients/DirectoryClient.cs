@@ -13,6 +13,9 @@ public sealed record DirectoryPractitioner(Guid PractitionerId, PractitionerStat
 public sealed record DirectoryOffering(Guid OfferingId, Guid PractitionerId, string PractitionerUserId, PractitionerStatus PractitionerStatus,
     string Title, int DurationMinutes, MoneyDto Price, string? MeetingUrl, bool IsActive);
 
+/// <summary>GET /internal/v1/practitioners/{id}: display name and slug for the booking views (ADR-0012 section 6).</summary>
+public sealed record DirectoryPractitionerName(Guid PractitionerId, string DisplayName, string Slug);
+
 /// <summary>Directory did not answer in budget (connection failure, timeout or 5xx after the retry). The message never carries the URL or the key.</summary>
 public sealed class DirectoryUnavailableException(Exception? inner = null) : Exception("Directory is unavailable.", inner);
 
@@ -22,6 +25,8 @@ public interface IDirectoryClient
     Task<DirectoryOffering?> GetOfferingAsync(Guid offeringId, CancellationToken ct);
     /// <summary>Null when the user is not a practitioner (404).</summary>
     Task<DirectoryPractitioner?> GetPractitionerByUserAsync(string userId, CancellationToken ct);
+    /// <summary>Null when the practitioner is unknown (404).</summary>
+    Task<DirectoryPractitionerName?> GetPractitionerNameAsync(Guid practitionerId, CancellationToken ct);
     /// <summary>One probe of /alive, no retry; false on any failure or non-200.</summary>
     Task<bool> IsAliveAsync(CancellationToken ct);
 }
@@ -40,6 +45,9 @@ public sealed class DirectoryClient(HttpClient http, string? internalKey, TimeSp
 
     public Task<DirectoryPractitioner?> GetPractitionerByUserAsync(string userId, CancellationToken ct) =>
         GetAsync<DirectoryPractitioner>($"internal/v1/practitioners/by-user/{Uri.EscapeDataString(userId)}", ct);
+
+    public Task<DirectoryPractitionerName?> GetPractitionerNameAsync(Guid practitionerId, CancellationToken ct) =>
+        GetAsync<DirectoryPractitionerName>($"internal/v1/practitioners/{practitionerId}", ct);
 
     public async Task<bool> IsAliveAsync(CancellationToken ct)
     {

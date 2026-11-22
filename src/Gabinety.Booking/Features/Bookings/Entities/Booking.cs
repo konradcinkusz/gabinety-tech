@@ -9,6 +9,8 @@ public sealed class Booking
 {
     public Guid Id { get; set; }
     public string ClientUserId { get; set; } = "";
+    /// <summary>What the practitioner sees instead of a name: "Klient" and the first letter of the client's token name, taken when the booking was made (ADR-0012 section 6). No e-mail, no surname. Null for rows made before the column existed and after an erasure.</summary>
+    public string? ClientDisplayName { get; set; }
     public Guid PractitionerId { get; set; }
     public string PractitionerUserId { get; set; } = "";
     public Guid OfferingId { get; set; }
@@ -49,6 +51,7 @@ sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
         b.Property(x => x.ClientUserId).HasColumnName("client_user_id").HasMaxLength(64);
+        b.Property(x => x.ClientDisplayName).HasColumnName("client_display_name").HasMaxLength(60);
         b.Property(x => x.PractitionerId).HasColumnName("practitioner_id");
         b.Property(x => x.PractitionerUserId).HasColumnName("practitioner_user_id").HasMaxLength(64);
         b.Property(x => x.OfferingId).HasColumnName("offering_id");

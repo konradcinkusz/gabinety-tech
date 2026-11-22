@@ -19,6 +19,28 @@ public class DevIdentityContractTests(DevIdentityHost host) : AuthContractSuite(
 [RequiresEnv("AUTH_BASE_URL")]
 public class RealAuthServiceContractTests() : AuthContractSuite(ForBaseUrl(Environment.GetEnvironmentVariable("AUTH_BASE_URL") is { Length: > 0 } url ? url : "http://unset.invalid"));
 
+/// <summary>F-02 guard: every authservice route the web calls (web/src/lib/session/identity.ts) exists in the stand-in, with and without the /api/v1 alias, and none answers 404.</summary>
+public class DevIdentityRouteSetTests(DevIdentityHost host) : IClassFixture<DevIdentityHost>
+{
+    public static IEnumerable<object[]> Routes() =>
+        new (string Method, string Path)[]
+        {
+            ("GET", "auth/me"), ("GET", "auth/consents"), ("POST", "auth/consents"), ("GET", "auth/consents/versions"), ("GET", "auth/export"), ("DELETE", "auth/account"),
+            ("POST", "auth/register"), ("POST", "auth/login"), ("POST", "auth/refresh"), ("POST", "auth/logout"),
+            ("GET", "external-auth/providers"), ("GET", "external-auth/login"), ("POST", "external-auth/exchange"),
+        }.SelectMany(r => new[] { "/api/v1/", "/api/" }.Select(prefix => new object[] { r.Method, prefix + r.Path }));
+
+    [Theory]
+    [MemberData(nameof(Routes))]
+    public async Task The_route_the_web_calls_is_mapped(string method, string path)
+    {
+        using var http = host.CreateClient(new() { AllowAutoRedirect = false });
+        using var response = await http.SendAsync(new HttpRequestMessage(new HttpMethod(method), path) { Content = method == "GET" ? null : JsonContent.Create(new { }) });
+        Assert.NotEqual(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+    }
+}
+
 /// <summary>What only the stand-in promises: the seeded synthetic users of SPEC 6.7 and the role claim of the admin.</summary>
 public class DevIdentitySeedTests(DevIdentityHost host) : AuthContractSuite(host.CreateClient()), IClassFixture<DevIdentityHost>
 {

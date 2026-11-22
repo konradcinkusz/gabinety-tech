@@ -23,7 +23,7 @@ public sealed class ErasureFeature : IServiceFeature
 {
     public const string ErasedBrief = "[usunięto]";
     public const int BatchSize = 500;
-    const string TokenPrefix = "erased-";
+    internal const string TokenPrefix = "erased-";
 
     public void Add(IHostApplicationBuilder builder) { }
 
@@ -101,7 +101,7 @@ public sealed class ErasureFeature : IServiceFeature
         b.BriefText = ErasedBrief;
         b.DisputeText = null;
         b.StatusReason = null;
-        if (b.ClientUserId == userId) b.ClientUserId = token;
+        if (b.ClientUserId == userId) { b.ClientUserId = token; b.ClientDisplayName = null; }
         if (b.PractitionerUserId == userId)
         {   // the practitioner's own data: a personal meeting link and the offering title; a client's erasure must not touch them
             b.PractitionerUserId = token;

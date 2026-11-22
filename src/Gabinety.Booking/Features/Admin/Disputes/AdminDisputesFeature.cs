@@ -102,7 +102,7 @@ public sealed class AdminDisputesFeature : IServiceFeature
     // ---- resolve ----
 
     static async Task<IResult> ResolveAsync(Guid id, ResolveRequest? body, ClaimsPrincipal user, BookingDbContext db, BookingTransitions transitions,
-        RefundCoordinator refunds, TimeProvider time, CancellationToken ct)
+        RefundCoordinator refunds, PartyNamesLookup names, TimeProvider time, CancellationToken ct)
     {
         var sub = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (sub is null) return Results.Unauthorized();
@@ -149,7 +149,7 @@ public sealed class AdminDisputesFeature : IServiceFeature
             },
         }, ct);
         if (result.ToErrorResult() is { } error) return error;
-        return Results.Ok(BookingViewFeature.ToView(result.Booking!, result.Payment, sub, admin: true) with { StatusReason = null }); // the note is for the admin list only
+        return Results.Ok(BookingViewFeature.ToView(result.Booking!, result.Payment, sub, admin: true, names: (await names.ForAsync([result.Booking!], ct))[result.Booking!.Id]) with { StatusReason = null }); // the note is for the admin list only
     }
 
     static Dictionary<string, string[]> Validate(ResolveRequest? body, long price)

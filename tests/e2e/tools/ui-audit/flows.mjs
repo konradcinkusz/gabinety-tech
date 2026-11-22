@@ -6,7 +6,7 @@ import { VIEWPORTS, axeCheck, inPageChecks, newContext, settle } from "./lib.mjs
 
 export async function runFlows(browser, { OUT, shotCount, findings }) {
   const log = [];
-  const MOBILE_SHOTS = new Set(["02-booking-form", "03-booking-validation", "05-checkout", "08-booking-detail", "09-cancel-dialog", "11-dispute-validation", "13-review-validation", "04-dashboard-draft", "05-profile-validation", "06-offerings-validation", "01-dispute-resolve-form", "01-register-validation"]);
+  const MOBILE_SHOTS = new Set(["02-booking-form", "03-booking-validation", "05-checkout", "08-booking-detail", "08a-reschedule","09-cancel-dialog", "11-dispute-validation", "13-review-validation", "04-dashboard-draft", "05-profile-validation", "06-offerings-validation", "01-dispute-resolve-form", "01-register-validation"]);
   async function snap(page, role, id, note) {
     const rec = { flow: role, step: id, note, url: page.url().replace(/^https?:\/\/[^/]+/, "") };
     for (const vp of [1440, 390]) {
@@ -60,6 +60,12 @@ export async function runFlows(browser, { OUT, shotCount, findings }) {
       await snap(page, "client", "06-confirmation", "confirmation");
     });
     await attempt("my bookings", async () => { await page.goto("/moje/rezerwacje"); await settle(page); await snap(page, "client", "07-my-bookings", "list with the new booking"); });
+    await attempt("reschedule", async () => {
+      // the booking just paid is Confirmed and far enough ahead (the first free slot), so the service offers the one move; the page is read, nothing is posted
+      await page.goto(`/moje/rezerwacje/${bookingId}?role=client`); await settle(page);
+      await page.getByRole("link", { name: "Zmień termin" }).click(); await page.waitForURL(/zmien-termin/); await settle(page, 1500);
+      await snap(page, "client", "08a-reschedule", "the move page with the free times of the offer");
+    });
     await attempt("detail+cancel", async () => {
       await page.goto(`/moje/rezerwacje/${bookingId}?role=client`); await settle(page);
       await snap(page, "client", "08-booking-detail", "new booking, confirmed");

@@ -64,7 +64,11 @@ public static class Pl
         public const string AllIntro = "Zweryfikowani programiści, z którymi umówisz płatną konsultację online. Wybierz problem, technologię i czas trwania.";
         public const string CategoryIntro = "Konsultacje „{0}” ze zweryfikowanymi programistami. Wybierz technologię, czas i budżet, a potem zarezerwuj termin.";
         public const string CategoryTechIntro = "Konsultacje „{0}” ze zweryfikowanymi programistami. Przeglądasz wyniki zawężone do wybranej technologii.";
-        public const string Count = "Wyniki: {0}", Empty = "Brak programistów dla wybranych filtrów.", ClearFilters = "Wyczyść filtry", ResultsLabel = "Lista programistów";
+        public const string Count = "Wyniki: {0}", ClearFilters = "Wyczyść filtry", ResultsLabel = "Lista programistów";
+        /// <summary>The count line of the result header: <c>6 programistów</c>, <c>1 programista</c>. Numerals 2 to 4 take the genitive plural too: the noun is masculine personal.</summary>
+        public const string CountPhrase = "{0} {1}", PractitionerOne = "programista", PractitionerMany = "programistów";
+        public const string EmptyTitle = "Nie ma programistów dla tych filtrów", EmptyBody = "Zmień albo usuń filtry, żeby zobaczyć programistów z innymi kryteriami.";
+        public const string ActiveFilters = "Aktywne filtry", RemoveFilter = "usuń filtr", SearchChip = "Szukaj: „{0}”";
         public const string Unavailable = "Nie udało się teraz wczytać listy programistów. Spróbuj ponownie za chwilę.";
         public const string MetaAllTitle = "Programiści do konsultacji online | Gabinety Tech";
         public const string MetaAllDescription = "Przeglądaj zweryfikowanych programistów i umów płatną konsultację online: audyt kodu, migracja, integracja AI i więcej.";

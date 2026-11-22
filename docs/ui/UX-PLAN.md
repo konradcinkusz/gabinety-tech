@@ -148,7 +148,7 @@ Status: **UX-001, UX-002, UX-003 and UX-005 are done** (UX-005: `wwwroot/enhance
 
 **UX-004.** SVG favicon from `docs/assets/logo.svg`, PNG fallbacks, `apple-touch-icon`, `theme-color` for both schemes, web manifest, a default `og:image` (and `twitter:card`) in `PageMeta`. All same-origin (CSP `img-src 'self' data:`).
 
-**UX-005.** One module, no dependency, under 5 KB, initialised on load and on Blazor's `enhancedload`. Behaviours keyed on existing markup so pages need no change: (a) `.field__counter` next to a `.field__control` updates while typing; (b) a submitting `form[method=post]` sets `aria-busy="true"` on the clicked button and ignores a second submit; (c) `[data-enhance="dialog"]` panels open as a native `<dialog>` with focus return; (d) `[data-enhance="autosubmit"]` selects submit their GET form; (e) `[data-enhance="reveal"]` toggles a password field; (f) `[data-enhance="copy"]` copies a link. Each behaviour has a no-script fallback that is the current behaviour.
+**UX-005.** One module, no dependency, under 8 KB, initialised on load and on Blazor's `enhancedload`. Behaviours keyed on existing markup so pages need no change: (a) `.field__counter` next to a `.field__control` updates while typing; (b) a submitting `form[method=post]` sets `aria-busy="true"` on the clicked button and ignores a second submit; (c) `[data-enhance="dialog"]` panels open as a native `<dialog>` with focus return; (d) `[data-enhance="autosubmit"]` selects submit their GET form; (e) `[data-enhance="reveal"]` toggles a password field; (f) `[data-enhance="copy"]` copies a link. Each behaviour has a no-script fallback that is the current behaviour.
 
 ### Wave 1: pages (parallel)
 

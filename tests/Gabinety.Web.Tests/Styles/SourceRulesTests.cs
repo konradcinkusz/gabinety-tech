@@ -22,15 +22,16 @@ public partial class SourceRulesTests
     }
 
     [Fact]
-    public void The_web_project_has_no_package_no_script_and_no_node_toolchain()
+    public void The_web_project_has_no_package_no_node_toolchain_and_exactly_one_script_file()
     {
         var csproj = Repo.Read("Gabinety.Web.csproj");
         Assert.DoesNotContain("<PackageReference", csproj); // the ASP.NET Core shared framework only (BLAZOR-WEB-APP section 4)
         Assert.Contains("Microsoft.NET.Sdk.Web", csproj);
         Assert.Empty(Repo.WebFiles("package.json"));
-        Assert.Empty(Repo.WebFiles("*.js"));
+        // UX-005 (owner decision D-1): the one first-party script is wwwroot/enhance.js; no other script, no TypeScript, no bundler output
+        Assert.Equal(["wwwroot/enhance.js"], Repo.WebFiles("*.js").Select(Repo.Rel).ToList());
         Assert.Empty(Repo.WebFiles("*.ts"));
-        Assert.Empty(Directory.EnumerateFiles(Path.Combine(Repo.Web, "wwwroot"), "*.js", SearchOption.AllDirectories));
+        Assert.True(new FileInfo(Path.Combine(Repo.Web, "wwwroot", "enhance.js")).Length < 8 * 1024, "enhance.js stays under 8 KB (UX-005)");
         Assert.DoesNotContain(Directory.GetDirectories(Repo.Web), d => Path.GetFileName(d) == "node_modules");
     }
 

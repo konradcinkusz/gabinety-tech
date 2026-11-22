@@ -10,11 +10,11 @@ public static class ReviewsText
         public const string Intro = "Opinia dotyczy odbytej konsultacji. Można ją wystawić raz.", RatingLegend = "Ocena", RatingOption = "{0} z 5", TextLabel = "Treść opinii";
         public const string TextHint = "Od 20 do 2000 znaków. Opisz, z czym przyszedłeś i jak przebiegła konsultacja.", Submit = "Wyślij opinię", Back = "Wróć do rezerwacji";
         public const string RatingRequired = "Wybierz ocenę od 1 do 5.", TextTooShort = "Opinia musi mieć co najmniej 20 znaków.", TextTooLong = "Opinia może mieć najwyżej 2000 znaków.";
-        public const string TextInvalid = "Treść opinii nie została przyjęta. Popraw ją i spróbuj ponownie.", Counter = "{0} / 2000", RatingPreview = "Twoja ocena: {0}", ScaleHint = "1 oznacza „bardzo słabo”, 5 oznacza „bardzo dobrze”.";
+        public const string TextInvalid = "Treść opinii nie została przyjęta. Popraw ją i spróbuj ponownie.", Counter = "{0} / 2000", ScaleHint = "1 oznacza „słabo”, 5 oznacza „świetnie”.";
     }
 
-    /// <summary>The words of the five-point scale shown next to the stars (a preview of what the number means).</summary>
-    public static readonly string[] Scale = ["Bardzo słabo", "Słabo", "Przeciętnie", "Dobrze", "Bardzo dobrze"];
+    /// <summary>The words of the five-point scale: all five are rendered and CSS shows only the one of the checked rating.</summary>
+    public static readonly string[] Scale = ["Słabo", "Przeciętnie", "Dobrze", "Bardzo dobrze", "Świetnie"];
 
     public static class Done
     {

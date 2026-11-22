@@ -27,7 +27,7 @@ public sealed class ReportClientNoShowFeature : IServiceFeature
     /// <summary>The lower edge is inclusive and the upper exclusive, as for the dispute window.</summary>
     public static bool InWindow(BookingEntity b, DateTimeOffset now) => now >= b.StartUtc + Earliest && now < b.StartUtc + Latest;
 
-    static async Task<IResult> ReportAsync(Guid id, ClaimsPrincipal user, BookingDbContext db, BookingTransitions transitions, TimeProvider time, CancellationToken ct)
+    static async Task<IResult> ReportAsync(Guid id, ClaimsPrincipal user, BookingDbContext db, BookingTransitions transitions, PartyNamesLookup names, TimeProvider time, CancellationToken ct)
     {
         var sub = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (sub is null) return Results.Unauthorized();
@@ -41,6 +41,6 @@ public sealed class ReportClientNoShowFeature : IServiceFeature
             Precondition = b => InWindow(b, now),
             Effects = c => c.Booking.PayoutDueAt = now,
         }, ct);
-        return result.ToErrorResult() ?? Results.Ok(BookingViewFeature.ToView(result.Booking!, result.Payment, sub, admin: false));
+        return result.ToErrorResult() ?? Results.Ok(BookingViewFeature.ToView(result.Booking!, result.Payment, sub, admin: false, names: (await names.ForAsync([result.Booking!], ct))[result.Booking!.Id]));
     }
 }

@@ -70,6 +70,8 @@ public static class WebHostingExtensions
         assets.MapStaticAssets();
         app.MapOAuth();
         app.MapAdminEndpoints(); // the ledger download (a stream, not a page)
+        app.MapAccountEndpoints(); // /konto/export
+
         app.MapSeoEndpoints(); // sitemap.xml, robots.txt
         // Interactive server rendering is registered for the pages that ask for it. The circuit endpoints (/_blazor/*) and the framework's own (/_framework/*) are anonymous: an interactive page
         // of an anonymous visitor needs them, and the deny-by-default fallback would answer 401 otherwise. Authorization is the page's own ([Authorize] on the page, so NOT a blanket

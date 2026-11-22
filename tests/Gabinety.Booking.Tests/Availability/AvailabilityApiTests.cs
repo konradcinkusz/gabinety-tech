@@ -246,6 +246,7 @@ public class PractitionerResolverTests
             return Task.FromResult(answer(userId) is { } id ? new DirectoryPractitioner(id, PractitionerStatus.Approved) : null);
         }
         public Task<DirectoryOffering?> GetOfferingAsync(Guid offeringId, CancellationToken ct) => throw new NotSupportedException();
+        public Task<DirectoryPractitionerName?> GetPractitionerNameAsync(Guid practitionerId, CancellationToken ct) => throw new NotSupportedException();
         public Task<DirectoryContact?> GetPractitionerContactAsync(string userId, CancellationToken ct) => throw new NotSupportedException();
         public Task<bool> IsAliveAsync(CancellationToken ct) => throw new NotSupportedException();
     }

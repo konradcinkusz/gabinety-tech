@@ -309,6 +309,43 @@ public abstract class AuthContractSuite(HttpClient http) : IDisposable
     }
 
     [ContractFact]
+    public async Task Accepting_the_consents_answers_the_status_and_needs_a_token()
+    {
+        var (terms, privacy) = await VersionsAsync();
+        var access = (await RegisterAsync(NewEmail())).GetProperty("accessToken").GetString()!;
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/v1/auth/consents") { Content = JsonContent.Create(new { acceptedTerms = true, acceptedPrivacy = true }) };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access);
+
+        var response = await Http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var status = await ReadJson(response);
+        Assert.True(status.GetProperty("terms").GetProperty("accepted").GetBoolean());
+        Assert.Equal(terms, status.GetProperty("terms").GetProperty("acceptedVersion").GetString());
+        Assert.Equal(privacy, status.GetProperty("privacy").GetProperty("acceptedVersion").GetString());
+        Assert.False(status.GetProperty("requiresConsent").GetBoolean());
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Http.PostAsJsonAsync("api/v1/auth/consents", new { acceptedTerms = true })).StatusCode);
+    }
+
+    [ContractFact]
+    public async Task Consents_have_the_cookie_entry_the_account_page_reads()
+    {
+        var access = (await RegisterAsync(NewEmail())).GetProperty("accessToken").GetString()!;
+        var status = await ReadJson(await AuthorizedAsync(HttpMethod.Get, "api/v1/auth/consents", access));
+        var cookies = status.GetProperty("cookies");
+        Assert.False(string.IsNullOrWhiteSpace(cookies.GetProperty("requiredVersion").GetString()));
+        Assert.Equal(JsonValueKind.False, cookies.GetProperty("accepted").ValueKind);
+    }
+
+    [ContractFact]
+    public async Task Exchanging_a_code_that_was_never_issued_is_401()
+    {
+        var response = await Http.PostAsJsonAsync("api/v1/external-auth/exchange", new { code = "demo-never-issued" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [ContractFact]
     public async Task Me_has_the_fields_the_account_page_reads()
     {
         var access = (await RegisterAsync(NewEmail())).GetProperty("accessToken").GetString()!;

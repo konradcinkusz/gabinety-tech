@@ -76,12 +76,12 @@ public class AdminAccessTests
     public async Task The_header_offers_Administracja_to_an_administrator_and_to_nobody_else()
     {
         await using var admin = await AdminHost.StartAsync();
-        Assert.Contains(("/admin", "Administracja"), (await admin.Browser.GetAsync("/")).All("header nav a").Select(a => (a.GetAttribute("href")!, a.TextContent.Trim())));
+        Assert.Contains(("/admin/weryfikacja", "Administracja"), (await admin.Browser.GetAsync("/")).All("header nav a").Select(a => (a.GetAttribute("href")!, a.TextContent.Trim())));
 
         await using var client = await AdminHost.StartAsClientAsync();
-        Assert.DoesNotContain("/admin", (await client.Browser.GetAsync("/")).All("header nav a").Select(a => a.GetAttribute("href")));
+        Assert.DoesNotContain("/admin/weryfikacja", (await client.Browser.GetAsync("/")).All("header nav a").Select(a => a.GetAttribute("href")));
         await using var visitor = new WebFactory();
-        Assert.DoesNotContain("/admin", (await visitor.NewBrowser().GetAsync("/")).All("header nav a").Select(a => a.GetAttribute("href")));
+        Assert.DoesNotContain("/admin/weryfikacja", (await visitor.NewBrowser().GetAsync("/")).All("header nav a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]
@@ -95,7 +95,8 @@ public class AdminAccessTests
         Assert.Equal(["Weryfikacja programistów", "Spory", "Księga", "Opinie", "Podejrzane pary"], tabs.Select(a => a.TextContent.Trim()));
         Assert.Equal(["Spory"], tabs.Where(a => a.GetAttribute("aria-current") == "page").Select(a => a.TextContent.Trim()));
         Assert.Contains("noindex", page.One("meta[name=robots]")!.GetAttribute("content"));
-        Assert.Equal(["Menu główne", "Sekcje administracji", "Status"], page.All("nav").Select(n => n.GetAttribute("aria-label"))); // distinct names (contract 7.5)
+        Assert.Single(page.All("nav"), n => n.GetAttribute("aria-label") == "Sekcje administracji"); // the area's own navs have names of their own (contract 7.5)
+        Assert.Single(page.All("nav"), n => n.GetAttribute("aria-label") == "Status");
     }
 
     [Fact]

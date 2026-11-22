@@ -137,9 +137,9 @@ else if (_booking is { } b)
     [SupplyParameterFromQuery(Name = "role")] public string? RoleParam { get; set; }
     [SupplyParameterFromQuery(Name = "action")] public string? ActionParam { get; set; }
     [SupplyParameterFromQuery(Name = "done")] public string? DoneParam { get; set; }
-    [SupplyParameterFromForm(FormName = "cancel")] CancelForm? CancelModel { get; set; }
-    [SupplyParameterFromForm(FormName = "dispute")] DisputeForm? DisputeModel { get; set; }
-    [SupplyParameterFromForm(FormName = "noshow")] NoShowForm? NoShowModel { get; set; }
+    [SupplyParameterFromForm(FormName = "cancel", Name = "Model")] CancelForm? CancelModel { get; set; }
+    [SupplyParameterFromForm(FormName = "dispute", Name = "Model")] DisputeForm? DisputeModel { get; set; }
+    [SupplyParameterFromForm(FormName = "noshow", Name = "Model")] NoShowForm? NoShowModel { get; set; }
 
     public sealed class CancelForm { public string? Reason { get; set; } }
     public sealed class DisputeForm { public string? Kind { get; set; } public string? Text { get; set; } }

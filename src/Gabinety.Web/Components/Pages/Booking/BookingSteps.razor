@@ -1,0 +1,18 @@
+@* The four steps of a booking (UX-020): Termin, Opis, Platnosc, Gotowe. The current one carries aria-current="step"; finished ones are marked for assistive technology with a hidden "(ukończony)" and look different through the scoped sheet. Used by the form, and by checkout and confirmation with another Current. *@
+<nav aria-label="@BookFlowText.Steps.Label" class="booking-steps">
+    <ol class="booking-steps__list">
+        @for (var i = 0; i < BookFlowText.Steps.Names.Length; i++)
+        {
+            var state = i < Current ? "done" : i == Current ? "current" : "todo";
+            <li class="@("booking-steps__item booking-steps__item--" + state)" aria-current="@(i == Current ? "step" : null)">
+                <span class="booking-steps__mark" aria-hidden="true">@(i + 1)</span>
+                <span class="booking-steps__name">@BookFlowText.Steps.Names[i]@if (i < Current) {<span class="sr-only"> @BookFlowText.Steps.Done</span>}</span>
+            </li>
+        }
+    </ol>
+</nav>
+
+@code {
+    /// <summary>The 0-based index of the current step: 0 Termin, 1 Opis, 2 Płatność, 3 Gotowe.</summary>
+    [Parameter] public int Current { get; set; }
+}

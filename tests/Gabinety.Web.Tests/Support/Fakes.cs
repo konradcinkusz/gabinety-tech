@@ -71,7 +71,15 @@ public sealed class FakeIdentity
     public string KeyId { get; set; } = "kid-1";
     public int RefreshCalls { get; private set; }
     public bool RefuseRefresh { get; set; }
+    /// <summary>A status the refresh endpoint answers with instead of working (429, 503): the identity service throttling or failing.</summary>
+    public int RefreshStatus { get; set; }
+    /// <summary>The refresh tokens presented to <c>/refresh</c>, in order. A rotating service spends each once: a repeat here is a replay, which authservice answers by revoking the family.</summary>
+    public List<string> SpentRefreshTokens { get; } = [];
+    /// <summary>Signs the ACCESS tokens of refreshes with this key instead of the published one (an attacker's token).</summary>
+    public RSA? AccessTokenSigner { get; set; }
     public bool Down { get; set; }
+    /// <summary>Set by <c>/logout</c>: authservice revokes every refresh token of the user.</summary>
+    public bool Revoked { get; private set; }
     public TimeSpan AccessLifetime { get; set; } = TimeSpan.FromHours(1);
     public string[] Roles { get; set; } = [];
 
@@ -121,15 +129,18 @@ public sealed class FakeIdentity
                     return Tokens(Field("email")!);
                 case "/api/v1/auth/refresh":
                     RefreshCalls++;
-                    if (RefuseRefresh || Field("refreshToken") is null) return FakeBackend.Json(new { message = "Invalid refresh token." }, HttpStatusCode.Unauthorized);
-                    return Tokens("demo-client@demo.example");
+                    if (RefreshStatus != 0) return new HttpResponseMessage((HttpStatusCode)RefreshStatus); // throttled or failing: the token is not spent
+                    SpentRefreshTokens.Add(Field("refreshToken") ?? "");
+                    if (RefuseRefresh || Revoked || Field("refreshToken") is null || SpentRefreshTokens.Count(t => t == Field("refreshToken")) > 1) return FakeBackend.Json(new { message = "Invalid refresh token." }, HttpStatusCode.Unauthorized); // a replay is refused like the real service
+                    return Tokens("demo-client@demo.example", AccessTokenSigner);
                 case "/api/v1/auth/logout":
+                    Revoked = true;
                     return FakeBackend.Json(new { message = "Logged out." });
             }
         }
         return new HttpResponseMessage(HttpStatusCode.NotFound);
     }
 
-    HttpResponseMessage Tokens(string email) =>
-        FakeBackend.Json(new { accessToken = Issue(email: email), refreshToken = $"refresh-{++_counter}", expiresIn = (int)AccessLifetime.TotalSeconds, tokenType = "Bearer" });
+    HttpResponseMessage Tokens(string email, RSA? signWith = null) =>
+        FakeBackend.Json(new { accessToken = Issue(email: email, signWith: signWith), refreshToken = $"refresh-{++_counter}", expiresIn = (int)AccessLifetime.TotalSeconds, tokenType = "Bearer" });
 }

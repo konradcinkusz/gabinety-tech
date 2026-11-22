@@ -168,6 +168,8 @@ builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchProfileName: null)
     .WithEnvironment("Backend__Assistant", AssistantUrl)
     .WithEnvironment("Backend__Auth", identityAuthority)
     .WithEnvironment("Site__BaseUrl", "http://localhost:3001")
+    // The session cookie is sealed with Data Protection (stateless sessions, ADR-0010): the key ring is persisted per user so a restart of the host does not sign a developer out. On Fly it is a volume.
+    .WithEnvironment("DataProtection__KeysPath", Path.Combine(Path.GetTempPath(), $"gabinety-web-keys-{Environment.UserName}"))
     .WaitFor(directory);
 
 builder.Build().Run();

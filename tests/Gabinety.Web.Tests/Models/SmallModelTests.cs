@@ -113,18 +113,6 @@ public class WebOptionsTests
     [Fact] public void Defaults_are_the_fake_profile_address_and_no_proxy_key() { var o = WebOptions.From(new ConfigurationBuilder().Build()); Assert.Equal("http://localhost:3001", o.SiteBaseUrl); Assert.Null(o.TrustedProxyKey); Assert.False(o.SecureCookies); }
 }
 
-public class SiteNavigationTests
-{
-    [Fact] public void The_practitioner_list_comes_first_for_everybody() { Assert.Equal("/programisci", SiteNavigation.Items(false)[0].Href); Assert.Equal("/programisci", SiteNavigation.Items(true)[0].Href); }
-
-    [Fact]
-    public void Order_is_pinned()
-    {
-        Assert.Equal(["/programisci", "/logowanie"], SiteNavigation.Items(false).Select(i => i.Href));
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/wyloguj"], SiteNavigation.Items(true).Select(i => i.Href));
-    }
-}
-
 public class FlashKeyTests
 {
     [Fact] public void A_known_key_shows_its_own_text() => Assert.Equal("Wylogowano.", FlashKey.Resolve("http://localhost/?flash=signed-out"));

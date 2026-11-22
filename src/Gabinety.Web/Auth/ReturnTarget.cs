@@ -6,8 +6,8 @@ namespace Gabinety.Web.Auth;
 /// </summary>
 public static class ReturnTarget
 {
-    public const string Parameter = "redirect", LoginPath = "/logowanie", LogoutPath = "/wyloguj", OAuthCallbackPath = "/oauth/callback";
-    static readonly string[] AuthPages = [LoginPath, LogoutPath, OAuthCallbackPath, "/rejestracja"];
+    public const string Parameter = "redirect", LoginPath = "/logowanie", LogoutPath = "/wyloguj", OAuthCallbackPath = "/oauth/callback", RegisterPath = "/rejestracja", TwoFactorPath = "/logowanie/kod", CheckInboxPath = "/rejestracja/sprawdz-skrzynke";
+    static readonly string[] AuthPages = [LoginPath, LogoutPath, OAuthCallbackPath, RegisterPath];
 
     public static string Safe(string? raw)
     {
@@ -22,4 +22,10 @@ public static class ReturnTarget
 
     /// <summary><c>/logowanie</c> with the return target attached; "/" needs no parameter.</summary>
     public static string LoginUrl(string back) => back == "/" ? LoginPath : $"{LoginPath}?{Parameter}={Uri.EscapeDataString(back)}";
+
+    /// <summary><c>/rejestracja</c> with the return target attached.</summary>
+    public static string RegisterUrl(string back) => back == "/" ? RegisterPath : $"{RegisterPath}?{Parameter}={Uri.EscapeDataString(back)}";
+
+    /// <summary>The page that asks for the two-factor code; the target itself travels in the sealed challenge, but a link may carry it too.</summary>
+    public static string TwoFactorUrl(string back) => back == "/" ? TwoFactorPath : $"{TwoFactorPath}?{Parameter}={Uri.EscapeDataString(back)}";
 }

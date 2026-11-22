@@ -5,6 +5,7 @@ import { addDays, bff, day, openSlots, publicProfile, registerDemoUser, uniqueDe
 import { restoreClock } from "../harness/clock";
 import { resetAndReseed } from "../harness/demo-data";
 
+// Next.js variant (posts through /api/proxy/...). Under HOST=blazor the config does not select this file; the Blazor variant is j7-foreign-origin.blazor.spec.ts.
 // J7 (SPEC 10, 11): a state-changing request through the web origin with a foreign Origin, or from a cross-site fetch, is refused with 403
 // `cross_site_request` (CONTRACTS 10.1) and changes nothing: no booking exists afterwards. A same-origin request with the same body is the control.
 test.describe("J7 foreign Origin is refused", () => {

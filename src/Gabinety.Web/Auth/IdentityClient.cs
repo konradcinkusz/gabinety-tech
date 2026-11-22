@@ -5,13 +5,17 @@ using Gabinety.Web.Api;
 namespace Gabinety.Web.Auth;
 
 /// <summary><c>Accepted</c> is the 202 of registration: an e-mail confirmation is pending and no token is issued.</summary>
-public enum IdentityOutcome { Tokens, Accepted, TwoFactor, VerificationRequired, Unauthorized, Rejected, Unavailable }
+/// <summary>
+/// <c>RateLimited</c> (429: wait, nothing is wrong with the credentials), <c>LockedOut</c> (401 with <c>lockedOut</c>: the account is paused after repeated failures; authservice says so only to a caller
+/// who got the password right, so it leaks nothing), <c>Unauthorized</c> (every other 401: wrong password and unknown address are one answer). Both of the first two are NOT a refused refresh.
+/// </summary>
+public enum IdentityOutcome { Tokens, Accepted, TwoFactor, VerificationRequired, Unauthorized, LockedOut, Rejected, RateLimited, Unavailable }
 
-public sealed record IdentityResult(IdentityOutcome Outcome, string? AccessToken = null, string? RefreshToken = null, int ExpiresInSeconds = 3600);
+public sealed record IdentityResult(IdentityOutcome Outcome, string? AccessToken = null, string? RefreshToken = null, int ExpiresInSeconds = 3600, string? ChallengeToken = null);
 
 /// <summary>
 /// The sign-in calls of the identity service (authservice, or DevIdentity in the fake profile), mirroring <c>web/src/lib/session/identity.ts</c>: the same paths, the same answer
-/// classification. Server side only; the tokens it returns go to <see cref="ServerSessionStore"/> and nowhere else. A body or a title of the service is never kept.
+/// classification. Server side only; the tokens it returns go to the session (<see cref="SessionCache"/> and the sealed cookie) and nowhere else. A body or a title of the service is never kept.
 /// </summary>
 public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visitor)
 {
@@ -22,6 +26,13 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
 
     public Task<IdentityResult> RefreshAsync(string refreshToken, CancellationToken ct = default) =>
         PostAsync("/api/v1/auth/refresh", new { refreshToken }, null, ct);
+
+    /// <summary>
+    /// The second step of a two-factor sign-in: the challenge token of the first step (valid for 5 minutes) and ONE of an authenticator code or a recovery code (authservice's
+    /// <c>2fa/login</c>; a wrong code is the generic 401, a repeat of a recovery code too).
+    /// </summary>
+    public Task<IdentityResult> TwoFactorAsync(string challengeToken, string? code, string? recoveryCode, CancellationToken ct = default) =>
+        PostAsync("/api/v1/auth/2fa/login", code is not null ? new { challengeToken, code } : new { challengeToken, recoveryCode }, null, ct);
 
     /// <summary>The versions of the terms and the privacy text a registration must accept (null when the identity service cannot say).</summary>
     public async Task<(string Terms, string Privacy)?> ConsentVersionsAsync(CancellationToken ct = default)
@@ -100,7 +111,8 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
                 using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
                 var root = doc.RootElement;
                 if (root.ValueKind != JsonValueKind.Object) return new IdentityResult(IdentityOutcome.Unavailable);
-                if (root.TryGetProperty("requiresTwoFactor", out var two) && two.ValueKind == JsonValueKind.True) return new IdentityResult(IdentityOutcome.TwoFactor);
+                if (root.TryGetProperty("requiresTwoFactor", out var two) && two.ValueKind == JsonValueKind.True)
+                    return new IdentityResult(IdentityOutcome.TwoFactor, ChallengeToken: root.TryGetProperty("challengeToken", out var ct2) && ct2.ValueKind == JsonValueKind.String ? ct2.GetString() : null);
                 if (root.TryGetProperty("accessToken", out var at) && at.ValueKind == JsonValueKind.String && root.TryGetProperty("refreshToken", out var rt) && rt.ValueKind == JsonValueKind.String)
                 {
                     var expires = root.TryGetProperty("expiresIn", out var e) && e.TryGetInt32(out var n) && n > 0 ? n : 3600;
@@ -110,9 +122,18 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
             catch (JsonException) { }
             return new IdentityResult(IdentityOutcome.Unavailable);
         }
-        if (status == 429) return new IdentityResult(IdentityOutcome.Unavailable); // rate limited: a refresh that is throttled is not a refused one, the session must not end
+        if (status == 429) return new IdentityResult(IdentityOutcome.RateLimited); // a refresh that is throttled is not a refused one: the session must not end (UserTokens treats it as an outage)
         if (status == 202) return new IdentityResult(IdentityOutcome.Accepted);
-        if (status == 401) return new IdentityResult(IdentityOutcome.Unauthorized);
+        if (status == 401)
+        {
+            try
+            {
+                using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("lockedOut", out var l) && l.ValueKind == JsonValueKind.True) return new IdentityResult(IdentityOutcome.LockedOut);
+            }
+            catch (JsonException) { }
+            return new IdentityResult(IdentityOutcome.Unauthorized);
+        }
         if (status == 403)
         {
             try

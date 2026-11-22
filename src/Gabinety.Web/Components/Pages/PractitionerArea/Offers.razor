@@ -3,8 +3,8 @@
 @layout PractitionerLayout
 @inherits PractitionerPage
 @inject DirectoryClient Directory
-@* Offers: the list with a confirmation step before "Wyłącz" (F-04, P-OFF-1) and a way back ("Włącz"), and the form to add or edit one. Static server rendering with plain forms: the confirmation is a
-   page state (?wylacz=<id>), so it works without JavaScript and can be linked. The price is typed in zloty and sent as integer grosz. *@
+@* Offers: the list first, with a confirmation step before "Wyłącz" (F-04, P-OFF-1) and a way back ("Włącz"). The new-offer form is closed by default: it opens from "Dodaj ofertę" (?nowa=1), from "Edytuj" (?edit=<id>), or when a posted form has to be shown again with its errors.
+   Static server rendering with plain forms: the confirmation is a page state (?wylacz=<id>), so it works without JavaScript and can be linked. The price is typed in zloty and sent as integer grosz. *@
 <PageTitle>@PlPractitioner.Offers.MetaTitle</PageTitle>
 <h1>@PlPractitioner.Offers.Title</h1>
 
@@ -31,6 +31,7 @@ else if (_loaded)
         </section>
     }
 
+    <h2 id="offers-list-title">@PlPractitioner.Offers.ListLabel</h2>
     @if (_offers.Count == 0)
     {
         <p class="empty-state">@PlPractitioner.Offers.Empty</p>
@@ -39,7 +40,7 @@ else if (_loaded)
     {
         <form method="post" @onsubmit="EnableAsync" @formname="offer-enable">
             <AntiforgeryToken />
-            <ul class="stack offers" aria-label="@PlPractitioner.Offers.ListLabel">
+            <ul class="stack offers" aria-labelledby="offers-list-title">
                 @foreach (var o in _offers)
                 {
                     <li class="card offer" data-testid="offer" data-active="@(o.IsActive ? "true" : "false")">
@@ -65,68 +66,97 @@ else if (_loaded)
         </form>
     }
 
-    <section class="card section" aria-labelledby="offer-form-title">
-        <h2 id="offer-form-title">@(_editing is null ? PlPractitioner.Offers.FormTitleNew : PlPractitioner.Offers.FormTitleEdit)</h2>
-        @if (_editing is not null) {<p class="muted">@PlPractitioner.Offers.PriceChangeNote</p>}
-        @if (_taxonomy is null) {<Alert Variant="AlertVariant.Danger" TestId="taxonomy-unavailable">@PlPractitioner.Offers.TaxonomyUnavailable</Alert>}
-        <ErrorSummary Errors="Summary" />
-        @if (_general is not null) {<Alert Variant="AlertVariant.Danger" TestId="offer-error">@_general</Alert>}
-        <form method="post" @onsubmit="SaveAsync" @formname="offer" class="form stack form-narrow" novalidate>
-            <AntiforgeryToken />
-            <input type="hidden" name="id" value="@_editing" />
-            <FormField Id="title" Label="@PlPractitioner.Offers.Name" Hint="@PlPractitioner.Offers.NameHint" Error="@Error("title")" Max="80" Length="_f.Title.Length">
-                <input id="@context.Id" name="title" value="@_f.Title" maxlength="80" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
-            </FormField>
-            <FormField Id="description" Label="@PlPractitioner.Offers.Description" Hint="@PlPractitioner.Offers.DescriptionHint" Error="@Error("description")" Max="600" Length="_f.Description.Length" Optional="true">
-                <textarea id="@context.Id" name="description" rows="5" maxlength="600" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">@_f.Description</textarea>
-            </FormField>
-            <div class="offer-form__pair">
-                <FormField Id="duration" Label="@PlPractitioner.Offers.Duration" Error="@Error("durationMinutes")">
-                    <select id="@context.Id" name="duration" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">
-                        <option value="30" selected="@(_f.Duration != "60")">@PlPractitioner.Offers.D30</option>
-                        <option value="60" selected="@(_f.Duration == "60")">@PlPractitioner.Offers.D60</option>
-                    </select>
-                </FormField>
-                <FormField Id="price" Label="@PlPractitioner.Offers.Price" Hint="@PlPractitioner.Offers.PriceHint" Error="@Error("priceMinor")">
-                    <input id="@context.Id" name="price" inputmode="decimal" autocomplete="off" value="@_f.Price" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
-                </FormField>
-            </div>
-            <FormField Id="problemSlug" Label="@PlPractitioner.Offers.Problem" Error="@Error("problemSlug")">
-                <select id="@context.Id" name="problemSlug" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">
-                    <option value="" selected="@(_f.Problem == "")">@PlPractitioner.Offers.Choose</option>
-                    @foreach (var p in _taxonomy?.Problems ?? [])
-                    {
-                        <option value="@p.Slug" selected="@(_f.Problem == p.Slug)">@p.NamePl</option>
-                    }
-                </select>
-            </FormField>
-            <fieldset class="option-group" id="techSlugs" aria-describedby="@(Error("techSlugs") is null ? "techs-hint" : "techs-hint techSlugs-error")">
-                <legend>@PlPractitioner.Offers.Techs</legend>
-                <p class="field__hint" id="techs-hint">@PlPractitioner.Offers.TechsHint</p>
-                <div class="cluster chips">
-                    @foreach (var t in _taxonomy?.Techs ?? [])
-                    {
-                        <label class="option chip"><input type="checkbox" name="techs" value="@t.Slug" checked="@_f.Techs.Contains(t.Slug)" /> @t.NamePl</label>
-                    }
-                </div>
-                @if (Error("techSlugs") is { } techError) {<p class="field__error" id="techSlugs-error"><span class="visually-hidden">@($"{PlPractitioner.Common.ErrorWord} ")</span>@techError</p>}
-            </fieldset>
-            <FormField Id="meetingUrl" Label="@PlPractitioner.Offers.Meeting" Hint="@PlPractitioner.Offers.MeetingHint" Error="@Error("meetingUrl")" Optional="true">
-                <input id="@context.Id" name="meetingUrl" type="url" inputmode="url" maxlength="300" value="@_f.Meeting" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
-            </FormField>
-            <div class="form-actions cluster">
-                <button class="btn btn--primary" type="submit" disabled="@(_editing is null && _active >= OfferForm.MaxActive)">@PlPractitioner.Common.Save</button>
-                @if (_editing is not null) {<a class="btn btn--ghost" href="@PractitionerPaths.Offers">@PlPractitioner.Offers.Cancel</a>}
-            </div>
-            @if (_editing is null && _active >= OfferForm.MaxActive) {<p class="muted">@PlPractitioner.Offers.TooMany</p>}
-        </form>
-    </section>
+    @if (!_formOpen)
+    {
+        <div class="cluster section">
+            @if (_active < OfferForm.MaxActive)
+            {
+                <a class="btn btn--primary" href="@($"{PractitionerPaths.Offers}?nowa=1")">@PlPractitioner.Offers.AddNew</a>
+            }
+            else
+            {
+                <p class="muted">@PlPractitioner.Offers.TooMany</p>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="offer-editor section">
+            <section class="card offer-editor__form" aria-labelledby="offer-form-title">
+                <h2 id="offer-form-title">@(_editing is null ? PlPractitioner.Offers.FormTitleNew : PlPractitioner.Offers.FormTitleEdit)</h2>
+                @if (_editing is not null) {<p class="muted">@PlPractitioner.Offers.PriceChangeNote</p>}
+                @if (_taxonomy is null) {<Alert Variant="AlertVariant.Danger" TestId="taxonomy-unavailable">@PlPractitioner.Offers.TaxonomyUnavailable</Alert>}
+                <ErrorSummary Errors="Summary" />
+                @if (_general is not null) {<Alert Variant="AlertVariant.Danger" TestId="offer-error">@_general</Alert>}
+                <form method="post" @onsubmit="SaveAsync" @formname="offer" class="form stack form-narrow" novalidate>
+                    <AntiforgeryToken />
+                    <input type="hidden" name="id" value="@_editing" />
+                    <FormField Id="title" Label="@PlPractitioner.Offers.Name" Hint="@PlPractitioner.Offers.NameHint" Error="@Error("title")" Max="80" Length="_f.Title.Length">
+                        <input id="@context.Id" name="title" value="@_f.Title" maxlength="80" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+                    </FormField>
+                    <FormField Id="description" Label="@PlPractitioner.Offers.Description" Hint="@PlPractitioner.Offers.DescriptionHint" Error="@Error("description")" Max="600" Length="_f.Description.Length" Optional="true">
+                        <textarea id="@context.Id" name="description" rows="5" maxlength="600" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">@_f.Description</textarea>
+                    </FormField>
+                    <div class="offer-form__pair">
+                        <FormField Id="duration" Label="@PlPractitioner.Offers.Duration" Error="@Error("durationMinutes")">
+                            <select id="@context.Id" name="duration" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">
+                                <option value="30" selected="@(_f.Duration != "60")">@PlPractitioner.Offers.D30</option>
+                                <option value="60" selected="@(_f.Duration == "60")">@PlPractitioner.Offers.D60</option>
+                            </select>
+                        </FormField>
+                        <FormField Id="price" Label="@PlPractitioner.Offers.Price" Hint="@PlPractitioner.Offers.PriceHint" Error="@Error("priceMinor")">
+                            <input id="@context.Id" name="price" inputmode="decimal" autocomplete="off" value="@_f.Price" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+                        </FormField>
+                    </div>
+                    <FormField Id="problemSlug" Label="@PlPractitioner.Offers.Problem" Error="@Error("problemSlug")">
+                        <select id="@context.Id" name="problemSlug" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">
+                            <option value="" selected="@(_f.Problem == "")">@PlPractitioner.Offers.Choose</option>
+                            @foreach (var p in _taxonomy?.Problems ?? [])
+                            {
+                                <option value="@p.Slug" selected="@(_f.Problem == p.Slug)">@p.NamePl</option>
+                            }
+                        </select>
+                    </FormField>
+                    <fieldset class="option-group" id="techSlugs" aria-describedby="@(Error("techSlugs") is null ? "techs-hint techs-count" : "techs-hint techs-count techSlugs-error")">
+                        <legend>@PlPractitioner.Offers.Techs</legend>
+                        <p class="field__hint" id="techs-hint">@PlPractitioner.Offers.TechsHint</p>
+                        <div class="cluster chips">
+                            @foreach (var t in _taxonomy?.Techs ?? [])
+                            {
+                                <label class="option chip"><input type="checkbox" name="techs" value="@t.Slug" checked="@_f.Techs.Contains(t.Slug)" /> @t.NamePl</label>
+                            }
+                        </div>
+                        <p class="muted" id="techs-count">@string.Format(PlPractitioner.Offers.TechCount, _f.Techs.Count)</p>
+                        @if (Error("techSlugs") is { } techError) {<p class="field__error" id="techSlugs-error"><span class="visually-hidden">@($"{PlPractitioner.Common.ErrorWord} ")</span>@techError</p>}
+                    </fieldset>
+                    <FormField Id="meetingUrl" Label="@PlPractitioner.Offers.Meeting" Hint="@PlPractitioner.Offers.MeetingHint" Error="@Error("meetingUrl")" Optional="true">
+                        <input id="@context.Id" name="meetingUrl" type="url" inputmode="url" maxlength="300" value="@_f.Meeting" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+                    </FormField>
+                    <div class="form-actions cluster">
+                        <button class="btn btn--primary" type="submit" disabled="@(_editing is null && _active >= OfferForm.MaxActive)">@PlPractitioner.Common.Save</button>
+                        <a class="btn btn--ghost" href="@PractitionerPaths.Offers">@PlPractitioner.Offers.Cancel</a>
+                    </div>
+                    @if (_editing is null && _active >= OfferForm.MaxActive) {<p class="muted">@PlPractitioner.Offers.TooMany</p>}
+                </form>
+            </section>
+
+            @* The card a client sees on the profile, from the values in the form (saved values when editing, placeholders when creating). Static: it does not need JavaScript. *@
+            <section class="card offer-preview" aria-labelledby="offer-preview-title">
+                <h2 id="offer-preview-title" class="offer-preview__label">@PlPractitioner.Offers.PreviewLabel</h2>
+                <p class="muted offer-preview__note">@PlPractitioner.Offers.PreviewNote</p>
+                <h3 class="offer-preview__title @(string.IsNullOrWhiteSpace(_f.Title) ? "muted" : null)">@(string.IsNullOrWhiteSpace(_f.Title) ? PlPractitioner.Offers.PreviewTitle : _f.Title)</h3>
+                <p class="offer-preview__desc @(string.IsNullOrWhiteSpace(_f.Description) ? "muted" : null)">@(string.IsNullOrWhiteSpace(_f.Description) ? PlPractitioner.Offers.PreviewDescription : _f.Description)</p>
+                <p class="cluster offer-preview__meta"><span>@string.Format(PlPractitioner.Offers.Minutes, _f.Duration == "60" ? 60 : 30)</span> · <span class="num @(PreviewPriceIsPlaceholder ? "muted" : null)">@PreviewPrice</span></p>
+            </section>
+        </div>
+    }
 }
 
 @code {
-    /// <summary><c>?edit=&lt;id&gt;</c>: the offer in the form. <c>?wylacz=&lt;id&gt;</c>: the confirmation of disabling it. Both are looked up in the practitioner's own list; an unknown id shows nothing.</summary>
+    /// <summary><c>?edit=&lt;id&gt;</c>: the offer in the form. <c>?wylacz=&lt;id&gt;</c>: the confirmation of disabling it. <c>?nowa=1</c>: the form for a new offer. Both ids are looked up in the practitioner's own list; an unknown id shows nothing.</summary>
     [SupplyParameterFromQuery(Name = "edit")] public Guid? EditId { get; set; }
     [SupplyParameterFromQuery(Name = "wylacz")] public Guid? DisableId { get; set; }
+    [SupplyParameterFromQuery(Name = "nowa")] public string? NewParam { get; set; }
 
     IReadOnlyList<OfferingPrivateDto> _offers = [];
     TaxonomyDto? _taxonomy;
@@ -134,7 +164,7 @@ else if (_loaded)
     OfferingPrivateDto? _confirm;
     Guid? _editing;
     int _active;
-    bool _loaded;
+    bool _loaded, _formOpen;
     string? _general, _listNote;
     readonly Dictionary<string, string> _errors = [];
 
@@ -142,6 +172,15 @@ else if (_loaded)
     static string? Invalid(FormField.FieldContext c) => c.Invalid ? "true" : null;
 
     IReadOnlyList<KeyValuePair<string, string>> Summary => [.. OfferForm.FieldOrder.Where(_errors.ContainsKey).Select(f => KeyValuePair.Create(OfferForm.IdOf(f), _errors[f]))];
+
+    /// <summary>The price as the card shows it, or the placeholder while the typed text is not a valid price.</summary>
+    (string Text, bool IsPlaceholder) Preview()
+    {
+        var (problem, grosz) = PriceInput.Parse(_f.Price);
+        return problem == PriceProblem.None ? (Money.Pln(grosz), false) : (PlPractitioner.Offers.PreviewPrice, true);
+    }
+    string PreviewPrice => Preview().Text;
+    bool PreviewPriceIsPlaceholder => Preview().IsPlaceholder;
 
     protected override async Task OnInitializedAsync()
     {
@@ -154,6 +193,7 @@ else if (_loaded)
         _taxonomy = taxonomy.Result.Value;
         _active = _offers.Count(o => o.IsActive);
         _confirm = DisableId is { } d ? _offers.FirstOrDefault(o => o.Id == d && o.IsActive) : null;
+        _formOpen = NewParam is "1" or "true" || EditId is not null;
         if (EditId is { } e && _offers.FirstOrDefault(o => o.Id == e && o.IsActive) is { } mine) { _editing = mine.Id; _f = OfferForm.From(mine); }
         _loaded = true;
     }
@@ -166,6 +206,7 @@ else if (_loaded)
 
     async Task SaveAsync()
     {
+        _formOpen = true; // a posted form is shown again with its errors, whatever the URL said
         _f = OfferForm.FromPosted(Posted);
         _editing = Guid.TryParse(Posted.Get("id"), out var id) && _offers.Any(o => o.Id == id) ? id : null; // only an offer of this practitioner
         var local = _f.Validate();

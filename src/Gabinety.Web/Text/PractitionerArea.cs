@@ -126,6 +126,9 @@ public static class PlPractitioner
         public const string PriceFormat = "Wpisz cenę w złotych, na przykład 250 lub 250,50 (najwyżej dwa miejsca po przecinku).", PriceRange = "Cena musi mieścić się między 50 a 1500 zł.";
         public const string ConfirmTitle = "Wyłączyć ofertę „{0}”?", ConfirmBody = "Klienci nie zobaczą jej na profilu i nie zarezerwują nowych terminów. Istniejące rezerwacje zostają. Możesz ją włączyć z powrotem.";
         public const string ConfirmYes = "Tak, wyłącz ofertę", ConfirmNo = "Nie, zostaw aktywną", NotFound = "Nie znaleziono tej oferty.";
+        public const string AddNew = "Dodaj ofertę", TechCount = "Wybrano {0} z 4", Minutes = "{0} min";
+        public const string PreviewLabel = "Podgląd oferty", PreviewNote = "Tak zobaczą ją klienci na Twoim profilu. Podgląd pokazuje wartości zapisane w formularzu.";
+        public const string PreviewTitle = "Tytuł oferty", PreviewDescription = "Opis pojawi się tutaj.", PreviewPrice = "cena w zł";
     }
 
     public static class Availability

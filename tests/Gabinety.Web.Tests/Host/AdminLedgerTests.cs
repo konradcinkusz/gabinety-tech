@@ -71,7 +71,7 @@ public class AdminLedgerTests
         var today = DateTime.UtcNow;
         Assert.Equal($"{today:yyyy-MM}-01", page.One("input[name=from]")!.GetAttribute("value"));
         Assert.Equal($"{today:yyyy-MM-dd}", page.One("input[name=to]")!.GetAttribute("value"));
-        Assert.Equal("Ten miesiąc", page.TextOf(".admin-segmented a[aria-current=page]"));
+        Assert.Equal("Ten miesiąc", page.TextOf(".segmented a.chip[aria-current=true]"));
         Assert.Contains(page.All("main button"), b => b.TextContent.Trim() == "Pokaż okres" && b.ClassName!.Contains("btn--primary"));
         var download = page.All("main a").Single(a => a.TextContent == "Pobierz CSV");
         Assert.Equal($"/admin/ksiega/csv?from={today:yyyy-MM}-01&to={today:yyyy-MM-dd}", download.GetAttribute("href"));
@@ -119,10 +119,10 @@ public class AdminLedgerTests
         await using var host = await AdminHost.StartAsync();
         host.Web.Booking.Respond = _ => CsvOf(Header);
         var page = await host.Browser.GetAsync("/admin/ksiega");
-        Assert.Equal(["Ten miesiąc", "Poprzedni miesiąc", "Ten rok"], page.All(".admin-segmented a").Select(a => a.TextContent));
-        var last = page.All(".admin-segmented a")[1].GetAttribute("href")!;
+        Assert.Equal(["Ten miesiąc", "Poprzedni miesiąc", "Ten rok"], page.All(".segmented a.chip").Select(a => a.TextContent));
+        var last = page.All(".segmented a.chip")[1].GetAttribute("href")!;
         var chosen = await host.Browser.GetAsync(last);
-        Assert.Equal("Poprzedni miesiąc", chosen.TextOf(".admin-segmented a[aria-current=page]"));
+        Assert.Equal("Poprzedni miesiąc", chosen.TextOf(".segmented a.chip[aria-current=true]"));
         Assert.Equal("Brak wpisów w tym okresie.", chosen.TextOf(".empty-state"));
     }
 

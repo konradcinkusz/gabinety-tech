@@ -32,7 +32,7 @@ public class AdminComponentTests : BunitContext
     {
         var cut = Render<SegmentedLinks>(p => p.Add(c => c.Label, "Status").Add(c => c.Items, [new("Otwarte", "/a?status=open", true), new("Rozstrzygnięte", "/a?status=resolved", false)]));
         Assert.Equal("Status", cut.Find("nav").GetAttribute("aria-label"));
-        Assert.Equal(["page", null], cut.FindAll("a").Select(a => a.GetAttribute("aria-current")));
+        Assert.Equal(["true", null], cut.FindAll("a").Select(a => a.GetAttribute("aria-current")));
         Assert.Equal(["/a?status=open", "/a?status=resolved"], cut.FindAll("a").Select(a => a.GetAttribute("href")));
     }
 
@@ -64,7 +64,7 @@ public class AdminComponentTests : BunitContext
         Services.AddSingleton<Microsoft.AspNetCore.Components.Forms.AntiforgeryStateProvider, FakeAntiforgery>();
         var cut = Render<ReasonForm>(p => p.Add(c => c.FormName, "n").Add(c => c.Label, "L").Add(c => c.Hint, "H").Add(c => c.ConfirmText, "C").Add(c => c.CancelHref, "/"));
         Assert.Null(cut.Find("textarea").GetAttribute("aria-invalid"));
-        Assert.Empty(cut.FindAll(".admin-error"));
+        Assert.Empty(cut.FindAll(".field__error"));
         Assert.DoesNotContain("reason-error", cut.Find("textarea").GetAttribute("aria-describedby"));
     }
 

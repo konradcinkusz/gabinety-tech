@@ -52,7 +52,7 @@ public class AdminDisputesTests
         Assert.DoesNotContain("demo-client-2", text);
         Assert.Contains("Konsultacja różniła się od opisu", text);
         Assert.Contains(card.QuerySelectorAll("button"), b => b.TextContent.Trim() == "Rozstrzygnij");
-        Assert.Equal("Otwarte", page.TextOf(".admin-segmented a[aria-current=page]"));
+        Assert.Equal("Otwarte\u00A0(1)", page.TextOf(".segmented a.chip[aria-current=true]"));
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class AdminDisputesTests
         Assert.Equal(["Wypłać programiście", "Zwróć klientowi całość", "Zwróć klientowi część"], card.QuerySelectorAll("input[type=radio]").Select(r => Page.Squash(r.ParentElement!.QuerySelector("span")!.ChildNodes[0].TextContent)));
         Assert.Equal("Kwota zwrotu w zł", card.QuerySelector("label[for^=amount]")!.TextContent);
         Assert.StartsWith("Notatka", card.QuerySelector("label[for^=note]")!.TextContent);
-        Assert.Contains("Od 0,01 zł do 180,00", Page.Squash(card.QuerySelector(".admin-hint")!.TextContent).Replace(' ', ' ') + Page.Squash(card.TextContent).Replace(' ', ' ')); // the maximum is the field's hint
+        Assert.Contains("Od 0,01 zł do 180,00", Page.Squash(card.QuerySelector(".field__hint")!.TextContent).Replace(' ', ' ') + Page.Squash(card.TextContent).Replace(' ', ' ')); // the maximum is the field's hint
         Assert.Contains(card.QuerySelectorAll("button"), b => b.TextContent.Trim() == "Przejdź do potwierdzenia");
         Assert.DoesNotContain(card.QuerySelectorAll("button"), b => b.TextContent.Contains("Potwierdź rozstrzygnięcie"));
         Assert.NotNull(card.QuerySelector("form[method=post] input[name=__RequestVerificationToken]"));
@@ -236,7 +236,7 @@ public class AdminDisputesTests
         Assert.Contains("25 lis 2026, 10:30", text);
         Assert.Empty(page.All("main button"));
         Assert.Contains("status=resolved", host.Web.Booking.Requests[0].PathAndQuery);
-        Assert.Equal("Rozstrzygnięte", page.TextOf(".admin-segmented a[aria-current=page]"));
+        Assert.StartsWith("Rozstrzygnięte", page.TextOf(".segmented a.chip[aria-current=true]"));
     }
 
     [Theory]

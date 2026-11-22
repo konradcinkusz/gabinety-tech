@@ -37,7 +37,7 @@ public class AdminReviewsAndPairsTests
         Assert.Equal("24 lis 2026, 13:00", AdminHost.Fact(card, "Dodano"));
         Assert.Contains(card.QuerySelectorAll("button"), b => b.TextContent.Trim() == "Opublikuj");
         Assert.Contains(card.QuerySelectorAll("button"), b => b.TextContent.Trim() == "Odrzuć");
-        Assert.Equal("Wstrzymane", page.TextOf(".admin-segmented a[aria-current=page]"));
+        Assert.Equal("Wstrzymane", page.TextOf(".segmented a.chip[aria-current=true]"));
     }
 
     [Fact]

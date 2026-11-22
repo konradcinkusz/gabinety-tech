@@ -2,15 +2,16 @@
 @layout MainLayout
 @inject NavigationManager Navigation
 
-@* The administrator area (DESIGN-CONTRACT 5.8, 5.9; UI-AUDIT P-ADM-1): a strip "Administracja" and ONE .tabs pattern for the sections, with aria-current on the current one. Every page of the area uses this layout (Pages/Admin/_Imports.razor),
-   so the tabs cannot be forgotten. The role is checked before any of this renders (the Admin policy of the page), not here. *@
+@* The administrator area (DESIGN-CONTRACT 5.8, 5.9; UI-AUDIT P-ADM-1): a strip "Administracja" and the shared .tabs pattern for the sections, with aria-current on the current one. Every page of the area uses this layout
+   (Pages/Admin/_Imports.razor), so the tabs cannot be forgotten. The tabs carry no counts: a count would be an extra backend call on every admin page, so the counts sit on each page's own status chips (UX-050).
+   The role is checked before any of this renders (the Admin policy of the page), not here. *@
 <div class="admin-area">
     <p class="admin-strip">@PlAdmin.Shell.Strip</p>
-    <nav aria-label="@PlAdmin.Shell.NavLabel" class="admin-tabs">
+    <nav aria-label="@PlAdmin.Shell.NavLabel" class="tabs">
         <ul>
             @foreach (var (href, label) in Sections)
             {
-                <li><a href="@href" aria-current="@(IsCurrent(href) ? "page" : null)">@label</a></li>
+                <li><a class="tabs__link" href="@href" aria-current="@(IsCurrent(href) ? "page" : null)">@label</a></li>
             }
         </ul>
     </nav>

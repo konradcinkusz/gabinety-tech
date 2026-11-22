@@ -26,8 +26,8 @@ public class AdminVerificationTests
         Assert.Single(row.QuerySelectorAll("button"), b => b.TextContent.Trim() == "Odrzuć"); // reveal button of the reject step
         Assert.Single(row.QuerySelectorAll(".badge"), b => b.TextContent == "Czeka na weryfikację");
         Assert.Contains("24 lis 2026, 13:00", Page.Squash(row.TextContent)); // short date in Warsaw time, no seconds
-        Assert.Contains("Weryfikacja programistów", page.TextOf("nav.admin-tabs a[aria-current=page]"));
-        Assert.Equal("Czeka na weryfikację", page.TextOf(".admin-segmented a[aria-current=page]"));
+        Assert.Contains("Weryfikacja programistów", page.TextOf("nav.tabs a.tabs__link[aria-current=page]"));
+        Assert.Equal("Czeka na weryfikację\u00A0(2)", page.TextOf(".segmented a.chip[aria-current=true]")); // the chip of the status on screen counts the rows the page loaded
         var queue = host.Web.Directory.Requests.Single(r => r.PathAndQuery != "/api/v1/me");
         Assert.Equal("Bearer", queue.Authorization?.Split(' ')[0]); // the user's own token
         Assert.Contains("status=Submitted", queue.PathAndQuery);

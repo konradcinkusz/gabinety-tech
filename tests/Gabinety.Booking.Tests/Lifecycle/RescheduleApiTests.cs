@@ -20,10 +20,10 @@ static class Resched
     public static Task<HttpResponseMessage> Move(CreateHost h, Guid id, string? as_, string startUtc) => Post(h, id, as_, new { startUtc });
 
     /// <summary>A host with the practitioner's work week, a confirmed booking <paramref name="startIn"/> ahead and its notification rows as confirmation would have written them.</summary>
-    public static async Task<(CreateHost Host, RecordingProvider Provider, Guid Id)> Confirmed(TimeSpan startIn, BookingStatus status = BookingStatus.Confirmed)
+    public static async Task<(CreateHost Host, RecordingProvider Provider, Guid Id)> Confirmed(TimeSpan startIn, BookingStatus status = BookingStatus.Confirmed, Action<CreateHost>? tweak = null)
     {
         var provider = new RecordingProvider();
-        var h = Life.Host(provider);
+        var h = Life.Host(provider, tweak);
         await h.WorkWeek();
         var id = await Life.Seed(h, status, startIn);
         var b = await Life.Row(h, id);

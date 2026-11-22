@@ -1,3 +1,4 @@
+using Gabinety.Booking.Notifications.Preferences;
 using Gabinety.Booking.Payments.Abstractions;
 using Gabinety.Booking.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -59,6 +60,18 @@ public sealed class NotificationDispatcher(IServiceScopeFactory scopes, TimeProv
 
         var n = await db.Notifications.SingleOrDefaultAsync(x => x.Id == id, ct);
         if (n is null || n.SentAt != null || n.Attempts >= MaxAttempts || n.DueAt > now) return false;
+
+        // A switchable kind the recipient switched off AT SEND TIME is closed without sending, so a change takes effect for rows scheduled earlier.
+        // A transactional kind never reaches the query: whatever the table says, it is sent.
+        if (NotificationPreferenceRules.IsSwitchable(n.Kind)
+            && await db.NotificationPreferences.AsNoTracking().AnyAsync(p => p.UserId == n.ToUserId && p.Kind == n.Kind && !p.Enabled, ct))
+        {
+            n.SentAt = now; // closed: never selected again; attempts stays, nothing was attempted
+            try { await db.SaveChangesAsync(ct); }
+            catch (DbUpdateConcurrencyException) { return false; } // claimed or removed by someone else meanwhile
+            log.LogInformation("Notification {NotificationId} ({Kind}) to user {UserId} closed without sending: the recipient switched it off", n.Id, n.Kind, n.ToUserId);
+            return false;
+        }
 
         var booking = await db.Bookings.AsNoTracking().Where(b => b.Id == n.BookingId)
             .Select(b => new { b.StartUtc, b.PractitionerUserId, b.ClientEmail }).SingleOrDefaultAsync(ct);

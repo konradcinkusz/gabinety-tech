@@ -17,7 +17,7 @@ builder.Services.AddSingleton(sp => new TokenIssuer(sp.GetRequiredService<TimePr
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok("Healthy"));
-app.MapDevIdentityEndpoints(builder.Configuration["Jwt:PublicBaseUrl"]);
+app.MapDevIdentityEndpoints(builder.Configuration["Jwt:PublicBaseUrl"], fakeProfile: true); // the guard above already proved GABINETY_FAKE=1
 app.Run();
 return 0;
 

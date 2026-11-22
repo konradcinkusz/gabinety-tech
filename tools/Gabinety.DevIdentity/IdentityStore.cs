@@ -2,8 +2,10 @@ using System.Security.Cryptography;
 
 namespace Gabinety.DevIdentity;
 
-public sealed record DevUser(string Id, string Email, byte[] Salt, byte[] Hash, string[] Roles, DateTimeOffset CreatedAt)
+public sealed record DevUser(string Id, string Email, byte[] InitialSalt, byte[] InitialHash, string[] Roles, DateTimeOffset CreatedAt)
 {
+    public byte[] Salt { get; set; } = InitialSalt;
+    public byte[] Hash { get; set; } = InitialHash;
     public DateTimeOffset? LastLoginAt { get; set; }
     /// <summary>Consecutive wrong passwords; reaches <see cref="IdentityStore.MaxFailedAttempts"/> and locks the account, as ASP.NET Identity does in authservice.</summary>
     public int FailedAttempts { get; set; }
@@ -24,6 +26,7 @@ public sealed class IdentityStore(TimeProvider time)
     public const string SeedEmailDomain = "demo.example";
     public const int MaxFailedAttempts = 5; // authservice: Lockout.MaxFailedAccessAttempts
     public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(5); // authservice: Lockout.DefaultLockoutTimeSpan
+    public static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromMinutes(10); // authservice: a day; short here so expiry is cheap to prove
     public static readonly TimeSpan RefreshLifetime = TimeSpan.FromDays(7); // authservice default (spike section 1)
 
     private sealed class RefreshEntry(string userId, string family, DateTimeOffset expires)
@@ -39,6 +42,8 @@ public sealed class IdentityStore(TimeProvider time)
     private readonly Dictionary<string, DevUser> _byEmail = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DevUser> _byId = new();
     private readonly Dictionary<string, RefreshEntry> _refresh = new();
+    private readonly Dictionary<string, (string Token, DateTimeOffset Expires)> _resetByUser = new();
+    private readonly Dictionary<string, string> _lastResetByEmail = new(StringComparer.OrdinalIgnoreCase);
 
     public void Seed()
     {
@@ -116,6 +121,72 @@ public sealed class IdentityStore(TimeProvider time)
             user.DeletedAt = time.GetUtcNow();
             foreach (var e in _refresh.Values.Where(e => e.UserId == user.Id)) e.Revoked = true;
         }
+    }
+
+    /// <summary>
+    /// Issues a password-reset token for a known, live account (a newer one replaces the older, as a new security stamp would) and returns it; null for an unknown address.
+    /// The caller never tells the two apart. The fake profile sends no e-mail, so the token is only readable through the dev route.
+    /// </summary>
+    public string? IssueResetToken(string email)
+    {
+        lock (_gate)
+        {
+            if (!_byEmail.TryGetValue(email, out var user) || user.DeletedAt is not null) return null;
+            var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).Replace('+', '-').Replace('/', '_').TrimEnd('=');
+            _resetByUser[user.Id] = (token, time.GetUtcNow() + ResetTokenLifetime);
+            _lastResetByEmail[user.Email] = token;
+            return token;
+        }
+    }
+
+    /// <summary>The last token issued for the address, used or not (development route only).</summary>
+    public string? LastResetToken(string email)
+    {
+        lock (_gate) return _lastResetByEmail.GetValueOrDefault(email);
+    }
+
+    /// <summary>
+    /// Identity's ResetPasswordAsync: the token is checked first, then the password rules; a rejected password leaves the token usable, a success consumes it,
+    /// revokes every refresh token and lifts a lockout. Returns the error list (empty on success).
+    /// </summary>
+    public IReadOnlyList<string> ResetPassword(string email, string token, string newPassword, Func<string, IEnumerable<string>> rules)
+    {
+        lock (_gate)
+        {
+            if (!_byEmail.TryGetValue(email, out var user) || user.DeletedAt is not null) return ["Invalid or expired reset token."];
+            if (!_resetByUser.TryGetValue(user.Id, out var entry) || entry.Expires <= time.GetUtcNow()
+                || !CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(entry.Token), System.Text.Encoding.UTF8.GetBytes(token)))
+                return ["Invalid token."];
+            var errors = rules(newPassword).ToList();
+            if (errors.Count > 0) return errors;
+            SetPassword(user, newPassword);
+            _resetByUser.Remove(user.Id);
+            user.FailedAttempts = 0;
+            user.LockoutEnd = null;
+            foreach (var e in _refresh.Values.Where(e => e.UserId == user.Id)) e.Revoked = true;
+            return [];
+        }
+    }
+
+    /// <summary>Identity's ChangePasswordAsync: the current password first, then the rules. Success also ends every session and any pending reset token.</summary>
+    public IReadOnlyList<string> ChangePassword(DevUser user, string currentPassword, string newPassword, Func<string, IEnumerable<string>> rules)
+    {
+        lock (_gate)
+        {
+            if (!PasswordMatches(user, currentPassword)) return ["Incorrect password."];
+            var errors = rules(newPassword).ToList();
+            if (errors.Count > 0) return errors;
+            SetPassword(user, newPassword);
+            _resetByUser.Remove(user.Id);
+            foreach (var e in _refresh.Values.Where(e => e.UserId == user.Id)) e.Revoked = true;
+            return [];
+        }
+    }
+
+    private static void SetPassword(DevUser user, string password)
+    {
+        user.Salt = RandomNumberGenerator.GetBytes(16);
+        user.Hash = Hash(password, user.Salt);
     }
 
     public bool PasswordMatches(DevUser user, string password) => CryptographicOperations.FixedTimeEquals(user.Hash, Hash(password, user.Salt));

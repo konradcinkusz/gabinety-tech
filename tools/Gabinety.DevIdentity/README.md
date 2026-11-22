@@ -4,7 +4,7 @@ A development stand-in for the authservice (ADR-0003). It serves the subset of t
 
 Rules: it lives under `tools/`, no project under `src/` is referenced by it (the AppHost starts it, only when the fake profile is on), it is in no Dockerfile, and **it refuses to start unless `GABINETY_FAKE=1`** (exit code 1, the reason on stderr). Everything is lost on restart. The RSA key is generated in memory at start.
 
-The stand-in must mimic the real service, so every difference found is fixed here: the contract suite (`tests/Gabinety.Integration.Tests/AuthContract`) holds the observable behaviour and runs on both. Known differences that remain: no two-factor, no GitHub, no e-mail confirmation (`202`), no rate limit, no admin API, `userName` is the e-mail, and demo users get `demo-` subjects.
+The stand-in must mimic the real service, so every difference found is fixed here: the contract suite (`tests/Gabinety.Integration.Tests/AuthContract`) holds the observable behaviour and runs on both. Known differences that remain: no two-factor, no GitHub, no e-mail confirmation (`202`), no e-mail at all (a reset token is read from the dev route), no rate limit, no admin API, `userName` is the e-mail, and demo users get `demo-` subjects.
 
 The real surface is proven separately: `tests/Gabinety.Integration.Tests/AuthContract` runs one suite against this tool (unit tier) and against the real authservice image (integration tier, when `AUTH_BASE_URL` is set), so the stand-in cannot drift.
 
@@ -27,6 +27,10 @@ GABINETY_FAKE=1 ASPNETCORE_URLS=http://localhost:5100 dotnet run --project tools
 | `POST /api/v1/auth/logout` | Bearer; revokes every refresh token of the user |
 | `GET /api/v1/auth/me` | Bearer; the fields the spike lists |
 | `GET /api/v1/auth/consents`, `POST /api/v1/auth/consents` | Bearer; required and accepted versions (`/konto`) |
+| `POST /api/v1/auth/forgot-password` | `{email}`; `200 {message, isOAuthOnly:false}` for every well-formed address (known or not: byte-identical, no enumeration); a malformed address is the `400` problem document of `[ApiController]` |
+| `POST /api/v1/auth/reset-password` | `{email, token, newPassword}`; `200 {message}`; a wrong, used or expired token or an unknown address is `400 {errors:[...]}`, so is a password that breaks the rules (the token stays usable then). Success consumes the token, revokes every refresh token and lifts a lockout. Tokens live 10 minutes |
+| `POST /api/v1/auth/change-password` | Bearer, `{currentPassword, newPassword}`; a wrong current password is `400 {errors}`; success is `200 {message, sessionsRevoked:true, tokens}` with a fresh token pair, every other refresh token revoked |
+| `GET /dev/last-reset-token?email=` | **Development only**, no `/api` prefix: `200 {token}` with the last reset token issued for the address (the fake profile sends no e-mail), `404` when none. Mapped only when `GABINETY_FAKE=1`; the real authservice has no such route |
 | `GET /api/v1/auth/export` | Bearer; profile, consents, empty lists |
 | `DELETE /api/v1/auth/account` | Bearer, body `{password, confirmation:"DELETE"}`; soft delete: the account can no longer sign in or refresh |
 | `GET /api/v1/external-auth/providers` | `{providers:[]}`: no provider is configured |

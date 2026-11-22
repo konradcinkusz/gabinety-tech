@@ -1,0 +1,25 @@
+@inherits LayoutComponentBase
+@layout MainLayout
+@inject NavigationManager Navigation
+@* The area's shell: noindex (SPEC 6.5: nothing under /gabinet-programisty is for a crawler) and the one section navigation of the design contract (5.9): .tabs with aria-current on the current section. *@
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<nav class="tabs" aria-label="@PlPractitioner.SectionsLabel">
+    <ul>
+        @foreach (var (href, label) in Sections)
+        {
+            <li><a class="tabs__link" href="@href" aria-current="@(IsCurrent(href) ? "page" : null)">@label</a></li>
+        }
+    </ul>
+</nav>
+@Body
+
+@code {
+    static readonly (string Href, string Label)[] Sections =
+    [
+        (PractitionerPaths.Home, PlPractitioner.Tabs.Overview), (PractitionerPaths.Profile, PlPractitioner.Tabs.Profile), (PractitionerPaths.Offers, PlPractitioner.Tabs.Offers),
+        (PractitionerPaths.Availability, PlPractitioner.Tabs.Availability), (PractitionerPaths.Payments, PlPractitioner.Tabs.Payments),
+    ];
+
+    /// <summary>The section whose path is the current one (query and fragment ignored); <c>Start</c> only on the dashboard itself.</summary>
+    bool IsCurrent(string href) => string.Equals(new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/'), href, StringComparison.OrdinalIgnoreCase);
+}

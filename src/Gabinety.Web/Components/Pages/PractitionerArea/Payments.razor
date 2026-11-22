@@ -1,0 +1,86 @@
+@page "/gabinet-programisty/platnosci"
+@attribute [Authorize]
+@layout PractitionerLayout
+@inherits PractitionerPage
+@inject PractitionerSchedulingClient Scheduling
+@* The practitioner's payments account (PR #127, docs/operations/PAYMENTS-GO-LIVE.md): its state, and the one button that asks Booking for the provider's single-use onboarding link. The link is NOT
+   followed by a redirect after the post: the CSP says form-action 'self', which browsers also apply to the redirect that answers a form post; so the page shows the link and the practitioner
+   follows it (a plain navigation). The return and the refresh URLs of the provider land on /practitioner/payments (PaymentsLanding), which sends them here. *@
+<PageTitle>@PlPractitioner.Payments.MetaTitle</PageTitle>
+<h1>@PlPractitioner.Payments.Title</h1>
+
+@if (LoadFailure is not null)
+{
+    <Alert Variant="AlertVariant.Danger" TestId="unavailable">@FailureText(LoadFailure) <a href="@PractitionerPaths.Payments">@PlPractitioner.Common.Retry</a></Alert>
+}
+else if (Profile is not null)
+{
+    <p class="lead">@PlPractitioner.Payments.Intro</p>
+    @if (Return) {<Alert Variant="AlertVariant.Info" TestId="payments-returned">@PlPractitioner.Payments.Returned</Alert>}
+    @if (Refresh && _state != PaymentsState.Ready) {<Alert Variant="AlertVariant.Warning" TestId="payments-refresh">@PlPractitioner.Payments.Refresh</Alert>}
+
+    <section class="card stack" aria-labelledby="payments-status-title">
+        <h2 id="payments-status-title">@PlPractitioner.Payments.StatusLabel</h2>
+        @if (_state is not (PaymentsState.NotApplicable or PaymentsState.Unknown))
+        {
+            <p><KindBadge Label="@PaymentsView.Label(_state)" Kind="@PaymentsView.Kind(_state)" TestId="payments-status" /></p>
+        }
+        @if (_state == PaymentsState.Unknown)
+        {
+            <Alert Variant="AlertVariant.Danger" TestId="unavailable">@PaymentsView.Body(_state) <a href="@PractitionerPaths.Payments">@PlPractitioner.Payments.Retry</a></Alert>
+        }
+        else
+        {
+            <p data-testid="payments-body">@PaymentsView.Body(_state)</p>
+        }
+        @if (_state is PaymentsState.None or PaymentsState.Pending)
+        {
+            <div class="callout callout--warning" data-testid="payments-must-be-ready"><p>@PlPractitioner.Payments.MustBeReady</p></div>
+        }
+        @if (_error is not null) {<Alert Variant="AlertVariant.Danger" TestId="payments-error">@_error</Alert>}
+        @if (_link is not null)
+        {
+            <div class="callout callout--success" role="status" data-testid="payments-link">
+                <p>@PlPractitioner.Payments.LinkReady</p>
+                <a class="btn btn--primary" href="@_link" rel="noopener noreferrer">@PlPractitioner.Payments.OpenLink</a>
+            </div>
+        }
+        @if (_state is not (PaymentsState.Ready or PaymentsState.NotApplicable))
+        {
+            @* The form exists whenever the account is not settled: Blazor dispatches a post to a form by name in the first render of that request, and the state read for it can differ from the page's
+               (a provider that was down a moment ago). The button shows only when there is an action. *@
+            <form method="post" @onsubmit="StartAsync" @formname="payments-start" hidden="@(PaymentsView.Action(_state) is null)">
+                <AntiforgeryToken />
+                <button class="@(_link is null ? "btn btn--primary" : "btn btn--secondary")" type="submit">@(PaymentsView.Action(_state) ?? PlPractitioner.Payments.Start)</button>
+            </form>
+        }
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "return")] public string? ReturnParam { get; set; }
+    [SupplyParameterFromQuery(Name = "refresh")] public string? RefreshParam { get; set; }
+
+    /// <summary>Only the exact value "1" (what Booking puts in the URLs) counts: anything else shows nothing.</summary>
+    bool Return => ReturnParam == "1";
+    bool Refresh => RefreshParam == "1";
+
+    PaymentsState _state = PaymentsState.Unknown;
+    string? _link, _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await LoadProfileAsync()) return;
+        _state = NextSteps.PaymentsOf(await Scheduling.PaymentAccountAsync());
+        if (_state == PaymentsState.Unknown && HttpContext is { Response.HasStarted: false }) HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+    }
+
+    async Task StartAsync()
+    {
+        var r = await Scheduling.StartPaymentOnboardingAsync();
+        if (!r.IsOk) { _error = FieldErrors.General(r.Failure!, PlPractitioner.Payments.StartFailed); return; }
+        if (r.Value!.State == "ready") { Done(PractitionerPaths.Payments); return; } // nothing left to do: the page shows the new state
+        if (PaymentsView.IsFollowable(r.Value.OnboardingUrl)) { _link = r.Value.OnboardingUrl; _state = PaymentsState.Pending; }
+        else _error = PlPractitioner.Payments.StartFailed;
+    }
+}

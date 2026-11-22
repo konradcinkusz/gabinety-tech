@@ -1,0 +1,4 @@
+.form-summary__title { font-size: var(--text-lg); margin-bottom: var(--space-2); }
+.form-summary ul { padding-left: var(--space-4); }
+.form-summary li { list-style: disc; }
+.form-summary a { display: inline-block; padding-block: var(--space-1); }

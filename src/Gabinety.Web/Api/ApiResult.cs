@@ -1,7 +1,7 @@
 namespace Gabinety.Web.Api;
 
 /// <summary>Why a backend call failed. <see cref="Status"/> 0 means no answer at all (down, timed out, circuit open, no address configured); <see cref="Code"/> is the code of CONTRACTS 10.1 when the body had one.</summary>
-public sealed record ApiFailure(int Status, string Code, IReadOnlyList<string>? Fields = null)
+public sealed record ApiFailure(int Status, string Code, IReadOnlyList<string>? Fields = null, IReadOnlyList<string>? Unmet = null)
 {
     public const string Unavailable = "unavailable", InvalidResponse = "invalid_response";
     public static ApiFailure NoAnswer { get; } = new(0, Unavailable);

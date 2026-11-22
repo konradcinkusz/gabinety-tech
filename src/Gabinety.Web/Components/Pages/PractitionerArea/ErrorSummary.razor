@@ -1,0 +1,16 @@
+@* "Popraw N pól": every error of the form in one alert, each a link to its field (contract 5.5). Nothing is rendered when there is no error. *@
+@if (Errors.Count > 0)
+{
+    <div class="callout callout--danger form-summary" role="alert" tabindex="-1" id="form-summary" data-testid="form-summary">
+        <h2 class="form-summary__title">@string.Format(PlPractitioner.Common.ErrorsSummary, Errors.Count, Noun(Errors.Count))</h2>
+        <ul>@foreach (var (id, message) in Errors) {<li><a href="#@id">@message</a></li>}</ul>
+    </div>
+}
+
+@code {
+    /// <summary>Field id to message, in the order of the form.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<KeyValuePair<string, string>> Errors { get; set; } = [];
+
+    /// <summary>Polish plural of "pole": 1 pole, 2-4 pola, 5-21 pól, 22-24 pola.</summary>
+    public static string Noun(int n) => n == 1 ? PlPractitioner.Common.FieldOne : n % 10 is >= 2 and <= 4 && n % 100 is < 12 or > 14 ? PlPractitioner.Common.FieldFew : PlPractitioner.Common.FieldMany;
+}

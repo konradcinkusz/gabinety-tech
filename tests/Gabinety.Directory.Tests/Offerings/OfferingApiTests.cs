@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using Gabinety.Contracts.Common;
 using Gabinety.Contracts.Directory;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using static Gabinety.Directory.Tests.Offerings.Kit;
 
 namespace Gabinety.Directory.Tests.Offerings;
@@ -161,6 +163,56 @@ public class OfferingApiTests(OfferingFactory f) : IClassFixture<OfferingFactory
         Assert.Equal(HttpStatusCode.NoContent, (await c.PostAsync($"{Url}/{o.Id}/deactivate", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await c.PostAsync($"{Url}/{o.Id}/deactivate", null)).StatusCode);
         Assert.False((await List(c)).Single().IsActive);
+    }
+
+    [Fact]
+    public async Task Activate_turns_a_deactivated_offering_back_on_and_is_idempotent()
+    {
+        var c = await Practitioner(f);
+        var o = await Created(c, Valid());
+        await c.PostAsync($"{Url}/{o.Id}/deactivate", null);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.PostAsync($"{Url}/{o.Id}/activate", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.PostAsync($"{Url}/{o.Id}/activate", null)).StatusCode);
+        Assert.True((await List(c)).Single().IsActive);
+    }
+
+    [Fact]
+    public async Task A_suspended_practitioner_activating_an_offer_stays_unlisted_and_has_no_public_profile()
+    {
+        var uid = Id();
+        var c = await Practitioner(f, uid);
+        var o = await Created(c, Valid());
+        await c.PostAsync($"{Url}/{o.Id}/deactivate", null);
+        string slug;
+        using (var scope = f.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Gabinety.Directory.Persistence.DirectoryDbContext>();
+            var p = await db.Practitioners.SingleAsync(x => x.UserId == uid);
+            p.Status = PractitionerStatus.Suspended;
+            slug = p.Slug;
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.NoContent, (await c.PostAsync($"{Url}/{o.Id}/activate", null)).StatusCode);
+        var anonymous = f.CreateClient();
+        Assert.Equal(HttpStatusCode.NotFound, (await anonymous.GetAsync($"/api/v1/practitioners/{slug}")).StatusCode); // only Approved profiles are public
+        var list = await anonymous.GetStringAsync("/api/v1/practitioners?limit=100");
+        Assert.DoesNotContain(slug, list);
+    }
+
+    [Fact]
+    public async Task Activate_refuses_a_sixth_active_offering_and_another_practitioners_offering_is_404()
+    {
+        var c = await Practitioner(f);
+        var first = await Created(c, Valid(title: "Pierwsza oferta"));
+        await c.PostAsync($"{Url}/{first.Id}/deactivate", null);
+        for (var i = 0; i < 5; i++) await Created(c, Valid(title: $"Oferta numer {i}"));
+        var r = await c.PostAsync($"{Url}/{first.Id}/activate", null);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, r.StatusCode);
+        Assert.Equal("too_many_offerings", (await ProblemOf(r)).Code);
+        Assert.False((await List(c)).Single(x => x.Id == first.Id).IsActive);
+
+        var other = await Practitioner(f);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PostAsync($"{Url}/{first.Id}/activate", null)).StatusCode);
     }
 
     [Fact]

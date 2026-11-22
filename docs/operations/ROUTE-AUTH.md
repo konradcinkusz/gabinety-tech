@@ -36,6 +36,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Directory | POST | `/api/v1/me/practitioner/offerings` | Authenticated | all | |
 | Directory | PUT | `/api/v1/me/practitioner/offerings/{id}` | Authenticated | all | |
 | Directory | POST | `/api/v1/me/practitioner/offerings/{id}/deactivate` | Authenticated | all | |
+| Directory | POST | `/api/v1/me/practitioner/offerings/{id}/activate` | Authenticated | all | undo of deactivate; 422 `too_many_offerings` at 5 active |
 | Directory | POST | `/api/v1/me/practitioner/github-link` | Authenticated | all | |
 | Directory | POST | `/api/v1/me/practitioner/github-link/verify` | Authenticated | all | |
 | Directory | GET | `/api/v1/admin/practitioners` | Admin | all | |
@@ -168,6 +169,12 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/bookings/{BookingId}` | Authenticated | all | where the payment provider returns the browser (Stripe Checkout success URL): redirects to the confirmation |
 | Web | PAGE | `/konto` | Authenticated | all | account: e-mail, consents, data export link, account deletion (static rendering, forms with antiforgery) |
 | Web | GET | `/konto/export` | Authenticated | all | the user's data as a no-store JSON attachment (the identity service's export, passed through) |
+| Web | PAGE | `/gabinet-programisty` | Authenticated | all | practitioner dashboard and onboarding, static server rendering; any signed-in account may become a practitioner (ADR-0012, "Practitioner area") |
+| Web | PAGE | `/gabinet-programisty/profil` | Authenticated | all | practitioner profile form |
+| Web | PAGE | `/gabinet-programisty/oferty` | Authenticated | all | offers: list, confirmation before disabling, re-enable, form |
+| Web | PAGE | `/gabinet-programisty/dostepnosc` | Authenticated | all | weekly availability and blocked days |
+| Web | PAGE | `/gabinet-programisty/platnosci` | Authenticated | all | payments account status and onboarding link (PAYMENTS-GO-LIVE) |
+| Web | PAGE | `/practitioner/payments` | Authenticated | all | the return and refresh address Booking gives Stripe; forwards to `/gabinet-programisty/platnosci` |
 | Web | PAGE | `/not-found` | Anonymous | all | status code re-execution target |
 | Web | PAGE | `/Error` | Anonymous | all | exception handler target |
 | Web | ANY | `/_blazor` | Anonymous | all | circuit websocket: refused first by the origin guard for a foreign page |

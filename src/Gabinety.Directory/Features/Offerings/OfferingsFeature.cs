@@ -31,6 +31,7 @@ public sealed class OfferingsFeature : IServiceFeature
         g.MapPost("", Create);
         g.MapPut("{id:guid}", Update);
         g.MapPost("{id:guid}/deactivate", Deactivate);
+        g.MapPost("{id:guid}/activate", Activate);
     }
 
     static IResult Problem(int status, string code, string title, Dictionary<string, string[]>? errors = null) =>
@@ -93,7 +94,7 @@ public sealed class OfferingsFeature : IServiceFeature
             var o = await db.Offerings.SingleOrDefaultAsync(x => x.Id == id && x.PractitionerId == p.Id, ct);
             if (o is null) return Problem(404, ErrorCodes.NotFound, "Not found");
             if (await Validate(req, db, contact, config, ct) is { } rejected) return rejected;
-            Apply(o, req); // IsActive is not touched: there is no reactivation
+            Apply(o, req); // IsActive is not touched: reactivation is its own route (activate)
             await Save(db, p, time, ct);
             return Results.Ok(View(o));
         });
@@ -104,6 +105,20 @@ public sealed class OfferingsFeature : IServiceFeature
             var o = await db.Offerings.SingleOrDefaultAsync(x => x.Id == id && x.PractitionerId == p.Id, ct);
             if (o is null) return Problem(404, ErrorCodes.NotFound, "Not found");
             o.IsActive = false; // already inactive: nothing changes, still 204
+            await Save(db, p, time, ct);
+            return Results.NoContent();
+        });
+
+    /// <summary>Turns a deactivated offering back on (the practitioner's undo of "Wyłącz"). The limit of 5 active offerings applies; already active: nothing changes, still 204.</summary>
+    static Task<IResult> Activate(Guid id, ClaimsPrincipal user, DirectoryDbContext db, TimeProvider time, CancellationToken ct) =>
+        UserId(user) is not { } uid ? Task.FromResult(Results.Unauthorized()) : OnOwnRow(db, uid, ct, async p =>
+        {
+            var o = await db.Offerings.SingleOrDefaultAsync(x => x.Id == id && x.PractitionerId == p.Id, ct);
+            if (o is null) return Problem(404, ErrorCodes.NotFound, "Not found");
+            if (o.IsActive) return Results.NoContent();
+            if (await db.Offerings.CountAsync(x => x.PractitionerId == p.Id && x.IsActive, ct) >= MaxActive)
+                return Problem(422, ErrorCodes.TooManyOfferings, "At most 5 active offerings");
+            o.IsActive = true;
             await Save(db, p, time, ct);
             return Results.NoContent();
         });

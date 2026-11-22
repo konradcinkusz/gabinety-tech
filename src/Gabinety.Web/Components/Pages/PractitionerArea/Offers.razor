@@ -1,0 +1,196 @@
+@page "/gabinet-programisty/oferty"
+@attribute [Authorize]
+@layout PractitionerLayout
+@inherits PractitionerPage
+@inject DirectoryClient Directory
+@* Offers: the list with a confirmation step before "Wyłącz" (F-04, P-OFF-1) and a way back ("Włącz"), and the form to add or edit one. Static server rendering with plain forms: the confirmation is a
+   page state (?wylacz=<id>), so it works without JavaScript and can be linked. The price is typed in zloty and sent as integer grosz. *@
+<PageTitle>@PlPractitioner.Offers.MetaTitle</PageTitle>
+<h1>@PlPractitioner.Offers.Title</h1>
+
+@if (LoadFailure is not null)
+{
+    <Alert Variant="AlertVariant.Danger" TestId="unavailable">@FailureText(LoadFailure) <a href="@PractitionerPaths.Offers">@PlPractitioner.Common.Retry</a></Alert>
+}
+else if (_loaded)
+{
+    <p class="muted" data-testid="active-count">@string.Format(PlPractitioner.Offers.ActiveCount, _active)</p>
+    @if (_listNote is not null) {<Alert Variant="AlertVariant.Danger" TestId="offers-error">@_listNote</Alert>}
+
+    @if (_confirm is { } confirm)
+    {
+        <section class="callout callout--warning" role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-body" data-testid="confirm-disable">
+            <h2 id="confirm-title" class="callout__title">@string.Format(PlPractitioner.Offers.ConfirmTitle, confirm.Title)</h2>
+            <p id="confirm-body">@PlPractitioner.Offers.ConfirmBody</p>
+            <form method="post" @onsubmit="DisableAsync" @formname="offer-disable" class="cluster">
+                <AntiforgeryToken />
+                <input type="hidden" name="id" value="@confirm.Id" />
+                <button class="btn btn--danger" type="submit">@PlPractitioner.Offers.ConfirmYes</button>
+                <a class="btn btn--ghost" href="@PractitionerPaths.Offers">@PlPractitioner.Offers.ConfirmNo</a>
+            </form>
+        </section>
+    }
+
+    @if (_offers.Count == 0)
+    {
+        <p class="empty-state">@PlPractitioner.Offers.Empty</p>
+    }
+    else
+    {
+        <form method="post" @onsubmit="EnableAsync" @formname="offer-enable">
+            <AntiforgeryToken />
+            <ul class="stack offers" aria-label="@PlPractitioner.Offers.ListLabel">
+                @foreach (var o in _offers)
+                {
+                    <li class="card offer" data-testid="offer" data-active="@(o.IsActive ? "true" : "false")">
+                        <div class="cluster cluster--between">
+                            <h3 class="offer__title">@o.Title</h3>
+                            <KindBadge Label="@(o.IsActive ? PlPractitioner.Offers.Active : PlPractitioner.Offers.Inactive)" Kind="@(o.IsActive ? "success" : "neutral")" />
+                        </div>
+                        <p class="muted"><span class="num">@Money.Pln(o.Price.AmountMinor)</span> · @o.DurationMinutes min</p>
+                        <div class="cluster row-actions">
+                            @if (o.IsActive)
+                            {
+                                <a class="btn btn--secondary" href="@($"{PractitionerPaths.Offers}?edit={o.Id}")" aria-label="@($"{PlPractitioner.Offers.Edit}: {o.Title}")">@PlPractitioner.Offers.Edit</a>
+                                <a class="btn btn--ghost-danger" href="@($"{PractitionerPaths.Offers}?wylacz={o.Id}")" aria-label="@($"{PlPractitioner.Offers.Disable}: {o.Title}")">@PlPractitioner.Offers.Disable</a>
+                            }
+                            else
+                            {
+                                <button class="btn btn--secondary" type="submit" name="enable" value="@o.Id" aria-label="@($"{PlPractitioner.Offers.Enable}: {o.Title}")">@PlPractitioner.Offers.Enable</button>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        </form>
+    }
+
+    <section class="card section" aria-labelledby="offer-form-title">
+        <h2 id="offer-form-title">@(_editing is null ? PlPractitioner.Offers.FormTitleNew : PlPractitioner.Offers.FormTitleEdit)</h2>
+        @if (_editing is not null) {<p class="muted">@PlPractitioner.Offers.PriceChangeNote</p>}
+        @if (_taxonomy is null) {<Alert Variant="AlertVariant.Danger" TestId="taxonomy-unavailable">@PlPractitioner.Offers.TaxonomyUnavailable</Alert>}
+        <ErrorSummary Errors="Summary" />
+        @if (_general is not null) {<Alert Variant="AlertVariant.Danger" TestId="offer-error">@_general</Alert>}
+        <form method="post" @onsubmit="SaveAsync" @formname="offer" class="form stack form-narrow" novalidate>
+            <AntiforgeryToken />
+            <input type="hidden" name="id" value="@_editing" />
+            <FormField Id="title" Label="@PlPractitioner.Offers.Name" Hint="@PlPractitioner.Offers.NameHint" Error="@Error("title")" Max="80" Length="_f.Title.Length">
+                <input id="@context.Id" name="title" value="@_f.Title" maxlength="80" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <FormField Id="description" Label="@PlPractitioner.Offers.Description" Hint="@PlPractitioner.Offers.DescriptionHint" Error="@Error("description")" Max="600" Length="_f.Description.Length" Optional="true">
+                <textarea id="@context.Id" name="description" rows="5" maxlength="600" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">@_f.Description</textarea>
+            </FormField>
+            <div class="offer-form__pair">
+                <FormField Id="duration" Label="@PlPractitioner.Offers.Duration" Error="@Error("durationMinutes")">
+                    <select id="@context.Id" name="duration" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">
+                        <option value="30" selected="@(_f.Duration != "60")">@PlPractitioner.Offers.D30</option>
+                        <option value="60" selected="@(_f.Duration == "60")">@PlPractitioner.Offers.D60</option>
+                    </select>
+                </FormField>
+                <FormField Id="price" Label="@PlPractitioner.Offers.Price" Hint="@PlPractitioner.Offers.PriceHint" Error="@Error("priceMinor")">
+                    <input id="@context.Id" name="price" inputmode="decimal" autocomplete="off" value="@_f.Price" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+                </FormField>
+            </div>
+            <FormField Id="problemSlug" Label="@PlPractitioner.Offers.Problem" Error="@Error("problemSlug")">
+                <select id="@context.Id" name="problemSlug" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">
+                    <option value="" selected="@(_f.Problem == "")">@PlPractitioner.Offers.Choose</option>
+                    @foreach (var p in _taxonomy?.Problems ?? [])
+                    {
+                        <option value="@p.Slug" selected="@(_f.Problem == p.Slug)">@p.NamePl</option>
+                    }
+                </select>
+            </FormField>
+            <fieldset class="option-group" id="techSlugs" aria-describedby="@(Error("techSlugs") is null ? "techs-hint" : "techs-hint techSlugs-error")">
+                <legend>@PlPractitioner.Offers.Techs</legend>
+                <p class="field__hint" id="techs-hint">@PlPractitioner.Offers.TechsHint</p>
+                <div class="cluster chips">
+                    @foreach (var t in _taxonomy?.Techs ?? [])
+                    {
+                        <label class="option chip"><input type="checkbox" name="techs" value="@t.Slug" checked="@_f.Techs.Contains(t.Slug)" /> @t.NamePl</label>
+                    }
+                </div>
+                @if (Error("techSlugs") is { } techError) {<p class="field__error" id="techSlugs-error"><span class="visually-hidden">@($"{PlPractitioner.Common.ErrorWord} ")</span>@techError</p>}
+            </fieldset>
+            <FormField Id="meetingUrl" Label="@PlPractitioner.Offers.Meeting" Hint="@PlPractitioner.Offers.MeetingHint" Error="@Error("meetingUrl")" Optional="true">
+                <input id="@context.Id" name="meetingUrl" type="url" inputmode="url" maxlength="300" value="@_f.Meeting" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <div class="form-actions cluster">
+                <button class="btn btn--primary" type="submit" disabled="@(_editing is null && _active >= OfferForm.MaxActive)">@PlPractitioner.Common.Save</button>
+                @if (_editing is not null) {<a class="btn btn--ghost" href="@PractitionerPaths.Offers">@PlPractitioner.Offers.Cancel</a>}
+            </div>
+            @if (_editing is null && _active >= OfferForm.MaxActive) {<p class="muted">@PlPractitioner.Offers.TooMany</p>}
+        </form>
+    </section>
+}
+
+@code {
+    /// <summary><c>?edit=&lt;id&gt;</c>: the offer in the form. <c>?wylacz=&lt;id&gt;</c>: the confirmation of disabling it. Both are looked up in the practitioner's own list; an unknown id shows nothing.</summary>
+    [SupplyParameterFromQuery(Name = "edit")] public Guid? EditId { get; set; }
+    [SupplyParameterFromQuery(Name = "wylacz")] public Guid? DisableId { get; set; }
+
+    IReadOnlyList<OfferingPrivateDto> _offers = [];
+    TaxonomyDto? _taxonomy;
+    OfferForm _f = OfferForm.Empty;
+    OfferingPrivateDto? _confirm;
+    Guid? _editing;
+    int _active;
+    bool _loaded;
+    string? _general, _listNote;
+    readonly Dictionary<string, string> _errors = [];
+
+    string? Error(string field) => _errors.GetValueOrDefault(field);
+    static string? Invalid(FormField.FieldContext c) => c.Invalid ? "true" : null;
+
+    IReadOnlyList<KeyValuePair<string, string>> Summary => [.. OfferForm.FieldOrder.Where(_errors.ContainsKey).Select(f => KeyValuePair.Create(OfferForm.IdOf(f), _errors[f]))];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await LoadProfileAsync()) return;
+        var offers = Practitioner.OfferingsAsync();
+        var taxonomy = Directory.TaxonomyAsync();
+        await Task.WhenAll(offers, taxonomy);
+        if (!offers.Result.IsOk) { LoadFailure = offers.Result.Failure; return; }
+        _offers = offers.Result.Value!;
+        _taxonomy = taxonomy.Result.Value;
+        _active = _offers.Count(o => o.IsActive);
+        _confirm = DisableId is { } d ? _offers.FirstOrDefault(o => o.Id == d && o.IsActive) : null;
+        if (EditId is { } e && _offers.FirstOrDefault(o => o.Id == e && o.IsActive) is { } mine) { _editing = mine.Id; _f = OfferForm.From(mine); }
+        _loaded = true;
+    }
+
+    async Task Reload()
+    {
+        var r = await Practitioner.OfferingsAsync();
+        if (r.IsOk) { _offers = r.Value!; _active = _offers.Count(o => o.IsActive); }
+    }
+
+    async Task SaveAsync()
+    {
+        _f = OfferForm.FromPosted(Posted);
+        _editing = Guid.TryParse(Posted.Get("id"), out var id) && _offers.Any(o => o.Id == id) ? id : null; // only an offer of this practitioner
+        var local = _f.Validate();
+        if (local.Count > 0) { foreach (var (field, message) in local) _errors[field] = message; return; }
+        var r = await Practitioner.SaveOfferingAsync(_editing, _f.ToBody());
+        if (r.IsOk) { Done(PractitionerPaths.Offers, FlashKey.Saved); return; }
+        foreach (var (field, message) in FieldErrors.From(r.Failure!, new Dictionary<string, string?> { ["title"] = _f.Title, ["description"] = _f.Description })) _errors[field] = message;
+        if (r.Failure!.Code == "too_many_offerings") _general = PlPractitioner.Offers.TooMany;
+        else if (_errors.Count == 0) _general = FieldErrors.General(r.Failure, PlPractitioner.Offers.Failed);
+    }
+
+    async Task DisableAsync()
+    {
+        if (!Guid.TryParse(Posted.Get("id"), out var id) || !_offers.Any(o => o.Id == id)) { _listNote = PlPractitioner.Offers.NotFound; return; }
+        var r = await Practitioner.DeactivateOfferingAsync(id);
+        if (r.IsOk) { Done(PractitionerPaths.Offers, FlashKey.OfferDisabled); return; }
+        _listNote = FieldErrors.General(r.Failure!, PlPractitioner.Offers.Failed);
+    }
+
+    async Task EnableAsync()
+    {
+        if (!Guid.TryParse(Posted.Get("enable"), out var id) || !_offers.Any(o => o.Id == id)) { _listNote = PlPractitioner.Offers.NotFound; return; }
+        var r = await Practitioner.ActivateOfferingAsync(id);
+        if (r.IsOk) { Done(PractitionerPaths.Offers, FlashKey.OfferEnabled); return; }
+        _listNote = r.Failure!.Code == "too_many_offerings" ? PlPractitioner.Offers.TooMany : FieldErrors.General(r.Failure, PlPractitioner.Offers.Failed);
+        await Reload();
+    }
+}

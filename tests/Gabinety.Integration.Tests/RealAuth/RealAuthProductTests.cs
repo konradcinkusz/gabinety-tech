@@ -9,7 +9,9 @@ using Gabinety.Integration.Tests.AuthContract;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
+using DirectoryApp::Gabinety.Directory.Clients;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit.Abstractions;
 
 namespace Gabinety.Integration.Tests.RealAuth;
@@ -18,7 +20,7 @@ namespace Gabinety.Integration.Tests.RealAuth;
 /// A product service (in process) configured exactly as the AppHost default profile configures it for the real authservice: <c>Identity:Authority</c> is the authservice URL and
 /// <c>Identity:Audience</c> its audience, nothing else about identity. The JWKS is fetched over HTTP from the container; there is no test handler in between.
 /// </summary>
-public sealed class Service<TProgram>(string authority, string internalKey) : WebApplicationFactory<TProgram> where TProgram : class
+public sealed class Service<TProgram>(string authority, string internalKey, Action<IServiceCollection>? configure = null) : WebApplicationFactory<TProgram> where TProgram : class
 {
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
@@ -32,7 +34,11 @@ public sealed class Service<TProgram>(string authority, string internalKey) : We
         builder.UseSetting("Internal:Keys:Directory", internalKey);
         builder.UseSetting("Internal:Keys:Booking", internalKey);
         builder.UseSetting("Internal:Keys:Assistant", internalKey);
-        builder.ConfigureTestServices(s => s.PostConfigure<RateLimiterOptions>(o => o.GlobalLimiter = null));
+        builder.ConfigureTestServices(s =>
+        {
+            s.PostConfigure<RateLimiterOptions>(o => o.GlobalLimiter = null);
+            configure?.Invoke(s);
+        });
     }
 }
 
@@ -45,8 +51,8 @@ public sealed class Service<TProgram>(string authority, string internalKey) : We
 public sealed class RealAuthProductTests(RealAuthFixture auth, ITestOutputHelper output) : IDisposable
 {
     const string Key = "demo-real-auth-internal-key-not-a-secret-0123456789";
-    readonly Service<DirectoryApp::Program> _directory = new(auth.Main.Url, Key);
     readonly Service<BookingApp::Program> _booking = new(auth.Main.Url, Key);
+    readonly Service<DirectoryApp::Program> _directory = new(auth.Main.Url, Key);
     readonly Service<ReputationApp::Program> _reputation = new(auth.Main.Url, Key);
 
     public void Dispose()
@@ -147,9 +153,15 @@ public sealed class RealAuthProductTests(RealAuthFixture auth, ITestOutputHelper
     {
         // The owner's order (RUNBOOK 8): authservice deletes the account, then Directory, Booking and Reputation are told the user id. Nothing orchestrates this in code today.
         var user = await auth.Main.Register();
-        using var asUser = Client(_directory, user.AccessToken);
+        // Directory's erasure first asks Booking to cancel the practitioner's future bookings (ADR-0012): here it reaches the Booking host in process, with Booking's key.
+        using var directory = new Service<DirectoryApp::Program>(auth.Main.Url, Key, s =>
+        {
+            s.RemoveAll<IBookingClient>();
+            s.AddSingleton<IBookingClient>(_ => new BookingClient(_booking.CreateClient(), Key));
+        });
+        using var asUser = Client(directory, user.AccessToken);
         Assert.True((await asUser.PostAsJsonAsync("/api/v1/me/practitioner", new { displayName = "Demo Erased Person" })).IsSuccessStatusCode);
-        using var directoryInternal = _directory.CreateClient();
+        using var directoryInternal = directory.CreateClient();
         directoryInternal.DefaultRequestHeaders.Add("X-Internal-Key", Key);
         Assert.Equal(HttpStatusCode.OK, (await directoryInternal.GetAsync($"/internal/v1/practitioners/by-user/{user.Sub}")).StatusCode); // the real sub is the key Directory holds
 

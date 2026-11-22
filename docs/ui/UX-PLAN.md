@@ -112,6 +112,8 @@ Severity: **B** blocks a task, **M** hurts conversion, trust or a clear usabilit
 | D-3 | Faces: initials now, photos later? | Initials avatar now (no backend). Photos need a Directory contract change (UX-070) | UX-012, UX-014 |
 | D-4 | A user-controlled light/dark switch (the contract excludes it) | Later, after wave 1; the system setting already works | UX-061 |
 
+**Decided by the owner on 2026-11-22: all four recommendations accepted** (D-1 yes, D-2 practitioners only, D-3 initials now, D-4 after wave 1).
+
 ## 5. Rules for every task (so the sessions do not collide)
 
 1. One task, one branch, one PR. A task changes **only the files it owns** (column "Owns"). If it needs a change elsewhere it stops and says so in the PR; it does not edit another task's file.
@@ -127,6 +129,8 @@ Severity: **B** blocks a task, **M** hurts conversion, trust or a clear usabilit
 Waves: **0** foundation (merge first), **1** pages (all parallel once wave 0 is in), **2** cross-cutting polish, **3** needs a backend or contract change in `gabinety-tech-spec` first. Size: S up to half a day, M about a day, L two days.
 
 ### Wave 0: foundation
+
+Status: **UX-001 and UX-002 are done** (same PR as this document). What UX-002 left to the page tasks, because the rules live in scoped sheets it does not own: the filters' segmented controls still wrap (UX-013), the header sits on the sunken surface (UX-010), the administrator area still carries its `admin-*` copies (UX-050), `.flash` stays in `MainLayout.razor.css` (UX-060). Remaining tap targets under 44 px are inline links and 24 px checkboxes inside 44 px label rows, per page.
 
 | ID | Task | Owns | Depends | Size |
 |---|---|---|---|---|

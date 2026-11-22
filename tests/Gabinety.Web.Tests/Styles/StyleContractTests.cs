@@ -53,11 +53,21 @@ public partial class StyleContractTests
             "--color-success", "--color-success-soft", "--color-warning", "--color-warning-soft", "--color-danger", "--color-danger-soft",
             "--color-border", "--color-border-strong", "--color-focus", "--shadow-sm", "--shadow-md",
             "--radius-sm", "--radius-md", "--space-1", "--space-4", "--gutter", "--content-width", "--font-sans", "--font-mono", "--text-sm", "--text-md", "--text-2xl",
+            // the design contract's tokens (DESIGN-CONTRACT 3.1, 3.2, 3.4)
+            "--color-surface-sunken", "--color-accent-soft-text", "--color-danger-contrast", "--color-scrim", "--space-8", "--prose-width", "--form-width", "--tap", "--text-xs", "--text-3xl",
         ];
         Assert.All(required, k => Assert.True(light.ContainsKey(k), $"missing token {k}"));
         Assert.Matches(@"system-ui", light["--font-sans"]); // system fonts only
         Assert.DoesNotMatch(@"url\(|@font-face|@import", Tokens + AppCss);
         Assert.Equal("1rem", light["--gutter"]); // 16 px
+        Assert.Equal("2.75rem", light["--tap"]); // 44 px
+    }
+
+    [Fact]
+    public void The_documented_token_block_is_the_shipped_one()
+    {
+        // docs/ui/tokens.css is what the design contract links to: one source, so the document cannot drift from the product
+        Assert.Equal(Tokens, File.ReadAllText(Path.Combine(Repo.Root, "docs", "ui", "tokens.css")));
     }
 
     // ---- colour only through tokens ----
@@ -133,6 +143,11 @@ public partial class StyleContractTests
             ("--color-accent-contrast", "--color-accent"), ("--color-accent-contrast", "--color-accent-hover"),
             ("--color-text", "--color-danger-soft"), ("--color-text", "--color-warning-soft"), ("--color-text", "--color-success-soft"), ("--color-text", "--color-accent-soft"),
             ("--color-success", "--color-success-soft"), ("--color-danger", "--color-bg"), ("--color-danger", "--color-danger-soft"), ("--color-text-secondary", "--color-accent-soft"),
+            // the remaining pairs of DESIGN-CONTRACT 3.3
+            ("--color-text", "--color-surface-sunken"), ("--color-text-secondary", "--color-surface-sunken"), ("--color-text-muted", "--color-surface-raised"), ("--color-text-muted", "--color-surface-sunken"),
+            ("--color-accent", "--color-surface-raised"), ("--color-accent-hover", "--color-surface-raised"), ("--color-accent-soft-text", "--color-accent-soft"), ("--color-accent", "--color-accent-soft"),
+            ("--color-success", "--color-surface-raised"), ("--color-warning", "--color-warning-soft"), ("--color-warning", "--color-surface-raised"), ("--color-danger", "--color-surface-raised"),
+            ("--color-danger-contrast", "--color-danger"),
         }
         select new object[] { theme, pair.Item1, pair.Item2 };
 
@@ -148,6 +163,9 @@ public partial class StyleContractTests
     [Theory]
     [InlineData("light", "--color-focus", "--color-bg")] [InlineData("dark", "--color-focus", "--color-bg")]
     [InlineData("light", "--color-border-strong", "--color-bg")] [InlineData("dark", "--color-border-strong", "--color-bg")]
+    [InlineData("light", "--color-border-strong", "--color-surface-raised")] [InlineData("dark", "--color-border-strong", "--color-surface-raised")]
+    [InlineData("light", "--color-focus", "--color-surface-raised")] [InlineData("dark", "--color-focus", "--color-surface-raised")]
+    [InlineData("light", "--color-focus", "--color-accent-soft")] [InlineData("dark", "--color-focus", "--color-accent-soft")]
     public void Focus_rings_and_control_borders_reach_3_to_1(string theme, string fg, string bg)
     {
         var (light, dark) = Themes();
@@ -157,16 +175,43 @@ public partial class StyleContractTests
 
     // ---- behaviour of the shared sheet ----
 
+    /// <summary>The frozen class vocabulary of DESIGN-CONTRACT section 4 that the shared sheet owns (domain components of 4.7 and the shell of 4.6 live in their scoped sheets).</summary>
+    static readonly string[] SharedClasses =
+    [
+        ".container", ".container--form", ".container--prose", ".stack", ".stack--tight", ".stack--loose", ".cluster", ".cluster--between", ".grid-2", ".grid-2--even", ".divider", ".sr-only", ".visually-hidden", ".skip-link",
+        ".card", ".card--link", ".card__header", ".card__body", ".card__footer", ".callout", ".callout--info", ".callout--success", ".callout--warning", ".callout--danger",
+        ".badge", ".badge--neutral", ".badge--info", ".badge--success", ".badge--warning", ".badge--danger", ".chip", ".chip--selected", ".dl", ".prose", ".empty-state", ".skeleton", ".num", ".muted",
+        ".btn", ".btn--primary", ".btn--secondary", ".btn--ghost", ".btn--danger", ".btn--ghost-danger", ".btn--block", ".link", ".tabs", ".tabs__link", ".segmented",
+        ".form", ".field", ".field__label", ".field__optional", ".field__hint", ".field__control", ".field__counter", ".field__error", ".field--invalid", ".option", ".option-group", ".form-summary", ".form-actions",
+        ".table-wrap", ".table", ".table--cards", ".row-actions", ".breadcrumb", ".pagination", ".dialog", ".spinner", ".loading",
+    ];
+
+    [GeneratedRegex(@"@(media|supports)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}|@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", RegexOptions.Singleline)] private static partial Regex AtBlock();
+
+    static IEnumerable<string> DuplicateSelectors(string css) =>
+        Regex.Matches(AtBlock().Replace(Strip(css), ""), @"([^{}]+)\{[^{}]*\}")
+            .Select(m => Regex.Replace(m.Groups[1].Value.Trim(), @"\s+", " ")) // the whole selector list of a rule: "h1, h2, h3" and "h1" are different rules
+            .GroupBy(sel => sel).Where(g => g.Count() > 1).Select(g => g.Key);
+
+    [Fact]
+    public void Every_selector_of_the_shared_sheet_is_defined_once()
+    {
+        // stacked "additive" blocks once redefined .btn--ghost, .field__error and .form two and three times: the last one won and an edit of the first did nothing
+        Assert.Empty(DuplicateSelectors(AppCss));
+        Assert.Single(DuplicateSelectors(".a { margin: 0; } .b { padding: 0; } .a { padding: 0; } @media (min-width: 40rem) { .a { margin: 1rem; } }")); // the check itself works; a breakpoint override is not a duplicate
+    }
+
     [Fact]
     public void Focus_reduced_motion_and_the_shared_classes_are_in_the_shared_sheet()
     {
         var css = Strip(AppCss);
         Assert.Contains(":focus-visible", css);
         Assert.Matches(@"@media\s*\(prefers-reduced-motion:\s*reduce\)", css);
-        foreach (var cls in new[] { ".card", ".stack", ".cluster", ".field", ".btn", ".btn--primary", ".badge", ".badge--success", ".callout", ".callout--danger", ".callout--warning", ".table-wrap", ".num", ".empty-state", ".skip-link", ".visually-hidden" })
+        foreach (var cls in SharedClasses)
             Assert.Matches($@"(^|[\s,}}]){Regex.Escape(cls)}(?![\w-])", css);
         Assert.Matches(@"\.table-wrap\s*\{[^}]*overflow-x:\s*auto", css); // a wide table scrolls inside its wrapper, never the page
-        Assert.Matches(@"body\s*\{[^}]*overflow-wrap:\s*anywhere", css); // no horizontal page scroll at 390 px
+        Assert.Matches(@"body\s*\{[^}]*overflow-wrap:\s*break-word", css); // no horizontal page scroll at 390 px ("anywhere" would also shrink table columns to one letter)
+        Assert.Matches(@":focus-visible\s*\{[^}]*outline:\s*3px", css); // DESIGN-CONTRACT 7.2
         Assert.Matches(@"\.skip-link:focus", css);
     }
 

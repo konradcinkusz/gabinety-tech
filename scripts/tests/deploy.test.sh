@@ -114,9 +114,9 @@ cut="$tmp/estate-cutover.conf"; sed 's/^#cutover# //' "$root/deploy/estate.conf"
 check "the cutover row is commented out in the live estate (nothing deploys it yet)" bash -c "grep -q '^#cutover# web-blazor ' '$root/deploy/estate.conf' && ! grep -q '^web-blazor ' '$root/deploy/estate.conf'"
 cutover_row_ok() { # fields of the enabled row: key fly_app kind dockerfile context shared paths smoke smoke_path network
   local row; row="$(grep '^web-blazor ' "$cut")" || { echo "no cutover row"; return 1; }
-  set -- $row
-  [ $# = 10 ] || { echo "fields: $#"; return 1; }
-  [ "$2" = gabinety-web-blazor-staging ] && [ "$3" = built ] && [ -f "$root/$4" ] && [ "$8" = public ] && [ "$9" = /alive ] && [ "${10}" = public ] &&
+  local f; read -r -a f <<< "$row"
+  [ "${#f[@]}" = 10 ] || { echo "fields: ${#f[@]}"; return 1; }
+  [ "${f[1]}" = gabinety-web-blazor-staging ] && [ "${f[2]}" = built ] && [ -f "$root/${f[3]}" ] && [ "${f[7]}" = public ] && [ "${f[8]}" = /alive ] && [ "${f[9]}" = public ] &&
     grep -q '^app = "gabinety-web-blazor-staging"' "$root/deploy/fly/web-blazor.fly.toml"
 }
 check "enabled, the cutover row is well formed: 10 fields, a Dockerfile and a config that exist and name the app, public, /alive" cutover_row_ok

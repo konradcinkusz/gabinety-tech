@@ -31,6 +31,7 @@ public static class WebHostingExtensions
         builder.Configuration.AddInMemoryCollection(options.ServiceConfiguration());
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddPublicPageCache(); // five minutes, anonymous public GETs only (Hosting/PublicPageCache.cs)
         builder.Services.AddScoped<CircuitHandler, VisitorCircuitHandler>();
 
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(o =>
@@ -55,6 +56,7 @@ public static class WebHostingExtensions
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseAntiforgery();
+        app.UseOutputCache(); // after authentication: the policy refuses a request that carries a session
         return app;
     }
 
@@ -68,6 +70,8 @@ public static class WebHostingExtensions
         assets.MapStaticAssets();
         app.MapOAuth();
         app.MapAccountEndpoints(); // /konto/export
+
+        app.MapSeoEndpoints(); // sitemap.xml, robots.txt
         // Interactive server rendering is registered for the pages that ask for it. The circuit endpoints (/_blazor/*) and the framework's own (/_framework/*) are anonymous: an interactive page
         // of an anonymous visitor needs them, and the deny-by-default fallback would answer 401 otherwise. Authorization is the page's own ([Authorize] on the page, so NOT a blanket
         // AllowAnonymous on every component endpoint, which would override it) and the API behind it (BLAZOR-WEB-APP section 7: middleware is UX, the API is the boundary).

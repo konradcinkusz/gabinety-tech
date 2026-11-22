@@ -351,3 +351,19 @@ public class ShellTests
         Assert.Equal(["Zaloguj się", "Załóż konto"], home.All(".site-account a").Select(a => a.TextContent));
     }
 }
+
+public class FooterLinkTests
+{
+    [Theory]
+    [InlineData("/regulamin")] [InlineData("/polityka-prywatnosci")]
+    public async Task The_legal_links_of_the_footer_lead_to_real_pages_and_the_registration_consent_links_too(string path)
+    {
+        await using var web = new WebFactory();
+        var browser = web.NewBrowser();
+        var footerHrefs = (await browser.GetAsync("/logowanie")).All("footer a").Select(a => a.GetAttribute("href")).ToList();
+        Assert.Contains(path, footerHrefs);
+        var page = await browser.GetAsync(path);
+        Assert.Equal(System.Net.HttpStatusCode.OK, page.Status);
+        Assert.Single(page.All("h1"));
+    }
+}

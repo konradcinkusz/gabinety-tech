@@ -170,6 +170,9 @@ builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchProfileName: null)
     .WithEnvironment("Site__BaseUrl", "http://localhost:3001")
     // The session cookie is sealed with Data Protection (stateless sessions, ADR-0010): the key ring is persisted per user so a restart of the host does not sign a developer out. On Fly it is a volume.
     .WithEnvironment("DataProtection__KeysPath", Path.Combine(Path.GetTempPath(), $"gabinety-web-keys-{Environment.UserName}"))
+
+    // The journeys change data and read the public pages straight after (approve, then open the profile): the five-minute output cache of the public pages is off in this host.
+    .WithEnvironment("OutputCache__Enabled", "false")
     .WaitFor(directory);
 
 builder.Build().Run();

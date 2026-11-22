@@ -1,0 +1,17 @@
+@* A POST names the form it submits, and Blazor refuses a post for a form the page did not render. A row can vanish between the page the administrator saw and their click (somebody else decided first): the list is
+   re-read for the post, the row is gone, and so is its form. This renders an empty form with the posted name so the post still has a handler, which says "this entry changed" instead of failing with an error page. *@
+@if (Name is { } name)
+{
+    <form method="post" @formname="@name" @onsubmit="OnStale"></form>
+}
+
+@code {
+    [CascadingParameter] HttpContext? Http { get; set; }
+
+    /// <summary>The names of the forms the page rendered for its rows.</summary>
+    [Parameter, EditorRequired] public IReadOnlyCollection<string> Rendered { get; set; } = [];
+
+    [Parameter, EditorRequired] public EventCallback OnStale { get; set; }
+
+    string? Name => Http is { Request: { Method: "POST" } request } && request.HasFormContentType && request.Form["_handler"].ToString() is { Length: > 0 } posted && !Rendered.Contains(posted) ? posted : null;
+}

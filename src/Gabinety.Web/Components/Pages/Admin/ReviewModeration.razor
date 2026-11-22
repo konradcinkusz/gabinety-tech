@@ -1,0 +1,159 @@
+@page "/admin/opinie"
+@inject AdminApi Api
+@inject NavigationManager Navigation
+@* Review moderation, static server rendering. Publish is one click; reject opens a step with the reason (10 to 500, ADR-0012 decision 2) and says what it does. Both are antiforgery-protected posts; 409 (somebody moderated first) is a message
+   and a fresh list. The reviewer's identity is not shown (the service does not send it); the practitioner is named when Directory can say, else a short reference. *@
+
+<PageTitle>@PlAdmin.Reviews.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<section class="admin-section">
+    <h1>@PlAdmin.Reviews.Title</h1>
+    <p class="admin-lead">@PlAdmin.Shell.ReviewsLead</p>
+    <SegmentedLinks Label="@PlAdmin.Reviews.FilterLabel" Items="Filters" />
+
+    @if (_notice is not null) {<Alert Variant="AlertVariant.Warning">@_notice</Alert>}
+    @if (_failure is { } failure)
+    {
+        <FailureAlert Failure="failure" Unavailable="@PlAdmin.Reviews.Unavailable" />
+    }
+    else if (_items.Count == 0)
+    {
+        <p class="empty-state">@(_status switch { "Published" => PlAdmin.Reviews.EmptyPublished, "Rejected" => PlAdmin.Reviews.EmptyRejected, _ => PlAdmin.Reviews.EmptyHeld })</p>
+    }
+    else
+    {
+        <ul class="admin-list" aria-label="@PlAdmin.Reviews.Title">
+            @foreach (var r in _items)
+            {
+                var id = r.Id;
+                <li class="card" data-testid="review">
+                    <div class="admin-row__head">
+                        <h2 class="admin-row__title">@PlAdmin.Reviews.Rating: @string.Format(PlAdmin.Reviews.RatingOf, r.Rating)</h2>
+                        <AdminBadge Kind="AdminFormat.ReviewStatusKind(r.Status)">@AdminFormat.ReviewStatus(r.Status)</AdminBadge>
+                    </div>
+                    <dl class="admin-facts">
+                        <dt>@PlAdmin.Reviews.Practitioner</dt>
+                        <dd><span title="@r.PractitionerId">@(_names.TryGetValue(r.PractitionerId, out var name) ? name : string.Format(PlAdmin.Common.PractitionerRef, AdminFormat.ShortRef(r.PractitionerId)))</span></dd>
+                        @if (r.CreatedAt is { } created) {<dt>@PlAdmin.Reviews.Created</dt><dd><time datetime="@created.ToString("O")">@AdminFormat.When(created)</time></dd>}
+                        @if (_status == ReviewRules.Published && r.PublishedAt is { } published) {<dt>@PlAdmin.Reviews.PublishedAt</dt><dd><time datetime="@published.ToString("O")">@AdminFormat.When(published)</time></dd>}
+                        <dt>@PlAdmin.Reviews.Triage</dt><dd>@AdminFormat.Triage(r.TriageFlag)</dd>
+                        <dt>@PlAdmin.Reviews.Reasons</dt>
+                        <dd>
+                            @if (r.HoldReasons is not { Count: > 0 }) {@PlAdmin.Reviews.ReasonNone}
+                            else {<ul>@foreach (var reason in r.HoldReasons) {<li>@AdminFormat.HoldReason(reason)</li>}</ul>}
+                        </dd>
+                        <dt>@PlAdmin.Reviews.Text</dt><dd class="admin-pre">@r.Text</dd>
+                        @if (!string.IsNullOrEmpty(r.ModerationNote)) {<dt>@PlAdmin.Reviews.Note</dt><dd class="admin-pre">@r.ModerationNote</dd>}
+                        @if (!string.IsNullOrEmpty(r.ModeratedBy)) {<dt>@PlAdmin.Reviews.Moderator</dt><dd><span class="admin-ref" title="@r.ModeratedBy">@AdminFormat.ShortRef(r.ModeratedBy)</span></dd>}
+                    </dl>
+                    @if (_messages.TryGetValue(id, out var message)) {<Alert Variant="message.Variant">@message.Text</Alert>}
+                    @if (r.Status != "Rejected")
+                    {
+                        @if (IsRejecting(r))
+                        {
+                            <ReasonForm FormName="@PostedForm.Name("reject", id)" OnSubmit="() => RejectAsync(id)" InputId="@($"reason-{id:N}")"
+                                        Label="@PlAdmin.Reviews.Label" Hint="@PlAdmin.Reviews.Hint" Value="@_reason" Error="@_reasonError" Warning="@PlAdmin.Reviews.Warning"
+                                        ConfirmText="@PlAdmin.Reviews.Confirm" CancelHref="@ListUrl()" />
+                        }
+                        else
+                        {
+                            <div class="admin-actions">
+                                @if (r.Status == "Held")
+                                {
+                                    <form method="post" @formname="@PostedForm.Name("publish", id)" @onsubmit="() => PublishAsync(id)">
+                                        <AntiforgeryToken />
+                                        <button type="submit" class="btn btn--primary">@PlAdmin.Reviews.Publish</button>
+                                    </form>
+                                }
+                                <RevealButton Action="/admin/opinie" Name="odrzuc" Value="@id.ToString("D")" Keep="Kept" Class="btn btn--ghost-danger">@PlAdmin.Reviews.Reject</RevealButton>
+                            </div>
+                        }
+                    }
+                </li>
+            }
+        </ul>
+        @if (_next is not null)
+        {
+            <p class="admin-more"><a class="btn" href="@ListUrl(cursor: _next)">@PlAdmin.Reviews.Next</a></p>
+        }
+    }
+    <StaleFormGuard Rendered="RenderedForms" OnStale="StaleAsync" />
+</section>
+
+@code {
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "status")] public string? StatusParam { get; set; }
+    [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+    [SupplyParameterFromQuery(Name = "odrzuc")] public string? RejectParam { get; set; }
+
+    readonly List<AdminReviewDto> _items = [];
+    readonly Dictionary<Guid, (AlertVariant Variant, string Text)> _messages = [];
+    IReadOnlyDictionary<Guid, string> _names = new Dictionary<Guid, string>();
+    string _status = ReviewRules.Held;
+    string? _cursor, _next, _reason, _reasonError, _notice;
+    Guid? _rejecting;
+    ApiFailure? _failure;
+
+    IReadOnlyList<SegmentedLinks.Item> Filters =>
+    [
+        new(PlAdmin.Reviews.Held, AdminQuery.Url("/admin/opinie", ("status", ReviewRules.Held)), _status == ReviewRules.Held),
+        new(PlAdmin.Reviews.Published, AdminQuery.Url("/admin/opinie", ("status", ReviewRules.Published)), _status == ReviewRules.Published),
+        new(PlAdmin.Reviews.Rejected, AdminQuery.Url("/admin/opinie", ("status", ReviewRules.Rejected)), _status == ReviewRules.Rejected),
+    ];
+    IEnumerable<KeyValuePair<string, string>> Kept => _cursor is null ? [new("status", _status)] : [new("status", _status), new("cursor", _cursor)];
+    string ListUrl(string? cursor = null) => AdminQuery.Url("/admin/opinie", ("status", _status), ("cursor", cursor ?? _cursor));
+    bool IsRejecting(AdminReviewDto r) => _rejecting == r.Id && r.Status != "Rejected";
+
+    /// <summary>The forms this page renders: the reason form of the open review, publish (a held review) and nothing else for the others.</summary>
+    IReadOnlyCollection<string> RenderedForms => [.. _items.SelectMany(r => IsRejecting(r) ? [PostedForm.Name("reject", r.Id)] : r.Status == "Held" ? [PostedForm.Name("publish", r.Id)] : Array.Empty<string>())];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _status = ReviewRules.Status(StatusParam);
+        _cursor = AdminQuery.Cursor(CursorParam);
+        _rejecting = Guid.TryParse(RejectParam, out var id) ? id : null;
+        await LoadAsync();
+    }
+
+    async Task LoadAsync()
+    {
+        var result = await Api.Reviews(_status, _cursor, ReviewRules.PageSize);
+        _items.Clear();
+        (_failure, _next) = (result.Failure, result.Value?.NextCursor);
+        if (!result.IsOk) return;
+        _items.AddRange(result.Value!.Items);
+        _names = await Api.PractitionerNames(_items.Select(r => r.PractitionerId));
+    }
+
+    Task PublishAsync(Guid id) => DecideAsync(id, () => Api.PublishReview(id), "admin-review-published");
+
+    async Task RejectAsync(Guid id)
+    {
+        _reason = HttpContext.Request.Form["reason"].ToString();
+        if (!TextRule.IsValid(_reason)) { _reasonError = PlAdmin.Reviews.ReasonInvalid; return; } // the form stays open with what was typed
+        await DecideAsync(id, () => Api.RejectReview(id, _reason), "admin-review-rejected");
+    }
+
+    async Task DecideAsync(Guid id, Func<Task<ApiResult<Unit>>> call, string flash)
+    {
+        var result = await call();
+        if (result.IsOk) { Navigation.NavigateTo(AdminQuery.Url("/admin/opinie", ("status", _status), ("flash", flash))); return; }
+        var f = result.Failure!;
+        _rejecting = null;
+        if (AdminFailure.IsConflict(f)) { _notice = PlAdmin.Reviews.StateChanged; await LoadAsync(); return; }
+        _messages[id] = (AlertVariant.Danger, f.Status switch
+        {
+            400 or 422 => PlAdmin.Reviews.ReasonRefused,
+            503 => PlAdmin.Reviews.ServiceUnavailable,
+            404 => PlAdmin.Reviews.NotFound,
+            _ => AdminFailure.Text(f),
+        });
+    }
+
+    async Task StaleAsync()
+    {
+        _notice = PlAdmin.Common.StaleForm;
+        _rejecting = null;
+        await LoadAsync();
+    }
+}

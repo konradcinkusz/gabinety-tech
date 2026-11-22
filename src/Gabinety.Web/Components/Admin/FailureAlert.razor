@@ -1,0 +1,26 @@
+@inject NavigationManager Navigation
+@* The failed read of an admin list, said once for every page: a service that refuses the role is "Brak dostępu" and the page's status becomes 403 (the cookie said Admin, the service disagrees: a withdrawn role); a session that ended says so with the way
+   back; anything else is the page's "unavailable" text. data-testid "forbidden" and "unavailable" are the hooks of DESIGN-CONTRACT 9.2. Nothing of the server's answer is shown: a status decides. *@
+@if (Failure.Status == 403)
+{
+    <Alert Variant="AlertVariant.Danger" TestId="forbidden">@PlAdmin.Forbidden.Body</Alert>
+}
+else if (Failure.Status == 401)
+{
+    <Alert Variant="AlertVariant.Danger" TestId="unavailable">@PlAdmin.Common.SignedOut <a href="@ReturnTarget.LoginUrl(ReturnTarget.Safe("/" + Navigation.ToBaseRelativePath(Navigation.Uri)))">@PlAdmin.Common.SignInAgain</a></Alert>
+}
+else
+{
+    <Alert Variant="AlertVariant.Danger" TestId="unavailable">@Unavailable</Alert>
+}
+
+@code {
+    [CascadingParameter] HttpContext? Http { get; set; }
+    [Parameter, EditorRequired] public ApiFailure Failure { get; set; } = default!;
+    [Parameter, EditorRequired] public string Unavailable { get; set; } = "";
+
+    protected override void OnParametersSet()
+    {
+        if (Failure.Status == 403 && Http is { Response.HasStarted: false } http) http.Response.StatusCode = StatusCodes.Status403Forbidden;
+    }
+}

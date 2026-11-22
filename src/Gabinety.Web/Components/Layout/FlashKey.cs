@@ -7,7 +7,12 @@ namespace Gabinety.Web.Components.Layout;
 public static class FlashKey
 {
     public const string Parameter = "flash", SignedOut = "signed-out";
-    static readonly Dictionary<string, string> Messages = new() { [SignedOut] = Pl.Flash.SignedOut };
+    static readonly Dictionary<string, string> Messages = new()
+    {
+        [SignedOut] = Pl.Flash.SignedOut,
+        ["admin-approved"] = PlAdmin.Flash.Approved, ["admin-rejected"] = PlAdmin.Flash.Rejected, ["admin-suspended"] = PlAdmin.Flash.Suspended, ["admin-reinstated"] = PlAdmin.Flash.Reinstated,
+        ["admin-dispute-resolved"] = PlAdmin.Flash.DisputeResolved, ["admin-review-published"] = PlAdmin.Flash.ReviewPublished, ["admin-review-rejected"] = PlAdmin.Flash.ReviewRejected,
+    };
 
     public static string? Resolve(string uri)
     {

@@ -14,7 +14,7 @@ namespace Gabinety.Web.Tests.Pipeline;
 /// </summary>
 public class PasswordPagesTests
 {
-    const string Token = "TOK-9f8e7d6c5b4a-FIXTURE", Email = "someone.private@example.test", Strong = "Nowe-Haslo-123!";
+    const string Token = "reset-link-one", Email = "someone.private@example.test", Strong = "Nowe-Haslo-123!";
 
     /// <summary>A reset service over the identity fake: tokens are issued by <c>Issue</c>, spent by one successful reset.</summary>
     sealed class ResetService
@@ -334,9 +334,9 @@ public class PasswordPagesTests
         await browser.PostFormAsync(ResetUrl(), ResetForm());                              // success
         await browser.PostFormAsync(ResetUrl(), ResetForm());                              // reuse: the bad-token state
         service.ResetStatus = 503;
-        await browser.PostFormAsync(ResetUrl("TOK-other-FIXTURE-2"), ResetForm());          // an outage while a token is in flight
+        await browser.PostFormAsync(ResetUrl("reset-link-two"), ResetForm());          // an outage while a token is in flight
         Assert.NotEmpty(logs.Lines);
-        foreach (var needle in new[] { Token, "TOK-other-FIXTURE-2", Email, Uri.EscapeDataString(Email), Uri.EscapeDataString(Token), Strong, "abc" })
+        foreach (var needle in new[] { Token, "reset-link-two", Email, Uri.EscapeDataString(Email), Uri.EscapeDataString(Token), Strong, "abc" })
             Assert.DoesNotContain(logs.Lines, l => l.Contains(needle, StringComparison.OrdinalIgnoreCase));
     }
 

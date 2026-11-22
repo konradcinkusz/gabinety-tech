@@ -1,7 +1,6 @@
 import { urls } from "../harness/env";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
 import { expect, test } from "../harness/fixtures";
-import { requirePorted } from "../harness/parity";
 import { PractitionerListPage } from "../harness/pages";
 import { listedInProblem, publicProfile, taxonomy } from "./support/directory-api";
 import { CategoryNav, PublicProfilePage } from "./support/pages";
@@ -11,7 +10,6 @@ import { CategoryNav, PublicProfilePage } from "./support/pages";
 // (the category and practitioner are taken from what the Directory lists now).
 test.describe("J1 visitor browses a category and opens a profile", () => {
   test("the category lists a practitioner, the profile opens, and its content is in the HTML without JavaScript", async ({ page, browser }) => {
-    await requirePorted(page.request, "/programisci", "/gabinet/demo-anna-demowska"); // HOST=blazor: skip with the owner named until the pages land (PARITY.md)
     // The category to browse: the first problem that has a listed practitioner, and one practitioner of it (the Directory's view, not a hard-coded name).
     const { problems } = await taxonomy();
     let category: { slug: string; namePl: string } | undefined;

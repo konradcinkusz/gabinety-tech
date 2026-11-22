@@ -6,7 +6,7 @@
   <a href="https://github.com/konradcinkusz/gabinety-tech/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/konradcinkusz/gabinety-tech/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/konradcinkusz/gabinety-tech/actions/workflows/pages.yml"><img alt="Pages" src="https://github.com/konradcinkusz/gabinety-tech/actions/workflows/pages.yml/badge.svg"></a>
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512bd4">
-  <img alt="Next.js" src="https://img.shields.io/badge/web-Next.js-000000">
+  <img alt="Blazor" src="https://img.shields.io/badge/web-Blazor-512bd4">
   <img alt="PostgreSQL" src="https://img.shields.io/badge/db-PostgreSQL-336791">
   <img alt="Aspire" src="https://img.shields.io/badge/orchestration-Aspire-512bd4">
 </p>
@@ -29,15 +29,14 @@ Prawdziwy [authservice](https://github.com/konradcinkusz/authservice) jest doł�
 
 ## Szybki start
 
-Potrzebne: .NET 10 SDK i pnpm.
+Potrzebne: .NET 10 SDK (pnpm i Node tylko do testów end-to-end w `tests/e2e`).
 
 ```bash
-pnpm --dir web install --frozen-lockfile
 dotnet run --project src/Gabinety.AppHost --launch-profile fake
 scripts/check-fake-profile.sh   # sprawdza wszystkie usługi
 ```
 
-Dwa frontendy działają obok siebie do przełączenia (ADR-0010): **Next.js** na <http://localhost:3000> (`web/`, kompletny) i **Blazor Web App** na <http://localhost:3001> (`src/Gabinety.Web`, strony przenoszone; lista postępu: [docs/operations/PARITY.md](docs/operations/PARITY.md)). Oba używają tych samych usług i tych samych użytkowników demo. Ścieżki użytkownika J1-J7 przechodzą na obu: `HOST=next|blazor pnpm --dir tests/e2e test` (kroki ze stronami, których Blazor jeszcze nie ma, są pomijane z nazwą gałęzi właściciela). Pełny przewodnik (logowanie, ścieżki, zegar testowy, warstwy testów): [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
+Frontend to **Blazor Web App** (`src/Gabinety.Web`, ADR-0010) na <http://localhost:3000>; Next.js (`web/`) został wycofany (przełączenie: [docs/operations/PARITY.md](docs/operations/PARITY.md), [docs/operations/CUTOVER.md](docs/operations/CUTOVER.md)). Ścieżki użytkownika J1-J7 przechodzą na nim: `pnpm --dir tests/e2e test`. Pełny przewodnik (logowanie, ścieżki, zegar testowy, warstwy testów): [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
 
 ## Architektura
 
@@ -48,8 +47,7 @@ Dwa frontendy działają obok siebie do przełączenia (ADR-0010): **Next.js** n
 | `Gabinety.Reputation` | opinie i oceny | 5103 |
 | `Gabinety.Assistant` | asystent (model językowy) | 5104 |
 | `Gabinety.DevIdentity` | zamiennik dostawcy tożsamości | 5100 |
-| `web/` | aplikacja webowa z BFF (Next.js; do przełączenia) | 3000 |
-| `src/Gabinety.Web` | frontend jako Blazor Web App obok `web/` (propozycja ADR-0010: `docs/adr-proposals/0010-blazor-web-app-frontend.md`); po przełączeniu zajmie port 3000 (`docs/operations/CUTOVER.md`) | 3001 |
+| `src/Gabinety.Web` | frontend: Blazor Web App (ADR-0010: `docs/adr-proposals/0010-blazor-web-app-frontend.md`), renderowanie statyczne, interaktywne tylko tam, gdzie trzeba | 3000 |
 
 Usługi .NET 10 (minimal API, EF Core, PostgreSQL) uruchamia Aspire AppHost. Autoryzacja: tokeny RS256 z [authservice](https://github.com/konradcinkusz/authservice). Pieniądze to `long` w groszach, czas pochodzi z `TimeProvider`.
 

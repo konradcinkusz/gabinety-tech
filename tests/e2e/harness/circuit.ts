@@ -1,15 +1,13 @@
 import type { Page, Response, WebSocket } from "@playwright/test";
-import { isBlazor } from "./host";
 
 /**
- * HOST=blazor, interactive pages (BLAZOR-WEB-APP section 13): the page is HTML first and interactive only after the circuit's websocket answers `StartCircuit`;
+ * Interactive pages (BLAZOR-WEB-APP section 13): the page is HTML first and interactive only after the circuit's websocket answers `StartCircuit`;
  * input before that is discarded without an error. Call `watchCircuit(page)` BEFORE navigating (or clicking a link to an interactive page) and `await` the returned
  * promise before interacting. It completes on the first frame the server sends after the client has sent its handshake and StartCircuit (two frames). It never
- * sleeps; it rejects after `timeoutMs`. On HOST=next it resolves at once, so one journey runs against both hosts. A static page has no circuit: do not await it there
+ * sleeps; it rejects after `timeoutMs`. A static page has no circuit: do not await it there
  * (`gotoInteractive` looks at the prerendered HTML and waits only when there is a server component marker, so it is safe on either kind of page).
  */
 export function watchCircuit(page: Page, timeoutMs = 15_000): Promise<void> {
-  if (!isBlazor) return Promise.resolve();
   const watch = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("the circuit did not start (no frame after StartCircuit)")), timeoutMs);
     page.on("websocket", (ws: WebSocket) => {
@@ -33,12 +31,12 @@ export async function hasCircuit(res: Response | null): Promise<boolean> {
   return /<!--Blazor:\{[^}]*"type":"server"/.test(html);
 }
 
-/** `page.goto` that, on the Blazor host and an interactive page, returns only once the circuit is live (a static page returns at once). */
+/** `page.goto` that, on an interactive page, returns only once the circuit is live (a static page returns at once). */
 export async function gotoInteractive(page: Page, path: string): Promise<Response | null> {
   const ready = watchCircuit(page);
   ready.catch(() => {}); // a static page never starts one: the timeout must not surface as an unhandled rejection
   const res = await page.goto(path);
-  if (isBlazor && (await hasCircuit(res))) await ready;
+  if (await hasCircuit(res)) await ready;
   return res;
 }
 
@@ -48,5 +46,5 @@ export async function gotoInteractive(page: Page, path: string): Promise<Respons
  */
 export async function awaitCircuitIfInteractive(res: Response, watch: Promise<void>): Promise<void> {
   watch.catch(() => {}); // not awaited for a static page: its timeout must not become an unhandled rejection
-  if (isBlazor && (await hasCircuit(res))) await watch;
+  if (await hasCircuit(res)) await watch;
 }

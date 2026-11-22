@@ -1,5 +1,7 @@
 # Performance measurement (T-10.04)
 
+> **After the cutover (2026-11-22):** the web app is the Blazor host. Sections 1 to 7 are the measurement of **2026-11-18, when the web app was the Next.js one** (`next start`, one Node process); they stay as the record of that run and of the commit it measured, and the script now measures the Blazor host (a Release publish, `scripts/perf/blazor-host.sh`), so a re-run gives new numbers for the web rows. The backend rows are unaffected. Section 8 (Blazor circuits) is the current web-host capacity measurement.
+
 SPEC section 13 rows, measured on one container on 2026-11-18, with the command, the environment and the number for each. **These numbers are not staging numbers.** Staging does not exist yet (owner accounts pending), the load generator shared four cores with the system it measured, and the dataset is synthetic. A target row that says "pass" here says only that this container did not miss it; A-15 (SPEC section 12.1, "the targets are reachable on the sizes of section 4.3") stays **not shown** until the staging rows are measured.
 
 Raw results: `docs/operations/performance/2026-11-18/` (`main/results.json` is the run quoted below; `main/commands.txt` has every command in full). Script: `scripts/measure-performance.sh` (stack: `scripts/perf-stack.sh`, load: `scripts/perf/load.mjs`).
@@ -97,18 +99,18 @@ None of the measured rows missed its target on this machine, so none of these is
 ```bash
 export PATH=$HOME/.dotnet:$PATH
 # 1. a PostgreSQL server on 127.0.0.1:5432 (any; the databases are created by the script):  PGHOST PGPORT PGUSER override the defaults
-PROFILE=postgres scripts/perf-stack.sh start          # builds and starts DevIdentity, four services (Release), and the web app (production build)
+PROFILE=postgres scripts/perf-stack.sh start          # builds and starts DevIdentity, four services (Release), and the web app (a Release publish of the Blazor host)
 # 2. the scaled dataset
 K=demo-development-internal-key-not-a-secret
 GABINETY_FAKE=1 Environment__Kind=Development Backend__Directory=http://localhost:5101 Backend__Booking=http://localhost:5102 Backend__Reputation=http://localhost:5103 \
   Internal__Keys__Directory=$K Internal__Keys__Booking=$K Internal__Keys__Reputation=$K Identity__Authority=http://localhost:5100 \
   dotnet run -c Release --no-launch-profile --project tools/Gabinety.DemoSeeder -- --factor 200          # about 4 min
 # 3. restart the four services (not DevIdentity) so the measurement starts from fresh processes (optional):  SERVICES="directory booking reputation assistant" scripts/perf-stack.sh start
-# 4. measure (the PR #113 comparison needs a second web app on :3001 built from the parent of a4536c4: WEB_DIR=<worktree>/web WEB_PORT=3001 START_BACKENDS=0 scripts/perf-stack.sh start)
-BASELINE_WEB_URL=http://localhost:3001 scripts/measure-performance.sh       # about 10 minutes; prints the table, writes perf-results/<date>/results.json
+# 4. measure (the PR #113 comparison was of two Next.js builds and no longer applies; BASELINE_WEB_URL may still name any second web app)
+scripts/measure-performance.sh       # about 10 minutes; prints the table, writes perf-results/<date>/results.json
 ```
 
-The AppHost's own fake profile can be measured too (`dotnet run --project src/Gabinety.AppHost --launch-profile fake`), but its rate limit is 6000 a minute (the read rows will hit 429 and the script reports them as `invalid`), it is in-memory, and its web app is `next dev`: not the numbers of this file.
+The AppHost's own fake profile can be measured too (`dotnet run --project src/Gabinety.AppHost --launch-profile fake`), but its rate limit is 6000 a minute (the read rows will hit 429 and the script reports them as `invalid`), it is in-memory, and its web app is a Debug build of the Blazor host: not the numbers of this file.
 
 ## 8. Blazor circuits: memory per open interactive page (ADR-0010)
 

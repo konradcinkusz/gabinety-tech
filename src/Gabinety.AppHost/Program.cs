@@ -142,22 +142,10 @@ IResourceBuilder<ProjectResource> Seeder(string name, params string[] args)
 Seeder("seeder");
 Seeder("seeder-reset", "--reset");
 
-var web = builder.AddJavaScriptApp("web", "../../web", "dev")
-    .WithPnpm()
-    .WithHttpEndpoint(port: 3000, env: "PORT", isProxied: false)
-    .WithEnvironment("Backend__Directory", DirectoryUrl)
-    .WithEnvironment("Backend__Booking", BookingUrl)
-    .WithEnvironment("Backend__Reputation", ReputationUrl)
-    .WithEnvironment("Backend__Assistant", AssistantUrl)
-    .WithEnvironment("Backend__Auth", identityAuthority)
-    .WithEnvironment("Site__BaseUrl", "http://localhost:3000")
-    .WaitFor(directory);
-if (authservice is not null) web.WaitFor(authservice);
-
-// The Blazor Web App frontend (ADR-0010 proposal) runs beside the Next.js one until a cutover PR: same backend addresses, port 3001, the kernel's /health. It is given NO internal key: that is for
+// The web frontend (ADR-0010: the Blazor Web App, the only one since the cutover): the backend addresses, port 3000, the kernel's /health. It is given NO internal key: that is for
 // services calling services (ADR-0007). Not in the default profile's WaitFor chain of anything: nothing depends on a frontend.
 var webBlazor = builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchProfileName: null)
-    .WithHttpEndpoint(port: 3001, isProxied: false)
+    .WithHttpEndpoint(port: 3000, isProxied: false)
     .WithHttpHealthCheck("/health")
     // Aspire starts a project WITHOUT ASPNETCORE_ENVIRONMENT here (launchProfileName: null), so it would run as Production from an unpublished build, where the pre-compressed static assets
     // (the stylesheets, blazor.web.js) cannot be found and answer 500 to every browser (they send Accept-Encoding; curl and in-process tests do not). A developer's AppHost is Development.
@@ -167,7 +155,7 @@ var webBlazor = builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchPr
     .WithEnvironment("Backend__Reputation", ReputationUrl)
     .WithEnvironment("Backend__Assistant", AssistantUrl)
     .WithEnvironment("Backend__Auth", identityAuthority)
-    .WithEnvironment("Site__BaseUrl", "http://localhost:3001")
+    .WithEnvironment("Site__BaseUrl", "http://localhost:3000")
     // The session cookie is sealed with Data Protection (stateless sessions, ADR-0010): the key ring is persisted per user so a restart of the host does not sign a developer out. On Fly it is a volume.
     .WithEnvironment("DataProtection__KeysPath", Path.Combine(Path.GetTempPath(), $"gabinety-web-keys-{Environment.UserName}"))
 
@@ -177,5 +165,6 @@ var webBlazor = builder.AddProject<Projects.Gabinety_Web>("web-blazor", launchPr
 // The mock checkout (/checkout/mock/{id}) exists only in the fake profile (security review F-01): the host decides that with the Booking service's own rule (GABINETY_FAKE=1 or Environment:Kind=Development,
 // and no real payment provider), so the fake profile must say so, or the booking form ends in "Nie udało się przejść do płatności" and journeys J3 and J4 cannot reach the checkout.
 if (fake) webBlazor.WithEnvironment("GABINETY_FAKE", "1");
+if (authservice is not null) webBlazor.WaitFor(authservice); // sign-in needs the real authservice in the default profile
 
 builder.Build().Run();

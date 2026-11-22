@@ -1,5 +1,0 @@
-{
-  "exemptions": [
-    { "route": "/api/*", "reason": "The Next BFF (/api/auth, /api/proxy, /api/config, /api/health) has no counterpart by design: the Blazor host never lets the browser call a backend (ADR-0010 decision 4); its health route is the kernel's /health." }
-  ]
-}

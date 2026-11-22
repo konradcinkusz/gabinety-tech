@@ -1,8 +1,7 @@
-# web-blazor (ADR-0010, T-09.02 for the Blazor host): src/Gabinety.Web, the Blazor Web App that replaces the Next.js BFF (deploy/fly/web.fly.toml) at the cutover.
-# NOT DEPLOYED YET: its row in deploy/estate.conf is a commented "#cutover#" row; the cutover PR uncomments it (docs/operations/CUTOVER.md). Until then this file is only checked
-# (scripts/check-fly-toml.sh, scripts/tests/deploy.test.sh) so that the cutover flips a switch and writes no new config.
+# web-blazor (ADR-0010, T-09.02 for the Blazor host): src/Gabinety.Web, the Blazor Web App that replaced the Next.js BFF at the cutover (docs/operations/CUTOVER.md).
+# The estate's web app since the cutover: its row in deploy/estate.conf is live (docs/operations/CUTOVER.md). A NEW Fly app, beside the old Next.js one (gabinety-web-staging), which is the rollback until the owner retires it.
 # Deploy (the workflow does it):  fly deploy --config deploy/fly/web-blazor.fly.toml --ha=false    (from the repository root; the context is the repository root)
-# Nothing secret and no real hostname lives in this file. Placeholders in <angle brackets> are filled by the owner with the Next app's (web.fly.toml).
+# Nothing secret and no real hostname lives in this file. Placeholders in <angle brackets> are filled by the owner.
 #
 # A STATEFUL frontend (BLAZOR-WEB-APP section 14; ADR-0010 "Hosting"). Every open interactive page is a circuit in this machine's memory behind a websocket:
 #  - min_machines_running = 1 and NO idle stop. This app is on the synchronous path of every page (SPEC 4.3), and a stopped machine ends every circuit: scale to zero (P7) is NOT available.

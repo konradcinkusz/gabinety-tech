@@ -210,7 +210,7 @@ public sealed class BriefFeature : IServiceFeature
 
         return await service.SuggestAsync(userId, text, ct) switch
         {
-            BriefResult.Suggestion s => Results.Json(Wire(s.Value)),
+            BriefResult.Suggestion s => Results.Json(s.Value),
             _ => Problem(ErrorCodes.AssistantUnavailable, "Assistant unavailable", 503),
         };
     }
@@ -227,13 +227,6 @@ public sealed class BriefFeature : IServiceFeature
     }
 
     sealed record BriefRequestBody(string? Text);
-
-    /// <summary>CONTRACTS 6 names the confidence values in lower case.</summary>
-    static object Wire(BriefSuggestion s) => new
-    {
-        s.ProblemSlug, s.TechSlugs, s.Summary, s.ClarifyingQuestions, s.SuggestedDurationMinutes,
-        Confidence = s.Confidence.ToString().ToLowerInvariant(), s.ModelId, s.PromptVersion,
-    };
 
     static IResult Problem(string code, string title, int status, Dictionary<string, string[]>? errors = null) =>
         Results.Json(ApiProblem.Of(code, title, status, null, errors), statusCode: status, contentType: "application/problem+json");

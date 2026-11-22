@@ -161,10 +161,16 @@ public class ModerationTests
         await h.Seed(p, held);
         var admin = h.As("demo-admin", Admin);
 
-        foreach (var reason in new[] { null, "", "   ", new string('x', 501) })
+        foreach (var reason in new[] { null, "", "   ", "Za krótki", "   Za krótki   ", new string('x', 501) })
             Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ModerationHost.Reject(admin, held.Id, reason)).StatusCode);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await admin.PostAsync($"/api/v1/admin/reviews/{held.Id}/reject", null)).StatusCode);
         Assert.Equal(ReviewStatus.Held, (await h.ReviewOf(held.Id)).Status);
+
+        // the boundaries match practitioner verification (CONTRACTS 3.4): 10 and 500 characters after trimming are accepted
+        Assert.Equal(HttpStatusCode.NoContent, (await ModerationHost.Reject(admin, held.Id, "  " + new string('x', 10) + "  ")).StatusCode);
+        var other = ModerationHost.NewReview(p, ReviewStatus.Held);
+        await h.Seed(p, other);
+        Assert.Equal(HttpStatusCode.NoContent, (await ModerationHost.Reject(admin, other.Id, new string('x', 500))).StatusCode);
 
         Assert.Equal(HttpStatusCode.NotFound, (await ModerationHost.Publish(admin, Guid.NewGuid())).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await ModerationHost.Reject(admin, Guid.NewGuid())).StatusCode);

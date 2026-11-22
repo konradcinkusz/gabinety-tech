@@ -115,6 +115,14 @@ describe("reject", () => {
     expect(calls).toHaveLength(0);
     expect(field().getAttribute("aria-invalid")).toBe("true");
   });
+  it("a reason under 10 characters blocks the call, as for practitioner verification", async () => {
+    const calls = stub();
+    await openForm();
+    await userEvent.type(field(), "Za krótki");
+    await click(new RegExp(mv("reject.confirm")));
+    expect(host.textContent).toContain(mv("reject.reasonInvalid"));
+    expect(calls).toHaveLength(0);
+  });
   it("sends the trimmed reason and reloads", async () => {
     const calls = stub();
     await openForm();
@@ -135,7 +143,7 @@ describe("reject", () => {
   it("a server 422 on the reason is shown, a network failure too", async () => {
     stub(422, { code: "validation_failed", errors: { reason: ["x"] } });
     await openForm();
-    await userEvent.type(field(), "powód");
+    await userEvent.type(field(), "powód odrzucenia");
     await click(new RegExp(mv("reject.confirm")));
     await flush();
     expect(host.textContent).toContain(mv("error.reason"));

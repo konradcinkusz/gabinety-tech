@@ -6,7 +6,7 @@ namespace Gabinety.Contracts.Reputation;
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ReviewStatus { Published, Held, Rejected }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(Gabinety.Contracts.Common.SnakeCaseLowerEnumConverter))]
 public enum TriageFlag { None, Hold, Unavailable }
 
 public sealed record CreateReviewRequest(Guid BookingId, [property: Range(1, 5)] int Rating,

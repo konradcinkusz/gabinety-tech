@@ -76,6 +76,7 @@ else
     [SupplyParameterFromQuery(Name = "duration")] public string? DurationParam { get; set; }
     [SupplyParameterFromQuery(Name = "maxPriceMinor")] public string? MaxPriceParam { get; set; }
     [SupplyParameterFromQuery(Name = "q")] public string? QueryParam { get; set; }
+    [SupplyParameterFromQuery(Name = "contract")] public string? ContractParam { get; set; }
     [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
 
     ListView? _view;
@@ -83,8 +84,8 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        var state = ListState.Parse(Problem, Tech, DurationParam, MaxPriceParam, QueryParam, CursorParam);
-        var query = new PractitionerQuery(state.Problem, state.Tech, state.Q, state.Duration, state.MaxPriceMinor, state.Cursor);
+        var state = ListState.Parse(Problem, Tech, DurationParam, MaxPriceParam, QueryParam, CursorParam, ContractParam);
+        var query = new PractitionerQuery(state.Problem, state.Tech, state.Q, state.Duration, state.MaxPriceMinor, state.Cursor, state.Contract);
         // Three independent reads: a failure of any is an error state of this page, never an exception (BLAZOR-WEB-APP section 5).
         var taxonomyTask = Directory.TaxonomyAsync();
         var sitemapTask = Directory.SitemapAsync();

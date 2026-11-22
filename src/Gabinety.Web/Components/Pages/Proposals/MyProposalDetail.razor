@@ -1,0 +1,28 @@
+@page "/moje/propozycje/{Id:guid}"
+@attribute [Authorize]
+@inherits ProposalDetailBase
+@* The client's side of one proposal (ADR proposal 0013). All the behaviour is in ProposalDetailBase; the view is shared with the programmer's page. *@
+
+<PageTitle>@ProposalsText.Detail.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@ProposalsText.Detail.Title</h1>
+
+@if (LoadFailure is not null)
+{
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@ProposalFormat.FailureText(LoadFailure)</p>
+        <a class="btn btn--secondary" href="@DetailHref()">@ProposalsText.Detail.Reload</a>
+    </div>
+}
+else if (Current is { } proposal)
+{
+    <ProposalDetailView View="proposal" Open="@Open" DoneText="@DoneText" Errors="Errors" ActionFailure="ActionFailure" Counter="CounterFields" CounterText="@CounterText" Today="Today"
+                        DetailPath="@PathOf(Id)" ListPath="@ListPath" OnAccept="AcceptAsync" OnReject="RejectAsync" OnWithdraw="WithdrawAsync" OnCounter="CounterAsync" />
+}
+
+@code {
+    protected override string ViewerRole => ProposalFormat.ClientRole;
+    protected override string PathOf(Guid id) => $"/moje/propozycje/{id}";
+    protected override string OtherPathOf(Guid id) => $"/gabinet-programisty/propozycje/{id}";
+    protected override string ListPath => "/moje/propozycje";
+}

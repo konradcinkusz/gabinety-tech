@@ -14,7 +14,10 @@ public sealed record TaxonomyDto(string Version, IReadOnlyList<CategoryDto> Prob
 public sealed record RatingDto(double Average, int Count);
 
 public sealed record PractitionerCardDto(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin, IReadOnlyList<string> Badges,
-    RatingDto? Rating, bool IsNew, MoneyDto FromPrice, IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations);
+    RatingDto? Rating, bool IsNew, MoneyDto FromPrice, IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations, ContractAvailabilityDto? Contract = null);
+
+/// <summary>What a practitioner advertises for contract work (ADR proposal 0013). Absent means "not available"; <c>AvailableFrom</c> absent means available now.</summary>
+public sealed record ContractAvailabilityDto(DateOnly? AvailableFrom, int HoursPerWeek, MoneyDto? Rate);
 
 /// <summary>A cursor page (CONTRACTS 0); <c>NextCursor</c> is absent on the last page.</summary>
 public sealed record PageDto<T>(IReadOnlyList<T> Items, string? NextCursor);
@@ -30,7 +33,7 @@ public sealed record OfferingDto(Guid Id, string Title, string Description, int 
 
 /// <summary>The public profile (CONTRACTS 3.2): the card's fields and the extras side by side (flat on the wire).</summary>
 public sealed record PractitionerProfileDto(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin, IReadOnlyList<string> Badges, RatingDto? Rating, bool IsNew,
-    MoneyDto FromPrice, string Bio, string? PortfolioUrl, IReadOnlyList<OfferingDto> Offerings, int CompletedCount, DateTimeOffset MemberSince);
+    MoneyDto FromPrice, string Bio, string? PortfolioUrl, IReadOnlyList<OfferingDto> Offerings, int CompletedCount, DateTimeOffset MemberSince, ContractAvailabilityDto? Contract = null);
 
 public sealed record RankingWeightsDto(double Rating, double Reliability, double Availability, double Completeness);
 
@@ -130,3 +133,33 @@ public sealed record PaymentAccountDto(string Provider, string State);
 
 /// <summary><c>POST /api/v1/me/payments/account/onboarding</c>: <c>OnboardingUrl</c> is single use and short lived; it is never stored or logged.</summary>
 public sealed record PaymentOnboardingDto(string Provider, string State, string? OnboardingUrl);
+
+// ---- contract availability and collaboration proposals (ADR proposal 0013)
+
+/// <summary><c>GET/PUT /api/v1/me/practitioner/contract-availability</c>. <c>Status</c> is <c>not_available | available_now | available_from</c>. Null fields are sent as null: the service reads them as "none".</summary>
+public sealed record ContractAvailabilitySettingsDto(string Status, DateOnly? AvailableFrom, int? HoursPerWeek, long? RateMinor);
+
+/// <summary>The negotiable terms, in the wire shape of the service. A short-term proposal has <c>TotalHours</c>; a long-term one <c>HoursPerWeek</c> and <c>DurationMonths</c>.</summary>
+public sealed record ProposalTermsDto(MoneyDto Rate, int? HoursPerWeek, int? TotalHours, int? DurationMonths, DateOnly StartDate);
+
+/// <summary><c>By</c> is <c>Client | Practitioner | System</c>; <c>Action</c> is <c>Proposed | Countered | Accepted | Rejected | Withdrawn | Expired</c>.</summary>
+public sealed record ProposalRoundDto(int Number, string By, string Action, ProposalTermsDto? Terms, string? Text, DateTimeOffset CreatedAt);
+
+/// <summary>The counterpart's address: present only once the proposal is accepted; <c>Email</c> is null when none is known right now.</summary>
+public sealed record ProposalContactDto(string? Email);
+
+/// <summary><c>Kind</c> is <c>ShortTerm | LongTerm</c>; <c>Status</c> is <c>AwaitingPractitioner | AwaitingClient | Accepted | Rejected | Withdrawn | Expired</c>; <c>ViewerRole</c> is <c>Client | Practitioner</c>.</summary>
+public sealed record ProposalViewDto(Guid Id, string Kind, string Status, ProposalTermsDto Terms, PractitionerRefDto Practitioner, ClientRefDto Client, string? CompanyName,
+    IReadOnlyList<ProposalRoundDto> Rounds, int Round, string ViewerRole, DateTimeOffset? ExpiresAt, bool CanAccept, bool CanCounter, bool CanReject, bool CanWithdraw, ProposalContactDto? Contact);
+
+public sealed record ProposalSummaryDto(Guid Id, string Kind, string Status, ProposalTermsDto Terms, PractitionerRefDto Practitioner, ClientRefDto Client, string? CompanyName,
+    int Round, bool YourTurn, DateTimeOffset LastActionAt, DateTimeOffset? ExpiresAt);
+
+/// <summary>An empty company name is omitted, not sent as null (CONTRACTS 0).</summary>
+public sealed record CreateProposalBody(Guid PractitionerId, string Kind, ProposalTermsDto Terms, string Text,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? CompanyName);
+
+public sealed record CounterProposalBody(int Round, ProposalTermsDto Terms,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Text);
+
+public sealed record ProposalRoundBody(int Round);

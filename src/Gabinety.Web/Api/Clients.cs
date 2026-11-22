@@ -4,7 +4,7 @@ using Gabinety.Web.Auth;
 namespace Gabinety.Web.Api;
 
 /// <summary>The filters of <c>GET /api/v1/practitioners</c> (CONTRACTS 3.2).</summary>
-public sealed record PractitionerQuery(string? Problem = null, string? Tech = null, string? Q = null, int? Duration = null, long? MaxPriceMinor = null, string? Cursor = null);
+public sealed record PractitionerQuery(string? Problem = null, string? Tech = null, string? Q = null, int? Duration = null, long? MaxPriceMinor = null, string? Cursor = null, bool Contract = false);
 
 /// <summary>Directory, public reads only (SPEC 5.1: 5 s, once, GET only: see <see cref="ApiResilience"/>).</summary>
 public sealed partial class DirectoryClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
@@ -28,6 +28,7 @@ public sealed partial class DirectoryClient(HttpClient http, VisitorAddressAcces
         Add("duration", query.Duration?.ToString(CultureInfo.InvariantCulture));
         Add("maxPriceMinor", query.MaxPriceMinor?.ToString(CultureInfo.InvariantCulture));
         Add("cursor", query.Cursor);
+        if (query.Contract) parts.Add("contract=1"); // ADR proposal 0013: only practitioners who take collaboration proposals
         return GetAsync<PageDto<PractitionerCardDto>>("/api/v1/practitioners" + (parts.Count == 0 ? "" : "?" + string.Join('&', parts)), null, ct);
     }
 }

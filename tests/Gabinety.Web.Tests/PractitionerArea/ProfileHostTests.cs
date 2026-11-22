@@ -14,11 +14,13 @@ public class ProfileHostTests
         var page = await browser.GetAsync("/gabinet-programisty/profil");
         Assert.Equal("Profil", page.TextOf("h1"));
         var labels = page.All("form label").Select(l => l.TextContent.Trim()).ToList();
-        Assert.Equal(["Nazwa wyświetlana", "Nagłówek", "Opis (o mnie)", "Link do portfolio (opcjonalnie)", "Domyślny link do spotkań (opcjonalnie)", "NIP (opcjonalnie)"], labels);
+        Assert.Equal(["Nazwa wyświetlana", "Nagłówek", "Opis (o mnie)", "Link do portfolio (opcjonalnie)", "Domyślny link do spotkań (opcjonalnie)", "NIP (opcjonalnie)",
+            "Dostępność", "Dostępny od (opcjonalnie)", "Godzin tygodniowo (opcjonalnie)", "Orientacyjna stawka za godzinę (zł) (opcjonalnie)"], labels); // the last four are the contract availability form (ADR proposal 0013)
         // J2: getByLabel is a substring match: each of these must match ONE control.
         foreach (var needle in new[] { "Nagłówek", "Opis", "Link do portfolio", "NIP", "Nazwa wyświetlana" }) Assert.Equal(1, labels.Count(l => l.Contains(needle, StringComparison.OrdinalIgnoreCase)));
         Assert.All(page.All("form label"), l => Assert.NotNull(page.One($"#{l.GetAttribute("for")}"))); // a label points at a real control
         Assert.Equal("Zapisz", page.One("form button[type=submit]")!.TextContent); // J2
+        Assert.Single(page.All("form button[type=submit]"), b => b.TextContent.Contains("Zapisz")); // the contract form's button must not match the journeys' "Zapisz"
         Assert.Equal("0 / 120", page.TextOf("#headline ~ .field__counter")); // inside the field, right after the control
         Assert.Equal("numeric", page.One("#nip")!.GetAttribute("inputmode"));
         Assert.Equal("10", page.One("#nip")!.GetAttribute("maxlength"));
@@ -116,7 +118,7 @@ public class ProfileHostTests
         var page = await browser.GetAsync("/gabinet-programisty/profil");
         var nav = page.One("nav.tabs")!;
         Assert.Equal("Sekcje panelu programisty", nav.GetAttribute("aria-label"));
-        Assert.Equal(["Start", "Profil", "Oferty", "Dostępność", "Płatności"], nav.QuerySelectorAll("a").Select(a => a.TextContent));
+        Assert.Equal(["Start", "Profil", "Oferty", "Dostępność", "Propozycje", "Płatności"], nav.QuerySelectorAll("a").Select(a => a.TextContent));
         Assert.Equal(["Profil"], nav.QuerySelectorAll("a[aria-current=page]").Select(a => a.TextContent));
         Assert.Equal("noindex,nofollow", page.One("meta[name=robots]")!.GetAttribute("content"));
         var start = await browser.GetAsync("/gabinet-programisty");

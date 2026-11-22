@@ -36,14 +36,46 @@ else if (Profile is not null)
         </FormField>
         <div class="form-actions"><button class="btn btn--primary" type="submit">@PlPractitioner.Common.Save</button></div>
     </form>
+
+    @* Contract availability (ADR proposal 0013): its own form and its own save, because the profile PUT replaces every field it knows. *@
+    <section class="stack form-narrow" aria-labelledby="contract-title" data-testid="contract-form">
+        <h2 id="contract-title">@ProposalsText.Contract.Title</h2>
+        <p>@ProposalsText.Contract.Intro</p>
+        <p><a href="@PractitionerPaths.Proposals">@ProposalsText.Contract.Inbox</a></p>
+        <ErrorSummary Errors="ContractSummary" />
+        @if (_contractGeneral is not null) {<Alert Variant="AlertVariant.Danger" TestId="contract-error">@_contractGeneral</Alert>}
+        <form method="post" @onsubmit="SaveContractAsync" @formname="contract" class="form stack" novalidate>
+            <AntiforgeryToken />
+            <FormField Id="contractStatus" Label="@ProposalsText.Contract.StatusLabel" Error="@ContractError("contractStatus")">
+                <select id="@context.Id" name="contractStatus" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)">
+                    @foreach (var status in ContractInput.Statuses) {<option value="@status" selected="@(status == _c.Status)">@ContractInput.StatusLabel(status)</option>}
+                </select>
+            </FormField>
+            <FormField Id="contractFrom" Label="@ProposalsText.Contract.FromLabel" Hint="@ProposalsText.Contract.FromHint" Error="@ContractError("contractFrom")" Optional="true">
+                <input id="@context.Id" name="contractFrom" type="date" value="@_c.From" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <FormField Id="contractHours" Label="@ProposalsText.Contract.HoursLabel" Hint="@ProposalsText.Contract.HoursHint" Error="@ContractError("contractHours")" Optional="true">
+                <input id="@context.Id" name="contractHours" inputmode="numeric" value="@_c.Hours" maxlength="2" autocomplete="off" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <FormField Id="contractRate" Label="@ProposalsText.Contract.RateLabel" Hint="@ProposalsText.Contract.RateHint" Error="@ContractError("contractRate")" Optional="true">
+                <input id="@context.Id" name="contractRate" inputmode="decimal" value="@_c.Rate" maxlength="10" autocomplete="off" aria-describedby="@context.DescribedBy" aria-invalid="@Invalid(context)" />
+            </FormField>
+            <div class="form-actions"><button class="btn btn--primary" type="submit">@ProposalsText.Contract.Save</button></div>
+        </form>
+    </section>
 }
 
 @code {
     sealed record Values(string DisplayName, string Headline, string Bio, string PortfolioUrl, string MeetingUrl, string Nip);
 
     Values _v = new("", "", "", "", "", "");
-    string? _general;
-    readonly Dictionary<string, string> _errors = [];
+    string? _general, _contractGeneral;
+    readonly Dictionary<string, string> _errors = [], _contractErrors = [];
+    ContractFields _c = ContractFields.Default;
+
+    string? ContractError(string field) => _contractErrors.GetValueOrDefault(field);
+    IReadOnlyList<KeyValuePair<string, string>> ContractSummary => [.. ContractInput.FieldOrder.Where(_contractErrors.ContainsKey).Select(f => KeyValuePair.Create(f, _contractErrors[f]))];
+    [Inject] TimeProvider Clock { get; set; } = default!;
 
     string? Error(string field) => _errors.GetValueOrDefault(field);
     static string? Invalid(FormField.FieldContext c) => c.Invalid ? "true" : null;
@@ -56,6 +88,24 @@ else if (Profile is not null)
         if (!await LoadProfileAsync()) return;
         var p = Profile!;
         _v = new(p.DisplayName, p.Headline, p.Bio, p.PortfolioUrl ?? "", p.MeetingUrlDefault ?? "", p.Nip ?? "");
+        var contract = await Practitioner.ContractAvailabilityAsync(); // a refusal leaves the form at "not available": saving it says what is wrong
+        if (contract.IsOk) _c = ContractInput.From(contract.Value!);
+    }
+
+    /// <summary>Saves the contract availability only: its own check first, then the service, which stays the authority.</summary>
+    async Task SaveContractAsync()
+    {
+        var f = Posted;
+        _c = new ContractFields(f.Text("contractStatus"), f.Text("contractFrom"), f.Text("contractHours"), f.Text("contractRate"));
+        _contractErrors.Clear();
+        _contractGeneral = null;
+        var (body, errors) = ContractInput.Parse(_c, Gabinety.Web.Components.Pages.Shared.PlFormat.TodayWarsaw(Clock.GetUtcNow()));
+        foreach (var (field, message) in errors) _contractErrors[field] = message;
+        if (_contractErrors.Count > 0 || body is null) return;
+        var r = await Practitioner.SaveContractAvailabilityAsync(body);
+        if (r.IsOk) { Done(PractitionerPaths.Profile, FlashKey.Saved); return; }
+        foreach (var (field, message) in ContractInput.FieldErrors(r.Failure!)) _contractErrors[field] = message;
+        if (_contractErrors.Count == 0) _contractGeneral = ProposalsText.Contract.ErrGeneral;
     }
 
     async Task SaveAsync()

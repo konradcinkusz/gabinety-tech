@@ -1,3 +1,4 @@
+@inject TimeProvider Time
 <article class="card practitioner-card" data-testid="practitioner-card">
     <h2 class="practitioner-card__name"><a href="@($"/gabinet/{Practitioner.Slug}")">@Practitioner.DisplayName</a></h2>
     <p class="practitioner-card__headline">@Practitioner.Headline</p>
@@ -6,6 +7,10 @@
         @if (Practitioner.Badges.Contains("approved"))
         {
             <li><span class="badge badge--success">@PlPages.ListExtra.Verified</span></li>
+        }
+        @if (Practitioner.Contract is { } contract)
+        {
+            <li><span class="badge badge--info" data-testid="card-contract">@ContractAvailabilityFormat.CardLine(contract, PlFormat.TodayWarsaw(Time.GetUtcNow()))</span></li>
         }
         <li>
             @if (Practitioner.Rating is { } rating && !Practitioner.IsNew)

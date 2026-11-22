@@ -1,0 +1,182 @@
+@* One proposal as the party sees it (ADR proposal 0013): the current terms, the contact once accepted, the rounds, and what the viewer may do. Static server rendering, like the booking detail: an action opens as
+   a state of the page (?action=), shown as a native dialog that is open in the markup (no script); a GET form's button opens it, a POST form confirms it, and the result is a redirect with a fixed key
+   (?done=). Every action is driven ONLY by the server's can* flags. The texts of users are plain text nodes and request bodies only: never markup, never a URL, never logged. *@
+<div class="stack">
+    @if (DoneText is { } done) {<div class="callout callout--success" role="status" data-testid="done">@done</div>}
+
+    <section class="card" aria-labelledby="proposal-title">
+        <div class="cluster cluster--between">
+            <h2 id="proposal-title">@ProposalFormat.KindLabel(View.Kind)</h2>
+            <BookingBadge Badge="ProposalFormat.StatusBadge(View.Status)" />
+        </div>
+        <dl class="dl" data-testid="proposal-terms">
+            <dt>@ProposalsText.Detail.PartyPractitioner</dt><dd>@View.Practitioner.DisplayName</dd>
+            <dt>@ProposalsText.Detail.PartyClient</dt><dd>@View.Client.DisplayName</dd>
+            @if (View.CompanyName is { Length: > 0 } company) {<dt>@ProposalsText.Detail.Company</dt><dd data-testid="company">@company</dd>}
+            <dt>@ProposalsText.Terms.Rate</dt><dd class="num">@ProposalFormat.Rate(View.Terms)</dd>
+            <dt>@(View.Terms.HoursPerWeek is not null ? ProposalsText.Terms.HoursPerWeek : ProposalsText.Terms.TotalHours)</dt><dd>@ProposalFormat.Hours(View.Terms)</dd>
+            @if (ProposalFormat.Duration(View.Terms) is { } duration) {<dt>@ProposalsText.Terms.Duration</dt><dd>@duration</dd>}
+            <dt>@ProposalsText.Terms.Start</dt><dd>@ProposalFormat.Date(View.Terms.StartDate)</dd>
+            @if (View.ExpiresAt is { } expires) {<dt>@string.Format(ProposalsText.Status.ExpiresAt, "")</dt><dd>@ProposalFormat.Date(expires)</dd>}
+        </dl>
+        @if (!ProposalFormat.IsOpen(View.Status)) {<p class="muted">@ProposalsText.Detail.Closed</p>}
+        else if (YourTurn) {<p><strong>@ProposalsText.Detail.YourTurn</strong></p>}
+        else {<p class="muted">@ProposalsText.Detail.Waiting</p>}
+    </section>
+
+    @if (View.Contact is { } contact)
+    {
+        <section class="card" aria-labelledby="contact-title" data-testid="proposal-contact">
+            <h2 id="contact-title">@ProposalsText.Detail.Contact</h2>
+            <p>@ProposalsText.Detail.ContactIntro</p>
+            @if (SafeEmail(contact.Email) is { } email)
+            {
+                <p><span class="muted">@ProposalsText.Detail.ContactEmail:</span> <a href="@($"mailto:{email}")" data-testid="contact-email">@email</a></p>
+            }
+            else {<p class="muted" data-testid="contact-missing">@ProposalsText.Detail.ContactMissing</p>}
+        </section>
+    }
+
+    <section aria-labelledby="thread-title" class="stack">
+        <h2 id="thread-title">@ProposalsText.Detail.Thread</h2>
+        <ProposalThread Rounds="View.Rounds" />
+    </section>
+
+    @if (Open == "accept" && View.CanAccept)
+    {
+        <dialog open role="alertdialog" aria-labelledby="accept-title" class="dialog card" data-testid="accept-dialog">
+            <h2 id="accept-title" tabindex="-1" autofocus>@ProposalsText.Actions.AcceptTitle</h2>
+            <p>@ProposalsText.Actions.AcceptBody</p>
+            <form method="post" @onsubmit="OnAccept" @formname="accept" class="form">
+                <AntiforgeryToken />
+                <input type="hidden" name="round" value="@View.Round" />
+                @FailureBlock()
+                <div class="form-actions">
+                    <button type="submit" class="btn btn--primary">@ProposalsText.Actions.AcceptConfirm</button>
+                    <a class="btn btn--secondary" href="@DetailPath">@ProposalsText.Actions.Keep</a>
+                </div>
+            </form>
+        </dialog>
+    }
+    else if (Open == "reject" && View.CanReject)
+    {
+        <dialog open role="alertdialog" aria-labelledby="reject-title" class="dialog card" data-testid="reject-dialog">
+            <h2 id="reject-title" tabindex="-1" autofocus>@ProposalsText.Actions.RejectTitle</h2>
+            <p>@ProposalsText.Actions.RejectBody</p>
+            <form method="post" @onsubmit="OnReject" @formname="reject" class="form">
+                <AntiforgeryToken />
+                <input type="hidden" name="round" value="@View.Round" />
+                @FailureBlock()
+                <div class="form-actions">
+                    <button type="submit" class="btn btn--danger">@ProposalsText.Actions.RejectConfirm</button>
+                    <a class="btn btn--secondary" href="@DetailPath">@ProposalsText.Actions.Keep</a>
+                </div>
+            </form>
+        </dialog>
+    }
+    else if (Open == "withdraw" && View.CanWithdraw)
+    {
+        <dialog open role="alertdialog" aria-labelledby="withdraw-title" class="dialog card" data-testid="withdraw-dialog">
+            <h2 id="withdraw-title" tabindex="-1" autofocus>@ProposalsText.Actions.WithdrawTitle</h2>
+            <p>@ProposalsText.Actions.WithdrawBody</p>
+            <form method="post" @onsubmit="OnWithdraw" @formname="withdraw" class="form">
+                <AntiforgeryToken />
+                <input type="hidden" name="confirm" value="yes" />
+                @FailureBlock()
+                <div class="form-actions">
+                    <button type="submit" class="btn btn--danger">@ProposalsText.Actions.WithdrawConfirm</button>
+                    <a class="btn btn--secondary" href="@DetailPath">@ProposalsText.Actions.Keep</a>
+                </div>
+            </form>
+        </dialog>
+    }
+    else if (Open == "counter" && View.CanCounter)
+    {
+        <section class="card" aria-labelledby="counter-title" data-testid="counter-form">
+            <h2 id="counter-title">@ProposalsText.Actions.CounterTitle</h2>
+            <p>@ProposalsText.Actions.CounterIntro</p>
+            <ErrorSummary Errors="Summary" />
+            <form method="post" @onsubmit="OnCounter" @formname="counter" class="form" novalidate>
+                <AntiforgeryToken />
+                <input type="hidden" name="round" value="@View.Round" />
+                <ProposalTermsFields LongTerm="(View.Kind == ProposalFormat.LongTerm)" Fields="Counter" Errors="Errors" Today="Today" />
+                <FormField Id="text" Label="@ProposalsText.Actions.CounterNote" Hint="@ProposalsText.Actions.CounterNoteHint" Error="@Error("text")" Optional="true" Max="1000" Length="CounterText.Length">
+                    <textarea id="@context.Id" name="text" rows="5" maxlength="1000" aria-describedby="@context.DescribedBy" aria-invalid="@(context.Invalid ? "true" : null)">@CounterText</textarea>
+                </FormField>
+                @FailureBlock()
+                <div class="form-actions">
+                    <button type="submit" class="btn btn--primary">@ProposalsText.Actions.CounterSubmit</button>
+                    <a class="btn btn--ghost" href="@DetailPath">@ProposalsText.Actions.Keep</a>
+                </div>
+            </form>
+        </section>
+    }
+    else if (View.CanAccept || View.CanCounter || View.CanReject || View.CanWithdraw)
+    {
+        <div class="stack stack--tight">
+            @* a GET form: the buttons open the action without a script and without a state change (a link would not be a button) *@
+            <form method="get" action="@DetailPath" class="cluster">
+                @if (View.CanAccept) {<button type="submit" name="action" value="accept" class="btn btn--primary">@ProposalsText.Actions.Accept</button>}
+                @if (View.CanCounter) {<button type="submit" name="action" value="counter" class="btn btn--secondary">@ProposalsText.Actions.Counter</button>}
+                @if (View.CanReject) {<button type="submit" name="action" value="reject" class="btn btn--ghost-danger">@ProposalsText.Actions.Reject</button>}
+                @if (View.CanWithdraw) {<button type="submit" name="action" value="withdraw" class="btn btn--ghost-danger">@ProposalsText.Actions.Withdraw</button>}
+            </form>
+            @if ((View.CanAccept || View.CanReject) && !View.CanCounter) {<p class="muted">@ProposalsText.Actions.CounterCapped</p>}
+        </div>
+    }
+
+    <p><a href="@ListPath">@ProposalsText.Detail.Back</a></p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProposalViewDto View { get; set; } = default!;
+    /// <summary>The action the page was opened with: <c>accept</c>, <c>counter</c>, <c>reject</c> or <c>withdraw</c>.</summary>
+    [Parameter] public string? Open { get; set; }
+    [Parameter] public string? DoneText { get; set; }
+    /// <summary>Field id to message, for the counter form.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string> Errors { get; set; } = new Dictionary<string, string>();
+    [Parameter] public ApiFailure? ActionFailure { get; set; }
+    [Parameter] public TermsFields Counter { get; set; } = TermsFields.Empty;
+    [Parameter] public string CounterText { get; set; } = "";
+    [Parameter, EditorRequired] public DateOnly Today { get; set; }
+    /// <summary>This proposal's own path (the actions come back to it) and the list to go back to.</summary>
+    [Parameter, EditorRequired] public string DetailPath { get; set; } = "";
+    [Parameter, EditorRequired] public string ListPath { get; set; } = "";
+    [Parameter] public EventCallback OnAccept { get; set; }
+    [Parameter] public EventCallback OnReject { get; set; }
+    [Parameter] public EventCallback OnWithdraw { get; set; }
+    [Parameter] public EventCallback OnCounter { get; set; }
+
+    bool YourTurn => View.CanAccept || View.CanCounter || View.CanReject;
+
+    string? Error(string field) => Errors.TryGetValue(field, out var e) ? e : null;
+
+    /// <summary>The errors in the order of the form, each pointing at its field's id.</summary>
+    IReadOnlyList<KeyValuePair<string, string>> Summary =>
+        [.. new[] { "rate", "hoursPerWeek", "totalHours", "durationMonths", "startDate", "text" }.Where(Errors.ContainsKey).Select(f => KeyValuePair.Create(f, Errors[f]))];
+
+    /// <summary>The address as a link target only when it is one plain address: no space, quote or angle bracket can leave the attribute.</summary>
+    static string? SafeEmail(string? email) =>
+        email is { Length: > 3 and <= 254 } e && e.Count(c => c == '@') == 1 && !e.Any(c => char.IsWhiteSpace(c) || c is '"' or '\'' or '<' or '>' or '&' or ',' or ';') ? e : null;
+
+    RenderFragment FailureBlock() => builder =>
+    {
+        if (ActionFailure is not { } failure) return;
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "callout callout--danger");
+        builder.AddAttribute(2, "role", "alert");
+        builder.AddAttribute(3, "data-testid", "action-error");
+        builder.OpenElement(4, "p");
+        builder.AddContent(5, ProposalFormat.FailureText(failure));
+        builder.CloseElement();
+        if (failure.Code == "invalid_transition")
+        {
+            builder.OpenElement(6, "a");
+            builder.AddAttribute(7, "class", "btn btn--secondary");
+            builder.AddAttribute(8, "href", DetailPath);
+            builder.AddContent(9, ProposalsText.Detail.Reload);
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+}

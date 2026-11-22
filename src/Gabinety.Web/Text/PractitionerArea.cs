@@ -10,7 +10,7 @@ public static class PlPractitioner
 
     public static class Tabs
     {
-        public const string Overview = "Start", Profile = "Profil", Offers = "Oferty", Availability = "Dostępność", Payments = "Płatności";
+        public const string Overview = "Start", Profile = "Profil", Offers = "Oferty", Availability = "Dostępność", Payments = "Płatności", Proposals = "Propozycje";
     }
 
     public static class Common

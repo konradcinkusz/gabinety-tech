@@ -229,7 +229,7 @@ public class ShellTests
         var browser = web.NewBrowser();
         await SignIn.As(web, browser);
         var page = await browser.GetAsync("/programisci");
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/gabinet-programisty"], Hrefs(page, ".site-nav a"));
+        Assert.Equal(["/programisci", "/moje/rezerwacje", "/moje/propozycje", "/gabinet-programisty"], Hrefs(page, ".site-nav a"));
         Assert.Equal(["/konto", "/wyloguj"], Hrefs(page, ".account-menu a"));
         Assert.Equal("Twoje konto", page.TextOf(".account-menu summary"));
         Assert.Equal("Wyloguj się", page.All(".account-menu a")[1].TextContent);
@@ -306,7 +306,7 @@ public class ShellTests
 
         await SignIn.As(web, browser);
         var member = await browser.GetAsync("/programisci");
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/gabinet-programisty", "/konto", "/wyloguj"], member.One("header details.site-menu")!.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/programisci", "/moje/rezerwacje", "/moje/propozycje", "/gabinet-programisty", "/konto", "/wyloguj"], member.One("header details.site-menu")!.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]

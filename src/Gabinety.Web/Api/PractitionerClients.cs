@@ -19,6 +19,12 @@ public sealed class PractitionerClient(HttpClient http, VisitorAddressAccessor v
 
     public Task<ApiResult<PractitionerPrivateDto>> SaveProfileAsync(UpdatePractitionerBody body, CancellationToken ct = default) => Write<PractitionerPrivateDto>(HttpMethod.Put, Me, body, ct);
 
+    /// <summary>The contract availability (ADR proposal 0013): a separate resource, because the profile PUT replaces every field it knows.</summary>
+    public Task<ApiResult<ContractAvailabilitySettingsDto>> ContractAvailabilityAsync(CancellationToken ct = default) => Get<ContractAvailabilitySettingsDto>(Me + "/contract-availability", ct);
+
+    public Task<ApiResult<ContractAvailabilitySettingsDto>> SaveContractAvailabilityAsync(ContractAvailabilitySettingsDto body, CancellationToken ct = default) =>
+        Write<ContractAvailabilitySettingsDto>(HttpMethod.Put, Me + "/contract-availability", body, ct);
+
     public Task<ApiResult<Unit>> SubmitAsync(CancellationToken ct = default) => Write<Unit>(HttpMethod.Post, Me + "/submit", null, ct);
 
     public Task<ApiResult<GithubChallengeDto>> RequestGithubLinkAsync(string githubLogin, CancellationToken ct = default) =>

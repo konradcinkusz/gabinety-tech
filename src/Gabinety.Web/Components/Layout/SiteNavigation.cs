@@ -27,7 +27,7 @@ public sealed record HeaderModel(IReadOnlyList<NavItem> Links, NavItem? SignIn, 
 /// <summary>
 /// The main navigation, in ORDER: a product decision, pinned by a test (DESIGN-CONTRACT 5.1). The practitioner list is first; the other public pages (<c>/jak-to-dziala</c>,
 /// <c>/zasady-rankingu</c>, <c>/cennik</c>) are added to <see cref="Primary"/> by the sessions that port them, in the position they have in the contract, so no link in this host leads to a 404.
-/// The account area is by session: a visitor has "Zaloguj się" and "Załóż konto"; a signed-in user has "Moje rezerwacje", the practitioner panel and the account menu ("Konto", "Wyloguj się");
+/// The account area is by session: a visitor has "Zaloguj się" and "Załóż konto"; a signed-in user has "Moje rezerwacje", "Moje propozycje" (ADR proposal 0013), the practitioner panel and the account menu ("Konto", "Wyloguj się");
 /// an administrator also "Administracja". The role comes from the verified claims of the session (<see cref="ClaimMapping"/>), the page is the boundary anyway.
 /// </summary>
 public static class SiteNavigation
@@ -38,14 +38,14 @@ public static class SiteNavigation
     public static IReadOnlyList<NavItem> Primary { get; } = [Practitioners];
 
     public static readonly NavItem SignIn = new(ReturnTarget.LoginPath, Pl.Nav.SignIn), Register = new(ReturnTarget.RegisterPath, Pl.Nav.Register);
-    public static readonly NavItem MyBookings = new("/moje/rezerwacje", Pl.Nav.MyBookings), Account = new("/konto", Pl.Nav.Account), SignOut = new(ReturnTarget.LogoutPath, Pl.Nav.SignOut);
+    public static readonly NavItem MyBookings = new("/moje/rezerwacje", Pl.Nav.MyBookings), MyProposals = new("/moje/propozycje", Pl.Nav.MyProposals), Account = new("/konto", Pl.Nav.Account), SignOut = new(ReturnTarget.LogoutPath, Pl.Nav.SignOut);
     public static readonly NavItem PractitionerArea = new("/gabinet-programisty", Pl.Nav.PractitionerArea), Admin = new("/admin/weryfikacja", Pl.Nav.Admin, "/admin");
 
     /// <param name="back">The page the visitor is on, already filtered by <see cref="ReturnTarget.Safe"/>: the sign-in and registration links bring them back to it.</param>
     public static HeaderModel For(ClaimsPrincipal? user, string currentPath, string back = "/")
     {
         if (user?.Identity?.IsAuthenticated != true) return new HeaderModel(Primary, SignIn with { Href = ReturnTarget.LoginUrl(back) }, Register with { Href = ReturnTarget.RegisterUrl(back) }, [], null, currentPath);
-        List<NavItem> links = [.. Primary, MyBookings, PractitionerArea];
+        List<NavItem> links = [.. Primary, MyBookings, MyProposals, PractitionerArea];
         if (ClaimMapping.IsAdmin(user)) links.Add(Admin);
         return new HeaderModel(links, null, null, [Account, SignOut], ClaimMapping.Email(user.Claims), currentPath);
     }

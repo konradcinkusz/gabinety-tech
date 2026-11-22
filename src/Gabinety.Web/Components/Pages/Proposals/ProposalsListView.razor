@@ -1,0 +1,70 @@
+@* A list of proposals for one role (ADR proposal 0013), as complete HTML: the state is a tab (a link), "more" is a link with the cursor, so a URL reopens the same view (DESIGN-CONTRACT 5.9).
+   The rows say whose turn it is and link to the detail; the message and the contact details of a proposal are never in a list. *@
+<nav class="tabs" aria-label="@ProposalsText.List.TabsLabel">
+    <ul>
+        <li><a class="tabs__link" href="@Href(null, null)" aria-current="@(State is null ? "page" : null)">@ProposalsText.List.All</a></li>
+        <li><a class="tabs__link" href="@Href(ProposalsClient.OpenState, null)" aria-current="@(State == ProposalsClient.OpenState ? "page" : null)">@ProposalsText.List.Open</a></li>
+        <li><a class="tabs__link" href="@Href(ProposalsClient.ClosedState, null)" aria-current="@(State == ProposalsClient.ClosedState ? "page" : null)">@ProposalsText.List.Closed</a></li>
+    </ul>
+</nav>
+
+@if (Failure is { IsUnauthenticated: true })
+{
+    <div class="callout callout--danger" role="alert" data-testid="proposals-signed-out">
+        <p>@ProposalsText.Errors.SignedOut <a href="@ReturnTarget.LoginUrl(ReturnTarget.Safe(Href(State, Cursor)))">@ProposalsText.Errors.SignInAgain</a></p>
+    </div>
+}
+else if (Failure is { } failure)
+{
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@ProposalFormat.FailureText(failure)</p>
+        <a class="btn btn--secondary" href="@Href(State, Cursor)">@ProposalsText.List.Retry</a>
+    </div>
+}
+else if (Items is { Items.Count: 0 })
+{
+    <div class="empty-state" data-testid="proposals-empty">
+        <h2>@ProposalsText.List.EmptyTitle</h2>
+        <p>@(State is not null ? ProposalsText.List.EmptyFiltered : AsClient ? ProposalsText.List.EmptyClient : ProposalsText.List.EmptyPractitioner)</p>
+        @if (State is not null) {<a class="btn btn--secondary" href="@Href(null, null)">@ProposalsText.List.ShowAll</a>}
+        else if (AsClient) {<a class="btn btn--primary" href="/programisci">@ProposalsText.List.FindPractitioner</a>}
+        else {<a class="btn btn--secondary" href="@SettingsHref">@ProposalsText.List.SettingsLink</a>}
+    </div>
+}
+else if (Items is not null)
+{
+    <ul class="stack proposals" data-testid="proposals">
+        @foreach (var p in Items.Items)
+        {
+            <li class="card proposal-row" data-testid="proposal-row">
+                <div class="cluster cluster--between">
+                    <h2 class="proposal-row__title">@Counterpart(p)</h2>
+                    <BookingBadge Badge="ProposalFormat.StatusBadge(p.Status)" />
+                </div>
+                <p class="muted">@ProposalFormat.KindLabel(p.Kind)</p>
+                <p class="num">@ProposalFormat.Summary(p.Terms)</p>
+                @if (p.YourTurn && ProposalFormat.IsOpen(p.Status)) {<p><strong data-testid="your-turn">@ProposalsText.Status.YourTurn</strong></p>}
+                else if (ProposalFormat.IsOpen(p.Status)) {<p class="muted">@ProposalsText.Status.Waiting</p>}
+                <a class="proposal-row__link" href="@($"{BasePath}/{p.Id}")">@ProposalsText.List.Details<span class="sr-only">: @Counterpart(p)</span></a>
+            </li>
+        }
+    </ul>
+    @if (Items.NextCursor is { } next) {<a class="btn btn--secondary" rel="next" href="@Href(State, next)">@ProposalsText.List.Next</a>}
+}
+
+@code {
+    /// <summary>The list's own path: <c>/moje/propozycje</c> or <c>/gabinet-programisty/propozycje</c>; a row links to <c>{BasePath}/{id}</c>.</summary>
+    [Parameter, EditorRequired] public string BasePath { get; set; } = "";
+    [Parameter] public bool AsClient { get; set; } = true;
+    [Parameter] public string? State { get; set; }
+    [Parameter] public string? Cursor { get; set; }
+    [Parameter] public PageDto<ProposalSummaryDto>? Items { get; set; }
+    [Parameter] public ApiFailure? Failure { get; set; }
+    /// <summary>Where a programmer with no proposals is sent to switch their availability on.</summary>
+    [Parameter] public string SettingsHref { get; set; } = PractitionerPaths.Profile;
+
+    string Counterpart(ProposalSummaryDto p) => ProposalFormat.Counterpart(p, AsClient) + (p.CompanyName is { Length: > 0 } c && !AsClient ? " (" + c + ")" : "");
+
+    string Href(string? state, string? cursor) =>
+        BasePath + (state is null && string.IsNullOrEmpty(cursor) ? "" : "?" + string.Join('&', new[] { state is null ? null : "state=" + state, string.IsNullOrEmpty(cursor) ? null : "cursor=" + Uri.EscapeDataString(cursor) }.OfType<string>()));
+}

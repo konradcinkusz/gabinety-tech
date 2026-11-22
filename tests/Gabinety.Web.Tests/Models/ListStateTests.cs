@@ -86,11 +86,11 @@ public class ListViewTests
     public void Filters_mark_the_current_choice_and_offer_technologies_only_inside_a_problem()
     {
         var plain = View().Filters();
-        Assert.Equal(["Problem", "Czas trwania", "Cena do"], plain.Select(g => g.Title));
+        Assert.Equal(["Problem", "Czas trwania", "Cena do", "Współpraca"], plain.Select(g => g.Title));
         Assert.True(plain[0].Items[0].Current); // "Wszystkie"
 
         var inside = View(new ListState("audyt-kodu", Duration: 60)).Filters();
-        Assert.Equal(["Problem", "Technologia", "Czas trwania", "Cena do"], inside.Select(g => g.Title));
+        Assert.Equal(["Problem", "Technologia", "Czas trwania", "Cena do", "Współpraca"], inside.Select(g => g.Title));
         Assert.Contains(inside[0].Items, i => i is { Label: "Audyt kodu", Current: true });
         Assert.Contains(inside[2].Items, i => i is { Label: "60 min", Current: true, Href: "/programisci/audyt-kodu?duration=60" });
         Assert.Contains(inside[3].Items, i => i.Label == "do 150,00 zł" && i.Href == "/programisci/audyt-kodu?duration=60&maxPriceMinor=15000");

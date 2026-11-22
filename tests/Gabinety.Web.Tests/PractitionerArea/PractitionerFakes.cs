@@ -26,6 +26,13 @@ public sealed class PractitionerWorld
     public bool BookingDown { get; set; }
     public string OnboardingUrl { get; set; } = "https://connect.stripe.com/setup/e/acct_test/abc";
     public int OnboardingCalls { get; private set; }
+    /// <summary>The contract availability (ADR proposal 0013) the stand-in holds; the PUT checks it like the service does and stores it.</summary>
+    public ContractAvailabilitySettingsDto Contract { get; set; } = new("not_available", null, null, null);
+    public int ContractSaves { get; private set; }
+    /// <summary>Set to make the PUT refuse with this status and these field names (a refusal our own check does not predict).</summary>
+    public (HttpStatusCode Status, string Code, string[]? Fields)? ContractRefusal { get; set; }
+    /// <summary>"Today" the stand-in checks dates against.</summary>
+    public DateOnly Today { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
 
     public static readonly JsonSerializerOptions Json = ApiClient.Json;
 
@@ -81,6 +88,28 @@ public sealed class PractitionerWorld
             return FakeBackend.Json(Current, HttpStatusCode.Created);
         }
         if (Profile is null) return Problem(HttpStatusCode.NotFound, "not_found");
+        if (path == me + "/contract-availability")
+        {
+            if (method == "GET") return FakeBackend.Json(Contract);
+            var b = Body(r)!;
+            ContractSaves++;
+            if (ContractRefusal is { } refusal) return Problem(refusal.Status, refusal.Code, refusal.Fields);
+            var status = S(b, "status");
+            var fields = new List<string>();
+            if (status is not ("not_available" or "available_now" or "available_from")) fields.Add("status");
+            else if (status != "not_available")
+            {
+                var hours = b["hoursPerWeek"]?.GetValue<int>();
+                if (hours is not (>= 1 and <= 60)) fields.Add("hoursPerWeek");
+                var rate = b["rateMinor"]?.GetValue<long>();
+                if (rate is { } rr && rr is < 2_000 or > 100_000) fields.Add("rateMinor");
+                if (status == "available_from" && !(DateOnly.TryParse(b["availableFrom"]?.GetValue<string>(), out var from) && from > Today && from <= Today.AddMonths(24))) fields.Add("availableFrom");
+            }
+            if (fields.Count > 0) return Problem(HttpStatusCode.UnprocessableEntity, "validation_failed", [.. fields]);
+            Contract = status == "not_available" ? new("not_available", null, null, null)
+                : new(status, status == "available_from" ? DateOnly.Parse(b["availableFrom"]!.GetValue<string>()) : null, b["hoursPerWeek"]!.GetValue<int>(), b["rateMinor"]?.GetValue<long>());
+            return FakeBackend.Json(Contract);
+        }
         if (path == me && method == "GET") return FakeBackend.Json(Current);
         if (path == me && method == "PUT")
         {

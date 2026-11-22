@@ -7,7 +7,7 @@ namespace Gabinety.Web.Components.Pages.Practitioners;
 /// The state of a list page and the links between its variants: plain URLs, because the filters are plain links (no JavaScript needed). A port of <c>web/src/lib/seo/listUrl.ts</c>: same
 /// parsing limits, same link shapes, so a link of one host reads the same on the other. A plain class: tested with strings, no renderer (BLAZOR-WEB-APP section 10).
 /// </summary>
-public sealed partial record ListState(string? Problem = null, string? Tech = null, int? Duration = null, long? MaxPriceMinor = null, string? Q = null, string? Cursor = null)
+public sealed partial record ListState(string? Problem = null, string? Tech = null, int? Duration = null, long? MaxPriceMinor = null, string? Q = null, string? Cursor = null, bool Contract = false)
 {
     public static readonly int[] Durations = [30, 60];
     /// <summary>Price ceiling presets offered as links, in grosz (money is an integer grosz everywhere).</summary>
@@ -18,7 +18,7 @@ public sealed partial record ListState(string? Problem = null, string? Tech = nu
     private static partial Regex PriceFormat();
 
     /// <summary>The route values and the query as the page received them; anything out of range is dropped, never an error.</summary>
-    public static ListState Parse(string? problem, string? tech, string? duration, string? maxPriceMinor, string? q, string? cursor)
+    public static ListState Parse(string? problem, string? tech, string? duration, string? maxPriceMinor, string? q, string? cursor, string? contract = null)
     {
         var s = new ListState();
         if (!string.IsNullOrEmpty(problem)) s = s with { Problem = problem, Tech = string.IsNullOrEmpty(tech) ? null : tech };
@@ -27,6 +27,7 @@ public sealed partial record ListState(string? Problem = null, string? Tech = nu
         var query = q?.Trim();
         if (!string.IsNullOrEmpty(query) && query.Length <= MaxQ) s = s with { Q = query };
         if (!string.IsNullOrEmpty(cursor) && cursor.Length <= MaxCursor) s = s with { Cursor = cursor };
+        if (contract == "1") s = s with { Contract = true }; // ADR proposal 0013: only practitioners who take collaboration proposals
         return s;
     }
 
@@ -34,6 +35,7 @@ public sealed partial record ListState(string? Problem = null, string? Tech = nu
     public ListState WithTech(string? tech) => this with { Tech = tech, Cursor = null };
     public ListState WithDuration(int? duration) => this with { Duration = duration, Cursor = null };
     public ListState WithMaxPrice(long? maxPriceMinor) => this with { MaxPriceMinor = maxPriceMinor, Cursor = null };
+    public ListState WithContract(bool contract) => this with { Contract = contract, Cursor = null };
     public ListState FirstPage() => this with { Cursor = null };
 
     /// <summary>"Clear filters": the category stays, everything narrowing it goes.</summary>
@@ -46,11 +48,12 @@ public sealed partial record ListState(string? Problem = null, string? Tech = nu
         var parts = new List<string>();
         if (Duration is { } d) parts.Add($"duration={d}");
         if (MaxPriceMinor is { } m) parts.Add($"maxPriceMinor={m}");
+        if (Contract) parts.Add("contract=1");
         if (!string.IsNullOrEmpty(Q)) parts.Add($"q={Uri.EscapeDataString(Q)}");
         if (!string.IsNullOrEmpty(Cursor)) parts.Add($"cursor={Uri.EscapeDataString(Cursor)}");
         return parts.Count == 0 ? Path : $"{Path}?{string.Join('&', parts)}";
     }
 
     /// <summary>True when the page is a filtered or paginated variant of its category (such variants are not indexed).</summary>
-    public bool IsVariant => Duration is not null || MaxPriceMinor is not null || !string.IsNullOrEmpty(Q) || !string.IsNullOrEmpty(Cursor);
+    public bool IsVariant => Duration is not null || MaxPriceMinor is not null || Contract || !string.IsNullOrEmpty(Q) || !string.IsNullOrEmpty(Cursor);
 }

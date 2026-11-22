@@ -173,6 +173,11 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/moje/rezerwacje/{BookingId}` | Authenticated | all | booking detail with cancel, dispute and no-show (form posts, antiforgery) |
 | Web | PAGE | `/moje/opinie` | Authenticated | all | the practitioner's own reviews and replies |
 | Web | PAGE | `/moje/opinie/{BookingId}` | Authenticated | all | write a review (form post, antiforgery) |
+| Web | PAGE | `/propozycja/{Slug}` | Authenticated | all | ADR proposal 0013: a client's collaboration proposal to one programmer (form post, antiforgery, `Idempotency-Key`); `?kind=short` for a short one |
+| Web | PAGE | `/moje/propozycje` | Authenticated | all | the proposals the user sent, tabs by state, static server rendering |
+| Web | PAGE | `/moje/propozycje/{Id}` | Authenticated | all | one proposal as its client: accept, counter, reject, withdraw (antiforgery posts, confirmation step); the counterpart's address only once accepted |
+| Web | PAGE | `/gabinet-programisty/propozycje` | Authenticated | all | the proposals sent to the programmer, tabs by state |
+| Web | PAGE | `/gabinet-programisty/propozycje/{Id}` | Authenticated | all | one proposal as its programmer: accept, counter, reject |
 | Web | PAGE | `/rezerwacja/{OfferingId}` | Authenticated | all | booking form: brief, assistant suggestion, pay (form posts, antiforgery) |
 | Web | PAGE | `/rezerwacja/potwierdzenie/{BookingId}` | Authenticated | all | confirmation |
 | Web | PAGE | `/checkout/mock/{BookingId}` | Authenticated | all | mock checkout: answers 404 unless the fake profile runs the mock provider (`WebOptions.MockPayments`); the clock alone is interactive |

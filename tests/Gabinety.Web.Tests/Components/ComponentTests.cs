@@ -15,6 +15,9 @@ namespace Gabinety.Web.Tests.Rendering;
 /// <summary>Markup, test hooks, state transitions and error rendering with bUnit; the typed clients are wired to a fake handler (BLAZOR-WEB-APP section 13). The roots (render mode) are not visible here: RenderModeTests reads them from disk.</summary>
 public class PresentationalComponentTests : BunitContext
 {
+    /// <summary>The card reads today's date for the contract availability line (ADR proposal 0013).</summary>
+    public PresentationalComponentTests() => Services.AddSingleton<TimeProvider>(TestClock.Default());
+
     [Fact]
     public void A_card_shows_the_practitioner_with_the_hooks_the_journey_uses()
     {
@@ -66,11 +69,12 @@ public class PresentationalComponentTests : BunitContext
         var view = new ListView(state, Sample.Taxonomy, Sample.Sitemap(5, true, "/programisci/audyt-kodu"));
         var cut = Render<FilterNav>(p => p.Add(f => f.State, state).Add(f => f.Groups, view.Filters()));
         Assert.Equal("Filtry", cut.Find("nav").GetAttribute("aria-label"));
-        Assert.Equal(["Problem", "Technologia", "Czas trwania", "Cena do"], cut.FindAll("h2").Select(h => h.TextContent));
+        Assert.Equal(["Problem", "Technologia", "Czas trwania", "Cena do", "Współpraca"], cut.FindAll("h2").Select(h => h.TextContent));
         var current = cut.FindAll("a[aria-current=true]").Select(a => a.TextContent).ToList();
-        Assert.Equal(["Audyt kodu", "Wszystkie", "60 min", "do 300,00 zł"], current);
+        Assert.Equal(["Audyt kodu", "Wszystkie", "60 min", "do 300,00 zł", "Wszyscy"], current); // the last is "Współpraca: Wszyscy" (contract availability, ADR proposal 0013)
         var form = cut.Find("form[role=search]");
         Assert.Equal(("get", "/programisci/audyt-kodu"), (form.GetAttribute("method"), form.GetAttribute("action")));
+        Assert.Null(form.QuerySelector("input[name=contract]")); // only carried when the filter is on
         Assert.Equal("60", form.QuerySelector("input[name=duration]")!.GetAttribute("value"));
         Assert.Equal("30000", form.QuerySelector("input[name=maxPriceMinor]")!.GetAttribute("value"));
         Assert.Equal("kod", form.QuerySelector("input[name=q]")!.GetAttribute("value"));
@@ -127,7 +131,7 @@ public class LayoutTests : BunitContext
         Assert.Equal(["/logowanie", "/rejestracja"], visitor.FindAll("header .site-account a").Select(a => a.GetAttribute("href")));
         auth.SetAuthorized("demo-client@demo.example");
         var member = Render<MainLayout>(p => p.Add(l => l.Body, Body()));
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/gabinet-programisty"], member.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/programisci", "/moje/rezerwacje", "/moje/propozycje", "/gabinet-programisty"], member.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
         Assert.Equal(["/konto", "/wyloguj"], member.FindAll("header .site-account a").Select(a => a.GetAttribute("href")));
     }
 

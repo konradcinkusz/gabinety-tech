@@ -1,0 +1,34 @@
+@* The terms of a proposal as form fields (ADR proposal 0013): rate, hours, period and start. Inputs only; the form, its handler and the posted values are the page's. The ids are the field names the
+   page reads back and the errors point at: rate, hoursPerWeek or totalHours, durationMonths, startDate. A long-term proposal asks for hours a week and months; a short one for total hours and, optionally, months. *@
+<FormField Id="rate" Label="@ProposalsText.Form.RateLabel" Hint="@ProposalsText.Form.RateHint" Error="@Error("rate")">
+    <input id="@context.Id" name="rate" inputmode="decimal" value="@Fields.Rate" maxlength="10" autocomplete="off" aria-describedby="@context.DescribedBy" aria-invalid="@(context.Invalid ? "true" : null)" />
+</FormField>
+@if (LongTerm)
+{
+    <FormField Id="hoursPerWeek" Label="@ProposalsText.Form.HoursPerWeekLabel" Hint="@ProposalsText.Form.HoursPerWeekHint" Error="@Error("hoursPerWeek")">
+        <input id="@context.Id" name="hoursPerWeek" inputmode="numeric" value="@Fields.Hours" maxlength="2" autocomplete="off" aria-describedby="@context.DescribedBy" aria-invalid="@(context.Invalid ? "true" : null)" />
+    </FormField>
+}
+else
+{
+    <FormField Id="totalHours" Label="@ProposalsText.Form.TotalHoursLabel" Hint="@ProposalsText.Form.TotalHoursHint" Error="@Error("totalHours")">
+        <input id="@context.Id" name="totalHours" inputmode="numeric" value="@Fields.Hours" maxlength="3" autocomplete="off" aria-describedby="@context.DescribedBy" aria-invalid="@(context.Invalid ? "true" : null)" />
+    </FormField>
+}
+<FormField Id="durationMonths" Label="@ProposalsText.Form.DurationLabel" Hint="@(LongTerm ? ProposalsText.Form.DurationHint : ProposalsText.Form.DurationHintOptional)" Error="@Error("durationMonths")" Optional="@(!LongTerm)">
+    <input id="@context.Id" name="durationMonths" inputmode="numeric" value="@Fields.Months" maxlength="2" autocomplete="off" aria-describedby="@context.DescribedBy" aria-invalid="@(context.Invalid ? "true" : null)" />
+</FormField>
+<FormField Id="startDate" Label="@ProposalsText.Form.StartLabel" Hint="@ProposalsText.Form.StartHint" Error="@Error("startDate")">
+    <input id="@context.Id" name="startDate" type="date" value="@Fields.Start" min="@Iso(Today)" max="@Iso(Today.AddMonths(ProposalInputs.MaxStartMonthsAhead))" aria-describedby="@context.DescribedBy" aria-invalid="@(context.Invalid ? "true" : null)" />
+</FormField>
+
+@code {
+    [Parameter] public bool LongTerm { get; set; } = true;
+    [Parameter, EditorRequired] public TermsFields Fields { get; set; } = TermsFields.Empty;
+    [Parameter] public IReadOnlyDictionary<string, string>? Errors { get; set; }
+    /// <summary>Today in Warsaw: the bounds of the date field.</summary>
+    [Parameter, EditorRequired] public DateOnly Today { get; set; }
+
+    string? Error(string field) => Errors is not null && Errors.TryGetValue(field, out var e) ? e : null;
+    static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+}

@@ -1,0 +1,60 @@
+@page "/propozycja/{Slug}"
+@attribute [Authorize]
+@inherits ProposalFormBase
+@* The client's proposal to one programmer (ADR proposal 0013). Static server rendering with a plain form post and antiforgery, like the booking form: the kind of cooperation is a tab (a link), the rest is
+   one form. The message and the company name are user free text: request body only, never logged, never in a URL. *@
+
+<PageTitle>@ProposalsText.Form.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+
+@if (_profile is { } p)
+{
+    <h1>@string.Format(_long ? ProposalsText.Form.TitleLong : ProposalsText.Form.TitleShort, p.DisplayName)</h1>
+    @if (p.Contract is null)
+    {
+        <div class="callout callout--warning" role="status" data-testid="not-accepting">
+            <p>@ProposalsText.Form.NotAccepting</p>
+            <a class="btn btn--secondary" href="@($"/gabinet/{Uri.EscapeDataString(p.Slug)}")">@ProposalsText.Form.Back</a>
+        </div>
+    }
+    else
+    {
+        <p>@ProposalsText.Form.Intro</p>
+        <nav class="tabs" aria-label="@ProposalsText.Form.KindLabel">
+            <ul>
+                <li><a class="tabs__link" href="@KindHref(true)" aria-current="@(_long ? "page" : null)">@ProposalsText.Form.KindLong</a></li>
+                <li><a class="tabs__link" href="@KindHref(false)" aria-current="@(!_long ? "page" : null)">@ProposalsText.Form.KindShort</a></li>
+            </ul>
+        </nav>
+        <ErrorSummary Errors="Summary" />
+        @if (_failure is not null)
+        {
+            <Alert Variant="AlertVariant.Danger" TestId="proposal-error">@ProposalFormat.FailureText(_failure)</Alert>
+        }
+        <form method="post" @onsubmit="SubmitAsync" @formname="proposal" class="form stack form-narrow" novalidate>
+            <AntiforgeryToken />
+            <input type="hidden" name="kind" value="@(_long ? "long" : "short")" />
+            <input type="hidden" name="attemptKey" value="@_attemptKey" />
+            <input type="hidden" name="attemptFingerprint" value="@_attemptFingerprint" />
+            <ProposalTermsFields LongTerm="_long" Fields="_fields" Errors="_errors" Today="Today" />
+            <FormField Id="text" Label="@ProposalsText.Form.TextLabel" Hint="@ProposalsText.Form.TextHint" Error="@Error("text")" Max="1000" Length="_text.Length">
+                <textarea id="@context.Id" name="text" rows="8" maxlength="1000" aria-describedby="@context.DescribedBy" aria-invalid="@(context.Invalid ? "true" : null)">@_text</textarea>
+            </FormField>
+            <FormField Id="companyName" Label="@ProposalsText.Form.CompanyLabel" Hint="@ProposalsText.Form.CompanyHint" Error="@Error("companyName")" Optional="true">
+                <input id="@context.Id" name="companyName" value="@_company" maxlength="120" autocomplete="organization" aria-describedby="@context.DescribedBy" aria-invalid="@(context.Invalid ? "true" : null)" />
+            </FormField>
+            <div class="form-actions">
+                <button class="btn btn--primary" type="submit">@ProposalsText.Form.Submit</button>
+                <a class="btn btn--ghost" href="@($"/gabinet/{Uri.EscapeDataString(p.Slug)}")">@ProposalsText.Form.Back</a>
+            </div>
+        </form>
+    }
+}
+else if (_unavailable)
+{
+    <h1>@ProposalsText.Form.MetaTitle</h1>
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@ProposalsText.Errors.Unavailable</p>
+        <a class="btn btn--secondary" href="@CurrentPath">@ProposalsText.List.Retry</a>
+    </div>
+}

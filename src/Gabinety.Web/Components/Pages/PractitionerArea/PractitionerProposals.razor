@@ -1,0 +1,30 @@
+@page "/gabinet-programisty/propozycje"
+@attribute [Authorize]
+@layout PractitionerLayout
+@inject ProposalsClient Proposals
+@using Gabinety.Web.Components.Pages.Proposals
+@* The programmer's inbox (ADR proposal 0013): the proposals sent to the signed-in user as a programmer. Same list as the client's, the other role. The area's guard is not needed: the service answers an
+   account with no profile an empty list. *@
+
+<PageTitle>@ProposalsText.List.MetaTitlePractitioner</PageTitle>
+<h1>@ProposalsText.List.TitlePractitioner</h1>
+<p class="muted">@ProposalsText.List.IntroPractitioner</p>
+
+<ProposalsListView BasePath="@PractitionerPaths.Proposals" AsClient="false" State="@_state" Cursor="@_cursor" Items="_page" Failure="_failure" SettingsHref="@PractitionerPaths.Profile" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "state")] public string? StateParam { get; set; }
+    [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+
+    string? _state, _cursor;
+    PageDto<ProposalSummaryDto>? _page;
+    ApiFailure? _failure;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        (_state, _cursor) = (ProposalFormat.StateFilter(StateParam), string.IsNullOrWhiteSpace(CursorParam) ? null : CursorParam);
+        (_page, _failure) = (null, null);
+        var result = await Proposals.ListAsync(ProposalsClient.PractitionerRole, _state, _cursor);
+        if (result.IsOk) _page = result.Value; else _failure = result.Failure;
+    }
+}

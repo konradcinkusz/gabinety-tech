@@ -310,7 +310,7 @@ public class ListPageFixesTests
         var page = await web.NewBrowser().GetAsync("/programisci/audyt-kodu/dotnet?duration=30");
         Assert.Equal("Filtry (3)", page.TextOf("details.filters > summary")); // problem, technology and duration are active
         Assert.NotNull(page.One("details.filters[open] nav[aria-label=Filtry]")); // the navigation keeps its name (hook)
-        Assert.Equal(2, page.All("nav[aria-label=Filtry] ul.segmented").Count);
+        Assert.Equal(3, page.All("nav[aria-label=Filtry] ul.segmented").Count); // duration, price and contract availability
         Assert.Equal(["Programiści", "Audyt kodu", ".NET"], page.All("nav.breadcrumb li").Select(l => l.TextContent.Trim()));
         Assert.Equal("page", page.One("nav.breadcrumb [aria-current]")!.GetAttribute("aria-current"));
     }

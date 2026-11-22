@@ -1,5 +1,6 @@
 using Gabinety.ServiceDefaults;
 using Gabinety.Web.Auth;
+using Gabinety.Web.Text;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
@@ -37,7 +38,15 @@ public static class AuthenticationExtensions
             o.SlidingExpiration = false;
             o.LoginPath = ReturnTarget.LoginPath;
             o.ReturnUrlParameter = ReturnTarget.Parameter; // /logowanie?redirect=<path and query>, the parameter the Next.js app uses
-            o.AccessDeniedPath = "/";
+            // F-10: a signed-in user who may not see a page gets the status 403 (the status-code page says "Brak dostępu"), not a silent redirect to "/".
+            o.Events.OnRedirectToAccessDenied = context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                // A GET is answered by the status-code page (HTML, "Brak dostępu"). A post must not be: the page would be re-executed as a POST and fail its antiforgery check with a 400, so it gets a plain 403 body instead.
+                if (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)) return Task.CompletedTask;
+                context.Response.ContentType = "text/plain; charset=utf-8";
+                return context.Response.WriteAsync(PlAdmin.Forbidden.Title);
+            };
         });
         services.AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme).Configure<ServerSessionStore, WebOptions, TimeProvider>((o, store, web, time) =>
         {
@@ -45,7 +54,7 @@ public static class AuthenticationExtensions
             o.Cookie.SecurePolicy = web.SecureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
             o.TimeProvider = time;
         });
-        services.AddAuthorizationBuilder().RequireAuthenticatedByDefault();
+        services.AddAuthorizationBuilder().RequireAuthenticatedByDefault().AddAdminPolicy();
         services.AddCascadingAuthenticationState();
 
         // Antiforgery tokens and the cookie are only valid across restarts and instances when the keys are shared (BLAZOR-WEB-APP section 14): DataProtection:KeysPath, a shared volume.

@@ -100,4 +100,23 @@ public class ContractCopiesTests
             check: c => Assert.Equal("Dziękuję", c.Items[0].Reply!.Text));
 
     [Fact] public void The_money_object_is_minor_units_and_a_currency() => RoundTrip<W.MoneyDto>(new MoneyDto(1500000), check: c => Assert.Equal(("PLN", 1500000L), (c.Currency, c.AmountMinor)));
+
+    [Fact]
+    public void A_suspicious_pair_of_the_admin_list() =>
+        RoundTrip<W.PageDto<W.SuspiciousPairDto>>(new Page<Gabinety.Contracts.Reputation.SuspiciousPairDto>([new Gabinety.Contracts.Reputation.SuspiciousPairDto("pair-1", "demo-client-1", Id, 4, 4)], "NEXT"),
+            check: c => Assert.Equal((Id, 4, "NEXT"), (c.Items[0].PractitionerId, c.Items[0].Reviews, c.NextCursor)));
+
+    [Theory]
+    [InlineData(PaymentStatus.Succeeded)] [InlineData(PaymentStatus.PartiallyRefunded)]
+    public void The_booking_a_dispute_card_reads_is_the_booking_view_with_the_payment_as_its_wire_name(PaymentStatus payment)
+    {
+        var real = new BookingView(Id, BookingStatus.Disputed, null, At, At.AddHours(1), 60, "Audyt kodu", new MoneyDto(18000), new PractitionerRef(Id, "", "demo-anna"), null, null, null, null,
+            new PaymentView(payment, new MoneyDto(10000)), null, null, false, false, false, false);
+        RoundTrip<W.AdminBookingDto>(real, new JsonSerializerOptions(JsonSerializerDefaults.Web), c =>
+        {
+            Assert.Equal(payment.ToString(), c.Payment.Status); // the keys of the Polish labels
+            Assert.Equal((18000L, 10000L, "Disputed"), (c.Price.AmountMinor, c.Payment.Refunded.AmountMinor, c.Status));
+            Assert.Equal(At, c.StartUtc);
+        });
+    }
 }

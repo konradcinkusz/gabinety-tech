@@ -2,7 +2,19 @@
 @attribute [AllowAnonymous]
 @layout MainLayout
 
-<PageTitle>@Pl.Errors.NotFoundTitle</PageTitle>
-<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
-<h1>@Pl.Errors.NotFoundTitle</h1>
-<p>@Pl.Errors.NotFoundBody</p>
+@* The status-code middleware re-executes this page for every refusal without a body and passes the original status (?status=403): a refusal of a signed-in user (F-10) says "Brak dostępu", the rest say "not found". *@
+@if (Status == StatusCodes.Status403Forbidden)
+{
+    <ForbiddenNotice />
+}
+else
+{
+    <PageTitle>@Pl.Errors.NotFoundTitle</PageTitle>
+    <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+    <h1>@Pl.Errors.NotFoundTitle</h1>
+    <p>@Pl.Errors.NotFoundBody</p>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "status")] public int? Status { get; set; }
+}

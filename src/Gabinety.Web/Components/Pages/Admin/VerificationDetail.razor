@@ -1,0 +1,109 @@
+@page "/admin/weryfikacja/{Id:guid}"
+@inject AdminApi Api
+@inject NavigationManager Navigation
+@* Read-only: the profile as a reviewer sees it and its append-only history (J2: the region "Historia weryfikacji" holds one listitem per event). Bio, reason and notes are user free text and are rendered as text nodes. An id that is not a GUID is
+   not a route (404); an unknown profile is a 404 status too; a failing history does not hide the profile. *@
+
+@if (_state == State.Forbidden)
+{
+    <ForbiddenNotice />
+}
+else if (_state == State.Ready)
+{
+    <PageTitle>@PlAdmin.Verification.DetailMetaTitle</PageTitle>
+    <HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+    <section class="admin-section">
+        <p><a href="/admin/weryfikacja">@PlAdmin.Verification.BackToQueue</a></p>
+        <div class="admin-row__head">
+            <h1>@_detail!.DisplayName</h1>
+            <AdminBadge Kind="AdminFormat.PractitionerStatusKind(_detail.Status)">@AdminFormat.PractitionerStatus(_detail.Status)</AdminBadge>
+        </div>
+        <p class="admin-lead">@_detail.Headline</p>
+        <div class="card">
+            <h2>@PlAdmin.Verification.Data</h2>
+            <dl class="admin-facts">
+                <dt>@PlAdmin.Verification.Slug</dt><dd>@_detail.Slug</dd>
+                <dt>@PlAdmin.Verification.Github</dt>
+                <dd>
+                    @if (_detail.GithubLinked && AdminFormat.IsGithubLogin(_detail.GithubLogin))
+                    {
+                        <a href="https://github.com/@Uri.EscapeDataString(_detail.GithubLogin!)" rel="noopener noreferrer" target="_blank">@_detail.GithubLogin</a>
+                    }
+                    else { @(_detail.GithubLinked ? PlAdmin.Verification.GithubLinked : PlAdmin.Verification.GithubNot) }
+                </dd>
+                <dt>@PlAdmin.Verification.Nip</dt>
+                <dd>@(string.IsNullOrEmpty(_detail.Nip) ? PlAdmin.Common.None : $"{_detail.Nip} ({(_detail.NipValid ? PlAdmin.Verification.NipValid : PlAdmin.Verification.NipInvalid)})")</dd>
+                <dt>@PlAdmin.Verification.Portfolio</dt>
+                <dd>
+                    @if (AdminFormat.IsHttp(_detail.PortfolioUrl)) {<a href="@_detail.PortfolioUrl" rel="noopener noreferrer nofollow" target="_blank">@_detail.PortfolioUrl</a>}
+                    else {@(_detail.PortfolioUrl ?? PlAdmin.Common.None)}
+                </dd>
+                <dt>@PlAdmin.Verification.Created</dt><dd><time datetime="@_detail.CreatedAt.ToString("O")">@AdminFormat.When(_detail.CreatedAt)</time></dd>
+                @if (_detail.SubmittedAt is { } submitted) {<dt>@PlAdmin.Verification.Submitted</dt><dd><time datetime="@submitted.ToString("O")">@AdminFormat.When(submitted)</time></dd>}
+                @if (_detail.ApprovedAt is { } approved) {<dt>@PlAdmin.Verification.Approved</dt><dd><time datetime="@approved.ToString("O")">@AdminFormat.When(approved)</time></dd>}
+                <dt>@PlAdmin.Verification.Updated</dt><dd><time datetime="@_detail.UpdatedAt.ToString("O")">@AdminFormat.When(_detail.UpdatedAt)</time></dd>
+                @if (!string.IsNullOrEmpty(_detail.StatusReason)) {<dt>@PlAdmin.Verification.Reason</dt><dd class="admin-pre">@_detail.StatusReason</dd>}
+            </dl>
+            <h3>@PlAdmin.Verification.Bio</h3>
+            <p class="admin-pre">@_detail.Bio</p>
+        </div>
+        <section aria-labelledby="timeline-title">
+            <h2 id="timeline-title">@PlAdmin.Verification.TimelineTitle</h2>
+            @if (_events is null)
+            {
+                <Alert Variant="AlertVariant.Warning">@PlAdmin.Verification.TimelineUnavailable</Alert>
+            }
+            else if (_events.Count == 0)
+            {
+                <p class="muted">@PlAdmin.Verification.TimelineEmpty</p>
+            }
+            else
+            {
+                <ol class="admin-timeline">
+                    @foreach (var e in _events)
+                    {
+                        <li>
+                            <strong>@AdminFormat.VerificationEvent(e.Kind)</strong> · <time datetime="@e.At.ToString("O")">@AdminFormat.When(e.At)</time>
+                            <br /><span class="muted">@PlAdmin.Verification.Actor: <span class="admin-ref" title="@e.ActorUserId">@AdminFormat.ShortRef(e.ActorUserId)</span></span>
+                            @if (!string.IsNullOrEmpty(e.Note)) {<p class="admin-pre">@PlAdmin.Verification.Note: @e.Note</p>}
+                        </li>
+                    }
+                </ol>
+            }
+        </section>
+    </section>
+}
+else if (_state != State.Loading)
+{
+    <PageTitle>@PlAdmin.Verification.DetailMetaTitle</PageTitle>
+    <HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+    <section class="admin-section">
+        <h1>@PlAdmin.Verification.DetailTitle</h1>
+        <p><a href="/admin/weryfikacja">@PlAdmin.Verification.BackToQueue</a></p>
+        <Alert Variant="AlertVariant.Danger" TestId="unavailable">@(_state == State.Unauthenticated ? PlAdmin.Common.SignedOut : PlAdmin.Verification.DetailUnavailable)</Alert>
+    </section>
+}
+
+@code {
+    /// <summary>Loading comes first: the component renders once while OnInitializedAsync is still awaiting, and that pass must not touch data that is not there yet.</summary>
+    enum State { Loading, Ready, Unavailable, Unauthenticated, Forbidden }
+
+    [Parameter] public Guid Id { get; set; }
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+
+    State _state;
+    AdminPractitionerDetailDto? _detail;
+    IReadOnlyList<AdminVerificationEventDto>? _events; // null: the history could not be read
+
+    protected override async Task OnInitializedAsync()
+    {
+        var (detail, history) = (Api.Practitioner(Id), Api.VerificationEvents(Id));
+        var d = await detail;
+        if (d.Failure is { Status: 404 }) { Navigation.NotFound(); return; } // an unknown profile is a 404 page and status
+        if (d.Failure is { Status: 403 }) { HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden; _state = State.Forbidden; return; } // the service refuses what the page let through
+        if (!d.IsOk) { _state = d.Failure!.Status == 401 ? State.Unauthenticated : State.Unavailable; return; }
+        (_detail, _state) = (d.Value, State.Ready);
+        var h = await history;
+        _events = h.IsOk ? h.Value!.Items : null;
+    }
+}

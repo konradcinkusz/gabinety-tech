@@ -14,7 +14,10 @@ public static class SiteNavigation
 {
     public static readonly NavItem Practitioners = new("/programisci", Pl.Nav.Search);
 
-    public static IReadOnlyList<NavItem> Items(bool signedIn) => signedIn
-        ? [Practitioners, new NavItem("/moje/rezerwacje", Pl.Nav.MyBookings), new NavItem(ReturnTarget.LogoutPath, Pl.Nav.SignOut)]
+    public static readonly NavItem Administration = new("/admin", PlAdmin.Shell.Strip);
+
+    /// <summary>An administrator also gets <c>Administracja</c> (DESIGN-CONTRACT 5.1), before the sign-out link; everybody else's items are unchanged.</summary>
+    public static IReadOnlyList<NavItem> Items(bool signedIn, bool isAdmin = false) => signedIn
+        ? [Practitioners, new NavItem("/moje/rezerwacje", Pl.Nav.MyBookings), .. isAdmin ? (NavItem[])[Administration] : [], new NavItem(ReturnTarget.LogoutPath, Pl.Nav.SignOut)]
         : [Practitioners, new NavItem(ReturnTarget.LoginPath, Pl.Nav.SignIn)];
 }

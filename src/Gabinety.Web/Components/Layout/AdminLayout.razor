@@ -1,0 +1,32 @@
+@inherits LayoutComponentBase
+@layout MainLayout
+@inject NavigationManager Navigation
+
+@* The administrator area (DESIGN-CONTRACT 5.8, 5.9; UI-AUDIT P-ADM-1): a strip "Administracja" and ONE .tabs pattern for the sections, with aria-current on the current one. Every page of the area uses this layout (Pages/Admin/_Imports.razor),
+   so the tabs cannot be forgotten. The role is checked before any of this renders (the Admin policy of the page), not here. *@
+<div class="admin-area">
+    <p class="admin-strip">@PlAdmin.Shell.Strip</p>
+    <nav aria-label="@PlAdmin.Shell.NavLabel" class="admin-tabs">
+        <ul>
+            @foreach (var (href, label) in Sections)
+            {
+                <li><a href="@href" aria-current="@(IsCurrent(href) ? "page" : null)">@label</a></li>
+            }
+        </ul>
+    </nav>
+    <div class="admin-body">@Body</div>
+</div>
+
+@code {
+    public static readonly (string Href, string Label)[] Sections =
+    [
+        ("/admin/weryfikacja", PlAdmin.Shell.Verification), ("/admin/spory", PlAdmin.Shell.Disputes), ("/admin/ksiega", PlAdmin.Shell.Ledger),
+        ("/admin/opinie", PlAdmin.Shell.Reviews), ("/admin/podejrzane", PlAdmin.Shell.Suspicious),
+    ];
+
+    bool IsCurrent(string href)
+    {
+        var path = new Uri(Navigation.Uri).AbsolutePath;
+        return path.Equals(href, StringComparison.OrdinalIgnoreCase) || path.StartsWith(href + "/", StringComparison.OrdinalIgnoreCase);
+    }
+}

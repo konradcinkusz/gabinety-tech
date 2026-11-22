@@ -1,0 +1,5 @@
+@* Every page of the administrator area: the Admin policy (a signed-in non-admin gets 403, a visitor goes to sign-in), the area layout (tabs) and its parts. A page cannot forget either. *@
+@using Gabinety.Web.Components.Admin
+@using Gabinety.Web.Components.Pages.Admin
+@attribute [Authorize(Policy = AdminAuthorization.Policy)]
+@layout AdminLayout

@@ -1,0 +1,68 @@
+@page "/admin/podejrzane"
+@inject AdminApi Api
+@* Suspicious pairs (T-10.03): ids and counts only, no review text. The practitioner is named when Directory can say, the client is a short reference (no service has a client's name for an administrator). A table: a pair is compared across columns. *@
+
+<PageTitle>@PlAdmin.Suspicious.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<section class="admin-section">
+    <h1>@PlAdmin.Suspicious.Title</h1>
+    <p class="admin-lead">@PlAdmin.Suspicious.Intro</p>
+    @if (_failure is { } failure)
+    {
+        <FailureAlert Failure="failure" Unavailable="@PlAdmin.Suspicious.Unavailable" />
+    }
+    else if (_items.Count == 0)
+    {
+        <p class="empty-state">@PlAdmin.Suspicious.Empty</p>
+    }
+    else
+    {
+        <div class="table-wrap" role="region" aria-label="@PlAdmin.Suspicious.TableLabel" tabindex="0">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th scope="col">@PlAdmin.Suspicious.ColClient</th>
+                        <th scope="col">@PlAdmin.Suspicious.ColPractitioner</th>
+                        <th scope="col" class="num">@PlAdmin.Suspicious.ColBookings</th>
+                        <th scope="col" class="num">@PlAdmin.Suspicious.ColReviews</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in _items)
+                    {
+                        <tr>
+                            <td data-label="@PlAdmin.Suspicious.ColClient"><span title="@p.ClientUserId">@string.Format(PlAdmin.Common.ClientRef, AdminFormat.ShortRef(p.ClientUserId))</span></td>
+                            <td data-label="@PlAdmin.Suspicious.ColPractitioner"><span title="@p.PractitionerId">@(_names.TryGetValue(p.PractitionerId, out var name) ? name : string.Format(PlAdmin.Common.PractitionerRef, AdminFormat.ShortRef(p.PractitionerId)))</span></td>
+                            <td data-label="@PlAdmin.Suspicious.ColBookings" class="num">@p.Bookings</td>
+                            <td data-label="@PlAdmin.Suspicious.ColReviews" class="num">@p.Reviews</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (_next is not null)
+        {
+            <p class="admin-more"><a class="btn" href="@AdminQuery.Url("/admin/podejrzane", ("cursor", _next))">@PlAdmin.Suspicious.Next</a></p>
+        }
+    }
+</section>
+
+@code {
+    public const int PageSize = 20;
+
+    [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+
+    readonly List<SuspiciousPairDto> _items = [];
+    IReadOnlyDictionary<Guid, string> _names = new Dictionary<Guid, string>();
+    string? _next;
+    ApiFailure? _failure;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.SuspiciousPairs(AdminQuery.Cursor(CursorParam), PageSize);
+        (_failure, _next) = (result.Failure, result.Value?.NextCursor);
+        if (!result.IsOk) return;
+        _items.AddRange(result.Value!.Items);
+        _names = await Api.PractitionerNames(_items.Select(p => p.PractitionerId));
+    }
+}

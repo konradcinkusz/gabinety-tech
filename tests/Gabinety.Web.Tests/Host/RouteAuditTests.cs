@@ -64,7 +64,9 @@ public class RouteAuditTests
         await using var web = new WebFactory();
         web.CreateClient();
         var (rows, _) = Actual(web.Services);
-        Assert.Equal(["/moje/rezerwacje"], rows.Where(r => r.Policy != "Anonymous").Select(r => r.Pattern));
+        Assert.Equal(["/admin", "/admin/ksiega", "/admin/ksiega/csv", "/admin/opinie", "/admin/podejrzane", "/admin/spory", "/admin/weryfikacja", "/admin/weryfikacja/{Id}", "/moje/rezerwacje"],
+            rows.Where(r => r.Policy != "Anonymous").Select(r => r.Pattern));
+        Assert.All(rows.Where(r => r.Pattern.StartsWith("/admin")), r => Assert.Equal("Admin", r.Policy)); // the whole area is behind the one policy: a page of /admin cannot be added without it
         Assert.DoesNotContain(rows, r => r.Pattern.StartsWith("/api") || r.Pattern.StartsWith("/internal")); // the host serves no API of its own: the browser talks to no backend
     }
 

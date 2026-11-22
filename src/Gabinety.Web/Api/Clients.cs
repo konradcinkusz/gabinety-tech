@@ -7,7 +7,7 @@ namespace Gabinety.Web.Api;
 public sealed record PractitionerQuery(string? Problem = null, string? Tech = null, string? Q = null, int? Duration = null, long? MaxPriceMinor = null, string? Cursor = null);
 
 /// <summary>Directory, public reads only (SPEC 5.1: 5 s, once, GET only: see <see cref="ApiResilience"/>).</summary>
-public sealed class DirectoryClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
+public sealed partial class DirectoryClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
 {
     public Task<ApiResult<TaxonomyDto>> TaxonomyAsync(CancellationToken ct = default) => GetAsync<TaxonomyDto>("/api/v1/taxonomy", null, ct);
 
@@ -28,7 +28,7 @@ public sealed class DirectoryClient(HttpClient http, VisitorAddressAccessor visi
 }
 
 /// <summary>Booking, for the signed-in user: the bearer is read from the caller's scope (<see cref="IAccessTokenSource"/>) and handed to the handler through the request.</summary>
-public sealed class BookingClient(HttpClient http, VisitorAddressAccessor visitor, IAccessTokenSource tokens) : ApiClient(http, visitor)
+public sealed partial class BookingClient(HttpClient http, VisitorAddressAccessor visitor, IAccessTokenSource tokens) : ApiClient(http, visitor)
 {
     public const string ClientRole = "client", PractitionerRole = "practitioner";
 
@@ -42,7 +42,7 @@ public sealed class BookingClient(HttpClient http, VisitorAddressAccessor visito
 }
 
 /// <summary>Reputation, public reads.</summary>
-public sealed class ReputationClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
+public sealed partial class ReputationClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
 {
     public Task<ApiResult<PageDto<ReviewDto>>> ReviewsAsync(Guid practitionerId, string? cursor = null, CancellationToken ct = default) =>
         GetAsync<PageDto<ReviewDto>>($"/api/v1/practitioners/{practitionerId}/reviews" + (string.IsNullOrEmpty(cursor) ? "" : "?cursor=" + Uri.EscapeDataString(cursor)), null, ct);

@@ -22,6 +22,7 @@ public static class ApiResilience
         Add<ReputationClient>(services, Backend.Reputation);
         Add<AssistantClient>(services, Backend.Assistant); // status reads only; the 35 s brief call (SPEC 5.1) gets its own timeout when the booking flow is ported
         Add<Auth.IdentityClient>(services, Backend.Auth);
+        services.AddScoped<AdminApi>();      // the admin pages' calls with the administrator's own bearer (Api/Admin)
         // The options of the ONE handler the kernel added to every client. All backends share the SPEC 5.1 profile of a read: 5 s per attempt, ONE retry, and only for a GET or HEAD, so a login,
         // a refresh and every later write are never retried automatically (SPEC 5 rule 8), whatever the client. The wait before the retry follows Retry-After (the services answer 429 under
         // their per-client limit), at most 2 s. (Per-client names such as "directory-standard" are not what the kernel's default registration reads: ConfigureAll is.)

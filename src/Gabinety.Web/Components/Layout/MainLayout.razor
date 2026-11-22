@@ -9,7 +9,7 @@
         <nav aria-label="@Pl.Nav.Label">
             <ul class="nav-list">
                 <AuthorizeView>
-                    <Authorized>@foreach (var item in SiteNavigation.Items(true)) {<li><a href="@item.Href">@item.Label</a></li>}</Authorized>
+                    <Authorized Context="auth">@foreach (var item in SiteNavigation.Items(true, ClaimMapping.IsAdmin(auth.User))) {<li><a href="@item.Href">@item.Label</a></li>}</Authorized>
                     <NotAuthorized>@foreach (var item in SiteNavigation.Items(false)) {<li><a href="@item.Href">@item.Label</a></li>}</NotAuthorized>
                 </AuthorizeView>
             </ul>

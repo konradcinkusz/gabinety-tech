@@ -189,4 +189,26 @@ public static class Pl
         public static readonly string[] MonthsGenitive = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "września", "października", "listopada", "grudnia"];
         public static readonly string[] Weekdays = ["niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"];
     }
+
+    /// <summary>The account page (<c>/konto</c>, port of <c>web/src/components/auth/strings.ts</c> "account"); the versions of the documents go to a title, never to the text (DESIGN-CONTRACT 8).</summary>
+    public static class Account
+    {
+        public const string Title = "Konto", MetaTitle = "Konto | Gabinety Tech", Email = "Adres e-mail";
+        public const string Verified = "Adres e-mail potwierdzony", NotVerified = "Adres e-mail niepotwierdzony. Sprawdź skrzynkę i kliknij link z wiadomości.";
+        public const string Consents = "Zgody";
+        public const string TermsAccepted = "Regulamin: zaakceptowany", TermsPending = "Regulamin: wymaga ponownej akceptacji";
+        public const string PrivacyAccepted = "Polityka prywatności: zaakceptowana", PrivacyPending = "Polityka prywatności: wymaga ponownej akceptacji";
+        public const string VersionTitle = "Wersja dokumentu: {0}";
+        public const string AcceptCurrent = "Zaakceptuj aktualne wersje";
+        public const string Data = "Twoje dane", Export = "Pobierz moje dane (JSON)", SignOut = "Wyloguj się";
+        public const string DeleteTitle = "Usunięcie konta";
+        public const string DeleteBody = "Konto zostanie usunięte, a dane po okresie przechowywania zanonimizowane. Tej operacji nie da się cofnąć.";
+        public const string DeleteConfirm = "Rozumiem i chcę usunąć konto", DeletePassword = "Hasło (potwierdzenie)", DeleteSubmit = "Usuń konto";
+        public const string DeleteFailed = "Nie udało się usunąć konta. Sprawdź hasło i spróbuj ponownie.";
+        public const string DeleteConfirmRequired = "Zaznacz potwierdzenie, aby usunąć konto.";
+        public const string DeletePasswordRequired = "Podaj hasło, aby potwierdzić usunięcie konta.";
+        public const string DeleteUnavailable = "Usuwanie konta jest chwilowo niedostępne. Spróbuj ponownie za chwilę.";
+        public const string AcceptFailed = "Nie udało się zapisać zgód. Spróbuj ponownie za chwilę.";
+        public const string Unavailable = "Dane konta są chwilowo niedostępne. Spróbuj ponownie za chwilę.";
+    }
 }

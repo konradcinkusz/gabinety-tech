@@ -139,6 +139,8 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |
 | Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect, state checked against the cookie, code exchanged |
 | Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings, interactive server rendering |
+| Web | PAGE | `/konto` | Authenticated | all | account: e-mail, consents, data export link, account deletion (static rendering, forms with antiforgery) |
+| Web | GET | `/konto/export` | Authenticated | all | the user's data as a no-store JSON attachment (the identity service's export, passed through) |
 | Web | PAGE | `/not-found` | Anonymous | all | status code re-execution target |
 | Web | PAGE | `/Error` | Anonymous | all | exception handler target |
 | Web | ANY | `/_blazor` | Anonymous | all | circuit websocket: refused first by the origin guard for a foreign page |

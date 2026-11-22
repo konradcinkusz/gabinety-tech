@@ -138,9 +138,59 @@ public sealed class FakeIdentity
                     return FakeBackend.Json(new { message = "Logged out." });
             }
         }
+        if (Account(r, path, doc) is { } account) return account;
         return new HttpResponseMessage(HttpStatusCode.NotFound);
     }
 
     HttpResponseMessage Tokens(string email, RSA? signWith = null) =>
         FakeBackend.Json(new { accessToken = Issue(email: email, signWith: signWith), refreshToken = $"refresh-{++_counter}", expiresIn = (int)AccessLifetime.TotalSeconds, tokenType = "Bearer" });
+
+    // ---- the account endpoints (me, consents, export, delete), as authservice answers them ----
+    public bool EmailConfirmed { get; set; } = true;
+    public bool HasPassword { get; set; } = true;
+    public bool TermsAccepted { get; set; } = true;
+    public bool PrivacyAccepted { get; set; } = true;
+    public string AccountEmail { get; set; } = "demo-client@demo.example";
+    /// <summary>When set, <c>/me</c>, <c>/consents</c> and the export answer with it (503: the account data is down while sign-in works).</summary>
+    public int AccountStatus { get; set; }
+    /// <summary>Set by a successful <c>DELETE /account</c>.</summary>
+    public bool AccountDeleted { get; private set; }
+    public string? LastDeleteBody { get; private set; }
+    public int ConsentPosts { get; private set; }
+
+    HttpResponseMessage? Account(HttpRequestMessage r, string path, JsonDocument? body)
+    {
+        if (!path.StartsWith("/api/v1/auth/") || path.Split('/')[^1] is not ("me" or "consents" or "export" or "account")) return null;
+        if (r.Headers.Authorization is null) return FakeBackend.Json(new { error = "Unauthorized" }, HttpStatusCode.Unauthorized);
+        if (AccountStatus != 0) return new HttpResponseMessage((HttpStatusCode)AccountStatus);
+        lock (_gate)
+        {
+            switch (path.Split('/')[^1], r.Method.Method)
+            {
+                case ("me", "GET"):
+                    // fields a careless page might dump: the real service returns more than the page may show
+                    return FakeBackend.Json(new { id = "demo-user-1", email = AccountEmail, emailConfirmed = EmailConfirmed, hasPassword = HasPassword, accessToken = "AT-SECRET", refreshToken = "RT-SECRET", organizations = new[] { new { id = "o1" } } });
+                case ("consents", "GET"):
+                    return FakeBackend.Json(new
+                    {
+                        terms = new { requiredVersion = "2026-01-01", acceptedVersion = TermsAccepted ? "2026-01-01" : "2025-06-01", accepted = TermsAccepted },
+                        privacy = new { requiredVersion = "2026-02-01", acceptedVersion = PrivacyAccepted ? "2026-02-01" : "2025-06-01", accepted = PrivacyAccepted },
+                        requiresConsent = !(TermsAccepted && PrivacyAccepted),
+                    });
+                case ("consents", "POST"):
+                    ConsentPosts++; (TermsAccepted, PrivacyAccepted) = (true, true);
+                    return FakeBackend.Json(new { requiresConsent = false });
+                case ("export", "GET"):
+                    return FakeBackend.Json(new { exportedAt = "2026-11-17T10:00:00Z", profile = new { email = AccountEmail } });
+                case ("account", "DELETE"):
+                    LastDeleteBody = body?.RootElement.GetRawText();
+                    var password = body is not null && body.RootElement.TryGetProperty("password", out var p) ? p.GetString() : null;
+                    if (body is null || body.RootElement.GetProperty("confirmation").GetString() != "DELETE") return FakeBackend.Json(new { error = "Confirmation text must be 'DELETE'" }, HttpStatusCode.BadRequest);
+                    if (HasPassword && password != Password) return FakeBackend.Json(new { error = "Invalid password" }, HttpStatusCode.BadRequest);
+                    AccountDeleted = true;
+                    return FakeBackend.Json(new { message = "Account deleted successfully" });
+            }
+        }
+        return null;
+    }
 }

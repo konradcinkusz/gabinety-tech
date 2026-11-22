@@ -66,7 +66,7 @@ public static class WebHostingExtensions
         var assets = app.MapGroup("");
         assets.AllowAnonymous();
         assets.MapStaticAssets();
-        app.MapOAuthCallback();
+        app.MapOAuth();
         // Interactive server rendering is registered for the pages that ask for it. The circuit endpoints (/_blazor/*) and the framework's own (/_framework/*) are anonymous: an interactive page
         // of an anonymous visitor needs them, and the deny-by-default fallback would answer 401 otherwise. Authorization is the page's own ([Authorize] on the page, so NOT a blanket
         // AllowAnonymous on every component endpoint, which would override it) and the API behind it (BLAZOR-WEB-APP section 7: middleware is UX, the API is the boundary).

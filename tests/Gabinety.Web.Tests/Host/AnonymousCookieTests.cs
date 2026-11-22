@@ -22,7 +22,6 @@ public class AnonymousCookieTests
 
     [Theory]
     [InlineData("/")] [InlineData("/programisci")] [InlineData("/programisci/audyt-kodu")] [InlineData("/programisci/nie-ma")] [InlineData("/nie-ma-takiej-strony")] [InlineData("/not-found")] [InlineData("/Error")]
-    [InlineData("/oauth/callback?code=a&state=b")]
     public async Task A_public_page_sets_no_cookie_and_is_not_marked_no_store(string path)
     {
         await using var web = Web();
@@ -32,7 +31,7 @@ public class AnonymousCookieTests
     }
 
     [Theory]
-    [InlineData("/health")] [InlineData("/alive")]
+    [InlineData("/health")] [InlineData("/alive")] [InlineData("/oauth/callback?code=a&state=b")] // the callback is a no-store redirect by design, and sets nothing without a state cookie
     public async Task The_probes_set_no_cookie(string path)
     {
         await using var web = Web();

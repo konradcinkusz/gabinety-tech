@@ -21,7 +21,6 @@ public interface ITokenVerifier
 /// </summary>
 public sealed class JwksTokenVerifier(IHttpClientFactory clients, WebOptions options, TimeProvider time) : ITokenVerifier
 {
-    const string RoleClaimUri = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
     static readonly TimeSpan KeyLifetime = TimeSpan.FromMinutes(5), MinRefetch = TimeSpan.FromSeconds(30), Skew = TimeSpan.FromSeconds(5);
 
     readonly object _gate = new();
@@ -42,12 +41,11 @@ public sealed class JwksTokenVerifier(IHttpClientFactory clients, WebOptions opt
         if (!result.IsValid) return (VerifyOutcome.Invalid, null);
 
         var claims = result.ClaimsIdentity.Claims.ToList();
-        string? One(string type) => claims.FirstOrDefault(c => c.Type == type)?.Value;
-        var sub = One("sub") ?? One(ClaimTypes.NameIdentifier);
+        var sub = ClaimMapping.Subject(claims);
         var exp = ((JsonWebToken)result.SecurityToken).ValidTo;
         if (string.IsNullOrEmpty(sub)) return (VerifyOutcome.Invalid, null);
-        var roles = claims.Where(c => c.Type is RoleClaimUri or ClaimTypes.Role or "role").Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList();
-        return (VerifyOutcome.Valid, new VerifiedToken(sub, One("email"), roles, new DateTimeOffset(DateTime.SpecifyKind(exp, DateTimeKind.Utc))));
+        var roles = ClaimMapping.Roles(claims);
+        return (VerifyOutcome.Valid, new VerifiedToken(sub, ClaimMapping.Email(claims), roles, new DateTimeOffset(DateTime.SpecifyKind(exp, DateTimeKind.Utc))));
     }
 
     Task<TokenValidationResult> Validate(string token, JsonWebKeySet keys) => new JsonWebTokenHandler().ValidateTokenAsync(token, new TokenValidationParameters

@@ -4,7 +4,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace Gabinety.Web.Auth;
 
-public enum SignInOutcome { SignedIn, InvalidCredentials, VerificationRequired, TwoFactor, Unavailable }
+/// <summary><c>ConfirmationPending</c>: the identity service accepted a registration (202) and wants the e-mail confirmed first; nobody is signed in.</summary>
+public enum SignInOutcome { SignedIn, ConfirmationPending, InvalidCredentials, VerificationRequired, TwoFactor, Unavailable }
 
 /// <summary>
 /// Signs a user in through the host (BLAZOR-WEB-APP section 7): the identity service's answer is VERIFIED (signature, issuer, audience, expiry: <see cref="ITokenVerifier"/>), its tokens go to
@@ -14,13 +15,23 @@ public enum SignInOutcome { SignedIn, InvalidCredentials, VerificationRequired, 
 public sealed class SignInService(IdentityClient identity, ITokenVerifier verifier, ServerSessionStore store, TimeProvider time)
 {
     public static readonly TimeSpan SessionLifetime = TimeSpan.FromDays(7); // the refresh cookie of the Next.js app (REFRESH_MAX_AGE)
-    public const string AdminRole = "Admin", SuperAdminRole = "SuperAdmin";
 
-    public async Task<SignInOutcome> SignInAsync(HttpContext http, string email, string password, CancellationToken ct = default)
+    public async Task<SignInOutcome> SignInAsync(HttpContext http, string email, string password, CancellationToken ct = default) =>
+        await CompleteAsync(http, await identity.LoginAsync(email, password, ct), ct);
+
+    /// <summary>Registration: signs in when the identity service issues tokens at once, else says what is pending (the pages are ported later; the plumbing is here).</summary>
+    public async Task<SignInOutcome> RegisterAsync(HttpContext http, string email, string password, CancellationToken ct = default) =>
+        await CompleteAsync(http, await identity.RegisterAsync(email, password, ct: ct), ct);
+
+    /// <summary>The GitHub leg: the one-time code becomes a session exactly like a password sign-in.</summary>
+    public async Task<SignInOutcome> SignInWithExchangeCodeAsync(HttpContext http, string code, CancellationToken ct = default) =>
+        await CompleteAsync(http, await identity.ExchangeAsync(code, ct), ct);
+
+    async Task<SignInOutcome> CompleteAsync(HttpContext http, IdentityResult result, CancellationToken ct)
     {
-        var result = await identity.LoginAsync(email, password, ct);
         switch (result.Outcome)
         {
+            case IdentityOutcome.Accepted: return SignInOutcome.ConfirmationPending;
             case IdentityOutcome.Unauthorized or IdentityOutcome.Rejected: return SignInOutcome.InvalidCredentials;
             case IdentityOutcome.VerificationRequired: return SignInOutcome.VerificationRequired;
             case IdentityOutcome.TwoFactor: return SignInOutcome.TwoFactor;

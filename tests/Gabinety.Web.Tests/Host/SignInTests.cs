@@ -220,19 +220,6 @@ public class SignInTests
     }
 
     [Fact]
-    public async Task The_oauth_callback_is_anonymous_and_is_not_bounced_through_the_sign_in_redirect()
-    {
-        await using var web = Web();
-        var page = await web.NewBrowser().GetAsync("/oauth/callback?code=abc&state=xyz&redirect=%2Fmoje%2Frezerwacje");
-        Assert.Equal(HttpStatusCode.Found, page.Status);
-        Assert.Equal("/logowanie?error=github_failed", page.Location); // until the exchange is ported: where a failed GitHub sign-in ends in the Next.js app
-        Assert.DoesNotContain("redirect=", page.Location); // no challenge: the code and state were not carried through /logowanie?redirect=
-        Assert.Empty(page.SetCookies);
-        var login = await web.NewBrowser().GetAsync(page.Location!);
-        Assert.Contains("Logowanie przez GitHub nie powiodło się", login.TextOf("[role=alert]"));
-    }
-
-    [Fact]
     public async Task The_authenticated_page_says_so_in_an_alert_when_the_booking_service_is_down_and_the_shell_stays()
     {
         await using var web = Web();

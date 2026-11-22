@@ -132,7 +132,8 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/programisci/{Problem}/{Tech}` | Anonymous | all | public list of a category and a technology |
 | Web | PAGE | `/logowanie` | Anonymous | all | sign-in form (the POST is handled by the page, antiforgery) |
 | Web | PAGE | `/wyloguj` | Anonymous | all | sign-out form |
-| Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect; the exchange is ported later |
+| Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |
+| Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect, state checked against the cookie, code exchanged |
 | Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings, interactive server rendering |
 | Web | PAGE | `/not-found` | Anonymous | all | status code re-execution target |
 | Web | PAGE | `/Error` | Anonymous | all | exception handler target |

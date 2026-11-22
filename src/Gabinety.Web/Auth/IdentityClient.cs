@@ -4,7 +4,8 @@ using Gabinety.Web.Api;
 
 namespace Gabinety.Web.Auth;
 
-public enum IdentityOutcome { Tokens, TwoFactor, VerificationRequired, Unauthorized, Rejected, Unavailable }
+/// <summary><c>Accepted</c> is the 202 of registration: an e-mail confirmation is pending and no token is issued.</summary>
+public enum IdentityOutcome { Tokens, Accepted, TwoFactor, VerificationRequired, Unauthorized, Rejected, Unavailable }
 
 public sealed record IdentityResult(IdentityOutcome Outcome, string? AccessToken = null, string? RefreshToken = null, int ExpiresInSeconds = 3600);
 
@@ -19,6 +20,36 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
 
     public Task<IdentityResult> RefreshAsync(string refreshToken, CancellationToken ct = default) =>
         PostAsync("/api/v1/auth/refresh", new { refreshToken }, null, ct);
+
+    /// <summary>The versions of the terms and the privacy text a registration must accept (null when the identity service cannot say).</summary>
+    public async Task<(string Terms, string Privacy)?> ConsentVersionsAsync(CancellationToken ct = default)
+    {
+        using var request = Request("/api/v1/auth/consents/versions", null, null, HttpMethod.Get);
+        try
+        {
+            using var response = await http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode) return null;
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            var r = doc.RootElement;
+            return r.ValueKind == JsonValueKind.Object && r.TryGetProperty("terms", out var t) && t.ValueKind == JsonValueKind.String && r.TryGetProperty("privacy", out var p) && p.ValueKind == JsonValueKind.String
+                ? (t.GetString()!, p.GetString()!) : null;
+        }
+        catch (Exception) when (!ct.IsCancellationRequested) { return null; }
+    }
+
+    /// <summary>Registration (the page is ported later): the accepted versions are the current ones unless given. 202 is <see cref="IdentityOutcome.Accepted"/>.</summary>
+    public async Task<IdentityResult> RegisterAsync(string email, string password, string? termsVersion = null, string? privacyVersion = null, string? locale = null, CancellationToken ct = default)
+    {
+        if (termsVersion is null || privacyVersion is null)
+        {
+            if (await ConsentVersionsAsync(ct) is not { } v) return new IdentityResult(IdentityOutcome.Unavailable);
+            (termsVersion, privacyVersion) = (termsVersion ?? v.Terms, privacyVersion ?? v.Privacy);
+        }
+        return await PostAsync("/api/v1/auth/register", new { email, password, acceptedTermsVersion = termsVersion, acceptedPrivacyVersion = privacyVersion, locale }, null, ct);
+    }
+
+    /// <summary>The GitHub leg's one-time code, exchanged for tokens (PR #118).</summary>
+    public Task<IdentityResult> ExchangeAsync(string code, CancellationToken ct = default) => PostAsync("/api/v1/external-auth/exchange", new { code }, null, ct);
 
     /// <summary>Best effort: the local session ends either way.</summary>
     public async Task<bool> LogoutAsync(string accessToken, CancellationToken ct = default)
@@ -42,9 +73,9 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
         }
     }
 
-    HttpRequestMessage Request(string path, object? body, string? bearer)
+    HttpRequestMessage Request(string path, object? body, string? bearer, HttpMethod? method = null)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, path);
+        var request = new HttpRequestMessage(method ?? HttpMethod.Post, path);
         if (body is not null) request.Content = new StringContent(JsonSerializer.Serialize(body, ApiClient.Json), Encoding.UTF8, "application/json");
         if (!string.IsNullOrEmpty(bearer)) request.Options.Set(RequestContext.AccessToken, bearer);
         if (visitor.Current is { } address) request.Options.Set(RequestContext.VisitorAddress, address);
@@ -71,6 +102,7 @@ public sealed class IdentityClient(HttpClient http, VisitorAddressAccessor visit
             catch (JsonException) { }
             return new IdentityResult(IdentityOutcome.Unavailable);
         }
+        if (status == 202) return new IdentityResult(IdentityOutcome.Accepted);
         if (status == 401) return new IdentityResult(IdentityOutcome.Unauthorized);
         if (status == 403)
         {

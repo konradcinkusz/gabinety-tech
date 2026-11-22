@@ -26,6 +26,12 @@ public static class AdminFormat
 
     public static string ShortRef(Guid id) => id.ToString("D")[..8];
 
+    /// <summary>
+    /// The last eight characters of an id: the random part of a UUIDv7. The first eight are its timestamp, so every id made in the same moment reads the same (the ledger's column of
+    /// identical <c>01a2039c</c> rows). The whole id goes into a <c>title</c>.
+    /// </summary>
+    public static string IdTail(Guid id) => id.ToString("D")[^8..];
+
     /// <summary>A grosz amount: <c>180,00 zł</c>; a negative amount (a reversal) keeps its sign.</summary>
     public static string Pln(long grosz) => grosz < 0 ? "−" + Money.Pln(-grosz) : Money.Pln(grosz);
 

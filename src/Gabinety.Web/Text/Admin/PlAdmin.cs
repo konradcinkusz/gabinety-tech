@@ -163,7 +163,8 @@ public static class PlAdmin
         public const string Intro = "Wpisy księgi w wybranym okresie i eksport do pliku CSV (kolumny: rezerwacja, rodzaj, kwota w groszach, waluta, data). Daty to dni UTC, obie granice włącznie.";
         public const string FilterLabel = "Okres", From = "Od", To = "Do", Show = "Pokaż okres";
         public const string PresetLabel = "Szybki wybór", ThisMonth = "Ten miesiąc", LastMonth = "Poprzedni miesiąc", ThisYear = "Ten rok";
-        public const string Download = "Pobierz CSV", Summary = "Wybrany okres: {0} – {1}.";
+        public const string Download = "Pobierz CSV", Summary = "Wybrany okres: {0}.";
+        public const string TotalsTitle = "Sumy po rodzajach", TotalsPartial = "Sumy po rodzajach pokazujemy, gdy okres ma nie więcej niż {0} wpisów. Pełny okres zawiera plik CSV.";
         public const string ProblemFormat = "Podaj obie daty w formacie rrrr-mm-dd.", ProblemOrder = "Data końcowa nie może być wcześniejsza niż początkowa.", ProblemRange = "Okres może mieć najwyżej 366 dni.";
         public const string Unauthorized = "Sesja wygasła. Zaloguj się ponownie.", Forbidden = "Nie masz uprawnień do pobrania księgi.", Validation = "Serwer odrzucił okres. Sprawdź daty.";
         public const string Unavailable = "Księga jest chwilowo niedostępna. Spróbuj ponownie za chwilę.";

@@ -104,6 +104,7 @@ public static class Pl
         public const string Github = "Zaloguj się przez GitHub", Or = "albo", NoAccount = "Nie masz konta?", Summary = "Popraw dane logowania";
         public const string EmailRequired = "Podaj adres e-mail.", PasswordRequired = "Podaj hasło.", EmailInvalid = "Podaj poprawny adres e-mail.";
         public const string SessionExpired = "Sesja wygasła. Zaloguj się ponownie.";
+        public const string BookingContext = "Zaloguj się, aby dokończyć rezerwację.", ShowPassword = "Pokaż hasło";
     }
 
     /// <summary>The second step of a two-factor sign-in (<c>/logowanie/kod</c>). The challenge itself is a sealed cookie; nothing of it is shown.</summary>
@@ -123,7 +124,8 @@ public static class Pl
     public static class Register
     {
         public const string Title = "Załóż konto", MetaTitle = "Załóż konto | Gabinety Tech", Email = "Adres e-mail", Password = "Hasło", Submit = "Załóż konto";
-        public const string PasswordHint = "Co najmniej 8 znaków, w tym mała i wielka litera, cyfra i znak specjalny.";
+        public const string BookingContext = "Załóż konto, aby dokończyć rezerwację.", ShowPassword = "Pokaż hasło";
+        public const string RuleLength = "co najmniej 8 znaków", RuleCase = "mała i wielka litera", RuleDigit = "cyfra", RuleSymbol = "znak specjalny";
         public const string ConsentPrefix = "Akceptuję ", ConsentAnd = " i ", ConsentSuffix = ".", Terms = "Regulamin", Privacy = "Politykę prywatności";
         public const string VersionTitle = "Wersja z dnia {0}";
         public const string EmailRequired = "Podaj adres e-mail.", EmailInvalid = "Podaj poprawny adres e-mail.", EmailTooLong = "Adres e-mail może mieć najwyżej 254 znaki.";

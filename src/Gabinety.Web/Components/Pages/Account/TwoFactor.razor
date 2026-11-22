@@ -8,31 +8,36 @@
 
 <PageTitle>@Pl.TwoFactor.MetaTitle</PageTitle>
 <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
-<h1>@Pl.TwoFactor.Title</h1>
-<p>@(Recovery ? Pl.TwoFactor.RecoveryLead : Pl.TwoFactor.Lead)</p>
 
-<FormSummary Problems="_problems" />
-@if (_message is not null)
-{
-    <Alert Variant="AlertVariant.Danger" TestId="two-factor-error">@_message</Alert>
-}
+<div class="container--form auth-page">
+    <div class="card">
+        <h1>@Pl.TwoFactor.Title</h1>
+        <p>@(Recovery ? Pl.TwoFactor.RecoveryLead : Pl.TwoFactor.Lead)</p>
 
-<EditForm Model="Model!" FormName="two-factor" OnSubmit="SubmitAsync" class="form form-narrow" novalidate>
-    <div class="field @(_problems.For(TwoFactorModel.CodeId) is null ? "" : "field--invalid")">
-        <label class="field__label" for="@TwoFactorModel.CodeId">@(Recovery ? Pl.TwoFactor.RecoveryLabel : Pl.TwoFactor.CodeLabel)</label>
-        @if (!Recovery) { <p class="field__hint" id="@(TwoFactorModel.CodeId)-hint">@Pl.TwoFactor.CodeHint</p> }
-        <input id="@TwoFactorModel.CodeId" name="Model.Code" class="field__control" type="text" autocomplete="one-time-code" maxlength="64" inputmode="@(Recovery ? "text" : "numeric")" autofocus
-                   aria-invalid="@(_problems.For(TwoFactorModel.CodeId) is null ? null : "true")"
-                   aria-describedby="@(_problems.For(TwoFactorModel.CodeId) is null ? (Recovery ? null : TwoFactorModel.CodeId + "-hint") : TwoFactorModel.CodeId + "-error")" />
-        <FieldError FieldId="@TwoFactorModel.CodeId" Problem="_problems.For(TwoFactorModel.CodeId)" />
+        <FormSummary Problems="_problems" />
+        @if (_message is not null)
+        {
+            <Alert Variant="AlertVariant.Danger" TestId="two-factor-error">@_message</Alert>
+        }
+
+        <EditForm Model="Model!" FormName="two-factor" OnSubmit="SubmitAsync" class="form" novalidate>
+            <div class="field @(_problems.For(TwoFactorModel.CodeId) is null ? "" : "field--invalid")">
+                <label class="field__label" for="@TwoFactorModel.CodeId">@(Recovery ? Pl.TwoFactor.RecoveryLabel : Pl.TwoFactor.CodeLabel)</label>
+                @if (!Recovery) { <p class="field__hint" id="@(TwoFactorModel.CodeId)-hint">@Pl.TwoFactor.CodeHint</p> }
+                <input id="@TwoFactorModel.CodeId" name="Model.Code" class="field__control" type="text" autocomplete="one-time-code" maxlength="64" inputmode="@(Recovery ? "text" : "numeric")" autofocus
+                       aria-invalid="@(_problems.For(TwoFactorModel.CodeId) is null ? null : "true")"
+                       aria-describedby="@(_problems.For(TwoFactorModel.CodeId) is null ? (Recovery ? null : TwoFactorModel.CodeId + "-hint") : TwoFactorModel.CodeId + "-error")" />
+                <FieldError FieldId="@TwoFactorModel.CodeId" Problem="_problems.For(TwoFactorModel.CodeId)" />
+            </div>
+            <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.TwoFactor.Submit</button></div>
+        </EditForm>
+        <p>
+            @if (Recovery) { <a href="@UrlFor(recovery: false)">@Pl.TwoFactor.UseApp</a> }
+            else { <a href="@UrlFor(recovery: true)">@Pl.TwoFactor.UseRecovery</a> }
+        </p>
+        <p><a href="@ReturnTarget.LoginUrl(Back)">@Pl.TwoFactor.Back</a></p>
     </div>
-    <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.TwoFactor.Submit</button></div>
-</EditForm>
-<p>
-    @if (Recovery) { <a href="@UrlFor(recovery: false)">@Pl.TwoFactor.UseApp</a> }
-    else { <a href="@UrlFor(recovery: true)">@Pl.TwoFactor.UseRecovery</a> }
-</p>
-<p><a href="@ReturnTarget.LoginUrl(Back)">@Pl.TwoFactor.Back</a></p>
+</div>
 
 @code {
     [CascadingParameter] HttpContext HttpContext { get; set; } = default!;

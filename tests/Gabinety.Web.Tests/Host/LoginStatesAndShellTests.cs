@@ -18,7 +18,7 @@ public class LoginStatesTests
         var throttled = await web.NewBrowser().PostFormAsync("/logowanie", Form());
         Assert.Equal("Zbyt wiele prób logowania. Spróbuj ponownie za minutę.", throttled.TextOf("[data-testid=login-error]"));
         Assert.DoesNotContain(throttled.SetCookies, c => c.StartsWith("gt_session="));
-        Assert.Equal("alert", throttled.One("[data-testid=login-error]")!.GetAttribute("role"));
+        Assert.Equal("alert", throttled.One("[data-testid=login-error]")!.ParentElement!.GetAttribute("role")); // the message sits in the live region that exists before any message
         Assert.Single(web.Identity.Backend.Requests, r => r.PathAndQuery.Contains("/auth/login") && r.Body!.Contains(FakeIdentity.Password)); // a login is never retried
     }
 

@@ -5,11 +5,16 @@
 
 <PageTitle>@Pl.Logout.MetaTitle</PageTitle>
 <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
-<h1>@Pl.Logout.Title</h1>
-<p>@Pl.Logout.Body</p>
-<EditForm Model="Form!" FormName="logout" OnSubmit="SubmitAsync" class="stack form-narrow">
-    <div><button class="btn btn--primary" type="submit">@Pl.Logout.Submit</button></div>
-</EditForm>
+
+<div class="container--form auth-page">
+    <div class="card">
+        <h1>@Pl.Logout.Title</h1>
+        <p>@Pl.Logout.Body</p>
+        <EditForm Model="Form!" FormName="logout" OnSubmit="SubmitAsync" class="form">
+            <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.Logout.Submit</button></div>
+        </EditForm>
+    </div>
+</div>
 
 @code {
     [CascadingParameter] HttpContext HttpContext { get; set; } = default!;

@@ -228,7 +228,7 @@ public class SignInTests
         web.Booking.Respond = FakeBackend.Throw(new HttpRequestException("down"));
         var page = await browser.GetAsync("/moje/rezerwacje");
         Assert.Equal(HttpStatusCode.OK, page.Status);
-        Assert.Equal("Brak połączenia z usługą rezerwacji. Spróbuj ponownie za chwilę.", page.TextOf("[data-testid=unavailable]"));
+        Assert.Equal("Brak połączenia z usługą rezerwacji. Spróbuj ponownie za chwilę.", page.TextOf("[data-testid=unavailable] p"));
         Assert.Equal("alert", page.One("[data-testid=unavailable]")!.GetAttribute("role"));
         Assert.Equal("Moje rezerwacje", page.TextOf("h1"));
         Assert.NotNull(page.One("a[href='/wyloguj']"));

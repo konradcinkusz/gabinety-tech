@@ -314,7 +314,8 @@ public class MyBookingsTests : BunitContext
         var cut = Open("practitioner", "Confirmed");
         var alert = cut.Find("[data-testid=unavailable]");
         Assert.Equal("alert", alert.GetAttribute("role"));
-        Assert.Equal(text + "Spróbuj ponownie", alert.TextContent);
+        Assert.Equal(text, alert.QuerySelector("p")!.TextContent);
+        Assert.Equal("Spróbuj ponownie", alert.QuerySelector("a")!.TextContent);
         Assert.Equal("/moje/rezerwacje?role=practitioner&status=Confirmed", alert.QuerySelector("a")!.GetAttribute("href"));
         Assert.DoesNotContain("SERVER-TITLE-MUST-NOT-APPEAR", cut.Markup);
         Assert.Equal("Moje rezerwacje", cut.Find("h1").TextContent);

@@ -79,3 +79,37 @@ for a suspension, reason `practitioner_suspended`, notification `Cancelled` to t
 **Decision.** `Network__ClientIpHeader=Fly-Client-IP` on authservice (fly toml, AppHost). Fly's edge sets that header for public traffic; the web sends the visitor's validated address in it on its server-to-authservice calls only. `X-Forwarded-For` was not used: it is multi-valued and client-appendable, and the header option needs no proxy lists. The Blazor gateway must forward the address the same way.
 
 **Consequences.** Visitors have separate buckets (tested against the real image). To verify on the first deploy: Fly's edge overwrites a client-sent `Fly-Client-IP`. Not changed: a `429` on refresh still ends the session in the web. Proof and details: `docs/operations/AUTH.md` section 9, finding 4.
+
+## 6. Booking flow and client area in the Blazor host (branch `port/booking`, 2026-11-22)
+
+**Scope.** `/rezerwacja/{offeringId}`, `/checkout/mock/{bookingId}`, `/rezerwacja/potwierdzenie/{bookingId}`, `/bookings/{bookingId}` (new, see c), `/moje/rezerwacje`, `/moje/rezerwacje/{id}`, `/moje/opinie`, `/moje/opinie/{bookingId}`.
+Decisions taken by the implementer, all revisable:
+
+a. **Plain form posts with antiforgery, no circuit, except one clock.** Every action of these pages (ask the assistant, apply its proposal, pay, simulate a payment, cancel, dispute, report a no-show, review, reply) is a
+   form post handled by the page; the role of `/moje/rezerwacje` is a tab (a link), the status filter a GET form, "more" a link with the cursor; a cancel or dispute opens by a GET form's button (`?action=`) and a result is a
+   redirect carrying a fixed key (`?done=`, `?sent=`, `?replied=`), so a reload never repeats a write and nothing from a query string is rendered. Reason: DESIGN-CONTRACT 9.7 (an input typed before a circuit connects is lost)
+   and ADR-0010 (a circuit only where needed). The one interactive piece is `HoldTimer` (`@rendermode` on that component in `MockCheckout.razor`): the checkout's countdown. `MyBookings` is no longer interactive: the foundation's
+   tests that pinned it are rewritten. **Cost:** the character counters count what the server received (after a post), not live; the assistant needs a post and a page load, not a fetch.
+b. **The create answer's field is `checkoutUrl`** (CONTRACTS 4.2, `CreateBookingResponse`), not `paymentUrl`. The page follows it generically (`CheckoutTarget`): a path of this site (the mock checkout) or an absolute `https`
+   URL (Stripe Checkout); `//host`, `http` on another host, `javascript:`, user-info and control characters are refused. `practitioner_payments_not_ready` (422) has its own Polish message.
+c. **Stripe's return page.** The Booking service gives Stripe Checkout `{Site__BaseUrl}/bookings/{id}` (`CheckoutRequest.SuccessUrl`, `docs/operations/PAYMENTS-GO-LIVE.md` step 4). That route exists in neither frontend, so the
+   Blazor host answers it with a redirect to the confirmation, which says "Czekamy na potwierdzenie płatności." and reloads itself every 5 s (meta refresh) while the hold lasts. **Suggested follow-up (service side):**
+   point `SuccessUrl` at `/rezerwacja/potwierdzenie/{id}` and drop the extra route.
+d. **The mock checkout gate is copied, not asked.** No backend endpoint says "the mock provider is on". `WebOptions.MockPayments` applies the rule the Booking service uses for its `simulate` route (`GABINETY_FAKE=1` or
+   `Environment:Kind=Development`) and the provider rule of the Next.js app (`Payments:Provider` unset or `Mock`): anywhere else the page is a 404 before any backend is asked, and the service refuses the simulation anyway (403).
+   If the service ever exposes its provider (for example on `GET /api/v1/payments/provider`), switch to it. The web app has no `Payments__Provider` in `deploy/fly/web.fly.toml`, on purpose (F-01): not changed.
+e. **`cancelOutcome` (F-11).** The Booking service does not send it yet; the page never computes the outcome (the 24 h rule is the service's, on its clock). `BookingDetailDto.CancelOutcome` is the raw JSON and
+   `CancelOutcome.From` reads, tolerantly, `{ "refundMinor": n }`, `{ "refund": { "amountMinor": n } }`, `{ "refundAmount": ... }` or the words `FullRefund` / `NoRefund`; anything else (and absence) shows the general rule.
+   When present, the dialog says the outcome ("Otrzymasz zwrot 180,00 zł.") **and keeps the general rule below it**, so journey J5 (which reads "co najmniej 24 godziny, zwrot wynosi 100% ceny" and "mniej niż 24 godziny, brak zwrotu"
+   in the dialog) passes before and after the field lands. **Reconcile the shape** with `auto/audit-backend` when it merges; `CancelOutcomeTests` / `BookingFlowModelTests` are the places.
+f. **Party names (F-03).** The pages read `practitioner.displayName` and `client.displayName` of the booking and leave the row out when it is empty: no "Programista: Programista", no leading separator
+   (`BookingFormat.MetaLine`). Nothing to change when the backend starts filling them.
+g. **Per-request budgets (SPEC 5.1).** All clients share one resilience configuration (the kernel registers one handler with one options name), so a per-client timeout is not possible. The options now carry a
+   `TimeoutGenerator` that reads `RequestContext.Timeout` from the request: the booking write asks for 12 s (the payment provider call is 10 s) and the assistant brief for 35 s; everything else keeps 5 s, and a write is never retried.
+   `ClientAreaClientTests.Through_the_real_pipeline_*` proves it against the real handler chain (5.5 s answer: the write with a budget succeeds, the one without is cut).
+h. **Authenticated pages answer 200 with a `role="alert"` block** when a backend is down (as the foundation's `MyBookings` did), not 503: they are `noindex`, and a status adds nothing for a signed-in user.
+i. **The cancel confirmation is a `<dialog open role="alertdialog">` in the markup, not a modal.** A modal needs `showModal()` (script). It has the title as its accessible name, the safe button ("Nie anuluj") beside the
+   danger one, and `autofocus` on its title; it has **no focus trap and no Esc** (DESIGN-CONTRACT 5.11 and 7.10 are not met until a script is allowed). Same for the no-show dialog.
+j. **Status filter** lists the ten states and "Wszystkie", not only those the user has (the list is paged, so the page cannot know them): P-BKS-1 stays open on that point.
+k. **`app.css`** gets one additive block of the shared classes these pages use (`.form`, `.field__*`, `.btn--secondary|ghost|danger|ghost-danger`, `.badge--info|warning|danger|neutral`, `.dl`, `.tabs`, `.dialog`, `.sr-only`),
+   written with the foundation's token names. The contract's full sheet replaces the block when it lands.

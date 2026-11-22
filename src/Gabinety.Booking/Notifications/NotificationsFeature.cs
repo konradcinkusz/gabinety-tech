@@ -32,9 +32,18 @@ public sealed class NotificationsFeature : IServiceFeature
                 builder.Services.AddSingleton(new EmailProviderState(false, "SMTP not configured, using the log sender: " + problem));
                 builder.Services.AddHostedService(sp => new EmailDegradedBanner(sp.GetRequiredService<EmailProviderState>(), sp.GetRequiredService<ILogger<EmailDegradedBanner>>()));
             }
-            builder.Services.AddHealthChecks().AddCheck<EmailHealthCheck>("email");
         }
-        else builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
+        else
+        {
+            builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
+            // Outside the fake profile the log sender is never silent: it marks notifications as sent without delivering them, so say so (one warning, a Degraded "email" check).
+            if (!NonDeployedProfile(builder.Configuration))
+            {
+                builder.Services.AddSingleton(new EmailProviderState(false, "Notifications:Provider is Log: e-mail is NOT delivered, it is only logged (set Notifications:Provider=Smtp with Notifications:Smtp:Host and Notifications:Smtp:FromAddress)"));
+                builder.Services.AddHostedService(sp => new EmailDegradedBanner(sp.GetRequiredService<EmailProviderState>(), sp.GetRequiredService<ILogger<EmailDegradedBanner>>()));
+            }
+        }
+        if (smtp || !NonDeployedProfile(builder.Configuration)) builder.Services.AddHealthChecks().AddCheck<EmailHealthCheck>("email");
 
         // The practitioner's address is a Directory fact, so the real resolver needs Backend:Directory (the fake profile sets it too, and delivers to the log sender).
         if (!string.IsNullOrWhiteSpace(builder.Configuration["Backend:Directory"])) builder.Services.TryAddSingleton<IContactResolver, ContactResolver>();
@@ -45,6 +54,10 @@ public sealed class NotificationsFeature : IServiceFeature
     }
 
     public void Map(IEndpointRouteBuilder endpoints) { }
+
+    /// <summary>The fake or developer profile (CONTRACTS 10.4): the only place where the log sender is the expected one.</summary>
+    static bool NonDeployedProfile(IConfiguration config) =>
+        config["GABINETY_FAKE"] == "1" || string.Equals(config["Environment:Kind"], "Development", StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>The startup banner line of SPEC 5 rule 7 for the e-mail dependency: one warning naming the keys at fault.</summary>

@@ -20,6 +20,21 @@ environment means no one is being e-mailed. Fix the configuration and restart.
 The sender logs the user id, the kind and the outcome class only, never an address, subject, body, host or credential. A refused or timed-out message is
 retried by the notification job (up to 5 attempts over 24 h).
 
+## Deploy (staging)
+
+Set these GitHub environment secrets (`staging`, names only here; `DEPLOY.md` section 2), then push a tag that touches Booking or re-run its job:
+
+| GitHub secret | Fly secret on Booking | Notes |
+|---|---|---|
+| `NOTIFICATIONS_SMTP_HOST` | `Notifications__Smtp__Host` | with FROM it switches the provider on |
+| `NOTIFICATIONS_SMTP_FROM` | `Notifications__Smtp__FromAddress` | a bare `local@domain` on a domain the SMTP vendor lets you send from |
+| `NOTIFICATIONS_SMTP_PORT`, `NOTIFICATIONS_SMTP_TLS_MODE` | `...Port`, `...TlsMode` | optional, 587 and `StartTls` by default |
+| `NOTIFICATIONS_SMTP_USER`, `NOTIFICATIONS_SMTP_PASSWORD` | `...User`, `...Password` | both or neither |
+
+`Notifications__Provider` is **not** in `booking.fly.toml`: the deploy stages `Smtp` only when HOST and FROM are both set; otherwise it is unset and the code default `Log` applies. Outside the fake profile
+a `Log` provider is never silent: Booking writes one startup warning (`Dependency email is Degraded: Notifications:Provider is Log: e-mail is NOT delivered, it is only logged ...`) and `/health/details`
+shows `email: Degraded`. `Degraded` on staging therefore means "no one is being e-mailed", whichever way it arose. Healthy means the SMTP sender is in use (not that the vendor accepted a message: send one test booking).
+
 ## Where the address comes from (T-04.09c)
 
 authservice has no "address by user id" endpoint, so no address is ever asked from it. Both addresses are facts a service already holds:

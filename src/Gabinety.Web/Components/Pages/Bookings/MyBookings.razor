@@ -72,7 +72,6 @@ else if (_page is not null)
     [SupplyParameterFromQuery(Name = "role")] public string? RoleParam { get; set; }
     [SupplyParameterFromQuery(Name = "status")] public string? StatusParam { get; set; }
     [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
-    [CascadingParameter] HttpContext? Http { get; set; }
 
     string _role = BookingClient.ClientRole, _status = "";
     string? _cursor;
@@ -87,7 +86,6 @@ else if (_page is not null)
         if (result.IsOk) { _page = result.Value; return; }
         if (result.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe("/" + Navigation.ToBaseRelativePath(Navigation.Uri)))); return; }
         _failure = result.Failure;
-        if (Http is { Response.HasStarted: false }) Http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
     }
 
     static string Href(string role, string status, string? cursor) =>

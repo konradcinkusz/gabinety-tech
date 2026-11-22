@@ -43,7 +43,6 @@ else if (_booking is { } b)
 
 @code {
     [Parameter] public Guid BookingId { get; set; }
-    [CascadingParameter] HttpContext? Http { get; set; }
 
     BookingDetailDto? _booking;
     ApiFailure? _failure;
@@ -60,7 +59,6 @@ else if (_booking is { } b)
             if (result.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe(CurrentPath))); return; }
             if (result.Failure.Status is 404 or 403) { Navigation.NotFound(); return; }
             _failure = result.Failure;
-            if (Http is { Response.HasStarted: false }) Http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
             return;
         }
         _booking = result.Value;

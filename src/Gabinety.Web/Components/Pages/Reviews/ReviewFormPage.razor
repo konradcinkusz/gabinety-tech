@@ -46,7 +46,7 @@ else
                 }
             </div>
             @if (Model!.Rating is >= ReviewRules.RatingMin and <= ReviewRules.RatingMax) {<p class="field__hint">@string.Format(ReviewsText.Form.RatingPreview, ReviewRules.Word(Model.Rating.Value))</p>}
-            @if (_ratingError is not null) {<p class="field__error" id="rating-error"><span class="sr-only">@Pl.A11y.ErrorPrefix </span>@_ratingError</p>}
+            @if (_ratingError is not null) {<p class="field__error" id="rating-error"><span class="sr-only">@(Pl.A11y.ErrorPrefix + " ")</span>@_ratingError</p>}
         </fieldset>
         <CounterTextArea Id="text" Name="Model.Text" Label="@ReviewsText.Form.TextLabel" Hint="@ReviewsText.Form.TextHint" Value="@Model!.Text" Rows="6" CounterFormat="@ReviewsText.Form.Counter"
                          Error="@_textError" Autofocus="@(_problems.Count == 1 && _ratingError is null)" />

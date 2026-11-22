@@ -137,7 +137,6 @@ else if (_booking is { } b)
     [SupplyParameterFromQuery(Name = "role")] public string? RoleParam { get; set; }
     [SupplyParameterFromQuery(Name = "action")] public string? ActionParam { get; set; }
     [SupplyParameterFromQuery(Name = "done")] public string? DoneParam { get; set; }
-    [CascadingParameter] HttpContext? Http { get; set; }
     [SupplyParameterFromForm(FormName = "cancel")] CancelForm? CancelModel { get; set; }
     [SupplyParameterFromForm(FormName = "dispute")] DisputeForm? DisputeModel { get; set; }
     [SupplyParameterFromForm(FormName = "noshow")] NoShowForm? NoShowModel { get; set; }
@@ -180,7 +179,6 @@ else if (_booking is { } b)
         if (result.Failure!.IsUnauthenticated) { SignIn(); return; }
         if (result.Failure.Status is 404 or 403) { Navigation.NotFound(); return; } // not this user's booking: the answer of an unknown id
         _failure = result.Failure;
-        if (Http is { Response.HasStarted: false }) Http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
     }
 
     void SignIn() => Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe(DetailHref())));

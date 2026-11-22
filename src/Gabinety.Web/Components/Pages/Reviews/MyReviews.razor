@@ -77,7 +77,6 @@ else if (_page is not null)
     [SupplyParameterFromQuery(Name = "reply")] public string? ReplyParam { get; set; }
     [SupplyParameterFromQuery(Name = "replied")] public string? RepliedParam { get; set; }
     [SupplyParameterFromForm(FormName = "reply")] ReplyFormModel? Model { get; set; }
-    [CascadingParameter] HttpContext? Http { get; set; }
 
     public sealed class ReplyFormModel { public string? ReviewId { get; set; } public string? Text { get; set; } }
 
@@ -127,7 +126,6 @@ else if (_page is not null)
     void Fail(ApiFailure failure)
     {
         _failure = failure;
-        if (Http is { Response.HasStarted: false }) Http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
     }
 
     async Task ReplyAsync()

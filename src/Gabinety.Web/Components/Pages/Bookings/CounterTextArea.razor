@@ -4,7 +4,7 @@
     @if (Hint is not null) {<p class="field__hint" id="@(Id)-hint">@Hint</p>}
     <textarea id="@Id" name="@Name" rows="@Rows" class="field__control" aria-invalid="@(Error is not null ? "true" : null)" aria-describedby="@Described" autofocus="@Autofocus">@Value</textarea>
     @if (CounterText is not null) {<p class="field__counter num">@CounterText</p>}
-    @if (Error is not null) {<p class="field__error" id="@(Id)-error"><span class="sr-only">@Pl.A11y.ErrorPrefix </span>@Error</p>}
+    @if (Error is not null) {<p class="field__error" id="@(Id)-error"><span class="sr-only">@(Pl.A11y.ErrorPrefix + " ")</span>@Error</p>}
 </div>
 
 @code {

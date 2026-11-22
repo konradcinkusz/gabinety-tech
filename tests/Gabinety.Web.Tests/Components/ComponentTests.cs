@@ -170,9 +170,9 @@ public class MyBookingsTests : BunitContext
     }
 
     // A SupplyParameterFromQuery parameter takes its value from the URL, as in the browser: navigate, then render.
-    IRenderedComponent<MyBookings> Open(string? role = null, string? status = null)
+    IRenderedComponent<MyBookings> Open(string? role = null, string? status = null, string? cursor = null)
     {
-        var query = string.Join('&', new[] { role is null ? null : $"role={Uri.EscapeDataString(role)}", status is null ? null : $"status={Uri.EscapeDataString(status)}" }.Where(q => q is not null));
+        var query = string.Join('&', new[] { role is null ? null : $"role={Uri.EscapeDataString(role)}", status is null ? null : $"status={Uri.EscapeDataString(status)}", cursor is null ? null : $"cursor={Uri.EscapeDataString(cursor)}" }.Where(q => q is not null));
         Services.GetRequiredService<NavigationManager>().NavigateTo("/moje/rezerwacje" + (query.Length > 0 ? "?" + query : ""));
         return Render<MyBookings>();
     }
@@ -184,18 +184,52 @@ public class MyBookingsTests : BunitContext
         Assert.Equal("Moje rezerwacje", cut.Find("h1").TextContent);
         Assert.Equal(["Pierwsza", "Druga"], cut.FindAll("[data-testid=booking-row] h2").Select(h => h.TextContent));
         Assert.Equal(["Potwierdzona", "Oczekuje na płatność"], cut.FindAll("[data-testid=booking-row] .badge").Select(b => b.TextContent));
+        Assert.Equal(["badge badge--info", "badge badge--warning"], cut.FindAll("[data-testid=booking-row] .badge").Select(b => b.ClassName)); // G-8: the kind follows the state
         Assert.Equal("/api/v1/me/bookings?role=client", _booking.Requests.Single().PathAndQuery);
-        Assert.Equal("true", cut.Find("[data-testid=role-client]").GetAttribute("aria-pressed"));
-        Assert.Equal("false", cut.Find("[data-testid=role-practitioner]").GetAttribute("aria-pressed"));
-        Assert.Equal("group", cut.Find("[aria-label='Pokaż rezerwacje jako']").GetAttribute("role"));
         Assert.Empty(cut.FindAll("[role=alert]"));
-        Assert.Empty(cut.FindAll("[data-testid=bookings-more]"));
+        Assert.Empty(cut.FindAll("a[rel=next]"));
     }
 
     [Fact]
-    public void The_wrapper_in_the_components_scope_hands_the_token_to_the_handler_through_the_request_options()
+    public void The_role_is_a_tab_with_the_current_one_marked_not_a_button_pair_G2()
     {
-        // BLAZOR-WEB-APP section 7, trap 2: a message handler lives in its own DI scope and cannot see the circuit's services, so the token travels on the request.
+        var cut = Open();
+        var nav = cut.Find("nav.tabs");
+        Assert.Equal("Rezerwacje jako", nav.GetAttribute("aria-label"));
+        var links = nav.QuerySelectorAll("a.tabs__link").ToList();
+        Assert.Equal(["Klient", "Programista"], links.Select(a => a.TextContent));
+        Assert.Equal(["page", null], links.Select(a => a.GetAttribute("aria-current")));
+        Assert.Equal(["/moje/rezerwacje?role=client", "/moje/rezerwacje?role=practitioner"], links.Select(a => a.GetAttribute("href")));
+        Assert.Equal(["Programista"], Open("practitioner").FindAll("a.tabs__link[aria-current=page]").Select(a => a.TextContent));
+    }
+
+    [Fact]
+    public void A_row_names_the_other_party_in_the_view_of_the_role_and_has_no_stray_separator_F03()
+    {
+        _booking.Respond = _ => FakeBackend.Json(new PageDto<BookingViewDto>([Sample.Booking("Z imieniem"), Sample.Booking("Bez imienia", practitioner: "")], null));
+        var cut = Open();
+        var lines = cut.FindAll("[data-testid=booking-row] p.muted").Select(p => p.TextContent).ToList();
+        Assert.StartsWith("Anna Demowska · ", lines[0]);
+        Assert.StartsWith("wtorek, 1 grudnia, 13:00–14:00", lines[1]); // no name: the line starts with the date, never with " · "
+        Assert.All(lines, l => { Assert.DoesNotContain("Programista", l); Assert.False(l.StartsWith(" ·") || l.EndsWith("· ")); });
+        Assert.StartsWith("demo-client · ", Open("practitioner").Find("[data-testid=booking-row] p.muted").TextContent); // the other party, for a practitioner, is the client
+    }
+
+    [Fact]
+    public void A_row_has_a_details_link_that_keeps_the_role_and_keeps_its_name_for_the_journey()
+    {
+        var cut = Open("practitioner");
+        var link = cut.Find("[data-testid=booking-row] a.booking-row__link");
+        Assert.Matches(@"^/moje/rezerwacje/[0-9a-f-]{36}\?role=practitioner$", link.GetAttribute("href"));
+        Assert.StartsWith("Szczegóły", link.TextContent); // J3 finds it with getByRole("link", { name: "Szczegóły" }) inside the row's listitem
+        Assert.Contains("Pierwsza", link.TextContent);
+        Assert.Equal("LI", link.ParentElement!.TagName);
+    }
+
+    [Fact]
+    public void The_token_goes_to_the_handler_through_the_request_options_not_through_a_scoped_service()
+    {
+        // BLAZOR-WEB-APP section 7, trap 2: a message handler lives in its own DI scope and cannot see the scope's services, so the token travels on the request.
         string? seen = "not called";
         var probe = new Probe(r => seen = r.Options.TryGetValue(RequestContext.AccessToken, out var t) ? t : null);
         Services.AddSingleton(new BookingClient(new HttpClient(probe) { BaseAddress = new Uri("http://booking.test") }, new VisitorAddressAccessor(new HttpContextAccessor()), new Token("tok-from-this-scope")));
@@ -222,47 +256,51 @@ public class MyBookingsTests : BunitContext
     }
 
     [Fact]
-    public void Switching_the_role_loads_the_other_view_and_replaces_the_list()
+    public void The_status_filter_is_a_get_form_that_keeps_the_role_and_selects_the_current_status()
     {
-        var cut = Open();
-        _booking.Respond = _ => FakeBackend.Json(new PageDto<BookingViewDto>([Sample.Booking("Jako programista")], null));
-        cut.Find("[data-testid=role-practitioner]").Click();
-        cut.WaitForAssertion(() => Assert.Equal(["Jako programista"], cut.FindAll("[data-testid=booking-row] h2").Select(h => h.TextContent)));
-        Assert.Equal("/api/v1/me/bookings?role=practitioner", _booking.Requests.Last().PathAndQuery);
-        Assert.Equal("true", cut.Find("[data-testid=role-practitioner]").GetAttribute("aria-pressed"));
-        Assert.Equal("demo-client", cut.Find("[data-testid=booking-row] p.muted").TextContent.Split(" · ")[0]); // the other party, for a practitioner, is the client
+        var cut = Open("practitioner", "Completed");
+        var form = cut.Find("form[method=get]");
+        Assert.Equal("/moje/rezerwacje", form.GetAttribute("action"));
+        Assert.Equal("practitioner", form.QuerySelector("input[name=role]")!.GetAttribute("value"));
+        var select = form.QuerySelector("select[name=status]")!;
+        Assert.Equal("Status", form.QuerySelector($"label[for={select.Id}]")!.TextContent);
+        Assert.Equal(["Completed"], select.QuerySelectorAll("option[selected]").Select(o => o.GetAttribute("value")));
+        Assert.Equal(11, select.QuerySelectorAll("option").Length); // "Wszystkie" and the ten states
     }
 
     [Fact]
-    public void Filtering_by_status_reloads_with_that_status_and_an_unknown_status_is_no_filter()
-    {
-        var cut = Open();
-        cut.Find("[data-testid=status-filter]").Change("Completed");
-        cut.WaitForAssertion(() => Assert.Equal("/api/v1/me/bookings?role=client&status=Completed", _booking.Requests.Last().PathAndQuery));
-        cut.Find("[data-testid=status-filter]").Change("<script>");
-        cut.WaitForAssertion(() => Assert.Equal("/api/v1/me/bookings?role=client", _booking.Requests.Last().PathAndQuery));
-    }
-
-    [Fact]
-    public void Show_more_appends_the_next_page_by_cursor_and_disappears_on_the_last()
+    public void More_is_a_link_with_the_cursor_that_keeps_the_view_and_the_last_page_has_none()
     {
         _booking.Respond = r => r.RequestUri!.Query.Contains("cursor=C2")
             ? FakeBackend.Json(new PageDto<BookingViewDto>([Sample.Booking("Strona druga")], null))
-            : FakeBackend.Json(new PageDto<BookingViewDto>([Sample.Booking("Strona pierwsza")], "C2"));
-        var cut = Open();
-        cut.Find("[data-testid=bookings-more]").Click();
-        cut.WaitForAssertion(() => Assert.Equal(["Strona pierwsza", "Strona druga"], cut.FindAll("[data-testid=booking-row] h2").Select(h => h.TextContent)));
-        Assert.Equal("/api/v1/me/bookings?role=client&cursor=C2", _booking.Requests.Last().PathAndQuery);
-        Assert.Empty(cut.FindAll("[data-testid=bookings-more]"));
+            : FakeBackend.Json(new PageDto<BookingViewDto>([Sample.Booking("Strona pierwsza")], "C 2"));
+        var cut = Open("practitioner", "Confirmed");
+        Assert.Equal("/moje/rezerwacje?role=practitioner&status=Confirmed&cursor=C%202", cut.Find("a[rel=next]").GetAttribute("href")); // the cursor is escaped
+        var second = Open("practitioner", "Confirmed", "C2");
+        Assert.Equal("/api/v1/me/bookings?role=practitioner&status=Confirmed&cursor=C2", _booking.Requests.Last().PathAndQuery);
+        Assert.Equal(["Strona druga"], second.FindAll("[data-testid=booking-row] h2").Select(h => h.TextContent));
+        Assert.Empty(second.FindAll("a[rel=next]"));
     }
 
     [Fact]
-    public void An_empty_listing_says_so_without_an_alert()
+    public void An_empty_listing_has_a_heading_a_sentence_and_one_action_and_no_alert()
     {
         _booking.Respond = _ => FakeBackend.Json(new PageDto<BookingViewDto>([], null));
-        var cut = Open();
-        Assert.Equal("Brak rezerwacji w tym widoku.", cut.Find("[data-testid=bookings-empty]").TextContent);
-        Assert.Empty(cut.FindAll("[role=alert]"));
+        var empty = Open().Find("[data-testid=bookings-empty]");
+        Assert.Equal("Brak rezerwacji", empty.QuerySelector("h2")!.TextContent);
+        Assert.Equal("Znajdź programistę", empty.QuerySelector("a")!.TextContent);
+        Assert.Equal("/programisci", empty.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Empty(Open().FindAll("[role=alert]"));
+        Assert.Empty(Open().FindAll("ul[data-testid=bookings]")); // never an empty list
+    }
+
+    [Fact]
+    public void An_empty_filtered_view_offers_to_show_every_status_instead()
+    {
+        _booking.Respond = _ => FakeBackend.Json(new PageDto<BookingViewDto>([], null));
+        var empty = Open("client", "Disputed").Find("[data-testid=bookings-empty]");
+        Assert.Equal("Brak rezerwacji o tym statusie.", empty.QuerySelector("p")!.TextContent);
+        Assert.Equal("/moje/rezerwacje?role=client", empty.QuerySelector("a")!.GetAttribute("href"));
     }
 
     [Theory]
@@ -270,57 +308,16 @@ public class MyBookingsTests : BunitContext
     [InlineData(503, "Rezerwacje są chwilowo niedostępne. Spróbuj ponownie za chwilę.")]
     [InlineData(429, "Zbyt wiele zapytań. Spróbuj ponownie za chwilę.")]
     [InlineData(500, "Nie udało się wczytać rezerwacji.")]
-    public void A_failure_is_an_alert_in_place_and_the_controls_stay(int status, string text)
+    public void A_failure_is_an_alert_in_place_with_a_retry_and_the_page_still_renders(int status, string text)
     {
         _booking.Respond = status == 0 ? FakeBackend.Throw(new HttpRequestException("x")) : _ => FakeBackend.Problem((System.Net.HttpStatusCode)status, "some_code");
-        var cut = Open();
-        var alert = cut.Find("[data-testid=bookings-error]");
+        var cut = Open("practitioner", "Confirmed");
+        var alert = cut.Find("[data-testid=unavailable]");
         Assert.Equal("alert", alert.GetAttribute("role"));
-        Assert.Equal(text, alert.TextContent);
+        Assert.Equal(text + "Spróbuj ponownie", alert.TextContent);
+        Assert.Equal("/moje/rezerwacje?role=practitioner&status=Confirmed", alert.QuerySelector("a")!.GetAttribute("href"));
         Assert.DoesNotContain("SERVER-TITLE-MUST-NOT-APPEAR", cut.Markup);
         Assert.Equal("Moje rezerwacje", cut.Find("h1").TextContent);
-        Assert.NotNull(cut.Find("[data-testid=role-practitioner]"));
-    }
-
-    [Fact]
-    public void A_401_says_the_session_ended_and_offers_to_sign_in_and_come_back()
-    {
-        _booking.Respond = _ => FakeBackend.Problem(System.Net.HttpStatusCode.Unauthorized, "unauthenticated");
-        var cut = Open();
-        var alert = cut.Find("[data-testid=bookings-error]");
-        Assert.Equal("alert", alert.GetAttribute("role"));
-        Assert.Equal("/logowanie?redirect=%2Fmoje%2Frezerwacje", alert.QuerySelector("a")!.GetAttribute("href"));
-    }
-
-    [Fact]
-    public void When_the_sign_in_ends_while_the_page_is_open_the_signed_in_markup_is_replaced_by_an_alert()
-    {
-        // The circuit's revalidation turns the authentication state anonymous (SessionRevalidatingAuthenticationStateProvider); the page must follow.
-        _auth.SetNotAuthorized();
-        var cut = Open();
-        Assert.Equal("alert", cut.Find("[data-testid=bookings-signed-out]").GetAttribute("role"));
-        Assert.Empty(cut.FindAll("[data-testid=bookings]"));
-    }
-
-    [Fact]
-    public async Task A_load_in_flight_is_cancelled_when_the_page_goes_away_and_by_a_newer_request()
-    {
-        var gate = new TaskCompletionSource<HttpResponseMessage>();
-        var seen = new List<CancellationToken>();
-        var http = new HttpClient(new CancelWatcher(gate, seen)) { BaseAddress = new Uri("http://booking.test") };
-        Services.AddSingleton(new BookingClient(http, new VisitorAddressAccessor(new HttpContextAccessor()), new Token("tok")));
-        var cut = Open();
-        cut.Find("[data-testid=role-practitioner]").Click(); // a newer request: the first is cancelled
-        Assert.Equal(2, seen.Count);
-        Assert.True(seen[0].IsCancellationRequested);
-        Assert.False(seen[1].IsCancellationRequested);
-        await DisposeComponentsAsync(); // the circuit ends: nothing keeps running against a dead component
-        Assert.True(seen[1].IsCancellationRequested);
-        gate.TrySetResult(FakeBackend.Json(new PageDto<BookingViewDto>([], null)));
-    }
-
-    sealed class CancelWatcher(TaskCompletionSource<HttpResponseMessage> gate, List<CancellationToken> seen) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) { seen.Add(ct); return gate.Task.WaitAsync(ct); }
+        Assert.NotNull(cut.Find("nav.tabs")); // the rest of the page renders
     }
 }

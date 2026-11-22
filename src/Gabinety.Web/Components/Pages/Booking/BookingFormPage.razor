@@ -78,7 +78,6 @@ else if (_offering is not null)
 }
 
 @code {
-    [CascadingParameter] HttpContext? Http { get; set; }
     [Parameter] public Guid OfferingId { get; set; }
     /// <summary>The slot: a UTC instant (<c>?start=</c>).</summary>
     [SupplyParameterFromQuery(Name = "start")] public string? StartParam { get; set; }
@@ -106,7 +105,6 @@ else if (_offering is not null)
         if (!profile.IsOk)
         {
             _unavailable = true;
-            if (Http is { Response.HasStarted: false }) Http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
             return;
         }
         _offering = profile.Value!.Offerings.FirstOrDefault(o => o.Id == OfferingId);

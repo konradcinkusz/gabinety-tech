@@ -47,7 +47,16 @@ public sealed record PractitionerProfileDto(PractitionerCardDto Card, IReadOnlyL
 
 public sealed record BriefDto(string Text, string? ProblemSlug, bool AiAssisted);
 
-public sealed record CreateBookingRequestDto(Guid OfferingId, DateTimeOffset StartUtc, BriefDto Brief);
+public sealed record CreateBookingRequestDto(Guid OfferingId, [property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantWriter))] DateTimeOffset StartUtc, BriefDto Brief);
+
+/// <summary>The service insists on a UTC instant written with <c>Z</c> (CONTRACTS 0): <c>2026-12-08T11:00:00Z</c>, never <c>+00:00</c> or a local offset.</summary>
+public sealed class UtcInstantWriter : System.Text.Json.Serialization.JsonConverter<DateTimeOffset>
+{
+    public override DateTimeOffset Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options) => reader.GetDateTimeOffset();
+
+    public override void Write(System.Text.Json.Utf8JsonWriter writer, DateTimeOffset value, System.Text.Json.JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'", System.Globalization.CultureInfo.InvariantCulture));
+}
 
 /// <summary><c>CheckoutUrl</c> is where the browser goes next: the mock checkout of this site, or the payment provider's page (Stripe Checkout) which returns to the site afterwards.</summary>
 public sealed record CreateBookingResponseDto(Guid BookingId, string Status, DateTimeOffset HoldExpiresAt, string CheckoutUrl);

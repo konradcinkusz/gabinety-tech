@@ -52,7 +52,6 @@ else if (_booking is { } b)
 
 @code {
     [Parameter] public Guid BookingId { get; set; }
-    [CascadingParameter] HttpContext? Http { get; set; }
     [SupplyParameterFromForm(FormName = "checkout")] CheckoutForm? Model { get; set; }
 
     BookingDetailDto? _booking;
@@ -74,7 +73,6 @@ else if (_booking is { } b)
         if (result.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe(CurrentPath))); return; }
         if (result.Failure.Status is 404 or 403) { Navigation.NotFound(); return; } // not this user's booking: the answer of an unknown id
         _loadFailure = result.Failure;
-        if (Http is { Response.HasStarted: false }) Http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
     }
 
     async Task SubmitAsync()

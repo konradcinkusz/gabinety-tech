@@ -1,6 +1,7 @@
 @page "/konto"
 @attribute [Authorize]
 @inject AccountClient Accounts
+@inject BookingClient Bookings
 @inject SignInService SignIn
 @inject NavigationManager Navigation
 @* Static server rendering: plain forms with antiforgery, no JavaScript needed. The page always renders its h1, the e-mail of the session and the sign-out link, whatever the identity service says (F-09). Deletion sits in a native details element: it opens without JavaScript, and it opens again when a post fails so the message is seen. *@
@@ -65,6 +66,35 @@
             <a class="btn btn--secondary" href="/konto/export" download>@Pl.Account.Export</a>
         </section>
 
+        <section class="card" aria-labelledby="account-notifications">
+            <h2 id="account-notifications">@Pl.Account.NotificationsTitle</h2>
+            <p>@Pl.Account.NotificationsAlways</p>
+            @if (_notificationsSaved) { <p class="callout callout--success" data-testid="notifications-saved">@Pl.Account.Saved</p> }
+            @if (_notificationsError is not null) { <Alert Variant="AlertVariant.Danger" TestId="notifications-error">@_notificationsError</Alert> }
+            @if (_showNotifications)
+            {
+                <EditForm Model="Notifications!" FormName="@NotificationPreferencesForm.FormName" OnSubmit="SaveNotificationsAsync" class="form stack">
+                    <fieldset class="option-group">
+                        <legend>@Pl.Account.NotificationsLegend</legend>
+                        <label class="option">
+                            <InputCheckbox id="notify-reminder-24h" @bind-Value="Notifications!.Reminder24h" />
+                            <span class="notification__text"><span>@Pl.Account.Reminder24h</span><span class="muted">@Pl.Account.Reminder24hHint</span></span>
+                        </label>
+                        <label class="option">
+                            <InputCheckbox id="notify-reminder-1h" @bind-Value="Notifications!.Reminder1h" />
+                            <span class="notification__text"><span>@Pl.Account.Reminder1h</span><span class="muted">@Pl.Account.Reminder1hHint</span></span>
+                        </label>
+                        <label class="option">
+                            <InputCheckbox id="notify-review-request" @bind-Value="Notifications!.ReviewRequest" />
+                            <span class="notification__text"><span>@Pl.Account.ReviewRequest</span><span class="muted">@Pl.Account.ReviewRequestHint</span></span>
+                        </label>
+                    </fieldset>
+                    <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.Account.NotificationsSave</button></div>
+                </EditForm>
+            }
+            else { <Alert Variant="AlertVariant.Danger" TestId="notifications-unavailable">@Pl.Account.NotificationsUnavailable</Alert> }
+        </section>
+
         @if (_account.HasPassword)
         {
             <section class="card" aria-labelledby="account-password">
@@ -126,6 +156,7 @@
     [SupplyParameterFromForm(FormName = "delete-account")] DeleteAccountForm? Delete { get; set; }
     [SupplyParameterFromForm(FormName = "accept-consents")] AcceptConsentsForm? Accept { get; set; }
     [SupplyParameterFromForm(FormName = "change-password")] ChangePasswordForm? Change { get; set; }
+    [SupplyParameterFromForm(FormName = NotificationPreferencesForm.FormName)] NotificationPreferencesForm? Notifications { get; set; }
 
     AccountDto? _account;
     string? _deleteMessage;
@@ -133,6 +164,9 @@
     FormProblems _changeProblems = new();
     string? _changeMessage;
     bool _changed;
+    bool _showNotifications;
+    bool _notificationsSaved;
+    string? _notificationsError;
 
     /// <summary>The e-mail of the session (the cookie's claim): shown even when the identity service cannot be asked.</summary>
     string? SessionEmail => HttpContext.User.FindFirst("email")?.Value;
@@ -142,9 +176,37 @@
         Delete ??= new();
         Accept ??= new();
         Change ??= new();
+        var posted = Notifications is not null; // a save of the notification section: the switches are the ones posted, not the stored ones
+        Notifications ??= new();
         var result = await Accounts.LoadAsync(ct: HttpContext.RequestAborted);
         if (result.IsOk) _account = result.Value;
         else if (result.Failure!.IsUnauthenticated) Navigation.NavigateTo(ReturnTarget.LoginUrl("/konto"), forceLoad: true);
+        await LoadNotificationsAsync(posted);
+    }
+
+    /// <summary>The switches of the notification section, from the Booking service, which fails soft: without them only the callout shows (unless a save was posted, which still gets its form).</summary>
+    async Task LoadNotificationsAsync(bool posted)
+    {
+        if (posted) { _showNotifications = true; return; }
+        var preferences = await Bookings.NotificationPreferencesAsync(HttpContext.RequestAborted);
+        if (!preferences.IsOk) return;
+        Notifications = NotificationPreferencesForm.From(preferences.Value!);
+        _showNotifications = true;
+    }
+
+    /// <summary>Saves the three switches in one call. The service's answer is shown, so the page shows what is stored; a refusal or an outage keeps the ticks the user made.</summary>
+    async Task SaveNotificationsAsync()
+    {
+        _notificationsSaved = false;
+        _notificationsError = null;
+        var saved = await Bookings.SetNotificationPreferencesAsync(Notifications!.ToItems(), HttpContext.RequestAborted);
+        if (saved.IsOk)
+        {
+            Notifications = NotificationPreferencesForm.From(saved.Value!);
+            _notificationsSaved = true;
+            return;
+        }
+        _notificationsError = Pl.Account.NotificationsSaveFailed;
     }
 
     async Task AcceptAsync()

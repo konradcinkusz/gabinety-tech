@@ -263,5 +263,14 @@ public static class Pl
         public const string CurrentRequired = "Podaj obecne hasło.", CurrentWrong = "Obecne hasło jest nieprawidłowe.", NewRejected = "Nowe hasło nie spełnia wymagań. Wybierz inne hasło.";
         public const string Changed = "Hasło zostało zmienione. Pozostałe sesje zostały zakończone.", ChangedSignedOutFlash = "Hasło zostało zmienione. Zaloguj się nowym hasłem.";
         public const string ChangeRateLimited = "Zbyt wiele prób. Spróbuj ponownie za minutę.", ChangeUnavailable = "Nie udało się teraz zmienić hasła. Spróbuj ponownie za chwilę.";
+        public const string NotificationsTitle = "Powiadomienia e-mail", Saved = "Zapisano.";
+        public const string NotificationsAlways = "Potwierdzenia rezerwacji, anulowania, spory i wypłaty wysyłamy zawsze. Nie da się ich wyłączyć.";
+        public const string NotificationsLegend = "Wysyłaj także te wiadomości";
+        public const string Reminder24h = "Przypomnienie 24 godziny przed", Reminder24hHint = "E-mail na dobę przed rozpoczęciem konsultacji.";
+        public const string Reminder1h = "Przypomnienie godzinę przed", Reminder1hHint = "E-mail godzinę przed rozpoczęciem konsultacji.";
+        public const string ReviewRequest = "Prośba o opinię po konsultacji", ReviewRequestHint = "E-mail po zakończonej konsultacji z prośbą o opinię o specjaliście.";
+        public const string NotificationsSave = "Zapisz ustawienia powiadomień";
+        public const string NotificationsUnavailable = "Ustawienia powiadomień są chwilowo niedostępne. Spróbuj ponownie za chwilę.";
+        public const string NotificationsSaveFailed = "Nie udało się zapisać ustawień powiadomień. Spróbuj ponownie za chwilę.";
     }
 }

@@ -1,0 +1,19 @@
+/* The week switch: the range sits between the two links on one row, and the links keep their 44 px touch height (DESIGN-CONTRACT 6). */
+.calendar-weeks { margin-block: var(--space-4); }
+.calendar-weeks__range { margin: 0; font-weight: 600; text-align: center; }
+
+/* The days: one stacked list on the phone, seven columns from 56 rem (DESIGN-CONTRACT 6). */
+.week { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); }
+.week__day { display: grid; align-content: start; gap: var(--space-3); min-width: 0; }
+.week__title { margin: 0; font-size: var(--text-md); }
+.week__empty { margin: 0; }
+.week__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.week__item { display: grid; gap: var(--space-1); min-width: 0; }
+.week__item p { margin: 0; overflow-wrap: anywhere; }
+.week__time { font-weight: 600; color: var(--color-text); }
+.week__offering { font-weight: 600; }
+.week__link { display: inline-flex; align-items: center; min-height: var(--tap); font-weight: 600; }
+
+@media (min-width: 56rem) {
+    .week { grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: start; gap: var(--space-3); }
+}

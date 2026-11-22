@@ -49,6 +49,14 @@ public sealed partial class BookingClient(HttpClient http, VisitorAddressAccesso
         if (!string.IsNullOrEmpty(cursor)) parts.Add($"cursor={Uri.EscapeDataString(cursor)}");
         return await GetAsync<PageDto<BookingViewDto>>("/api/v1/me/bookings?" + string.Join('&', parts), await tokens.AccessTokenAsync(ct), ct);
     }
+
+    /// <summary>The signed-in user's three switches (CONTRACTS 4.2): a kind without a row is on. Failure is state, never a cause, so the account page can fail soft.</summary>
+    public async Task<ApiResult<NotificationPreferencesDto>> NotificationPreferencesAsync(CancellationToken ct = default) =>
+        await GetAsync<NotificationPreferencesDto>("/api/v1/me/notification-preferences", await tokens.AccessTokenAsync(ct), ct);
+
+    /// <summary>Sets the kinds it names and answers with the full list. Only the switchable kinds are sent; the service refuses any other with <c>400 validation_failed</c>.</summary>
+    public async Task<ApiResult<NotificationPreferencesDto>> SetNotificationPreferencesAsync(IReadOnlyList<NotificationPreferenceDto> items, CancellationToken ct = default) =>
+        await WriteAsync<NotificationPreferencesDto>(HttpMethod.Put, "/api/v1/me/notification-preferences", await tokens.AccessTokenAsync(ct), new NotificationPreferencesDto(items), ct);
 }
 
 /// <summary>Reputation, public reads.</summary>

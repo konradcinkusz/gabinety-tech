@@ -190,6 +190,13 @@ public sealed class WebPage(HttpResponseMessage response, string html, IReadOnly
         }
     }
 
+    /// <summary>The text of the alert carrying a given <c>data-testid</c>, for a page that holds more than one alert (the account page), or null.</summary>
+    public string? AlertOf(string testId)
+    {
+        var m = Regex.Match(Html, @"<div\b(?=[^>]*data-testid=""" + Regex.Escape(testId) + @""")[^>]*>(?<t>.*?)</div>", RegexOptions.Singleline);
+        return m.Success ? Regex.Replace(WebUtility.HtmlDecode(Regex.Replace(m.Groups["t"].Value, "<[^>]+>", " ")), @"\s+", " ").Trim() : null;
+    }
+
     public string H1 => Regex.Match(Html, @"<h1[^>]*>(?<t>.*?)</h1>", RegexOptions.Singleline) is { Success: true } m ? WebUtility.HtmlDecode(Regex.Replace(m.Groups["t"].Value, "<[^>]+>", "")).Trim() : "";
 
     public Dictionary<string, string> HiddenFieldsOf(string formName)

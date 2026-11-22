@@ -26,7 +26,7 @@ public class EarningsHostTests
         Assert.Contains("Rezerwacje w okresie: 7", card.TextContent);
         Assert.Equal(["Wypłacone", "Oczekujące na wypłatę", "W sporze", "Opłaty platformy"], page.All("[data-testid=earnings-figures] dt").Select(d => d.TextContent));
         Assert.Null(page.One("[data-testid=earnings-failed]"));
-        Assert.Equal("/moje/rezerwacje?role=practitioner", card.QuerySelector("p:last-child a")!.GetAttribute("href"));
+        Assert.Equal("/gabinet-programisty/kalendarz", card.QuerySelector("p:last-child a")!.GetAttribute("href"));
     }
 
     [Fact]

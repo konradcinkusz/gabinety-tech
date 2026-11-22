@@ -18,6 +18,7 @@ jobs:
       - run: scripts/check-solution-projects.sh
       - run: scripts/check-fly-toml.sh # T-09.02: deploy/fly/*.fly.toml parse, name existing Dockerfiles, checks match HEALTHCHECK
       - run: scripts/check-private-topology.sh # F-03 / T-10.10: private apps stay private, web uses .internal/.flycast
+      - run: scripts/check-authservice-pin.sh # one authservice digest in the fly toml, the AppHost, the integration tests and this file
       - run: dotnet build -warnaserror
       - run: dotnet test --no-build --filter "tier!=integration"
   web:
@@ -99,13 +100,23 @@ jobs:
   # --- end docker-build (backend) ---
   integration:
     runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm --dir web install --frozen-lockfile
       - run: dotnet build -warnaserror
+      # One real authservice for the AuthContract suite and the web's real-service tests (AUTH_BASE_URL). The Testcontainers tests (tests/Gabinety.Integration.Tests/RealAuth, ThinSlice)
+      # start their own instances of the same image. Network__ClientIpHeader lets each test name its own client address: authservice limits auth calls to 20 a minute per address.
+      # The InitialAdmin and the dummy OAuth values are synthetic (CI only); GitHub sign-in can only be STARTED with them, never completed.
       - name: Start PostgreSQL and the real authservice image (pinned by digest)
         run: |
           set -euo pipefail
@@ -117,6 +128,11 @@ jobs:
             -e ConnectionStrings__DefaultConnection="Host=authpg;Port=5432;Database=authdb;Username=postgres;Password=ci-only" \
             -e DATABASE_PROVIDER=PostgreSQL -e Jwt__Algorithm=RS256 -e Jwt__Issuer=gabinety-contract -e Jwt__Audience=gabinety \
             -e Auth__RequireConfirmedEmail=false -e "Jwt__PrivateKeyPem=$(cat "$RUNNER_TEMP/jwt.pem")" \
+            -e Network__ClientIpHeader=Fly-Client-IP \
+            -e InitialAdmin__Email=owner@example.test -e 'InitialAdmin__Password=Owner-Pass-1234!' \
+            -e OAuth__GitHub__ClientId=dummy-github-client-id -e OAuth__GitHub__ClientSecret=dummy-github-client-secret \
+            -e OAuth__CallbackBaseUrl=http://localhost:8081 -e OAuth__PostLoginRedirectBaseUrl=http://localhost:3000 \
+            -e OAuth__PostLoginRedirectAllowedBaseUrls__0=http://localhost:3000 \
             ghcr.io/konradcinkusz/authservice@sha256:d0309a94f6b6300d4b8091381786c160ae7717a022416debaaa6d8d19a244645
           for i in $(seq 1 90); do
             [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8081/health/ready)" = 200 ] && break
@@ -125,6 +141,12 @@ jobs:
           curl -fsS http://localhost:8081/health/ready
           echo "AUTH_BASE_URL=http://localhost:8081" >> "$GITHUB_ENV"
       - run: dotnet test --no-build --filter "tier=integration" --logger "console;verbosity=detailed"
+      - name: The web's auth handlers against the real authservice (Vitest, skipped without AUTH_BASE_URL)
+        run: pnpm --dir web exec vitest run src/lib/session/real-authservice.test.ts
+        env:
+          AUTH_ADMIN_EMAIL: owner@example.test
+          AUTH_ADMIN_PASSWORD: Owner-Pass-1234!
+          AUTH_GITHUB_CONFIGURED: "1"
       - name: authservice log on failure
         if: failure()
         run: docker logs authsvc 2>&1 | tail -60

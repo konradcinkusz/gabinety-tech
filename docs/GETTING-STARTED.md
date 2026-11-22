@@ -273,7 +273,21 @@ End-to-end details:
 dotnet run --project src/Gabinety.AppHost --launch-profile default
 ```
 
-The default profile uses real components instead of fakes: PostgreSQL started by the AppHost in Docker (container `postgres`, volume `gabinety-pg`, host port 5432), and it asks for the internal key (`Parameters__internal-key`, or user secrets for the AppHost). The pinned auth service image is **not yet wired into the AppHost** (a comment in `src/Gabinety.AppHost/Program.cs` says it is added when T-01.01 records the image), and the web app and services point at `http://localhost:5105` for the identity authority, so sign-in does not work in this profile today. The seeder does not start by itself there (start `seeder` from the dashboard). This profile needs a Docker daemon; it was **not run** (section 8).
+The default profile uses real components instead of fakes. The AppHost starts, in Docker: PostgreSQL (container `postgres`, volume `gabinety-pg`, host port 5432, five databases `authdb`, `directorydb`, `bookingdb`, `reputationdb`, `assistantdb` as in `deploy/fly/init-databases.sql`) and the **real authservice** (`ghcr.io/konradcinkusz/authservice`, v0.3.4, pinned by digest, the same one as `deploy/fly/authservice.fly.toml`) on http://localhost:5105. The four services and the web app take `Identity__Authority=http://localhost:5105`, `Identity__Audience=gabinety` and `Backend__Auth=http://localhost:5105`; each service gets its own database through its `ConnectionStrings__<db>`. It needs a **Docker daemon** and asks for the internal key once (`Parameters__internal-key`, or the AppHost's user secrets: `dotnet user-secrets set Parameters:internal-key "<anything>" --project src/Gabinety.AppHost`).
+
+| What | Value in the default profile |
+|---|---|
+| Signing key | RS256, generated in memory on every start (a new key per start is harmless: sign in again). To keep one, set the parameter `Parameters:authservice-jwt-key` (a PKCS#8 PEM, made outside the work tree with `scripts/gen-authservice-key.sh`) |
+| PostgreSQL password | fixed development value `demo-development-postgres-not-a-secret` (the data volume keeps the password of its first start), override with `Parameters__postgres-password` before the first start |
+| E-mail confirmation | off (`Auth__RequireConfirmedEmail=false`): registering answers `200` with a session, never `202`; there is no mail sender |
+| First administrator | `demo-admin@demo.example` / `Demo-Dev-Passw0rd!` (`InitialAdmin__*`; change the address with `InitialAdmin:Email`). authservice gives this account the platform role **`SuperAdmin`**, not `Admin`; the services and the web treat both as administrator. `/admin` works with it |
+| GitHub sign-in | off (needs a real OAuth app); the "Zaloguj się przez GitHub" button leads to an error page. See `docs/operations/AUTH.md` section 5 |
+| Rate limit | authservice answers `429` after 20 sign-in or registration calls a minute from one address; the web forwards the visitor's address (`Fly-Client-IP`), on `localhost` that is you alone |
+| Passwords | authservice demands 8 or more characters with a digit, a lower-case and an upper-case letter and a special character (the web form says so; the stand-in of the fake profile enforces the same) |
+
+Differences from the fake profile you will notice: user ids (`sub`) are opaque GUIDs, not `demo-...`, so the demo reset of Booking and Reputation (CONTRACTS 10.4, which keys on a `demo-` user id) does not recognise those users' rows; the seeder (`seeder` in the dashboard, started by hand) logs in or registers the demo users through authservice's public endpoints and works, but it was **not run** against this profile. The practitioners' language model (`Llm__Provider`) is the real one and needs credentials: the Assistant is not waited for by anything.
+
+What was and was not proven (`docs/operations/AUTH.md` section 9): the CI `integration` job runs the real authservice image against everything the web needs and against the services' own admin policies; **no run of this AppHost profile itself exists**, because it needs Docker.
 
 What Docker is for in this repository:
 
@@ -290,7 +304,7 @@ Accounts and secrets are not something this repository can create (T-09.01): the
 
 ## 8. What was not verified for this guide
 
-- The default profile, the integration tier and the Docker images: the container used had no Docker daemon. `dotnet test --filter "tier=integration"` failed with `DockerUnavailableException` as expected; `dotnet run ... --launch-profile default` (with the internal key given) printed nothing and was still waiting after 100 s.
+- The default profile (including the authservice container added to it in the real-authservice change; it compiles and its image digest is checked by `scripts/check-authservice-pin.sh`, but nobody has started it), the integration tier and the Docker images: the container used had no Docker daemon. `dotnet test --filter "tier=integration"` failed with `DockerUnavailableException` as expected; `dotnet run ... --launch-profile default` (with the internal key given) printed nothing and was still waiting after 100 s.
 - `scripts/smoke-llm.sh` and the live evals against a real model (spend credits, need owner credentials). Only their refusals were run.
 - Click-through by hand in a browser: the steps in section 3 are taken from the Playwright journeys, which pass (18 of 18), not from a person following this text. The J3 path was later followed on a fresh checkout with `curl` only (see "Walkthrough record"); the clicking itself, the Polish button names and the page rendering in a real browser (including the client-loaded review list on the public profile) were still not done by a person.
 

@@ -64,6 +64,27 @@ describe("login", () => {
     expect(await res.json()).toMatchObject({ code: "invalid_credentials" });
     expect(setCookies(res)).toEqual([]);
   });
+  it("maps authservice's 429 (its per-address auth limit) to 429 rate_limited with Retry-After, not to bad credentials", async () => {
+    fakeBackend(() => Response.json({ error: "Too many requests. Please try again later.", retryAfter: 42 }, { status: 429 }));
+    const res = await login(json("/api/auth/login", { email: "a@example.test", password: "x" }));
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ code: "rate_limited" });
+    expect(res.headers.get("retry-after")).toBe("60");
+    expect(setCookies(res)).toEqual([]);
+    fakeBackend(() => new Response("{}", { status: 429 }));
+    expect((await register(json("/api/auth/register", { email: "a@example.test", password: "x", acceptedTermsVersion: "t", acceptedPrivacyVersion: "p" }))).status).toBe(429);
+  });
+  it("forwards the visitor's address to authservice in Fly-Client-IP, only a valid one, and never the visitor's own header", async () => {
+    const calls = fakeBackend(() => tokenBody());
+    await login(json("/api/auth/login", { email: "a@example.test", password: "x" }, { "fly-client-ip": "203.0.113.7", "x-forwarded-for": "6.6.6.6, 203.0.113.9" }));
+    expect(calls[0]!.headers.get("fly-client-ip")).toBe("203.0.113.7");
+    calls.length = 0;
+    await login(json("/api/auth/login", { email: "a@example.test", password: "x" }, { "x-forwarded-for": "6.6.6.6, 203.0.113.9" }));
+    expect(calls[0]!.headers.get("fly-client-ip")).toBe("203.0.113.9"); // the proxy's entry, not the first one the visitor wrote
+    calls.length = 0;
+    await login(json("/api/auth/login", { email: "a@example.test", password: "x" }, { "fly-client-ip": "not an address <script>" }));
+    expect(calls[0]!.headers.has("fly-client-ip")).toBe(false);
+  });
   it("maps a 2FA challenge to two_factor_not_supported without cookies", async () => {
     fakeBackend(() => Response.json({ requiresTwoFactor: true, challengeToken: "c" }));
     const res = await login(json("/api/auth/login", { email: "a@example.test", password: "x" }));

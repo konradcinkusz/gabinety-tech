@@ -1,3 +1,4 @@
+import { clientAddressOf } from "../api/clientAddress";
 import { checkOrigin } from "../api/originGuard";
 import { dependencyUnavailable, problem } from "../api/problem";
 import { resolveBackend } from "../api/backends";
@@ -46,6 +47,8 @@ function finish(r: IdentityResult, uniform: { status: number; code: string }): R
       return problem(400, "two_factor_not_supported");
     case "verification_required":
       return problem(403, "email_verification_required");
+    case "rate_limited":
+      return problem(429, "rate_limited", { "Retry-After": "60" });
     case "unauthorized":
     case "rejected":
       return problem(uniform.status, uniform.code);
@@ -61,7 +64,7 @@ export async function login(request: Request): Promise<Response> {
   const email = str(b.email);
   const password = str(b.password);
   if (!email || !password) return problem(400, "invalid_request");
-  return finish(await identity.login(email, password), { status: 401, code: "invalid_credentials" });
+  return finish(await identity.login(email, password, clientAddressOf(request.headers)), { status: 401, code: "invalid_credentials" });
 }
 
 export async function register(request: Request): Promise<Response> {
@@ -74,7 +77,7 @@ export async function register(request: Request): Promise<Response> {
   let terms = str(b.acceptedTermsVersion);
   let privacy = str(b.acceptedPrivacyVersion);
   if (!terms || !privacy) {
-    const v = await identity.consentVersions();
+    const v = await identity.consentVersions(clientAddressOf(request.headers));
     if (!v) return dependencyUnavailable();
     terms = terms ?? v.terms;
     privacy = privacy ?? v.privacy;
@@ -85,7 +88,7 @@ export async function register(request: Request): Promise<Response> {
     acceptedTermsVersion: terms,
     acceptedPrivacyVersion: privacy,
     locale: str(b.locale),
-  });
+  }, clientAddressOf(request.headers));
   return finish(result, { status: 400, code: "registration_failed" });
 }
 
@@ -103,7 +106,7 @@ export async function refresh(request: Request): Promise<Response> {
   const site = readConfig().siteBaseUrl;
   const rt = parseCookies(request.headers.get("cookie"))[REFRESH_COOKIE];
   if (!rt) return problem(401, "unauthenticated");
-  const tokens = await refreshOnce(rt);
+  const tokens = await refreshOnce(rt, clientAddressOf(request.headers));
   if (!tokens) return clearSessionCookies(problem(401, "unauthenticated"), site);
   return setSessionCookies(ok({ authenticated: true }), tokens, site);
 }
@@ -120,7 +123,7 @@ export async function refreshAndRedirect(request: Request): Promise<Response> {
   const rt = parseCookies(request.headers.get("cookie"))[REFRESH_COOKIE];
   const login = "/logowanie?redirect=" + encodeURIComponent(target);
   if (!rt) return go(login);
-  const tokens = await refreshOnce(rt);
+  const tokens = await refreshOnce(rt, clientAddressOf(request.headers));
   if (!tokens) return clearSessionCookies(go(login), site);
   return setSessionCookies(go(target), tokens, site);
 }
@@ -172,7 +175,7 @@ export async function githubCallback(request: Request): Promise<Response> {
   const bound = stateMatches(url.searchParams.get("state"), parseCookies(request.headers.get("cookie"))[OAUTH_STATE_COOKIE]);
   const code = url.searchParams.get("code");
   if (!bound || !code) return to("/logowanie?error=github_failed");
-  const r = await identity.exchange(code);
+  const r = await identity.exchange(code, clientAddressOf(request.headers));
   if (r.kind === "two_factor") return to("/logowanie?error=two_factor_not_supported");
   if (r.kind !== "tokens") return to("/logowanie?error=github_failed");
   return setSessionCookies(to(safeRedirect(url.searchParams.get("redirect"))), r.tokens, config.siteBaseUrl);

@@ -23,7 +23,9 @@ Cały system uruchamia się lokalnie w profilu `fake`, bez Dockera i bez kluczy:
 - dane demonstracyjne i zamiennik dostawcy tożsamości do prac lokalnych,
 - siedem automatycznych ścieżek end-to-end (J1 do J7).
 
-**Jeszcze nie:** profil domyślny z prawdziwym [authservice](https://github.com/konradcinkusz/authservice), prawdziwe płatności, e-mail i model językowy (wymagają kont i sekretów właściciela) oraz zweryfikowane wdrożenie.
+Prawdziwy [authservice](https://github.com/konradcinkusz/authservice) jest dołączony do profilu domyślnego (potrzebuje Dockera) i sprawdzany w CI na wszystkich przepływach, których potrzebuje web (`docs/operations/AUTH.md`); samego profilu domyślnego nikt jeszcze nie uruchomił.
+
+**Jeszcze nie:** logowanie przez GitHub do końca (potrzebuje prawdziwej aplikacji OAuth), potwierdzanie e-mail, prawdziwe płatności, e-mail i model językowy (wymagają kont i sekretów właściciela) oraz zweryfikowane wdrożenie.
 
 ## Szybki start
 

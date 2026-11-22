@@ -28,7 +28,7 @@ public static partial class FieldErrors
     public static Dictionary<string, string> From(ApiFailure failure, IReadOnlyDictionary<string, string?> freeText)
     {
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var f in failure.Fields) errors[f] = ByField.GetValueOrDefault(f, Unknown);
+        foreach (var f in failure.Fields ?? []) errors[f] = ByField.GetValueOrDefault(f, Unknown);
         if (failure.Code == "contact_details_not_allowed")
         {
             var hits = freeText.Where(kv => LooksLikeContact(kv.Value)).Select(kv => kv.Key).ToList();

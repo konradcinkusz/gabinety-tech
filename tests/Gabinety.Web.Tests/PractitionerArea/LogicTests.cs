@@ -262,7 +262,7 @@ public class FieldErrorsTests
     [Fact]
     public void A_field_the_service_names_gets_the_text_we_wrote_for_it_and_an_unknown_field_a_neutral_one()
     {
-        var errors = FieldErrors.From(new ApiFailure(422, "validation_failed") { Fields = ["headline", "nip", "brandNewField"] }, new Dictionary<string, string?>());
+        var errors = FieldErrors.From(new ApiFailure(422, "validation_failed", ["headline", "nip", "brandNewField"]), new Dictionary<string, string?>());
         Assert.Equal("Nagłówek ma mieć od 10 do 120 znaków.", errors["headline"]);
         Assert.Equal("NIP ma mieć 10 cyfr i poprawną sumę kontrolną.", errors["nip"]);
         Assert.Equal("To pole jest nieprawidłowe.", errors["brandNewField"]);

@@ -19,6 +19,20 @@ public static class BookingFormat
         return $"{Pl.Format.Weekdays[(int)start.DayOfWeek]}, {start.Day} {Pl.Format.MonthsGenitive[start.Month - 1]}, {start:HH\\:mm}–{end:HH\\:mm}";
     }
 
+    /// <summary><c>niedziela, 28 marca, 13:00–14:00</c> for any pair of instants (the booking form has a start and a duration, a booking has both).</summary>
+    public static string When(DateTimeOffset startUtc, DateTimeOffset endUtc)
+    {
+        var start = TimeZoneInfo.ConvertTime(startUtc, Warsaw);
+        var end = TimeZoneInfo.ConvertTime(endUtc, Warsaw);
+        return $"{Pl.Format.Weekdays[(int)start.DayOfWeek]}, {start.Day} {Pl.Format.MonthsGenitive[start.Month - 1]}, {start:HH\\:mm}–{end:HH\\:mm}";
+    }
+
+    /// <summary>The parts that exist, joined by " · ": a missing name never leaves a stray separator at either end (F-03: "· poniedziałek, 23 listopada · 180,00 zł").</summary>
+    public static string MetaLine(params string?[] parts) => string.Join(" · ", parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!.Trim()));
+
+    /// <summary>A person's display name when the API sent one, else null (the caller leaves the part out instead of printing a placeholder where a name is the point).</summary>
+    public static string? Name(string? raw) => string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+
     /// <summary>The other party's name when the API sent one, else a neutral label.</summary>
     public static string OtherParty(BookingViewDto b, string role)
     {

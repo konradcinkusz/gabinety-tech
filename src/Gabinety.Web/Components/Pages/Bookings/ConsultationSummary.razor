@@ -1,0 +1,26 @@
+@* The order summary of DESIGN-CONTRACT 5.6: one definition list used by the booking form, the checkout, the confirmation and the detail. A missing name leaves its row out; no separator is ever printed on its own (F-03). *@
+<section class="booking-summary card" aria-labelledby="@TitleId">
+    <h2 id="@TitleId">@Title</h2>
+    <dl class="dl">
+        <dt>@BookFlowText.Summary.Offering</dt><dd>@Offering</dd>
+        @if (Party is not null) {<dt>@PartyLabel</dt><dd>@Party</dd>}
+        <dt>@BookFlowText.Summary.When</dt><dd>@When</dd>
+        @if (Minutes is { } m) {<dt>@BookFlowText.Summary.Duration</dt><dd>@string.Format(BookFlowText.Summary.Minutes, m)</dd>}
+        <dt>@BookFlowText.Summary.Price</dt><dd class="booking-summary__total num">@Money.Pln(PriceMinor)</dd>
+    </dl>
+    <p class="muted">@BookFlowText.Summary.Zone</p>
+    @ChildContent
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = BookFlowText.Summary.Title;
+    [Parameter] public string TitleId { get; set; } = "summary-title";
+    [Parameter, EditorRequired] public string Offering { get; set; } = "";
+    /// <summary>The other party's name; null leaves the row out.</summary>
+    [Parameter] public string? Party { get; set; }
+    [Parameter] public string PartyLabel { get; set; } = BookFlowText.Summary.Practitioner;
+    [Parameter, EditorRequired] public string When { get; set; } = "";
+    [Parameter] public int? Minutes { get; set; }
+    [Parameter] public long PriceMinor { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

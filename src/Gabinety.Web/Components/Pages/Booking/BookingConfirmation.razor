@@ -1,0 +1,68 @@
+@page "/rezerwacja/potwierdzenie/{BookingId:guid}"
+@attribute [Authorize]
+@inject BookingClient Bookings
+@inject NavigationManager Navigation
+@inject TimeProvider Time
+@* Success is claimed only for a booking the server reports as Confirmed. A payment that is still being confirmed (the provider's notification has not arrived) says so and reloads itself while the hold lasts:
+   a meta refresh, no script. A 429/503 shows "Odśwież stronę" with the link that does it. *@
+
+<PageTitle>@BookFlowText.Confirmation.MetaTitle</PageTitle>
+<HeadContent>
+    <meta name="robots" content="noindex,follow" />
+    @if (_refreshSeconds is { } seconds) {<meta http-equiv="refresh" content="@seconds" />}
+</HeadContent>
+<h1>@BookFlowText.Confirmation.Title</h1>
+
+@if (_failure is not null)
+{
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@BookFlowText.Checkout.LoadFailed</p>
+        <a class="btn btn--secondary" href="@CurrentPath">@BookFlowText.Checkout.Refresh</a>
+    </div>
+}
+else if (_booking is { } b)
+{
+    <div class="stack booking-confirmation">
+        @if (b.Status == "Confirmed") {<div class="callout callout--success" role="status">@BookFlowText.Confirmation.Confirmed</div>}
+        else if (b.Status == "PendingPayment") {<div class="callout callout--info" role="status">@BookFlowText.Confirmation.Pending <a href="@CurrentPath">@BookFlowText.Confirmation.Refresh</a></div>}
+        else {<div class="callout callout--warning" role="status">@BookFlowText.Confirmation.Other</div>}
+        <ConsultationSummary Offering="@b.OfferingTitle" Party="@BookingFormat.Name(b.Practitioner.DisplayName)" When="@BookingFormat.When(b.StartUtc, b.EndUtc)"
+                             Minutes="b.DurationMinutes" PriceMinor="b.Price.AmountMinor">
+            @if (_meeting is not null)
+            {
+                <p><a href="@_meeting" rel="noopener noreferrer" target="_blank">@BookFlowText.Summary.Meeting</a></p>
+                <p class="muted">@BookFlowText.Summary.MeetingHint</p>
+            }
+        </ConsultationSummary>
+        <div class="form-actions">
+            <a class="btn btn--primary" href="@($"/moje/rezerwacje/{b.Id}?role=client")">@BookFlowText.Confirmation.View</a>
+            <a class="btn btn--secondary" href="/programisci">@BookFlowText.Confirmation.ToSearch</a>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid BookingId { get; set; }
+
+    BookingDetailDto? _booking;
+    ApiFailure? _failure;
+    string? _meeting;
+    int? _refreshSeconds;
+
+    string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Bookings.GetAsync(BookingId);
+        if (!result.IsOk)
+        {
+            if (result.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe(CurrentPath))); return; }
+            if (result.Failure.Status is 404 or 403) { Navigation.NotFound(); return; }
+            _failure = result.Failure;
+            return;
+        }
+        _booking = result.Value;
+        _meeting = _booking!.Status == "Confirmed" ? SafeUrl.Http(_booking.MeetingUrl) : null; // a link is shown only for a confirmed booking, and only when it is http(s)
+        if (_booking.Status == "PendingPayment" && (_booking.HoldExpiresAt is not { } hold || hold > Time.GetUtcNow())) _refreshSeconds = 5;
+    }
+}

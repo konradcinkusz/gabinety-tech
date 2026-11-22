@@ -1,0 +1,11 @@
+@page "/bookings/{BookingId:guid}"
+@attribute [Authorize]
+@inject NavigationManager Navigation
+@* The page the payment provider sends the browser back to (the Booking service gives Stripe Checkout <c>{Site__BaseUrl}/bookings/{id}</c>, docs/operations/PAYMENTS-GO-LIVE.md): the confirmation, which says
+   "waiting for the payment" until the provider's notification has arrived. *@
+
+@code {
+    [Parameter] public Guid BookingId { get; set; }
+
+    protected override void OnInitialized() => Navigation.NavigateTo($"/rezerwacja/potwierdzenie/{BookingId}", replace: true);
+}

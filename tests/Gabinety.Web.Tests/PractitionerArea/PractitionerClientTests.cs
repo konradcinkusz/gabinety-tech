@@ -74,7 +74,7 @@ public class PractitionerClientTests
         Assert.Equal((422, "submit_incomplete"), (f.Status, f.Code));
         Assert.Equal(["headline", "rules[2].endLocal"], f.Fields); // the key with markup characters is dropped
         Assert.Equal(["bio", "github_linked", "portfolioUrl"], f.Unmet);
-        Assert.DoesNotContain("SERVER", string.Join("|", f.Fields.Concat(f.Unmet).Append(f.Code)));
+        Assert.DoesNotContain("SERVER", string.Join("|", (f.Fields ?? []).Concat(f.Unmet ?? []).Append(f.Code)));
     }
 
     [Theory]
@@ -87,7 +87,7 @@ public class PractitionerClientTests
         web.Directory.Respond = _ => new HttpResponseMessage(HttpStatusCode.Conflict) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/problem+json") };
         var f = (await scope.ServiceProvider.GetRequiredService<PractitionerClient>().CreateProfileAsync("Demo")).Failure!;
         Assert.Equal((409, "http_409"), (f.Status, f.Code));
-        Assert.Empty(f.Fields);
+        Assert.Empty(f.Fields ?? []);
     }
 
     [Fact]

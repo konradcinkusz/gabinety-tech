@@ -1,5 +1,4 @@
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -11,26 +10,31 @@ namespace Gabinety.Web.Api;
 /// </summary>
 public abstract class ApiClient(HttpClient http, VisitorAddressAccessor visitor)
 {
-    /// <summary>An absent optional field is omitted, not sent as null (CONTRACTS 0): writing skips nulls; reading is unaffected.</summary>
-    public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) } };
+    public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) } };
 
     protected Task<ApiResult<T>> GetAsync<T>(string path, string? accessToken, CancellationToken ct) => SendAsync<T>(HttpMethod.Get, path, accessToken, ct);
 
-    /// <summary>A write: the body (when there is one) is sent as JSON. Writes are never retried by the resilience handler (SPEC 5 rule 8). Use <see cref="NoContent"/> as <typeparamref name="T"/> for a <c>204</c>.</summary>
+    /// <summary>A write (never retried by the resilience handler: SPEC 5 rule 8). <paramref name="body"/> is serialized with the services' options; <paramref name="timeout"/> lifts the attempt budget for the calls SPEC 5.1 gives more time.</summary>
+    protected Task<ApiResult<T>> PostAsync<T>(string path, object? body, string? accessToken, CancellationToken ct, IReadOnlyDictionary<string, string>? headers = null, TimeSpan? timeout = null) =>
+        SendAsync<T>(HttpMethod.Post, path, accessToken, ct, body, headers, timeout);
+
+    /// <summary>A write with any verb (a PUT, or a POST with no body): never retried (SPEC 5 rule 8). Use <see cref="Unit"/> as <typeparamref name="T"/> for a <c>204</c>.</summary>
     protected Task<ApiResult<T>> WriteAsync<T>(HttpMethod method, string path, string? accessToken, object? body, CancellationToken ct) => SendAsync<T>(method, path, accessToken, ct, body);
 
-    async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, string? accessToken, CancellationToken ct, object? body = null)
+    async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, string? accessToken, CancellationToken ct, object? body = null, IReadOnlyDictionary<string, string>? headers = null, TimeSpan? timeout = null)
     {
         using var request = new HttpRequestMessage(method, path);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         if (body is not null) request.Content = JsonContent.Create(body, body.GetType(), options: Json);
+        foreach (var (name, value) in headers ?? new Dictionary<string, string>()) request.Headers.TryAddWithoutValidation(name, value);
+        if (timeout is { } budget) request.Options.Set(RequestContext.Timeout, budget);
         if (!string.IsNullOrEmpty(accessToken)) request.Options.Set(RequestContext.AccessToken, accessToken);
         if (visitor.Current is { } address) request.Options.Set(RequestContext.VisitorAddress, address);
         try
         {
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseContentRead, ct);
-            if (!response.IsSuccessStatusCode) return ApiResult<T>.Fail(await FailureOf(response, ct));
-            if (typeof(T) == typeof(NoContent)) return ApiResult<T>.Ok((T)(object)NoContent.Value);
+            if (!response.IsSuccessStatusCode) { var (code, fields, unmet) = await FailureOf(response, ct); return ApiResult<T>.Fail(new ApiFailure((int)response.StatusCode, code, fields, unmet)); }
+            if (typeof(T) == typeof(Unit)) return ApiResult<T>.Ok((T)(object)Unit.Value);
             var value = await response.Content.ReadFromJsonAsync<T>(Json, ct);
             return value is null ? ApiResult<T>.Fail((int)response.StatusCode, ApiFailure.InvalidResponse) : ApiResult<T>.Ok(value);
         }
@@ -46,29 +50,30 @@ public abstract class ApiClient(HttpClient http, VisitorAddressAccessor visitor)
     }
 
     /// <summary>
-    /// The status, the <c>code</c> of an RFC 9457 body (CONTRACTS 0, else <c>http_&lt;status&gt;</c>), and the NAMES of the fields it complains about (<c>errors</c> keys) and of the unmet checklist items
-    /// (<c>unmetItems</c>), each reduced to a short identifier. A title, a detail, a message or any other text of the server is never used.
+    /// The <c>code</c> of an RFC 9457 body (CONTRACTS 0), else <c>http_&lt;status&gt;</c>, and the NAMES of the keys of <c>errors</c> (field names only, at most 8, each 1-64 letters, digits, dots or underscores).
+    /// A title, a detail or any message of the server is never used: they are English and may echo the input.
     /// </summary>
-    static async Task<ApiFailure> FailureOf(HttpResponseMessage response, CancellationToken ct)
+    static async Task<(string Code, IReadOnlyList<string>? Fields, IReadOnlyList<string>? Unmet)> FailureOf(HttpResponseMessage response, CancellationToken ct)
     {
-        var status = (int)response.StatusCode;
-        var plain = new ApiFailure(status, $"http_{status}");
+        var fallback = $"http_{(int)response.StatusCode}";
         try
         {
             using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
             var root = doc.RootElement;
-            if (root.ValueKind != JsonValueKind.Object) return plain;
-            var code = root.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.String && c.GetString() is { Length: > 0 and <= 64 } id && id.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_') ? id : plain.Code;
-            var fields = root.TryGetProperty("errors", out var e) && e.ValueKind == JsonValueKind.Object ? e.EnumerateObject().Select(p => Identifier(p.Name)).OfType<string>().Take(32).ToArray() : [];
-            var unmet = root.TryGetProperty("unmetItems", out var u) && u.ValueKind == JsonValueKind.Array ? u.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => Identifier(x.GetString())).OfType<string>().Take(32).ToArray() : [];
-            return new ApiFailure(status, code) { Fields = fields, Unmet = unmet };
+            if (root.ValueKind != JsonValueKind.Object) return (fallback, null, null);
+            var code = root.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.String
+                && c.GetString() is { Length: > 0 and <= 64 } text && text.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_') ? text : fallback;
+            var fields = root.TryGetProperty("errors", out var e) && e.ValueKind == JsonValueKind.Object
+                ? e.EnumerateObject().Select(p => p.Name).Where(n => n.Length is > 0 and <= 64 && n.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '_' or '.' or '[' or ']' or '-')).Take(32).ToList() // brackets: Booking names a row of the availability as rules[2].endLocal
+                : null;
+            var unmet = root.TryGetProperty("unmetItems", out var u) && u.ValueKind == JsonValueKind.Array // the checklist items a refused submit names (Directory, CONTRACTS 3.4)
+                ? u.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()!).Where(n => n.Length is > 0 and <= 64 && n.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_')).Take(32).ToList()
+                : null;
+            return (code, fields, unmet);
         }
         catch (Exception) when (!ct.IsCancellationRequested)
         {
-            return plain;
+            return (fallback, null, null);
         }
     }
-
-    /// <summary>An identifier the server may name a code or a field with: letters, digits, <c>_</c>, <c>.</c>, <c>[</c>, <c>]</c> and <c>-</c>, at most 64 characters. Anything else is not trusted.</summary>
-    static string? Identifier(string? raw) => raw is { Length: > 0 and <= 64 } && raw.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '_' or '.' or '[' or ']' or '-') ? raw : null;
 }

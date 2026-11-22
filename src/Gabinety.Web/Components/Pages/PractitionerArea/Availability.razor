@@ -132,7 +132,7 @@ else if (_draft is not null)
         if (_issues.Count > 0) return; // the problems are on screen; nothing is sent
         var r = await Scheduling.SaveAvailabilityAsync(_draft.ToDto());
         if (r.IsOk) { Done(PractitionerPaths.Availability, FlashKey.Saved); return; }
-        _serverRows = AvailabilityDraft.ServerRows(r.Failure!.Fields);
+        _serverRows = AvailabilityDraft.ServerRows(r.Failure!.Fields ?? []);
         if (_serverRows.Count == 0) _general = FieldErrors.General(r.Failure, PlPractitioner.Availability.Failed);
     }
 }

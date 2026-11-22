@@ -169,10 +169,10 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
     async Task CreateAsync()
     {
         _name = Posted.Text("displayName");
-        if (_name.Length is < 2 or > 80) { _errors["displayName"] = FieldErrors.From(new ApiFailure(422, "validation_failed") { Fields = ["displayName"] }, new Dictionary<string, string?>())["displayName"]; return; }
+        if (_name.Length is < 2 or > 80) { _errors["displayName"] = FieldErrors.From(new ApiFailure(422, "validation_failed", ["displayName"]), new Dictionary<string, string?>())["displayName"]; return; }
         var r = await Practitioner.CreateProfileAsync(_name);
         if (r.IsOk) { Done(PractitionerPaths.Home, FlashKey.GabinetCreated); return; }
-        if (r.Failure!.Fields.Contains("displayName")) _errors["displayName"] = FieldErrors.From(r.Failure, new Dictionary<string, string?>())["displayName"];
+        if (r.Failure!.Names("displayName")) _errors["displayName"] = FieldErrors.From(r.Failure, new Dictionary<string, string?>())["displayName"];
         else _general = r.Failure.Code == "practitioner_exists" ? PlPractitioner.Create.Exists : r.Failure.Status is 0 or 503 ? PlPractitioner.Common.Unavailable : PlPractitioner.Create.Failed;
     }
 
@@ -183,7 +183,7 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
         var f = r.Failure!;
         if (f.Code == "submit_incomplete")
         {
-            var items = string.Join(", ", OnboardingChecklist.FromServer(f.Unmet).Select(k => new ChecklistItem(k, false).Title));
+            var items = string.Join(", ", OnboardingChecklist.FromServer(f.Unmet ?? []).Select(k => new ChecklistItem(k, false).Title));
             _submitNote = (AlertVariant.Danger, string.Format(PlPractitioner.Dashboard.Incomplete, items));
             await RefreshAsync();
         }
@@ -196,7 +196,7 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
         if (!System.Text.RegularExpressions.Regex.IsMatch(_login, "^[A-Za-z0-9-]{1,39}$")) { _errors["githubLogin"] = PlPractitioner.Github.InvalidLogin; return; }
         var r = await Practitioner.RequestGithubLinkAsync(_login);
         if (r.IsOk) _code = r.Value!.Code;
-        else _githubNote = r.Failure!.Status is 0 or 503 ? FieldErrors.General(r.Failure, PlPractitioner.Github.Failed) : r.Failure.Fields.Contains("githubLogin") ? PlPractitioner.Github.InvalidLogin : PlPractitioner.Github.Failed;
+        else _githubNote = r.Failure!.Status is 0 or 503 ? FieldErrors.General(r.Failure, PlPractitioner.Github.Failed) : r.Failure.Names("githubLogin") ? PlPractitioner.Github.InvalidLogin : PlPractitioner.Github.Failed;
     }
 
     async Task VerifyCodeAsync()
@@ -208,7 +208,7 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
         if (r.IsOk) { Done(PractitionerPaths.Home); return; }
         _githubNote = r.Failure! switch
         {
-            { Code: "github_not_linked" } when r.Failure!.Fields.Contains("githubLogin") => PlPractitioner.Github.AlreadyLinked,
+            { Code: "github_not_linked" } when r.Failure!.Names("githubLogin") => PlPractitioner.Github.AlreadyLinked,
             { Code: "github_not_linked" } => PlPractitioner.Github.NotLinked,
             { Status: 503 } => PlPractitioner.Github.Unavailable,
             _ => PlPractitioner.Github.Failed,

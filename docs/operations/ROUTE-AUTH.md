@@ -151,7 +151,14 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/wyloguj` | Anonymous | all | sign-out form |
 | Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |
 | Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect, state checked against the cookie, code exchanged |
-| Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings, interactive server rendering |
+| Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings (client and practitioner tabs), static server rendering |
+| Web | PAGE | `/moje/rezerwacje/{BookingId}` | Authenticated | all | booking detail with cancel, dispute and no-show (form posts, antiforgery) |
+| Web | PAGE | `/moje/opinie` | Authenticated | all | the practitioner's own reviews and replies |
+| Web | PAGE | `/moje/opinie/{BookingId}` | Authenticated | all | write a review (form post, antiforgery) |
+| Web | PAGE | `/rezerwacja/{OfferingId}` | Authenticated | all | booking form: brief, assistant suggestion, pay (form posts, antiforgery) |
+| Web | PAGE | `/rezerwacja/potwierdzenie/{BookingId}` | Authenticated | all | confirmation |
+| Web | PAGE | `/checkout/mock/{BookingId}` | Authenticated | all | mock checkout: answers 404 unless the fake profile runs the mock provider (`WebOptions.MockPayments`); the clock alone is interactive |
+| Web | PAGE | `/bookings/{BookingId}` | Authenticated | all | where the payment provider returns the browser (Stripe Checkout success URL): redirects to the confirmation |
 | Web | PAGE | `/konto` | Authenticated | all | account: e-mail, consents, data export link, account deletion (static rendering, forms with antiforgery) |
 | Web | GET | `/konto/export` | Authenticated | all | the user's data as a no-store JSON attachment (the identity service's export, passed through) |
 | Web | PAGE | `/gabinet-programisty` | Authenticated | all | practitioner dashboard and onboarding, static server rendering; any signed-in account may become a practitioner (ADR-0012, "Practitioner area") |

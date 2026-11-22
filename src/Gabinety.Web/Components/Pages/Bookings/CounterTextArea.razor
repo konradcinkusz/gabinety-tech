@@ -1,0 +1,25 @@
+@* A labelled text area of DESIGN-CONTRACT 5.5: label, hint, control, counter and error are one unit; the error is linked with aria-describedby and starts with a hidden "Błąd:" for screen readers (never colour alone). The counter counts what the server received. *@
+<div class="@("field" + (Error is not null ? " field--invalid" : ""))">
+    <label class="field__label" for="@Id">@Label@if (Optional) {<span class="field__optional"> (opcjonalnie)</span>}</label>
+    @if (Hint is not null) {<p class="field__hint" id="@(Id)-hint">@Hint</p>}
+    <textarea id="@Id" name="@Name" rows="@Rows" class="field__control" aria-invalid="@(Error is not null ? "true" : null)" aria-describedby="@Described" autofocus="@Autofocus">@Value</textarea>
+    @if (CounterText is not null) {<p class="field__counter num">@CounterText</p>}
+    @if (Error is not null) {<p class="field__error" id="@(Id)-error"><span class="sr-only">@(Pl.A11y.ErrorPrefix + " ")</span>@Error</p>}
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public int Rows { get; set; } = 6;
+    [Parameter] public bool Optional { get; set; }
+    [Parameter] public bool Autofocus { get; set; }
+    /// <summary>The format of the counter ("{0} / 2000"); null shows none.</summary>
+    [Parameter] public string? CounterFormat { get; set; }
+
+    string? CounterText => CounterFormat is null ? null : string.Format(CounterFormat, (Value ?? "").Trim().Length);
+    string? Described => string.Join(' ', new[] { Hint is null ? null : Id + "-hint", Error is null ? null : Id + "-error" }.Where(s => s is not null)) is { Length: > 0 } d ? d : null;
+}

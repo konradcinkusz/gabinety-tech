@@ -54,7 +54,7 @@ public sealed class PractitionerWorld
         return new HttpResponseMessage(status) { Content = new StringContent(o.ToJsonString(), System.Text.Encoding.UTF8, "application/problem+json") };
     }
 
-    static HttpResponseMessage NoContent() => new(HttpStatusCode.NoContent);
+    static HttpResponseMessage Unit() => new(HttpStatusCode.NoContent);
 
     static JsonObject? Body(HttpRequestMessage r) => r.Content is null ? null : JsonNode.Parse(r.Content.ReadAsStringAsync().GetAwaiter().GetResult()) as JsonObject;
 
@@ -114,7 +114,7 @@ public sealed class PractitionerWorld
             if (!EmailVerified) unmet.Add("email_verified");
             if (unmet.Count > 0) return Problem(HttpStatusCode.UnprocessableEntity, "submit_incomplete", unmet: [.. unmet]);
             Profile = Profile with { Status = "Submitted" };
-            return NoContent();
+            return Unit();
         }
         if (path == me + "/github-link" && method == "POST")
         {
@@ -128,7 +128,7 @@ public sealed class PractitionerWorld
             if (PendingGithubLogin is null || !GithubBioHasCode) return Problem(HttpStatusCode.UnprocessableEntity, "github_not_linked");
             Profile = Profile with { GithubLinked = true, GithubLogin = PendingGithubLogin };
             PendingGithubLogin = null;
-            return NoContent();
+            return Unit();
         }
         if (path == me + "/offerings" && method == "GET") return FakeBackend.Json(new { items = Offers.Select(View) });
         if (path == me + "/offerings" && method == "POST")
@@ -154,12 +154,12 @@ public sealed class PractitionerWorld
                 Apply(o, b);
                 return FakeBackend.Json(View(o));
             }
-            if (parts.Length == 2 && parts[1] == "deactivate") { o.Active = false; return NoContent(); }
+            if (parts.Length == 2 && parts[1] == "deactivate") { o.Active = false; return Unit(); }
             if (parts.Length == 2 && parts[1] == "activate")
             {
                 if (!o.Active && Offers.Count(x => x.Active) >= 5) return Problem(HttpStatusCode.UnprocessableEntity, "too_many_offerings");
                 o.Active = true;
-                return NoContent();
+                return Unit();
             }
         }
         return new HttpResponseMessage(HttpStatusCode.NotFound);

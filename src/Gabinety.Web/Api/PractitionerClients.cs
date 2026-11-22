@@ -19,12 +19,12 @@ public sealed class PractitionerClient(HttpClient http, VisitorAddressAccessor v
 
     public Task<ApiResult<PractitionerPrivateDto>> SaveProfileAsync(UpdatePractitionerBody body, CancellationToken ct = default) => Write<PractitionerPrivateDto>(HttpMethod.Put, Me, body, ct);
 
-    public Task<ApiResult<NoContent>> SubmitAsync(CancellationToken ct = default) => Write<NoContent>(HttpMethod.Post, Me + "/submit", null, ct);
+    public Task<ApiResult<Unit>> SubmitAsync(CancellationToken ct = default) => Write<Unit>(HttpMethod.Post, Me + "/submit", null, ct);
 
     public Task<ApiResult<GithubChallengeDto>> RequestGithubLinkAsync(string githubLogin, CancellationToken ct = default) =>
         Write<GithubChallengeDto>(HttpMethod.Post, Me + "/github-link", new GithubLinkBody(githubLogin), ct);
 
-    public Task<ApiResult<NoContent>> VerifyGithubLinkAsync(CancellationToken ct = default) => Write<NoContent>(HttpMethod.Post, Me + "/github-link/verify", null, ct);
+    public Task<ApiResult<Unit>> VerifyGithubLinkAsync(CancellationToken ct = default) => Write<Unit>(HttpMethod.Post, Me + "/github-link/verify", null, ct);
 
     public async Task<ApiResult<IReadOnlyList<OfferingPrivateDto>>> OfferingsAsync(CancellationToken ct = default)
     {
@@ -36,9 +36,9 @@ public sealed class PractitionerClient(HttpClient http, VisitorAddressAccessor v
     public Task<ApiResult<OfferingPrivateDto>> SaveOfferingAsync(Guid? id, OfferingBody body, CancellationToken ct = default) =>
         Write<OfferingPrivateDto>(id is null ? HttpMethod.Post : HttpMethod.Put, Me + "/offerings" + (id is null ? "" : "/" + id), body, ct);
 
-    public Task<ApiResult<NoContent>> DeactivateOfferingAsync(Guid id, CancellationToken ct = default) => Write<NoContent>(HttpMethod.Post, $"{Me}/offerings/{id}/deactivate", null, ct);
+    public Task<ApiResult<Unit>> DeactivateOfferingAsync(Guid id, CancellationToken ct = default) => Write<Unit>(HttpMethod.Post, $"{Me}/offerings/{id}/deactivate", null, ct);
 
-    public Task<ApiResult<NoContent>> ActivateOfferingAsync(Guid id, CancellationToken ct = default) => Write<NoContent>(HttpMethod.Post, $"{Me}/offerings/{id}/activate", null, ct);
+    public Task<ApiResult<Unit>> ActivateOfferingAsync(Guid id, CancellationToken ct = default) => Write<Unit>(HttpMethod.Post, $"{Me}/offerings/{id}/activate", null, ct);
 }
 
 /// <summary>Booking, the practitioner's weekly availability (CONTRACTS 4.2) and payments account (PAYMENTS-GO-LIVE).</summary>

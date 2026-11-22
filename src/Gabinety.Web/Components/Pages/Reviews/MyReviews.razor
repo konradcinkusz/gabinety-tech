@@ -1,0 +1,142 @@
+@page "/moje/opinie"
+@attribute [Authorize]
+@inject MeClient Me
+@inject ReviewsClient Reviews
+@inject NavigationManager Navigation
+@* The signed-in practitioner's own published reviews, newest first, and the one reply to each. Static server rendering: "Odpowiedz" is a link (?reply=<id>) that opens the reply form of that one review, so a
+   page has one reply form and no two forms share a name. Every review and reply is rendered as text. *@
+
+<PageTitle>@ReviewsText.ListMetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@ReviewsText.ListTitle</h1>
+
+@if (_failure is not null)
+{
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@ReviewRules.FailureText(_failure)</p>
+        <a class="btn btn--secondary" href="@Here()">@BookingsText.Retry</a>
+    </div>
+}
+else if (_noProfile)
+{
+    <div class="empty-state" data-testid="no-profile">
+        <h2>@ReviewsText.List.NotPractitionerTitle</h2>
+        <p>@ReviewsText.List.NotPractitioner</p>
+        <a class="btn btn--secondary" href="/gabinet-programisty">@ReviewsText.List.CreateProfile</a>
+    </div>
+}
+else if (_page is not null)
+{
+    @if (RepliedParam == "1") {<div class="callout callout--success" role="status">@ReviewsText.Reply.Done</div>}
+    @if (_page.Items.Count == 0)
+    {
+        <div class="empty-state"><h2>@ReviewsText.List.EmptyTitle</h2><p>@ReviewsText.List.Empty</p></div>
+    }
+    else
+    {
+        <ul class="stack">
+            @foreach (var r in _page.Items)
+            {
+                <li class="card stack stack--tight">
+                    <p class="muted">@BookingFormat.MetaLine(ReviewsText.List.Reviewer, string.Format(ReviewsText.List.Rating, r.Rating), Day(r.CreatedAt))</p>
+                    <p class="review-text">@r.Text</p>
+                    @if (r.Reply is { } reply)
+                    {
+                        <div class="reply">
+                            <strong>@ReviewsText.List.ReplyHeading</strong>
+                            <p class="review-text">@reply.Text</p>
+                        </div>
+                    }
+                    else if (ReplyParam == r.Id.ToString("D"))
+                    {
+                        <form method="post" @onsubmit="ReplyAsync" @formname="reply" class="form" novalidate>
+                            <AntiforgeryToken />
+                            <input type="hidden" name="Model.ReviewId" value="@r.Id" />
+                            <BookingFormProblems Items="_problems" />
+                            <CounterTextArea Id="reply" Name="Model.Text" Label="@ReviewsText.Reply.Label" Hint="@ReviewsText.Reply.Hint" Value="@Model!.Text" Rows="3" Error="@_replyError" Autofocus="@(_problems.Count == 1)" />
+                            @if (_replyNote is not null) {<div class="callout callout--danger" role="alert">@_replyNote</div>}
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn--primary">@ReviewsText.Reply.Submit</button>
+                                <a class="btn btn--ghost" href="@Here()">@BookingsText.Dispute.Close</a>
+                            </div>
+                        </form>
+                    }
+                    else
+                    {
+                        <div><a class="btn btn--secondary" href="@Here(reply: r.Id.ToString("D"))">@(ReviewsText.Reply.Submit)<span class="sr-only">: @string.Format(ReviewsText.List.Rating, r.Rating)</span></a></div>
+                    }
+                </li>
+            }
+        </ul>
+        @if (_page.NextCursor is { } next) {<a class="btn btn--secondary" rel="next" href="@Here(cursor: next)">@ReviewsText.List.More</a>}
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+    [SupplyParameterFromQuery(Name = "reply")] public string? ReplyParam { get; set; }
+    [SupplyParameterFromQuery(Name = "replied")] public string? RepliedParam { get; set; }
+    [SupplyParameterFromForm(FormName = "reply")] ReplyFormModel? Model { get; set; }
+
+    public sealed class ReplyFormModel { public string? ReviewId { get; set; } public string? Text { get; set; } }
+
+    Guid _practitionerId;
+    PageDto<ReviewDto>? _page;
+    ApiFailure? _failure;
+    bool _noProfile;
+    string? _replyError, _replyNote;
+    List<FormProblem> _problems = [];
+
+    static string Day(DateTimeOffset at)
+    {
+        var d = TimeZoneInfo.ConvertTime(at, BookingFormat.Warsaw);
+        return $"{d.Day} {Pl.Format.MonthsGenitive[d.Month - 1]} {d.Year}";
+    }
+
+    string Here(string? reply = null, string? cursor = null)
+    {
+        var q = new List<string>();
+        if (!string.IsNullOrEmpty(cursor ?? CursorParam)) q.Add("cursor=" + Uri.EscapeDataString(cursor ?? CursorParam!));
+        if (reply is not null) q.Add("reply=" + reply);
+        return "/moje/opinie" + (q.Count > 0 ? "?" + string.Join('&', q) : "");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Model ??= new();
+        var me = await Me.GetAsync();
+        if (!me.IsOk)
+        {
+            if (me.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl("/moje/opinie")); return; }
+            Fail(me.Failure);
+            return;
+        }
+        if (me.Value!.PractitionerId is not { } id) { _noProfile = true; return; }
+        _practitionerId = id;
+        await LoadAsync();
+    }
+
+    async Task LoadAsync()
+    {
+        var list = await Reviews.ListAsync(_practitionerId, string.IsNullOrWhiteSpace(CursorParam) ? null : CursorParam);
+        if (list.IsOk) { _page = list.Value; return; }
+        Fail(list.Failure!);
+    }
+
+    void Fail(ApiFailure failure)
+    {
+        _failure = failure;
+    }
+
+    async Task ReplyAsync()
+    {
+        _replyError = ReviewRules.ReplyProblem(Model!.Text);
+        _problems = _replyError is null ? [] : [new FormProblem("reply", _replyError)];
+        if (_replyError is not null || !Guid.TryParse(Model.ReviewId, out var reviewId)) return;
+        var result = await Reviews.ReplyAsync(reviewId, Model.Text!);
+        if (result.IsOk) { Navigation.NavigateTo("/moje/opinie?replied=1"); return; }
+        var f = result.Failure!;
+        if (f.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl("/moje/opinie")); return; }
+        _replyNote = f.Code == "already_replied" ? ReviewsText.Reply.Already : ReviewRules.FailureText(f);
+    }
+}

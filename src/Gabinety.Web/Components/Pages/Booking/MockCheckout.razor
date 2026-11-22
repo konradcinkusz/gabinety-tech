@@ -1,0 +1,92 @@
+@page "/checkout/mock/{BookingId:guid}"
+@attribute [Authorize]
+@inject BookingClient Bookings
+@inject NavigationManager Navigation
+@inject Gabinety.Web.Hosting.WebOptions Site
+@inject TimeProvider Time
+@* The stand-in for the payment provider's page. It exists only in the fake profile, with the mock provider (the rule of the Booking service, copied into WebOptions.MockPayments): anywhere else this is a
+   404, before any backend is asked. The two outcomes are plain form posts; the clock alone is interactive (HoldTimer), so a click is never lost to a circuit that is not connected yet. *@
+
+<PageTitle>@BookFlowText.Checkout.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@BookFlowText.Checkout.Title</h1>
+
+@if (_loadFailure is not null)
+{
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@BookFlowText.Checkout.LoadFailed</p>
+        <a class="btn btn--secondary" href="@CurrentPath">@BookFlowText.Checkout.Refresh</a>
+    </div>
+}
+else if (_booking is { } b)
+{
+    @if (b.Status != "PendingPayment")
+    {
+        <div class="callout callout--info" role="status">
+            <p>@BookFlowText.Checkout.Closed</p>
+            @if (b.Status == "Confirmed") {<a class="btn btn--primary" href="@($"/rezerwacja/potwierdzenie/{b.Id}")">@BookFlowText.Checkout.ToBooking</a>}
+            else {<a class="btn btn--secondary" href="@ProfileHref(b)">@BookFlowText.Checkout.ToProfile</a>}
+        </div>
+    }
+    else
+    {
+        var expired = b.HoldExpiresAt is { } hold && HoldCountdown.Expired(HoldCountdown.Left(hold, Time.GetUtcNow()));
+        <div class="callout callout--info">@BookFlowText.Checkout.Demo</div>
+        <div class="checkout-layout">
+            <ConsultationSummary Offering="@b.OfferingTitle" Party="@BookingFormat.Name(b.Practitioner.DisplayName)" When="@BookingFormat.When(b.StartUtc, b.EndUtc)" Minutes="b.DurationMinutes" PriceMinor="b.Price.AmountMinor">
+                @if (b.HoldExpiresAt is { } until) {<HoldTimer @rendermode="InteractiveServer" ExpiresAt="until" />}
+            </ConsultationSummary>
+            <div class="stack">
+                @if (_declined) {<div class="callout callout--danger" role="alert">@BookFlowText.Checkout.Failed <a href="@ProfileHref(b)">@BookFlowText.Checkout.ToProfile</a></div>}
+                @if (_problem is not null) {<div class="callout callout--danger" role="alert">@_problem</div>}
+                @if (expired) {<div class="callout callout--warning" role="alert">@BookFlowText.Checkout.Expired <a href="@ProfileHref(b)">@BookFlowText.Checkout.ToProfile</a></div>}
+                <form method="post" @onsubmit="SubmitAsync" @formname="checkout" class="form-actions">
+                    <AntiforgeryToken />
+                    <button type="submit" name="Model.Outcome" value="succeeded" class="btn btn--primary" disabled="@(expired || _declined)">@BookFlowText.Checkout.Succeed</button>
+                    <button type="submit" name="Model.Outcome" value="failed" class="btn btn--ghost" disabled="@(expired || _declined)">@BookFlowText.Checkout.Fail</button>
+                </form>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid BookingId { get; set; }
+    [SupplyParameterFromForm(FormName = "checkout")] CheckoutForm? Model { get; set; }
+
+    BookingDetailDto? _booking;
+    ApiFailure? _loadFailure;
+    string? _problem;
+    bool _declined;
+
+    sealed class CheckoutForm { public string? Outcome { get; set; } }
+
+    string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+    static string ProfileHref(BookingDetailDto b) => string.IsNullOrWhiteSpace(b.Practitioner.Slug) ? "/programisci" : "/gabinet/" + Uri.EscapeDataString(b.Practitioner.Slug);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Model ??= new();
+        if (!Site.MockPayments) { Navigation.NotFound(); return; } // fail closed, before any backend is asked
+        var result = await Bookings.GetAsync(BookingId);
+        if (result.IsOk) { _booking = result.Value; return; }
+        if (result.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe(CurrentPath))); return; }
+        if (result.Failure.Status is 404 or 403) { Navigation.NotFound(); return; } // not this user's booking: the answer of an unknown id
+        _loadFailure = result.Failure;
+    }
+
+    async Task SubmitAsync()
+    {
+        var outcome = Model?.Outcome;
+        if (_booking is null || outcome is not ("succeeded" or "failed")) return;
+        var result = await Bookings.SimulatePaymentAsync(BookingId, outcome);
+        if (result.IsOk)
+        {
+            if (outcome == "succeeded") { Navigation.NavigateTo($"/rezerwacja/potwierdzenie/{BookingId}"); return; }
+            _declined = true;
+            return;
+        }
+        if (result.Failure!.IsUnauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe(CurrentPath))); return; }
+        _problem = result.Failure.Status is 403 or 404 ? BookFlowText.Checkout.NotMock : BookFlowText.Checkout.Error;
+    }
+}

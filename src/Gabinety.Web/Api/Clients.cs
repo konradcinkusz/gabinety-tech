@@ -33,7 +33,7 @@ public sealed class DirectoryClient(HttpClient http, VisitorAddressAccessor visi
 }
 
 /// <summary>Booking, for the signed-in user: the bearer is read from the caller's scope (<see cref="IAccessTokenSource"/>) and handed to the handler through the request.</summary>
-public sealed class BookingClient(HttpClient http, VisitorAddressAccessor visitor, IAccessTokenSource tokens) : ApiClient(http, visitor)
+public sealed partial class BookingClient(HttpClient http, VisitorAddressAccessor visitor, IAccessTokenSource tokens) : ApiClient(http, visitor)
 {
     public const string ClientRole = "client", PractitionerRole = "practitioner";
 

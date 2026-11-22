@@ -1,0 +1,19 @@
+@* The summary of DESIGN-CONTRACT 5.5: every problem of the form at once, each a link to its field. It is where focus goes after a submit with several errors (autofocus: the page is complete HTML, no script). *@
+@if (Items.Count > 0)
+{
+    <div class="form-summary callout callout--danger" role="alert" id="form-summary" tabindex="-1" autofocus="@(Items.Count > 1)">
+        <h2>@Heading</h2>
+        <ul class="stack stack--tight">
+            @foreach (var item in Items)
+            {
+                <li><a href="#@item.FieldId">@item.Message</a></li>
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<FormProblem> Items { get; set; } = [];
+
+    string Heading => FormProblemText.Heading(Items.Count);
+}

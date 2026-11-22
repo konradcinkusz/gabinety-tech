@@ -138,7 +138,7 @@ export async function runFlows(browser, { OUT, shotCount, findings }) {
       await page.goto("/gabinet-programisty/profil"); await settle(page);
       await page.getByRole("button", { name: "Zapisz" }).click(); await page.waitForTimeout(600);
       await snap(page, "newpractitioner", "05-profile-validation", "profile saved empty");
-      await page.goto("/gabinet-programisty/oferty"); await settle(page);
+      await page.goto("/gabinet-programisty/oferty?nowa=1"); await settle(page);
       await page.getByRole("button", { name: "Zapisz" }).click(); await page.waitForTimeout(600);
       await snap(page, "newpractitioner", "06-offerings-validation", "offer saved empty");
       await page.goto("/gabinet-programisty/dostepnosc"); await settle(page);

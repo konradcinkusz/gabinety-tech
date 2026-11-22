@@ -207,12 +207,12 @@ public class BookingDetailTests
     }
 
     [Fact]
-    public async Task When_the_service_sends_the_outcome_of_this_booking_the_dialog_says_it_and_keeps_the_rule_F11()
+    public async Task When_the_service_sends_the_outcome_of_this_booking_the_dialog_says_it_and_does_not_repeat_the_rule_F11()
     {
         await using var full = await Open(Detail(cancel: true, outcome: new CancelOutcomeDto("full_refund", new MoneyDto(25000, "PLN"))));
         var dialog = (await full.Browser.GetAsync(Client + "&action=cancel")).One("dialog")!;
         Assert.Contains("Otrzymasz zwrot 250,00 zł.", dialog.TextContent);
-        Assert.Contains("co najmniej 24 godziny, zwrot wynosi 100% ceny", dialog.TextContent); // J5 reads this too: both worlds pass
+        Assert.DoesNotContain("co najmniej 24 godziny", dialog.TextContent); // UX-031: the consequence once, not the rule again
 
         await using var none = await Open(Detail(cancel: true, outcome: new CancelOutcomeDto("no_refund", new MoneyDto(0, "PLN"))));
         var late = (await none.Browser.GetAsync(Client + "&action=cancel")).One("dialog")!;
@@ -325,7 +325,7 @@ public class BookingDetailTests
         Assert.Equal("Rodzaj sporu", page.One("label[for=kind]")!.TextContent);
         Assert.Equal(["Konsultacja różniła się od opisu", "Programista się nie stawił", "Inny powód"], page.All("#kind option").Select(o => o.TextContent));
         Assert.Equal("Opis sporu", page.One("label[for=text]")!.TextContent);
-        Assert.Equal(["Wyślij zgłoszenie"], page.All("section form button").Select(b => b.TextContent));
+        Assert.Equal(["Wyślij zgłoszenie"], page.All("dialog form button").Select(b => b.TextContent));
         Assert.Single(page.All("label"), l => l.TextContent.Contains("opis sporu", StringComparison.OrdinalIgnoreCase)); // getByLabel is a substring match: one control
         Assert.Equal("0 / 1000", page.TextOf(".field__counter"));
     }

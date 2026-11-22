@@ -14,6 +14,10 @@ namespace Gabinety.Directory.Features.Internal;
 public sealed record InternalOfferingDto(Guid OfferingId, Guid PractitionerId, string PractitionerUserId, PractitionerStatus PractitionerStatus,
     string Title, int DurationMinutes, MoneyDto Price, string? MeetingUrl, bool IsActive);
 public sealed record InternalPractitionerDto(Guid PractitionerId, PractitionerStatus Status);
+
+/// <summary><c>GET /internal/v1/practitioners/{id}</c>: what Booking shows next to a booking (ADR-0012 section 6). Display name and slug only; an erased practitioner reads <see cref="InternalFeature.ErasedName"/>.</summary>
+public sealed record InternalPractitionerNameDto(Guid PractitionerId, string DisplayName, string Slug);
+
 /// <summary>GET /internal/v1/practitioners/{userId}/contact: the e-mail snapshot only. Personal data; the caller (Booking) must not log it.</summary>
 public sealed record InternalContactDto(string Email);
 public sealed record ReputationPush(int RatingCount, decimal RatingAvg, long Version);
@@ -34,6 +38,7 @@ public sealed class InternalFeature : IServiceFeature
         var g = endpoints.MapGroup("/internal/v1").RequireAuthorization("Internal");
         g.MapGet("offerings/{id:guid}", GetOffering);
         g.MapGet("practitioners/by-user/{userId}", GetByUser);
+        g.MapGet("practitioners/{id:guid}", GetNames);
         g.MapGet("practitioners/{userId}/contact", GetContact);
         g.MapPut("practitioners/{id:guid}/reputation", PutReputation);
         g.MapPut("practitioners/{id:guid}/booking-stats", PutStats);
@@ -58,6 +63,12 @@ public sealed class InternalFeature : IServiceFeature
     {
         var row = await db.Practitioners.AsNoTracking().Where(p => p.UserId == userId).Select(p => new { p.Id, p.Status }).SingleOrDefaultAsync(ct);
         return row is null ? Problem(404, ErrorCodes.NotFound, "Not found") : Results.Ok(new InternalPractitionerDto(row.Id, row.Status));
+    }
+
+    static async Task<IResult> GetNames(Guid id, DirectoryDbContext db, CancellationToken ct)
+    {
+        var row = await db.Practitioners.AsNoTracking().Where(p => p.Id == id).Select(p => new { p.Id, p.DisplayName, p.Slug }).SingleOrDefaultAsync(ct);
+        return row is null ? Problem(404, ErrorCodes.NotFound, "Not found") : Results.Ok(new InternalPractitionerNameDto(row.Id, row.DisplayName, row.Slug));
     }
 
     /// <summary>404 for an unknown user and for a practitioner whose address is not held yet (they have not used their profile since the snapshot exists): the caller retries later.</summary>

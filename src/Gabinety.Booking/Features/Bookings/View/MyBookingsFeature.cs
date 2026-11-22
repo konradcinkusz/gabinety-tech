@@ -31,7 +31,7 @@ public sealed class MyBookingsFeature : IServiceFeature
         endpoints.MapGet("/api/v1/me/bookings", ListAsync).RequireAuthorization("Authenticated");
 
     static async Task<IResult> ListAsync(string? role, string? status, string? cursor, string? limit, ClaimsPrincipal user, BookingDbContext db,
-        TimeProvider time, CancellationToken ct)
+        PartyNamesLookup names, TimeProvider time, CancellationToken ct)
     {
         var sub = BookingViewFeature.CallerId(user);
         if (sub is null) return Results.Unauthorized();
@@ -67,7 +67,8 @@ public sealed class MyBookingsFeature : IServiceFeature
         var ids = rows.Select(b => b.Id).ToList();
         var payments = (await db.Payments.AsNoTracking().Where(pm => ids.Contains(pm.BookingId)).ToListAsync(ct)).ToDictionary(pm => pm.BookingId);
         var admin = BookingViewFeature.IsAdmin(user);
-        var items = rows.Select(b => BookingViewFeature.ToView(b, payments.GetValueOrDefault(b.Id), sub, admin, time)).ToList();
+        var nameOf = await names.ForAsync(rows, ct);
+        var items = rows.Select(b => BookingViewFeature.ToView(b, payments.GetValueOrDefault(b.Id), sub, admin, time, nameOf[b.Id])).ToList();
 
         return Results.Ok(more && rows.Count > 0
             ? new MyBookingsPage(items, Encode(new Position(rows[^1].StartUtc, rows[^1].Id), role!, statusFilter))

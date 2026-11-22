@@ -6,6 +6,7 @@ public sealed record RegisterRequest(string? Email, string? Password, string? Ac
 public sealed record LoginRequest(string? Email, string? Password);
 public sealed record RefreshRequest(string? RefreshToken);
 public sealed record RecordConsentRequest(bool? AcceptedTerms, bool? AcceptedPrivacy);
+public sealed record ExchangeRequest(string? Code);
 public sealed record DeleteAccountRequest(string? Password, string? Confirmation);
 
 public static class Endpoints
@@ -146,7 +147,15 @@ public static class Endpoints
 
         // No provider is configured in the stand-in, as in authservice without OAuth credentials.
         foreach (var prefix in new[] { "/api/v1/external-auth", "/api/external-auth" })
+        {
             app.MapGet($"{prefix}/providers", () => Results.Ok(new { providers = Array.Empty<object>() }));
+            // Start of a provider sign-in: authservice answers 400 when the provider is not configured (docs/spikes/authservice.md section 3).
+            app.MapGet($"{prefix}/login", () => Results.BadRequest(new { error = "Provider is not configured." }));
+            // Exchange of the single-use code: no code is ever issued here, so every code is a bad one (401). The web sends `{code}`.
+            app.MapPost($"{prefix}/exchange", (ExchangeRequest r) =>
+                string.IsNullOrWhiteSpace(r.Code) ? Results.BadRequest(new { error = "Code is required" })
+                : Results.Json(new { error = "Invalid or expired code" }, statusCode: StatusCodes.Status401Unauthorized));
+        }
 
         app.MapGet("/.well-known/jwks.json", (HttpResponse response) =>
         {

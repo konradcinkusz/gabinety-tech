@@ -54,7 +54,7 @@ public sealed class DisputeFeature : IServiceFeature
     }
 
     static async Task<IResult> DisputeAsync(Guid id, DisputeRequest? body, ClaimsPrincipal user, BookingDbContext db, BookingTransitions transitions,
-        TimeProvider time, CancellationToken ct)
+        PartyNamesLookup names, TimeProvider time, CancellationToken ct)
     {
         var sub = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (sub is null) return Results.Unauthorized();
@@ -81,6 +81,6 @@ public sealed class DisputeFeature : IServiceFeature
                 if (c.From == Gabinety.Billing.BookingStatus.Completed) ReopenMoney(c);
             },
         }, ct);
-        return result.ToErrorResult() ?? Results.Ok(BookingViewFeature.ToView(result.Booking!, result.Payment, sub, admin: false));
+        return result.ToErrorResult() ?? Results.Ok(BookingViewFeature.ToView(result.Booking!, result.Payment, sub, admin: false, names: (await names.ForAsync([result.Booking!], ct))[result.Booking!.Id]));
     }
 }

@@ -83,6 +83,17 @@ public class AreaComponentTests : BunitContext
         Assert.Empty(span.Children); // a text node, not an element or CSS content (contract 9.6)
     }
 
+    [Theory]
+    [InlineData(PaymentsState.Ready, "badge badge--success", "Gotowe")]
+    [InlineData(PaymentsState.Pending, "badge badge--warning", "Wymaga uzupełnienia")]
+    [InlineData(PaymentsState.None, "badge badge--neutral", "Nie rozpoczęto")]
+    public void The_payments_status_badge_has_the_kind_and_the_label_for_each_state(PaymentsState state, string className, string label)
+    {
+        var cut = Render<KindBadge>(p => p.Add(b => b.Label, PaymentsView.Label(state)).Add(b => b.Kind, PaymentsView.Kind(state)).Add(b => b.TestId, "payments-status"));
+        var badge = cut.Find("[data-testid=payments-status]");
+        Assert.Equal((className, label), (badge.ClassName, badge.TextContent));
+    }
+
     [Fact]
     public void The_tabs_mark_only_the_current_section_and_a_query_string_does_not_change_it()
     {

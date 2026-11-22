@@ -7,7 +7,8 @@ public static class PaymentsView
 {
     public static string Label(PaymentsState s) => s switch { PaymentsState.Ready => PlPractitioner.Payments.Ready, PaymentsState.None => PlPractitioner.Payments.NotStarted, _ => PlPractitioner.Payments.NeedsWork };
 
-    public static string Kind(PaymentsState s) => s switch { PaymentsState.Ready => "success", PaymentsState.None => "neutral", _ => "warning" };
+    /// <summary>The badge kind (contract 5.7): ready is success, a started account that needs work is a warning, everything else (not started, demo, unknown) is neutral.</summary>
+    public static string Kind(PaymentsState s) => s switch { PaymentsState.Ready => "success", PaymentsState.Pending => "warning", _ => "neutral" };
 
     public static string Body(PaymentsState s) => s switch
     {

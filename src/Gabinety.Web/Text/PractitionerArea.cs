@@ -109,6 +109,8 @@ public static class PlPractitioner
         public const string Nip = "NIP", NipHint = "10 cyfr. Sprawdzamy sumę kontrolną. Zmiana NIP zatwierdzonego profilu wymaga ponownej weryfikacji.";
         public const string NipChangeWarning = "Zmiana NIP wyśle zatwierdzony profil ponownie do weryfikacji.";
         public const string Slug = "Adres profilu";
+        /// <summary>The caption of the preview of the public header beside the form (UX-043); it shows the saved values, not the typed ones.</summary>
+        public const string PreviewTitle = "Podgląd profilu";
     }
 
     public static class Offers
@@ -153,6 +155,8 @@ public static class PlPractitioner
         public const string ReadyBody = "Konto płatności jest gotowe. Klienci mogą rezerwować Twoje terminy, a wypłaty trafiają na Twoje konto po konsultacji.";
         public const string PendingBody = "Konto płatności czeka na uzupełnienie danych u operatora płatności. Dokończ konfigurację, aby przyjmować rezerwacje.";
         public const string NoneBody = "Nie rozpocząłeś jeszcze konfiguracji konta płatności.";
+        /// <summary>What a client meets while the account is not ready: the booking is refused (Booking answers 422 without a ready account), so no payment is taken.</summary>
+        public const string ClientMeanwhile = "Co widzi klient w międzyczasie: nie może zarezerwować u Ciebie terminu ani zapłacić, dopóki konto płatności nie jest gotowe.";
         public const string Start = "Rozpocznij konfigurację płatności", Continue = "Dokończ konfigurację płatności";
         public const string LinkReady = "Link do konfiguracji jest gotowy. Jest jednorazowy i krótko ważny.", OpenLink = "Przejdź do konfiguracji w Stripe";
         public const string Returned = "Wróciłeś z konfiguracji. Poniżej jest aktualny status konta płatności.";

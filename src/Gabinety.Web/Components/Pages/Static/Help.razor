@@ -1,0 +1,118 @@
+@page "/pomoc"
+@attribute [AllowAnonymous]
+@attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = Gabinety.Web.Hosting.PublicPageCachePolicy.Name)]
+@inject Gabinety.Web.Hosting.WebOptions Options
+
+<PageMeta Title="@PlPages.Help.MetaTitle" Description="@PlPages.Help.MetaDescription" Path="/pomoc" />
+
+<div class="prose">
+    <header class="page-header">
+        <h1>@PlPages.Help.Title</h1>
+        <p class="lead">@PlPages.Help.Intro</p>
+    </header>
+
+    <section class="section" aria-labelledby="help-booking">
+        <h2 id="help-booking">@PlPages.Help.BookingTitle</h2>
+        <div class="faq">
+            <details>
+                <summary>@PlPages.Help.BookHowQ</summary>
+                <p>@PlPages.Help.BookHowA</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.PayWhenQ</summary>
+                <p>@PlPages.Help.PayWhenA</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.PriceQ</summary>
+                <p>@PlPages.Help.PriceA <a href="/cennik">@PlPages.Help.PricingLink</a>.</p>
+            </details>
+        </div>
+    </section>
+
+    <section class="section" aria-labelledby="help-cancel">
+        <h2 id="help-cancel">@PlPages.Help.CancelTitle</h2>
+        <div class="faq">
+            <details>
+                <summary>@PlPages.Help.CancelQ</summary>
+                <p>@PlPages.Help.CancelA</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.RefundQ</summary>
+                <p>@PlPages.Help.RefundA <a href="/jak-to-dziala">@PlPages.Help.HowLink</a>.</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.PartialQ</summary>
+                <p>@PlPages.Help.PartialA <a href="/cennik">@PlPages.Help.PricingLink</a>.</p>
+            </details>
+        </div>
+    </section>
+
+    <section class="section" aria-labelledby="help-dispute">
+        <h2 id="help-dispute">@PlPages.Help.DisputeTitle</h2>
+        <div class="faq">
+            <details>
+                <summary>@PlPages.Help.DisputeQ</summary>
+                <p>@PlPages.Help.DisputeA <a href="/jak-to-dziala">@PlPages.Help.HowLink</a>.</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.DisputeWhoQ</summary>
+                <p>@PlPages.Help.DisputeWhoA <a href="/regulamin">@PlPages.Help.TermsLink</a>.</p>
+            </details>
+        </div>
+    </section>
+
+    <section class="section" aria-labelledby="help-reviews">
+        <h2 id="help-reviews">@PlPages.Help.ReviewTitle</h2>
+        <div class="faq">
+            <details>
+                <summary>@PlPages.Help.ReviewQ</summary>
+                <p>@PlPages.Help.ReviewA</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.RankingQ</summary>
+                <p>@PlPages.Help.RankingA <a href="/zasady-rankingu">@PlPages.Help.RankingLink</a>.</p>
+            </details>
+        </div>
+    </section>
+
+    <section class="section" aria-labelledby="help-account">
+        <h2 id="help-account">@PlPages.Help.AccountTitle</h2>
+        <div class="faq">
+            <details>
+                <summary>@PlPages.Help.RegisterQ</summary>
+                <p>@PlPages.Help.RegisterA</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.DataQ</summary>
+                <p>@PlPages.Help.DataA <a href="/polityka-prywatnosci">@PlPages.Help.PrivacyLink</a>.</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.ExportQ</summary>
+                <p>@PlPages.Help.ExportA</p>
+            </details>
+        </div>
+    </section>
+
+    <section class="section" aria-labelledby="help-programmers">
+        <h2 id="help-programmers">@PlPages.Help.ProgrammerTitle</h2>
+        <div class="faq">
+            <details>
+                <summary>@PlPages.Help.BecomeQ</summary>
+                <p>@PlPages.Help.BecomeA</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.PayoutQ</summary>
+                <p>@PlPages.Help.PayoutA <a href="/jak-to-dziala">@PlPages.Help.HowLink</a>.</p>
+            </details>
+            <details>
+                <summary>@PlPages.Help.FeeQ</summary>
+                <p>@PlPages.Help.FeeA <a href="/cennik">@PlPages.Help.PricingLink</a>.</p>
+            </details>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Options.SupportEmail))
+    {
+        <p class="section">@PlPages.Help.NoAnswer <a href="mailto:@Options.SupportEmail">@PlPages.Help.WriteToUs</a></p>
+    }
+</div>

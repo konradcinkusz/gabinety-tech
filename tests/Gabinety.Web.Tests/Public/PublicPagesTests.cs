@@ -423,7 +423,7 @@ public class SeoEndpointsTests
         Assert.StartsWith("application/xml", page.Header("Content-Type"));
         var ns = XNamespace.Get("http://www.sitemaps.org/schemas/sitemap/0.9");
         var urls = XDocument.Parse(page.Html).Root!.Elements(ns + "url").ToList(); // parses: well-formed XML
-        Assert.Equal(["http://localhost/programisci", "http://localhost/programisci/audyt-kodu", "http://localhost/gabinet/demo-anna-demowska", "http://localhost/gabinet/demo-bartek"], urls.Select(u => u.Element(ns + "loc")!.Value));
+        Assert.Equal(["http://localhost/programisci", "http://localhost/programisci/audyt-kodu", "http://localhost/gabinet/demo-anna-demowska", "http://localhost/gabinet/demo-bartek", "http://localhost/pomoc"], urls.Select(u => u.Element(ns + "loc")!.Value));
         Assert.DoesNotContain("/programisci/migracja", page.Html); // 2 practitioners: noindex, so not offered
         Assert.Equal("2026-11-20T08:30:00.000Z", urls[2].Element(ns + "lastmod")!.Value);
         Assert.Null(urls[0].Element(ns + "lastmod"));

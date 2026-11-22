@@ -142,6 +142,7 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/zasady-rankingu` | Anonymous | all | ranking rules from the Directory; 503 when it does not answer |
 | Web | PAGE | `/regulamin` | Anonymous | all | legal text (embedded markdown) |
 | Web | PAGE | `/polityka-prywatnosci` | Anonymous | all | legal text (embedded markdown) |
+| Web | PAGE | `/pomoc` | Anonymous | all | static help; the contact sentence and mailto only when `Support:Email` is set |
 | Web | GET | `/sitemap.xml` | Anonymous | all | approved practitioners and indexable categories; 503 when the Directory does not answer |
 | Web | GET | `/robots.txt` | Anonymous | all | the rules of the retired Next.js app (the sitemap and robots of ADR-0010) |
 | Web | GET | `/avatar/{slug}` | Anonymous | all | the verified GitHub avatar of an approved practitioner (ADR-0013): slug validated, login read from the Directory profile, only `github.com` then `avatars.githubusercontent.com`, `image/png` or `image/jpeg` up to 200 KB, cached 24 h (failures 10 min); 404 for anything else |

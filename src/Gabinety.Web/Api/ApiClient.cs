@@ -21,6 +21,40 @@ public abstract class ApiClient(HttpClient http, VisitorAddressAccessor visitor)
     /// <summary>A write with any verb (a PUT, or a POST with no body): never retried (SPEC 5 rule 8). Use <see cref="Unit"/> as <typeparamref name="T"/> for a <c>204</c>.</summary>
     protected Task<ApiResult<T>> WriteAsync<T>(HttpMethod method, string path, string? accessToken, object? body, CancellationToken ct) => SendAsync<T>(method, path, accessToken, ct, body);
 
+    /// <summary>
+    /// A response that is passed on as a stream (a CSV export): the headers are read, the body is NOT buffered. The caller owns the result and disposes it (which ends the backend call).
+    /// A failure is an <see cref="ApiFailure"/> like any other call's.
+    /// </summary>
+    protected async Task<(ApiStream? Stream, ApiFailure? Failure)> OpenStreamAsync(string path, string accept, string? accessToken, CancellationToken ct)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
+        if (!string.IsNullOrEmpty(accessToken)) request.Options.Set(RequestContext.AccessToken, accessToken);
+        if (visitor.Current is { } address) request.Options.Set(RequestContext.VisitorAddress, address);
+        HttpResponseMessage? response = null;
+        try
+        {
+            response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var (code, _, _) = await FailureOf(response, ct);
+                var failure = new ApiFailure((int)response.StatusCode, code);
+                response.Dispose();
+                return (null, failure);
+            }
+            return (new ApiStream(response, await response.Content.ReadAsStreamAsync(ct)), null);
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            response?.Dispose();
+            return (null, ApiFailure.NoAnswer);
+        }
+        finally
+        {
+            request.Dispose();
+        }
+    }
+
     async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, string? accessToken, CancellationToken ct, object? body = null, IReadOnlyDictionary<string, string>? headers = null, TimeSpan? timeout = null)
     {
         using var request = new HttpRequestMessage(method, path);
@@ -76,4 +110,12 @@ public abstract class ApiClient(HttpClient http, VisitorAddressAccessor visitor)
             return (fallback, null, null);
         }
     }
+}
+
+/// <summary>A backend response body being passed on: disposing it releases the connection, which also ends a transfer the client has abandoned.</summary>
+public sealed class ApiStream(HttpResponseMessage response, Stream body) : IDisposable
+{
+    public Stream Body { get; } = body;
+    public string? ContentType => response.Content.Headers.ContentType?.ToString();
+    public void Dispose() { Body.Dispose(); response.Dispose(); }
 }

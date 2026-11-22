@@ -1,0 +1,19 @@
+@* A button that only changes what the page shows (opens the reason or the resolve form of one row): a GET form, so it works without JavaScript, keeps the view in the URL and changes nothing on the server. *@
+<form method="get" action="@Action" class="admin-reveal">
+    @foreach (var (name, value) in Keep)
+    {
+        <input type="hidden" name="@name" value="@value" />
+    }
+    <input type="hidden" name="@Name" value="@Value" />
+    <button type="submit" class="@Class">@ChildContent</button>
+</form>
+
+@code {
+    /// <summary>The page the form returns to (the path only: the query is rebuilt from <see cref="Keep"/> so the view stays the same).</summary>
+    [Parameter, EditorRequired] public string Action { get; set; } = "";
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public IEnumerable<KeyValuePair<string, string>> Keep { get; set; } = [];
+    [Parameter] public string Class { get; set; } = "btn";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

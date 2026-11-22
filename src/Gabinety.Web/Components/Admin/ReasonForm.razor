@@ -1,0 +1,29 @@
+@* The step before a destructive decision that needs a reason (reject, suspend; contract 5.8): a reason of 10 to 500 characters, the consequence in words, a danger button naming it, a way back. A static form post with
+   antiforgery; the typed text is kept when it is refused. The page reads the posted "reason" and decides. *@
+<form method="post" @formname="@FormName" @onsubmit="OnSubmit" class="admin-form" novalidate>
+    <AntiforgeryToken />
+    @if (Warning is not null) {<Alert Variant="AlertVariant.Warning">@Warning</Alert>}
+    <div class="@($"field{(Error is null ? "" : " admin-field--invalid")}")">
+        <label for="@InputId">@Label</label>
+        <p class="admin-hint" id="@(InputId)-hint">@Hint</p>
+        <textarea id="@InputId" name="reason" rows="4" maxlength="500" aria-describedby="@(InputId)-hint@(Error is null ? "" : " " + InputId + "-error")" aria-invalid="@(Error is null ? null : "true")">@Value</textarea>
+        @if (Error is not null) {<p class="admin-error" id="@(InputId)-error"><span class="visually-hidden">@PlAdmin.Common.ErrorPrefix </span>@Error</p>}
+    </div>
+    <div class="admin-actions">
+        <button type="submit" class="btn btn--danger">@ConfirmText</button>
+        <a class="btn btn--ghost" href="@CancelHref">@PlAdmin.Common.Cancel</a>
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired] public string FormName { get; set; } = "";
+    [Parameter, EditorRequired] public EventCallback OnSubmit { get; set; }
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Hint { get; set; } = "";
+    [Parameter, EditorRequired] public string ConfirmText { get; set; } = "";
+    [Parameter, EditorRequired] public string CancelHref { get; set; } = "";
+    [Parameter] public string? Warning { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string InputId { get; set; } = "reason";
+}

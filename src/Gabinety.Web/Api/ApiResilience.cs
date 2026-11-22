@@ -26,6 +26,7 @@ public static class ApiResilience
         Add<ReviewsClient>(services, Backend.Reputation);         // write a review, reply
         Add<MeClient>(services, Backend.Directory);               // who am I
         Add<Auth.IdentityClient>(services, Backend.Auth);
+        services.AddScoped<AdminApi>();      // the admin pages' calls with the administrator's own bearer (Api/Admin)
         Add<AccountClient>(services, Backend.Auth); // the signed-in user's own account calls (me, consents, export, delete)
         Add<PractitionerClient>(services, Backend.Directory);              // the practitioner's own profile and offers (port 4)
         Add<PractitionerSchedulingClient>(services, Backend.Booking);      // availability and the payments account (port 4)

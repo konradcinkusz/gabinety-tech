@@ -30,6 +30,8 @@ public sealed class WebFactory : WebApplicationFactory<Program>
         ["Site:BaseUrl"] = "http://localhost", ["RateLimit:TrustedProxyKey"] = TrustedKey,
     };
     string _environment = "Development";
+    /// <summary>What the host logged at Error or above while a test ran (a component that throws is caught by the error boundary and would otherwise be invisible).</summary>
+    public List<string> Errors { get; } = [];
     readonly List<Action<IServiceCollection>> _services = [];
 
     /// <summary>Replaces or adds services of the host under test (a fixed clock, for instance).</summary>
@@ -44,6 +46,7 @@ public sealed class WebFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_environment);
+        builder.ConfigureLogging(l => l.AddProvider(new ErrorSink(Errors)));
         foreach (var (k, v) in _settings) builder.UseSetting(k, v);
         foreach (var provider in _logProviders) builder.ConfigureLogging(l => l.AddProvider(provider));
         builder.ConfigureServices(services =>
@@ -120,4 +123,17 @@ public sealed class Page(HttpResponseMessage response, string html)
     public string TextOf(string css) => One(css)?.TextContent.Trim() ?? "";
     public bool HasAlert => Dom.QuerySelector("[role=alert]") is not null;
     public static string Squash(string s) => Regex.Replace(s, @"\s+", " ").Trim();
+}
+
+sealed class ErrorSink(List<string> sink) : Microsoft.Extensions.Logging.ILoggerProvider, Microsoft.Extensions.Logging.ILogger
+{
+    public Microsoft.Extensions.Logging.ILogger CreateLogger(string category) => this;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel level) => level >= Microsoft.Extensions.Logging.LogLevel.Warning;
+    public void Log<TState>(Microsoft.Extensions.Logging.LogLevel level, Microsoft.Extensions.Logging.EventId id, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    {
+        if (level < Microsoft.Extensions.Logging.LogLevel.Warning) return;
+        lock (sink) sink.Add(formatter(state, exception) + " " + exception);
+    }
+    public void Dispose() { }
 }

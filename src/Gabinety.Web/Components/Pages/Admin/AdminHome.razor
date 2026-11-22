@@ -1,0 +1,29 @@
+@page "/admin"
+@* The landing of the administrator area: where to go. No backend call (the sections load their own data). *@
+
+<PageTitle>@PlAdmin.Shell.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<section class="admin-section">
+    <h1>@PlAdmin.Shell.Title</h1>
+    <p class="admin-lead">@PlAdmin.Shell.Lead</p>
+    <ul class="admin-list" aria-label="@PlAdmin.Shell.NavLabel">
+        @foreach (var (href, title, lead) in Sections)
+        {
+            <li class="card">
+                <h2 class="admin-row__title"><a href="@href">@title</a></h2>
+                <p class="admin-row__sub">@lead</p>
+            </li>
+        }
+    </ul>
+</section>
+
+@code {
+    static readonly (string Href, string Title, string Lead)[] Sections =
+    [
+        ("/admin/weryfikacja", PlAdmin.Shell.Verification, PlAdmin.Shell.VerificationLead),
+        ("/admin/spory", PlAdmin.Shell.Disputes, PlAdmin.Shell.DisputesLead),
+        ("/admin/ksiega", PlAdmin.Shell.Ledger, PlAdmin.Shell.LedgerLead),
+        ("/admin/opinie", PlAdmin.Shell.Reviews, PlAdmin.Shell.ReviewsLead),
+        ("/admin/podejrzane", PlAdmin.Shell.Suspicious, PlAdmin.Shell.SuspiciousLead),
+    ];
+}

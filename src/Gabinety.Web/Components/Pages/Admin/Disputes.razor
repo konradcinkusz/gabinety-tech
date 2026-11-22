@@ -1,0 +1,223 @@
+@page "/admin/spory"
+@inject AdminApi Api
+@inject NavigationManager Navigation
+@* Static server rendering. The resolve flow is three steps of ONE antiforgery-protected form per dispute (name "resolve-<booking id>"): choose and write, check the consequence in words, confirm. "Rozstrzygnij" only opens
+   the form (a GET, nothing changes). The server revalidates every field at every step and the services decide the bounds (409 when somebody resolved first). J6 hooks: the card is a listitem that contains the booking id, the
+   buttons "Rozstrzygnij", "Przejdź do potwierdzenia", "Potwierdź rozstrzygnięcie", the radio "Zwróć klientowi część", the labels "Kwota zwrotu w zł" and "Notatka". *@
+
+<PageTitle>@PlAdmin.Disputes.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<section class="admin-section">
+    <h1>@PlAdmin.Disputes.Title</h1>
+    <p class="admin-lead">@PlAdmin.Shell.DisputesLead</p>
+    <SegmentedLinks Label="@PlAdmin.Disputes.FilterLabel" Items="Filters" />
+
+    @if (_notice is not null) {<Alert Variant="AlertVariant.Warning">@_notice</Alert>}
+    @if (_failure is { } failure)
+    {
+        <FailureAlert Failure="failure" Unavailable="@PlAdmin.Disputes.Unavailable" />
+    }
+    else if (_cards.Count == 0)
+    {
+        <p class="empty-state">@(_status == DisputeRules.Open ? PlAdmin.Disputes.EmptyOpen : PlAdmin.Disputes.EmptyResolved)</p>
+    }
+    else
+    {
+        <ul class="admin-list" aria-label="@PlAdmin.Disputes.Title">
+            @foreach (var card in _cards)
+            {
+                var d = card.Dispute;
+                var b = card.Booking;
+                <li class="card" data-testid="dispute">
+                    <div class="admin-row__head">
+                        <h2 class="admin-row__title">@AdminFormat.DisputeKind(d.Kind)</h2>
+                        @if (_status == DisputeRules.Open) {<AdminBadge Kind="BadgeKind.Warning">@PlAdmin.Disputes.Open</AdminBadge>}
+                        else {<AdminBadge Kind="BadgeKind.Neutral">@PlAdmin.Disputes.Resolved</AdminBadge>}
+                    </div>
+                    <dl class="admin-facts">
+                        <dt>@PlAdmin.Disputes.Offer</dt><dd>@(b?.OfferingTitle ?? PlAdmin.Disputes.BookingUnreadable)</dd>
+                        <dt>@PlAdmin.Disputes.Client</dt><dd><span title="@d.ClientUserId">@string.Format(PlAdmin.Common.ClientRef, AdminFormat.ShortRef(d.ClientUserId))</span></dd>
+                        <dt>@PlAdmin.Disputes.Practitioner</dt>
+                        <dd><span title="@d.PractitionerUserId">@(card.PractitionerName ?? string.Format(PlAdmin.Common.PractitionerRef, AdminFormat.ShortRef(d.PractitionerUserId)))</span></dd>
+                        @if (b is not null)
+                        {
+                            <dt>@PlAdmin.Disputes.Price</dt><dd class="num">@AdminFormat.Pln(b.Price.AmountMinor)</dd>
+                            @if (_status == DisputeRules.Open)
+                            {
+                                <dt>@PlAdmin.Disputes.MaxRefund</dt><dd class="num">@AdminFormat.Pln(b.Price.AmountMinor)</dd>
+                            }
+                            <dt>@PlAdmin.Disputes.Payment</dt>
+                            <dd>
+                                <AdminBadge Kind="AdminFormat.PaymentKind(b.Payment.Status)">@AdminFormat.Payment(b.Payment.Status)</AdminBadge>
+                                @if (b.Payment.Refunded.AmountMinor > 0) {<span class="num"> @string.Format(PlAdmin.Disputes.Refunded, AdminFormat.Pln(b.Payment.Refunded.AmountMinor))</span>}
+                            </dd>
+                        }
+                        <dt>@PlAdmin.Disputes.Booking</dt><dd><span class="admin-ref">@d.BookingId</span></dd>
+                        @if (d.OpenedAt is { } opened) {<dt>@PlAdmin.Disputes.Opened</dt><dd><time datetime="@opened.ToString("O")">@AdminFormat.When(opened)</time></dd>}
+                        @if (_status == DisputeRules.Resolved && d.ResolvedAt is { } resolvedAt) {<dt>@PlAdmin.Disputes.ResolvedAt</dt><dd><time datetime="@resolvedAt.ToString("O")">@AdminFormat.When(resolvedAt)</time></dd>}
+                        @if (_status == DisputeRules.Resolved && !string.IsNullOrEmpty(d.Resolution)) {<dt>@PlAdmin.Disputes.Outcome</dt><dd>@AdminFormat.Resolution(d.Resolution)</dd>}
+                        <dt>@PlAdmin.Disputes.Text</dt><dd class="admin-pre">@d.Text</dd>
+                        @if (_status == DisputeRules.Resolved && !string.IsNullOrEmpty(d.Note)) {<dt>@PlAdmin.Disputes.Note</dt><dd class="admin-pre">@d.Note</dd>}
+                    </dl>
+                    @if (_status == DisputeRules.Open)
+                    {
+                        @if (_messages.TryGetValue(card.Id, out var message)) {<Alert Variant="message.Variant">@message.Text</Alert>}
+                        @if (_activeId == card.Id) { @ResolveForm(card) }
+                        else
+                        {
+                            <div class="admin-actions"><RevealButton Action="/admin/spory" Name="rozstrzygnij" Value="@card.Id.ToString("D")" Keep="Kept" Class="btn btn--primary">@PlAdmin.Disputes.ResolveOpen</RevealButton></div>
+                        }
+                    }
+                </li>
+            }
+        </ul>
+        @if (_next is not null)
+        {
+            <p class="admin-more"><a class="btn" href="@ListUrl(cursor: _next)">@PlAdmin.Disputes.Next</a></p>
+        }
+    }
+    <StaleFormGuard Rendered="RenderedForms" OnStale="StaleAsync" />
+</section>
+
+@code {
+    RenderFragment ResolveForm(DisputeCard card) => __builder =>
+    {
+        var confirm = _step == ResolveStep.Confirm;
+        var form = _form;
+        var problems = confirm ? [] : _problems;
+        var amountProblem = problems.FirstOrDefault(p => p.Field == "amount");
+        var noteProblem = problems.FirstOrDefault(p => p.Field == "note");
+        var pickProblem = problems.FirstOrDefault(p => p.Field == "resolution");
+        var id = card.Id.ToString("N");
+        <form method="post" @formname="@PostedForm.Name("resolve", card.Id)" @onsubmit="() => ResolveAsync(card)" class="admin-form" novalidate>
+            <AntiforgeryToken />
+            @if (confirm)
+            {
+                <input type="hidden" name="resolution" value="@form.Resolution" />
+                <input type="hidden" name="amount" value="@form.Amount" />
+                <input type="hidden" name="note" value="@form.Note" />
+                <Alert Variant="AlertVariant.Warning" TestId="resolve-consequence"><strong>@PlAdmin.Disputes.ConfirmTitle</strong> @form.Consequence()</Alert>
+                @if (_error is not null) {<Alert Variant="AlertVariant.Danger">@_error</Alert>}
+                <div class="admin-actions">
+                    <button type="submit" name="step" value="confirm" class="btn btn--danger">@PlAdmin.Disputes.Confirm</button>
+                    <button type="submit" name="step" value="back" class="btn">@PlAdmin.Disputes.Back</button>
+                </div>
+            }
+            else
+            {
+                @if (problems.Count > 0)
+                {
+                    <div class="callout callout--danger" role="alert" data-testid="resolve-problems">
+                        <p><strong>@PlAdmin.Disputes.FormSummary</strong></p>
+                        <ul>@foreach (var p in problems) {<li>@p.Message</li>}</ul>
+                    </div>
+                }
+                <fieldset class="@($"admin-options{(pickProblem is null ? "" : " admin-field--invalid")}")">
+                    <legend>@PlAdmin.Disputes.Legend</legend>
+                    @foreach (var (value, label, hint) in Options)
+                    {
+                        <label class="admin-option">
+                            <input type="radio" name="resolution" value="@value" checked="@(form.Resolution == value)" />
+                            <span>@label<small>@hint</small></span>
+                        </label>
+                    }
+                </fieldset>
+                <div class="@($"field admin-amount{(amountProblem is null ? "" : " admin-field--invalid")}")">
+                    <label for="amount-@id">@PlAdmin.Disputes.Amount</label>
+                    <p class="admin-hint" id="amount-@id-hint">@(card.PriceGrosz is { } max ? string.Format(PlAdmin.Disputes.AmountHintMax, AdminFormat.Pln(max)) : PlAdmin.Disputes.AmountHint)</p>
+                    <input id="amount-@id" name="amount" type="text" inputmode="decimal" autocomplete="off" value="@form.Amount" aria-describedby="amount-@id-hint@(amountProblem is null ? "" : " amount-" + id + "-error")" aria-invalid="@(amountProblem is null ? null : "true")" />
+                    @if (amountProblem is not null) {<p class="admin-error" id="amount-@id-error"><span class="visually-hidden">@PlAdmin.Common.ErrorPrefix </span>@amountProblem.Message</p>}
+                </div>
+                <div class="@($"field{(noteProblem is null ? "" : " admin-field--invalid")}")">
+                    <label for="note-@id">@PlAdmin.Disputes.NoteLabel</label>
+                    <p class="admin-hint" id="note-@id-hint">@PlAdmin.Disputes.NoteHint</p>
+                    <textarea id="note-@id" name="note" rows="4" maxlength="500" aria-describedby="note-@id-hint@(noteProblem is null ? "" : " note-" + id + "-error")" aria-invalid="@(noteProblem is null ? null : "true")">@form.Note</textarea>
+                    @if (noteProblem is not null) {<p class="admin-error" id="note-@id-error"><span class="visually-hidden">@PlAdmin.Common.ErrorPrefix </span>@noteProblem.Message</p>}
+                </div>
+                <div class="admin-actions">
+                    <button type="submit" name="step" value="review" class="btn btn--primary">@PlAdmin.Disputes.Review</button>
+                    <a class="btn btn--ghost" href="@ListUrl()">@PlAdmin.Disputes.Cancel</a>
+                </div>
+            }
+        </form>
+    };
+
+    static readonly (string Value, string Label, string Hint)[] Options =
+    [
+        (DisputeResolveForm.Release, PlAdmin.Disputes.Release, PlAdmin.Disputes.ReleaseHint),
+        (DisputeResolveForm.RefundFull, PlAdmin.Disputes.RefundFull, PlAdmin.Disputes.RefundFullHint),
+        (DisputeResolveForm.RefundPartial, PlAdmin.Disputes.RefundPartial, PlAdmin.Disputes.RefundPartialHint),
+    ];
+
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "status")] public string? StatusParam { get; set; }
+    [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+    [SupplyParameterFromQuery(Name = "rozstrzygnij")] public string? ResolveParam { get; set; }
+
+    IReadOnlyList<DisputeCard> _cards = [];
+    readonly Dictionary<Guid, (AlertVariant Variant, string Text)> _messages = [];
+    string _status = DisputeRules.Open;
+    string? _cursor, _next, _notice, _error;
+    Guid? _activeId;
+    ResolveStep _step = ResolveStep.Edit;
+    DisputeResolveForm _form = DisputeResolveForm.From(null, null, null, null);
+    IReadOnlyList<DisputeResolveForm.Problem> _problems = [];
+    ApiFailure? _failure;
+
+    IReadOnlyList<SegmentedLinks.Item> Filters =>
+    [
+        new(PlAdmin.Disputes.Open, AdminQuery.Url("/admin/spory", ("status", DisputeRules.Open)), _status == DisputeRules.Open),
+        new(PlAdmin.Disputes.Resolved, AdminQuery.Url("/admin/spory", ("status", DisputeRules.Resolved)), _status == DisputeRules.Resolved),
+    ];
+    IEnumerable<KeyValuePair<string, string>> Kept => _cursor is null ? [new("status", _status)] : [new("status", _status), new("cursor", _cursor)];
+    string ListUrl(string? cursor = null) => AdminQuery.Url("/admin/spory", ("status", _status), ("cursor", cursor ?? _cursor));
+    /// <summary>The one form this page renders (the open card's): a post for any other form is a stale one.</summary>
+    IReadOnlyCollection<string> RenderedForms => _status == DisputeRules.Open && _activeId is { } active && _cards.Any(c => c.Id == active) ? [PostedForm.Name("resolve", active)] : [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _status = DisputeRules.Status(StatusParam);
+        _cursor = AdminQuery.Cursor(CursorParam);
+        _activeId = Guid.TryParse(ResolveParam, out var id) ? id : null;
+        await LoadAsync();
+    }
+
+    async Task LoadAsync()
+    {
+        var result = await Api.Disputes(_status, _cursor, DisputeRules.PageSize);
+        (_failure, _next) = (result.Failure, result.Value?.NextCursor);
+        _cards = result.IsOk ? await DisputeRules.LoadAsync(Api, result.Value!.Items) : [];
+    }
+
+    async Task ResolveAsync(DisputeCard card)
+    {
+        var posted = HttpContext.Request.Form;
+        _form = DisputeResolveForm.From(posted["resolution"], posted["amount"], posted["note"], card.PriceGrosz);
+        _activeId = card.Id;
+        var step = posted["step"].ToString();
+        if (step == "back") { _step = ResolveStep.Edit; return; }
+        _problems = _form.Validate();
+        if (_problems.Count > 0) { _step = ResolveStep.Edit; return; } // the form stays open with what was typed, every problem named
+        if (step != "confirm") { _step = ResolveStep.Confirm; return; }
+
+        _step = ResolveStep.Confirm;
+        var result = await Api.Resolve(card.Id, _form.Resolution!, _form.RefundToSend, _form.Note);
+        if (result.IsOk) { Navigation.NavigateTo(AdminQuery.Url("/admin/spory", ("status", DisputeRules.Open), ("flash", "admin-dispute-resolved"))); return; }
+        var f = result.Failure!;
+        if (AdminFailure.IsConflict(f)) { _notice = PlAdmin.Disputes.StateChanged; _activeId = null; await LoadAsync(); return; } // somebody resolved it first
+        _error = f.Status switch
+        {
+            400 or 422 => PlAdmin.Disputes.ValidationRefused,
+            503 => PlAdmin.Disputes.PaymentUnavailable,
+            404 => PlAdmin.Disputes.NotFound,
+            _ => AdminFailure.Text(f),
+        };
+    }
+
+    async Task StaleAsync()
+    {
+        _notice = PlAdmin.Common.StaleForm;
+        _activeId = null;
+        await LoadAsync();
+    }
+}

@@ -64,8 +64,9 @@ public class RouteAuditTests
         await using var web = new WebFactory();
         web.CreateClient();
         var (rows, _) = Actual(web.Services);
-        Assert.Equal(["/bookings/{BookingId}", "/checkout/mock/{BookingId}", "/gabinet-programisty", "/gabinet-programisty/dostepnosc", "/gabinet-programisty/oferty", "/gabinet-programisty/platnosci", "/gabinet-programisty/profil", "/konto", "/konto/export", "/moje/opinie", "/moje/opinie/{BookingId}", "/moje/rezerwacje", "/moje/rezerwacje/{BookingId}", "/practitioner/payments", "/rezerwacja/potwierdzenie/{BookingId}", "/rezerwacja/{OfferingId}"],
+        Assert.Equal(["/admin", "/admin/ksiega", "/admin/ksiega/csv", "/admin/opinie", "/admin/podejrzane", "/admin/spory", "/admin/weryfikacja", "/admin/weryfikacja/{Id}", "/bookings/{BookingId}", "/checkout/mock/{BookingId}", "/gabinet-programisty", "/gabinet-programisty/dostepnosc", "/gabinet-programisty/oferty", "/gabinet-programisty/platnosci", "/gabinet-programisty/profil", "/konto", "/konto/export", "/moje/opinie", "/moje/opinie/{BookingId}", "/moje/rezerwacje", "/moje/rezerwacje/{BookingId}", "/practitioner/payments", "/rezerwacja/potwierdzenie/{BookingId}", "/rezerwacja/{OfferingId}"],
             rows.Where(r => r.Policy != "Anonymous").Select(r => r.Pattern).Order(StringComparer.Ordinal));
+        Assert.All(rows.Where(r => r.Pattern.StartsWith("/admin")), r => Assert.Equal("Admin", r.Policy)); // the whole area is behind the one policy: a page of /admin cannot be added without it
         Assert.DoesNotContain(rows, r => r.Pattern.StartsWith("/api") || r.Pattern.StartsWith("/internal")); // the host serves no API of its own: the browser talks to no backend
     }
 

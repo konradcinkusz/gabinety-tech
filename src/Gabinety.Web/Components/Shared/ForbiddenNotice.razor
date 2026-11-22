@@ -1,0 +1,9 @@
+@* F-10 (UI audit): the page a signed-in user gets where they may not go. The status 403 is set by the host (the cookie's access-denied event, then the status-code page), this is its body. data-testid="forbidden" is the hook of
+   DESIGN-CONTRACT 9.2. One h1; nothing of the refused page is rendered, no backend was called. *@
+<PageTitle>@PlAdmin.Forbidden.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<div class="callout callout--danger" role="alert" data-testid="forbidden">
+    <h1>@PlAdmin.Forbidden.Title</h1>
+    <p>@PlAdmin.Forbidden.Body</p>
+    <p><a href="/">@PlAdmin.Forbidden.Home</a></p>
+</div>

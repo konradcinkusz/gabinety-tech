@@ -151,6 +151,14 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/wyloguj` | Anonymous | all | sign-out form |
 | Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |
 | Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect, state checked against the cookie, code exchanged |
+| Web | PAGE | `/admin` | Admin | all | administrator landing; a signed-in non-admin gets 403 "Brak dostępu", a visitor goes to sign-in (F-10) |
+| Web | PAGE | `/admin/weryfikacja` | Admin | all | verification queue; approve, reject, suspend, reinstate are antiforgery posts, the services check the role again |
+| Web | PAGE | `/admin/weryfikacja/{Id}` | Admin | all | one profile and its verification history (read only) |
+| Web | PAGE | `/admin/spory` | Admin | all | disputes; resolve is an antiforgery post with a confirmation step |
+| Web | PAGE | `/admin/opinie` | Admin | all | review moderation; publish and reject are antiforgery posts |
+| Web | PAGE | `/admin/ksiega` | Admin | all | ledger by period, first rows as a table |
+| Web | GET | `/admin/ksiega/csv` | Admin | all | ledger CSV, STREAMED from Booking with the administrator's own bearer (nothing buffered); an error mid-stream aborts the connection |
+| Web | PAGE | `/admin/podejrzane` | Admin | all | suspicious client-practitioner pairs (T-10.03) |
 | Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings (client and practitioner tabs), static server rendering |
 | Web | PAGE | `/moje/rezerwacje/{BookingId}` | Authenticated | all | booking detail with cancel, dispute and no-show (form posts, antiforgery) |
 | Web | PAGE | `/moje/opinie` | Authenticated | all | the practitioner's own reviews and replies |

@@ -1,0 +1,7 @@
+@* A state as a badge: the label is always text, the colour is the second channel (G-8, contract 5.7). *@
+<span class="badge badge--@Kind.ToString().ToLowerInvariant()">@ChildContent</span>
+
+@code {
+    [Parameter] public Gabinety.Web.Components.Pages.Admin.BadgeKind Kind { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -395,12 +395,12 @@ public class BlazorRealAuthTests(RealAuthFixture auth, ITestOutputHelper output)
 
         var wrong = await visitor.Submit("/konto", "delete-account", ("Delete.Password", Password + "-wrong"), ("Delete.Confirm", "true"));
         Assert.Equal(HttpStatusCode.OK, wrong.Status);
-        Assert.Equal(Pl.Account.DeleteFailed, wrong.Alert);
+        Assert.Equal(Pl.Account.DeleteFailed, wrong.AlertOf("delete-error"));
         Assert.NotNull(visitor.Session);
         Assert.Equal(HttpStatusCode.Found, (await host.Visitor().SignIn(user.Email, Password)).Status); // still there
 
         var unconfirmed = await visitor.Submit("/konto", "delete-account", ("Delete.Password", Password));
-        Assert.Equal(Pl.Account.DeleteConfirmRequired, unconfirmed.Alert);
+        Assert.Equal(Pl.Account.DeleteConfirmRequired, unconfirmed.AlertOf("delete-error"));
 
         var done = await visitor.Submit("/konto", "delete-account", ("Delete.Password", Password), ("Delete.Confirm", "true"));
         Assert.Equal(HttpStatusCode.Found, done.Status);

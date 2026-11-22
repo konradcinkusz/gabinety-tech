@@ -210,4 +210,33 @@ public class OffersHostTests
         Assert.Empty(page.All("b"));
         Assert.Equal("<b>Pogrubiona</b>", page.TextOf(".offer__title"));
     }
+
+    [Fact]
+    public async Task An_id_in_the_form_that_is_not_one_of_the_practitioners_offers_creates_a_new_offer_and_never_updates_it()
+    {
+        var (web, browser, world) = await PractitionerBrowsers.SignedIn(w => w.HaveProfile());
+        await using var _ = web;
+        var foreign = Guid.NewGuid();
+        var response = await browser.Submit("/gabinet-programisty/oferty", "offer", Fields([.. Valid(), ("id", foreign.ToString())]));
+        Assert.Contains((int)response.Status, new[] { 302, 303 });
+        Assert.DoesNotContain(web.Directory.Requests, r => r.Method == HttpMethod.Put);
+        Assert.Single(world.Offers);
+        Assert.NotEqual(foreign, world.Offers[0].Id);
+    }
+
+    [Fact]
+    public async Task Disabling_or_enabling_an_id_that_is_not_the_practitioners_calls_nothing()
+    {
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile(); w.Offers.Add(Offer("Przegląd testów")); });
+        await using var _ = web;
+        var id = Guid.NewGuid().ToString();
+        var page = await browser.GetAsync("/gabinet-programisty/oferty");
+        var token = page.One("input[name=__RequestVerificationToken]")!.GetAttribute("value")!;
+        var forged = await browser.SendAsync(new HttpRequestMessage(HttpMethod.Post, $"/gabinet-programisty/oferty?wylacz={id}") { Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["_handler"] = "offer-disable", ["id"] = id, ["__RequestVerificationToken"] = token }) });
+        Assert.Equal(HttpStatusCode.BadRequest, forged.Status); // no such confirmation form on the page: the framework refuses the post before any handler
+        var enable = await browser.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/gabinet-programisty/oferty") { Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["_handler"] = "offer-enable", ["enable"] = id, ["__RequestVerificationToken"] = token }) });
+        Assert.Equal(HttpStatusCode.OK, enable.Status);
+        Assert.Contains("Nie znaleziono tej oferty", enable.TextOf("[data-testid=offers-error]")); // asked of the practitioner's own list first
+        Assert.DoesNotContain(web.Directory.Requests, r => r.PathAndQuery.EndsWith("deactivate") || r.PathAndQuery.EndsWith("activate"));
+    }
 }

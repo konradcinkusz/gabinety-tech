@@ -253,4 +253,31 @@ public class DashboardHostTests
         Assert.Empty(page.All("img"));
         Assert.Contains("<img src=x onerror=alert(1)>", page.Text);
     }
+
+    [Fact]
+    public async Task A_profile_that_is_already_submitted_has_no_submit_form_and_a_forged_post_is_refused_before_any_call()
+    {
+        var (web, browser, world) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile("Submitted"); w.CompleteProfile(); });
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty");
+        var token = page.One("input[name=__RequestVerificationToken]");
+        var forged = await browser.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/gabinet-programisty") { Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["_handler"] = "submit-profile", ["__RequestVerificationToken"] = token?.GetAttribute("value") ?? "x" }) });
+        Assert.Equal(HttpStatusCode.BadRequest, forged.Status);
+        Assert.DoesNotContain(web.Directory.Requests, r => r.PathAndQuery.EndsWith("/submit"));
+        Assert.Equal("Submitted", world.Profile!.Status);
+    }
+
+    [Fact]
+    public async Task A_code_posted_back_with_the_verify_form_is_shown_only_when_it_has_the_shape_of_ours()
+    {
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => w.HaveProfile());
+        await using var _ = web;
+        var requested = await browser.Submit("/gabinet-programisty", "github-request", [new("githubLogin", "demo-gh")]);
+        var hidden = requested.One("[data-testid=github-code]")!.QuerySelectorAll("input[type=hidden]").ToDictionary(i => i.GetAttribute("name")!, i => i.GetAttribute("value")!);
+        hidden["code"] = "<script>alert(1)</script> and some other text";
+        var response = await browser.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/gabinet-programisty") { Content = new FormUrlEncodedContent(hidden) });
+        Assert.Equal(HttpStatusCode.OK, response.Status);
+        Assert.DoesNotContain("alert(1)", response.Html);
+        Assert.True(response.One("[data-testid=github-code]")!.HasAttribute("hidden")); // nothing of the forged text is shown
+    }
 }

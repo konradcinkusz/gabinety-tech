@@ -178,7 +178,6 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
 
     async Task SubmitAsync()
     {
-        if (!OnboardingChecklist.CanBeSubmitted(Profile!.Status)) return;
         var r = await Practitioner.SubmitAsync();
         if (r.IsOk) { Done(PractitionerPaths.Home, FlashKey.ProfileSubmitted); return; }
         var f = r.Failure!;

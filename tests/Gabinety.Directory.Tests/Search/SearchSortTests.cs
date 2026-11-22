@@ -85,7 +85,6 @@ public class SearchSortTests(SearchFactory f)
     [InlineData("sort=newest")]
     [InlineData("sort=")]
     [InlineData("sort=PRICE_ASC")]
-    [InlineData("sort=next_slot")]            // arrives with T-11.03; until then it is unknown
     [InlineData("sort=rank&sort=price_asc")]
     public async Task An_unknown_or_repeated_sort_is_a_validation_failure(string query)
     {

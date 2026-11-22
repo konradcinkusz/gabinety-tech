@@ -25,31 +25,33 @@ public sealed record OfferingFilter(string? Problem, string? Tech, int? Duration
 }
 
 /// <summary>The orders of the list (CONTRACTS 3.2). Every one ends with the ranking order, which ends with the id, so each is total.</summary>
-public enum SearchSort { Rank, PriceAsc, PriceDesc }
+public enum SearchSort { Rank, PriceAsc, PriceDesc, NextSlot }
 
 public static class SearchSorts
 {
     public static bool TryParse(string value, out SearchSort sort)
     {
-        (var ok, sort) = value switch { "rank" => (true, SearchSort.Rank), "price_asc" => (true, SearchSort.PriceAsc), "price_desc" => (true, SearchSort.PriceDesc), _ => (false, SearchSort.Rank) };
+        (var ok, sort) = value switch { "rank" => (true, SearchSort.Rank), "price_asc" => (true, SearchSort.PriceAsc), "price_desc" => (true, SearchSort.PriceDesc), "next_slot" => (true, SearchSort.NextSlot), _ => (false, SearchSort.Rank) };
         return ok;
     }
 
-    public static string Wire(this SearchSort sort) => sort switch { SearchSort.PriceAsc => "price_asc", SearchSort.PriceDesc => "price_desc", _ => "rank" };
+    public static string Wire(this SearchSort sort) => sort switch { SearchSort.PriceAsc => "price_asc", SearchSort.PriceDesc => "price_desc", SearchSort.NextSlot => "next_slot", _ => "rank" };
 }
 
 /// <summary>
 /// The keyset position after the last row of a page. It encodes the sort: a rank cursor keeps the original three-part form (so a cursor handed out before
-/// this field existed still works), a price cursor is `sort|price|score|ticks|id`. <see cref="Price"/> is 0 for rank.
+/// this field existed still works), a price cursor is `sort|price|score|ticks|id`. <see cref="Price"/> is 0 for rank. A next-slot cursor is `next_slot|slotTicks|score|ticks|id`,
+/// where the second part is `none` for a practitioner without a next free slot (those come last); <see cref="Slot"/> is null for every other sort.
 /// </summary>
-public sealed record Cursor(SearchSort Sort, long Price, decimal Score, DateTimeOffset ApprovedAt, Guid Id)
+public sealed record Cursor(SearchSort Sort, long Price, decimal Score, DateTimeOffset ApprovedAt, Guid Id, DateTimeOffset? Slot = null)
 {
     public Cursor(decimal score, DateTimeOffset approvedAt, Guid id) : this(SearchSort.Rank, 0, score, approvedAt, id) { }
 
     public string Encode()
     {
         var rank = $"{Score.ToString(CultureInfo.InvariantCulture)}|{ApprovedAt.UtcTicks.ToString(CultureInfo.InvariantCulture)}|{Id:N}";
-        return Base64Url.EncodeToString(Encoding.ASCII.GetBytes(Sort == SearchSort.Rank ? rank : $"{Sort.Wire()}|{Price.ToString(CultureInfo.InvariantCulture)}|{rank}"));
+        var lead = Sort == SearchSort.NextSlot ? (Slot is { } slot ? slot.UtcTicks.ToString(CultureInfo.InvariantCulture) : "none") : Price.ToString(CultureInfo.InvariantCulture);
+        return Base64Url.EncodeToString(Encoding.ASCII.GetBytes(Sort == SearchSort.Rank ? rank : $"{Sort.Wire()}|{lead}|{rank}"));
     }
 
     public static bool TryDecode(string text, out Cursor? cursor)
@@ -58,17 +60,25 @@ public sealed record Cursor(SearchSort Sort, long Price, decimal Score, DateTime
         try
         {
             var parts = Encoding.ASCII.GetString(Base64Url.DecodeFromChars(text)).Split('|');
-            var sort = SearchSort.Rank; long price = 0;
+            var sort = SearchSort.Rank; long price = 0; DateTimeOffset? slot = null;
             if (parts.Length == 5)
             {
-                if (!SearchSorts.TryParse(parts[0], out sort) || sort == SearchSort.Rank
-                    || !long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out price)) return false;
+                if (!SearchSorts.TryParse(parts[0], out sort) || sort == SearchSort.Rank) return false;
+                if (sort == SearchSort.NextSlot)
+                {
+                    if (parts[1] != "none")
+                    {
+                        if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var slotTicks) || slotTicks > 3155378975999999999) return false;
+                        slot = new DateTimeOffset(slotTicks, TimeSpan.Zero);
+                    }
+                }
+                else if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out price)) return false;
                 parts = parts[2..];
             }
             if (parts.Length != 3 || !decimal.TryParse(parts[0], NumberStyles.Number, CultureInfo.InvariantCulture, out var score)
                 || !long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var ticks)
                 || ticks is < 0 or > 3155378975999999999 || !Guid.TryParseExact(parts[2], "N", out var id)) return false;
-            cursor = new Cursor(sort, price, score, new DateTimeOffset(ticks, TimeSpan.Zero), id);
+            cursor = new Cursor(sort, price, score, new DateTimeOffset(ticks, TimeSpan.Zero), id, slot);
             return true;
         }
         catch (Exception e) when (e is FormatException or ArgumentException) { return false; }
@@ -131,7 +141,7 @@ public sealed class SearchQuery
         }
         if (sort is not null)
         {
-            if (!SearchSorts.TryParse(sort, out var so)) { s.Fail("sort", "rank, price_asc or price_desc"); return s; }
+            if (!SearchSorts.TryParse(sort, out var so)) { s.Fail("sort", "rank, price_asc, price_desc or next_slot"); return s; }
             s.Sort = so;
         }
         if (cursor is not null)

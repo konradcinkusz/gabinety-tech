@@ -94,18 +94,16 @@ public class DemoSeederTests(SeederFixture fx) : IClassFixture<SeederFixture>
     }
 
     [Fact]
-    public async Task The_display_cases_exist_new_two_reviews_exactly_three_and_many()
+    public async Task No_profile_shows_more_reviews_than_the_seeder_created_so_none_shows_a_rating_yet()
     {
         using var http = fx.Directory.CreateClient();
         var page = await http.GetFromJsonAsync<JsonElement>("/api/v1/practitioners?limit=50", J);
-        var bySlug = page.GetProperty("items").EnumerateArray().ToDictionary(i => i.GetProperty("slug").GetString()!);
-
-        Assert.True(bySlug["demo-celina-przykladowska"].GetProperty("isNew").GetBoolean());          // no review
-        Assert.True(bySlug["demo-dariusz-fikcyjny"].GetProperty("isNew").GetBoolean());             // two reviews: still "new"
-        var three = bySlug["demo-bartosz-testowy"];                                                   // exactly three: the rating shows
-        Assert.False(three.GetProperty("isNew").GetBoolean());
-        Assert.Equal(3, three.GetProperty("rating").GetProperty("count").GetInt32());
-        Assert.True(bySlug["demo-filip-syntetyczny"].GetProperty("rating").GetProperty("count").GetInt32() >= 10); // many
+        var items = page.GetProperty("items").EnumerateArray().ToList();
+        Assert.NotEmpty(items);
+        // the three seeded reviews are one each on three practitioners: below the three it takes to show a rating (CONTRACTS 3.2)
+        Assert.All(items, i => Assert.True(i.GetProperty("isNew").GetBoolean(), i.GetProperty("slug").GetString()));
+        Assert.All(items, i => Assert.False(i.TryGetProperty("rating", out var r) && r.ValueKind != JsonValueKind.Null, i.GetProperty("slug").GetString()));
+        Assert.True(DemoCatalog.Practitioners.Sum(p => p.Stats?.Reviews ?? 0) <= ReputationPlan.All.Length);
     }
 
     [Fact]

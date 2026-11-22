@@ -25,7 +25,7 @@ public sealed record AdminReviewRow(Guid Id, Guid PractitionerId, int Rating, st
 /// </summary>
 public sealed class ModerationFeature : IServiceFeature
 {
-    const int DefaultLimit = 20, MaxLimit = 50, MaxReasonLength = 500;
+    const int DefaultLimit = 20, MaxLimit = 50, MinReasonLength = 10, MaxReasonLength = 500; // the reject reason is 10 to 500 here as for practitioner verification (supervisor decision, ADR-0012)
 
     public void Add(IHostApplicationBuilder builder) { }
 
@@ -38,8 +38,8 @@ public sealed class ModerationFeature : IServiceFeature
         admin.MapPost("{id:guid}/reject", (Guid id, RejectReviewRequest? req, ClaimsPrincipal u, ReputationDbContext db, TimeProvider t, ILogger<ModerationFeature> log, CancellationToken ct) =>
         {
             var reason = req?.Reason?.Trim();
-            return string.IsNullOrEmpty(reason) || reason.Length > MaxReasonLength
-                ? Task.FromResult(Problem(422, ErrorCodes.ValidationFailed, "Validation failed", new() { ["reason"] = [$"reason is required, 1 to {MaxReasonLength} characters"] }))
+            return reason is null || reason.Length < MinReasonLength || reason.Length > MaxReasonLength
+                ? Task.FromResult(Problem(422, ErrorCodes.ValidationFailed, "Validation failed", new() { ["reason"] = [$"reason is required, {MinReasonLength} to {MaxReasonLength} characters"] }))
                 : DecideAsync(id, ModerationAction.Reject, reason, u, db, t, log, ct);
         });
     }

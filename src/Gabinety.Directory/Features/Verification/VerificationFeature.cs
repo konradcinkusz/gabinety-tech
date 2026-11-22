@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Gabinety.Contracts.Common;
 using Gabinety.Contracts.Directory;
+using Gabinety.Directory.Clients;
 using Gabinety.Directory.Features.Profiles;
 using Gabinety.Directory.Persistence;
 using Gabinety.ServiceDefaults;
@@ -51,16 +52,16 @@ public sealed class VerificationFeature : IServiceFeature
             Transition(id, PractitionerTrigger.Approve, null, u, db, t, ct));
         admin.MapPost("practitioners/{id:guid}/reject", (Guid id, RejectRequest? req, ClaimsPrincipal u, DirectoryDbContext db, TimeProvider t, CancellationToken ct) =>
             Transition(id, PractitionerTrigger.Reject, req?.Reason ?? "", u, db, t, ct));
-        admin.MapPost("practitioners/{id:guid}/suspend", (Guid id, SuspendRequest? req, ClaimsPrincipal u, DirectoryDbContext db, TimeProvider t, CancellationToken ct) =>
-            Transition(id, PractitionerTrigger.Suspend, req?.Reason ?? "", u, db, t, ct));
+        admin.MapPost("practitioners/{id:guid}/suspend", (Guid id, SuspendRequest? req, ClaimsPrincipal u, DirectoryDbContext db, TimeProvider t, IBookingClient booking, CancellationToken ct) =>
+            Transition(id, PractitionerTrigger.Suspend, req?.Reason ?? "", u, db, t, ct, booking));
         admin.MapPost("practitioners/{id:guid}/reinstate", (Guid id, ClaimsPrincipal u, DirectoryDbContext db, TimeProvider t, CancellationToken ct) =>
             Transition(id, PractitionerTrigger.Reinstate, null, u, db, t, ct));
         admin.MapPut("moderators/{userId}", AddModerator).RequireAuthorization(p => p.RequireRole("SuperAdmin"));
         admin.MapDelete("moderators/{userId}", RemoveModerator).RequireAuthorization(p => p.RequireRole("SuperAdmin"));
     }
 
-    static IResult Problem(int status, string code, string title, Dictionary<string, string[]>? errors = null) =>
-        Results.Json(ApiProblem.Of(code, title, status, null, errors), statusCode: status, contentType: "application/problem+json");
+    static IResult Problem(int status, string code, string title, Dictionary<string, string[]>? errors = null, string? detail = null) =>
+        Results.Json(ApiProblem.Of(code, title, status, detail, errors), statusCode: status, contentType: "application/problem+json");
 
     static IResult Invalid(string field, string message) => Problem(422, ErrorCodes.ValidationFailed, "Validation failed", new() { [field] = [message] });
 
@@ -122,7 +123,12 @@ public sealed class VerificationFeature : IServiceFeature
 
     // ---- admin transitions
 
-    static async Task<IResult> Transition(Guid id, PractitionerTrigger trigger, string? reason, ClaimsPrincipal user, DirectoryDbContext db, TimeProvider time, CancellationToken ct)
+    /// <summary>
+    /// One admin transition. A suspension then asks Booking to cancel the practitioner's future bookings with a full refund (ADR-0012): the status is saved FIRST, so Booking
+    /// already refuses new bookings when that runs, and the call is idempotent. When Booking cannot finish, the profile stays suspended and the answer is 503 saying so;
+    /// the cancellation is repeated through Booking's internal route (RUNBOOK 9.2).
+    /// </summary>
+    static async Task<IResult> Transition(Guid id, PractitionerTrigger trigger, string? reason, ClaimsPrincipal user, DirectoryDbContext db, TimeProvider time, CancellationToken ct, IBookingClient? booking = null)
     {
         if (UserId(user) is not { } admin) return Results.Unauthorized();
         string? note = null;
@@ -148,6 +154,15 @@ public sealed class VerificationFeature : IServiceFeature
         };
         VerificationEvents.Record(db, p.Id, kind, admin, note, time); // one SaveChanges: the status and its event commit together
         await db.SaveChangesAsync(ct);
+        if (trigger == PractitionerTrigger.Suspend && booking is not null)
+        {
+            try { await booking.CancelFutureBookingsAsync(p.Id, ct); }
+            catch (BookingUnavailableException)
+            {
+                return Problem(503, ErrorCodes.DependencyUnavailable, "Dependency unavailable",
+                    detail: "The practitioner is suspended, but their future bookings could not all be cancelled yet; repeat the cancellation (RUNBOOK 9.2).");
+            }
+        }
         return Results.NoContent();
     }
 

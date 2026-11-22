@@ -134,7 +134,8 @@ Mechanism: each callee has one `Internal:Key`; each caller holds the callee's ke
 |---|---|---|---|---|
 | Booking | Directory | `GET offerings/{id}`, `GET practitioners/by-user/{userId}`, `PUT practitioners/{id}/booking-stats` | yes | all of Directory's internal routes: `PUT .../reputation`, `DELETE subjects/{userId}` |
 | Reputation | Directory | `GET practitioners/by-user/{userId}`, `PUT practitioners/{id}/reputation` | yes | `PUT .../booking-stats`, `GET offerings/{id}` (meeting URL), `DELETE subjects/{userId}` |
-| Reputation | Booking | `GET bookings/{id}/reviewability` | yes | `DELETE subjects/{userId}` |
+| Reputation | Booking | `GET bookings/{id}/reviewability` | yes | `DELETE subjects/{userId}`, `POST practitioners/{id}/cancel-future-bookings` |
+| Directory | Booking | `POST practitioners/{id}/cancel-future-bookings` (ADR-0012, on suspension and erasure; own key `INTERNAL_KEY_DIRECTORY_TO_BOOKING`) | **no: added by ADR-0012, SPEC 5.1 to be updated by the supervisor** | the other internal routes of Booking, as for any caller (F-03) |
 | Reputation | Assistant | `POST review-triage` | yes | none other |
 | Assistant | Directory | taxonomy | yes (public `GET /api/v1/taxonomy`, no key) | n/a |
 | Web | any | none: no key in `web/` (`deploy/fly/web.fly.toml` comment; allow-list of forwarded headers) | yes ("Browser/web" rows are user-token calls) | n/a |

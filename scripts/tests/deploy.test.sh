@@ -153,18 +153,18 @@ for t in v4 shared_v4 v6; do STUB_IPS="[{\"Type\":\"$t\"}]" "$d/assert-no-public
   check "an app with a public $t address fails" bash -c "[ $rc = 1 ]"; done
 
 # ---------- set-secrets ----------
-export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"s3cr3tpw","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"dirkey","INTERNAL_KEY_REPUTATION_TO_DIRECTORY":"repdirkey","FLY_API_TOKEN":"tok","AUTH_JWT_PRIVATE_KEY_PEM":"-----BEGIN PRIVATE KEY-----\nLINE2\n-----END PRIVATE KEY-----"}'
+export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"s3cr3tpw","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"dirkey","INTERNAL_KEY_REPUTATION_TO_DIRECTORY":"repdirkey","INTERNAL_KEY_DIRECTORY_TO_BOOKING":"dbkey","FLY_API_TOKEN":"tok","AUTH_JWT_PRIVATE_KEY_PEM":"-----BEGIN PRIVATE KEY-----\nLINE2\n-----END PRIVATE KEY-----"}'
 : > "$tmp/log"; out="$("$d/set-secrets.sh" directory gabinety-directory-staging --map "$root/deploy/secrets.map" 2>&1)"; rc=$?
-check "directory secrets are staged" bash -c "[ $rc = 0 ] && grep -q '^secrets set --stage --app gabinety-directory-staging ConnectionStrings__directorydb=Host=gabinety-postgres-staging.internal;.*Password=s3cr3tpw Internal__Callers__Booking=dirkey Internal__Callers__Reputation=repdirkey\$' '$tmp/log'"
+check "directory secrets are staged" bash -c "[ $rc = 0 ] && grep -q '^secrets set --stage --app gabinety-directory-staging ConnectionStrings__directorydb=Host=gabinety-postgres-staging.internal;.*Password=s3cr3tpw Internal__Callers__Booking=dirkey Internal__Callers__Reputation=repdirkey Internal__Keys__Booking=dbkey\$' '$tmp/log'"
 check "values are masked" has "$out" "::add-mask::Host=gabinety-postgres-staging.internal;Port=5432;Database=directorydb;Username=postgres;Password=s3cr3tpw"
-check "a value is never printed outside ::add-mask::" bash -c "! printf '%s\n' \"\$1\" | grep -v '^::add-mask::' | grep -q -e s3cr3tpw -e dirkey" _ "$out"
+check "a value is never printed outside ::add-mask::" bash -c "! printf '%s\n' \"\$1\" | grep -v '^::add-mask::' | grep -q -e s3cr3tpw -e dirkey -e dbkey" _ "$out"
 out="$("$d/set-secrets.sh" booking gabinety-booking-staging --map "$root/deploy/secrets.map" 2>&1)"; rc=$?
 check "a missing required secret fails and names it, not its value" bash -c "[ $rc = 1 ]" && check "the failure names INTERNAL_KEY_REPUTATION_TO_BOOKING" has "$out" "INTERNAL_KEY_REPUTATION_TO_BOOKING"
-export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_REPUTATION_TO_BOOKING":"rb","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"bd","PAYMENTS_STRIPE_SECRET_KEY":"sk_test_x","PAYMENTS_STRIPE_WEBHOOK_SECRET":"whsec_x"}'
+export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_REPUTATION_TO_BOOKING":"rb","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"bd","INTERNAL_KEY_DIRECTORY_TO_BOOKING":"db","PAYMENTS_STRIPE_SECRET_KEY":"sk_test_x","PAYMENTS_STRIPE_WEBHOOK_SECRET":"whsec_x"}'
 : > "$tmp/log"; out="$("$d/set-secrets.sh" booking gabinety-booking-staging --map "$root/deploy/secrets.map" 2>&1)"
 check "an optional secret that is unset is skipped" has "$out" "skip Internal__Callers__Owner"
-check "booking stages five secrets, the two Stripe ones among them" has "$out" "staging 5 secret(s)"
-export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_REPUTATION_TO_BOOKING":"rb","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"bd"}'
+check "booking stages six secrets, the two Stripe ones among them" has "$out" "staging 6 secret(s)"
+export GH_SECRETS_JSON='{"POSTGRES_PASSWORD":"pw","INTERNAL_KEY_REPUTATION_TO_BOOKING":"rb","INTERNAL_KEY_BOOKING_TO_DIRECTORY":"bd","INTERNAL_KEY_DIRECTORY_TO_BOOKING":"db"}'
 out="$("$d/set-secrets.sh" booking gabinety-booking-staging --map "$root/deploy/secrets.map" 2>&1)"; rc=$?
 check "booking without the Stripe secrets fails the deploy and names them" bash -c "[ $rc = 1 ]" && check "the failure names PAYMENTS_STRIPE_SECRET_KEY" has "$out" "PAYMENTS_STRIPE_SECRET_KEY" && check "the failure names PAYMENTS_STRIPE_WEBHOOK_SECRET" has "$out" "PAYMENTS_STRIPE_WEBHOOK_SECRET"
 check "no mapped secret is a single shared callee key" bash -c "! grep -E '^[a-z]+ +Internal__Key +' '$root/deploy/secrets.map'"

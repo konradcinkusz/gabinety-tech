@@ -48,6 +48,20 @@ public class StatsPushCalculationTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cancellation_caused_by_suspension_does_not_count_but_a_voluntary_one_does()
+    {
+        // ADR-0012: an administrator's action must not lower the reliability of a practitioner who is later reinstated (a deviation from the CONTRACTS 8.1 text)
+        var cascade = await StatsFx.Seed(h, BookingStatus.CancelledByPractitioner);
+        await h.Seed(db => db.Bookings.Single(b => b.Id == cascade).StatusReason = Gabinety.Booking.Features.Internal.PractitionerCancellation.FutureBookingCanceller.Reason);
+        Assert.Equal(0, (await StatsFx.StatsOf(h)).PractitionerCancelCount);
+
+        var voluntary = await StatsFx.Seed(h, BookingStatus.CancelledByPractitioner);
+        await h.Seed(db => db.Bookings.Single(b => b.Id == voluntary).StatusReason = "Choroba, przepraszam");
+        await StatsFx.Seed(h, BookingStatus.CancelledByPractitioner); // no reason at all
+        Assert.Equal(2, (await StatsFx.StatsOf(h)).PractitionerCancelCount);
+    }
+
+    [Fact]
     public async Task Counts_are_per_practitioner_and_add_up()
     {
         await StatsFx.Seed(h, BookingStatus.Completed);

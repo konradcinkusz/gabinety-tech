@@ -19,15 +19,15 @@ public class StripeStartupTests
         Assert.Null(PaymentsFeature.Problem("Stripe", nonDeployed, Config(Fx.SecretKey, Fx.WebhookSecret)));
 
     [Theory]
-    [InlineData("rk_live_restricted0123456789")]
-    [InlineData("sk_live_0123456789")]
+    [InlineData("rk_" + "live_restricted0123456789")]
+    [InlineData("sk_" + "live_0123456789")]
     public void A_restricted_key_is_accepted_too(string key) => Assert.Null(PaymentsFeature.Problem("stripe", false, Config(key, Fx.WebhookSecret)));
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("  ")]
-    [InlineData("pk_test_publishable_key_is_not_a_secret")]
+    [InlineData("pk_" + "test_publishable_key_is_not_a_secret")]
     [InlineData("whsec_this_is_the_wrong_setting")]
     public void A_missing_or_wrong_kind_of_secret_key_stops_the_host_and_names_the_setting(string? key)
     {

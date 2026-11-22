@@ -28,7 +28,7 @@ primary_region = "fra"
   # Billing__FirstConsultationFeeBps is the owner's constant (CONTRACTS 9, D-17): not set here, the code default applies.
 # Secrets (NOT here), set once with `fly secrets set --app gabinety-booking-staging`:
 #   ConnectionStrings__bookingdb
-#   Internal__Callers__Reputation, Internal__Keys__Directory   (one key per caller and callee, never shared; F-03)
+#   Internal__Callers__Reputation, Internal__Callers__Directory, Internal__Keys__Directory   (one key per caller and callee, never shared; F-03)
 #   optional Internal__Callers__Owner
 #   Payments__Stripe__SecretKey, Payments__Stripe__WebhookSecret   (required: GitHub secrets PAYMENTS_STRIPE_SECRET_KEY and PAYMENTS_STRIPE_WEBHOOK_SECRET; docs/operations/PAYMENTS-GO-LIVE.md)
 #   Notifications__Smtp__* (only with T-09.06; names defined there)

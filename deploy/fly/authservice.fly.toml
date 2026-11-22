@@ -27,6 +27,8 @@ primary_region = "fra"
   # Verify on the first deploy that the edge overwrites a client-sent Fly-Client-IP (docs/operations/AUTH.md section 9, finding 4).
   Network__ClientIpHeader = "Fly-Client-IP"
   Cors__AllowedOrigins__0 = "https://<web-public-host>"
+  # The link in the password-reset e-mail is <FrontendBaseUrl>/reset-password?token=&email= (T-11.07): the SITE address, the same value as Site__BaseUrl of web-blazor (docs/operations/AUTH.md section 12).
+  FrontendBaseUrl = "https://<web-public-host>"
   # GitHub sign-in is OPTIONAL and enabled only if OAuth__GitHub__ClientId and __ClientSecret secrets are both set (docs/operations/AUTH.md section 5).
   OAuth__CallbackBaseUrl = "https://<authservice-public-host>"
   OAuth__PostLoginRedirectBaseUrl = "https://<web-public-host>"

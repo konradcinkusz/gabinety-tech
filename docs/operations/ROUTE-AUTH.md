@@ -149,6 +149,8 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/logowanie/kod` | Anonymous | all | second step of a two-factor sign-in; needs the sealed `gt_2fa` challenge cookie, else back to `/logowanie` |
 | Web | PAGE | `/rejestracja` | Anonymous | all | registration form (the POST is handled by the page, antiforgery) |
 | Web | PAGE | `/rejestracja/sprawdz-skrzynke` | Anonymous | all | "confirm your e-mail" state after a `202` registration |
+| Web | PAGE | `/zapomniane-haslo` | Anonymous | all | request a reset e-mail (T-11.07): one address, the same answer for a known and an unknown one; `noindex` |
+| Web | PAGE | `/reset-password` | Anonymous | all | the new password after the mailed link `?token=&email=` (T-11.07): token and address kept in hidden fields, never logged; signs nobody in; `noindex`, `referrer: no-referrer` |
 | Web | PAGE | `/wyloguj` | Anonymous | all | sign-out form |
 | Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |
 | Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect, state checked against the cookie, code exchanged |

@@ -7,7 +7,9 @@ namespace Gabinety.Web.Auth;
 public static class ReturnTarget
 {
     public const string Parameter = "redirect", LoginPath = "/logowanie", LogoutPath = "/wyloguj", OAuthCallbackPath = "/oauth/callback", RegisterPath = "/rejestracja", TwoFactorPath = "/logowanie/kod", CheckInboxPath = "/rejestracja/sprawdz-skrzynke";
-    static readonly string[] AuthPages = [LoginPath, LogoutPath, OAuthCallbackPath, RegisterPath];
+    /// <summary>The password-recovery pages (T-11.07). <c>/reset-password</c> is reached with a one-time token in its query: it must never become a return target, or the header's sign-in link would carry the token.</summary>
+    public const string ForgotPasswordPath = "/zapomniane-haslo", ResetPasswordPath = "/reset-password";
+    static readonly string[] AuthPages = [LoginPath, LogoutPath, OAuthCallbackPath, RegisterPath, ForgotPasswordPath, ResetPasswordPath];
 
     public static string Safe(string? raw)
     {

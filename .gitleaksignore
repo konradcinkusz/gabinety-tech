@@ -3,3 +3,8 @@
 08b882e98b4d0a91b8828acd7650ddb57380978c:tests/Gabinety.Booking.Tests/Payments/Stripe/StripeStartupTests.cs:stripe-access-token:23
 # A test marker string assigned to a variable named "secret" (a user brief the test proves is never logged); renamed in the working tree. One fingerprint per finding; no pattern, no path.
 7f0205ce3613f986a68df8339b1565cdedaf2476:tests/Gabinety.Web.Tests/Pages/BookingFormTests.cs:generic-api-key:366
+# Synthetic reset-link fixtures in the password-pages test (T-11.07); the working tree uses low-entropy values now. One fingerprint per finding; no pattern, no path.
+ae80a19f0eaf5e6bf3917846bd41e5335a55e33b:tests/Gabinety.Web.Tests/Host/PasswordPagesTests.cs:generic-api-key:17
+ae80a19f0eaf5e6bf3917846bd41e5335a55e33b:tests/Gabinety.Web.Tests/Host/PasswordPagesTests.cs:generic-api-key:339
+a3b24fb95a8cb2c4a8bb030998c1c9ddf740f993:tests/Gabinety.Web.Tests/Host/PasswordPagesTests.cs:generic-api-key:17
+a3b24fb95a8cb2c4a8bb030998c1c9ddf740f993:tests/Gabinety.Web.Tests/Host/PasswordPagesTests.cs:generic-api-key:339

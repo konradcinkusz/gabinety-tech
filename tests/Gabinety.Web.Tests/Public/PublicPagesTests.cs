@@ -43,8 +43,8 @@ public class ProfilePageTests
         Assert.All(times, t => Assert.Matches(@"^\d{2}:\d{2}$", t.TextContent)); // the harness regex
         Assert.Equal(["10:00", "11:00"], times.Select(t => t.TextContent)); // 09:00 and 10:00 UTC on 24 Nov are Warsaw winter time
         Assert.Equal($"/rezerwacja/{PublicSupport.OfferA}?start=2026-11-24T09%3A00%3A00Z&gabinet=demo-anna-demowska", times[0].GetAttribute("href"));
-        Assert.Equal("wtorek, 24 listopada", offer.QuerySelector(".slot-days a[aria-current=true]")!.TextContent); // F-08
-        Assert.Contains("środa, 25 listopada", offer.QuerySelectorAll(".slot-days a").Select(a => a.TextContent));
+        Assert.Equal("wtorek, 24 listopada", offer.QuerySelector(".slot-days a[aria-current=true]")!.GetAttribute("aria-label")); // F-08: the chip shows "wt." / "24 lis", the name stays the full date
+        Assert.Contains("środa, 25 listopada", offer.QuerySelectorAll(".slot-days a").Select(a => a.GetAttribute("aria-label")));
         Assert.Contains("Europe/Warsaw", offer.TextContent);
     }
 

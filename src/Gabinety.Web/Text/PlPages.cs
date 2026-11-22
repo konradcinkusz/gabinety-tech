@@ -160,6 +160,8 @@ public static class PlPages
         // F-16 / P-PROF-2: no offers, no times and times-unavailable are three different sentences.
         public const string Empty = "Brak wolnych terminów w najbliższych {0} dniach. Zajrzyj później.";
         public const string Unavailable = "Nie możemy teraz pokazać terminów. Spróbuj ponownie za chwilę.";
+        public const string Nearest = "Najbliższy wolny termin: {0}", Today = "dziś", Tomorrow = "jutro";
+        public const string Morning = "Rano", Afternoon = "Po południu", Evening = "Wieczorem", PrevWeek = "Poprzedni tydzień", NextWeek = "Następny tydzień", Week = "Tydzień";
         public const string More = "Pokaż kolejne dni", Retry = "Spróbuj ponownie", TimeZone = "Godziny w czasie polskim (Europe/Warsaw).";
     }
 

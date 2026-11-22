@@ -1,0 +1,13 @@
+@inject TimeProvider Time
+
+<footer class="site-footer">
+    <div class="site-footer__inner">
+        <p>@string.Format(Pl.Site.Copyright, Time.GetUtcNow().Year)</p>
+        <nav aria-label="@Pl.Site.FooterLabel">
+            <ul class="nav-list">
+                <li><a href="/regulamin">@Pl.Site.Terms</a></li>
+                <li><a href="/polityka-prywatnosci">@Pl.Site.Privacy</a></li>
+            </ul>
+        </nav>
+    </div>
+</footer>

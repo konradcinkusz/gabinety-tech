@@ -12,6 +12,19 @@ pnpm --dir tests/e2e test                                           # terminal 2
 
 `globalSetup` waits (up to 4 min, `E2E_WAIT_SECONDS`) for `/health` of DevIdentity, Directory, Booking, Reputation, Assistant and the web app, then for the seeded practitioners, then until the demo seeder has **finished** (no seeder process, both test clocks at 0, held for 10 s; up to 8 min, `E2E_SEEDER_WAIT_SECONDS`; `E2E_WAIT_FOR_SEEDER=0` skips it for an already seeded profile), because the seeder moves the global test clock while it runs. Chromium at a fixed path (sandbox, some CI images): `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`. Other overrides: `E2E_WEB_URL`, `E2E_DIRECTORY_URL`, ... (`harness/env.ts`). Traces and screenshots are kept on failure only.
 
+## Which host (Next.js or Blazor)
+
+`harness/host.ts` is the one place that reads `HOST=next|blazor` (default `next`: nothing changes when unset) and `BASE_URL` (alias `E2E_WEB_URL`; default `http://localhost:3000` for next, `http://localhost:3001` for blazor). The web health path (`/api/health` vs `/health`), the sign-in helper (`signInViaBff` posts the real `/logowanie` form with its antiforgery token when `HOST=blazor`; the Blazor host has no `/api/auth/login`) and `harness/circuit.ts` (`watchCircuit` / `gotoInteractive`: wait for the circuit before typing into an interactive page) hang off it.
+
+- `HOST=next` runs everything except `*.blazor.spec.ts`.
+- `HOST=blazor` runs ONLY the specs listed in `BLAZOR_SPECS` (`harness/host.ts`): today `journeys/j7-foreign-origin.blazor.spec.ts`. Each port session adds its journey to that list once its pages exist.
+
+CI command for the Blazor variant (the workflow is owned by the CI/E2E wiring; same running fake profile, the AppHost starts `web-blazor` on 3001):
+
+```
+HOST=blazor pnpm --dir tests/e2e test          # or: HOST=blazor BASE_URL=http://localhost:3001 ...
+```
+
 ## What the harness gives you
 
 Import `test` and `expect` from `../harness/fixtures`, never from `@playwright/test`.

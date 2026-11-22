@@ -128,7 +128,7 @@ jobs:
             -e ConnectionStrings__DefaultConnection="Host=authpg;Port=5432;Database=authdb;Username=postgres;Password=ci-only" \
             -e DATABASE_PROVIDER=PostgreSQL -e Jwt__Algorithm=RS256 -e Jwt__Issuer=gabinety-contract -e Jwt__Audience=gabinety \
             -e Auth__RequireConfirmedEmail=false -e "Jwt__PrivateKeyPem=$(cat "$RUNNER_TEMP/jwt.pem")" \
-            -e Network__ClientIpHeader=X-Test-Client-Ip \
+            -e Network__ClientIpHeader=Fly-Client-IP \
             -e InitialAdmin__Email=owner@example.test -e 'InitialAdmin__Password=Owner-Pass-1234!' \
             -e OAuth__GitHub__ClientId=dummy-github-client-id -e OAuth__GitHub__ClientSecret=dummy-github-client-secret \
             -e OAuth__CallbackBaseUrl=http://localhost:8081 -e OAuth__PostLoginRedirectBaseUrl=http://localhost:3000 \

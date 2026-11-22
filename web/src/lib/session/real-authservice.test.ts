@@ -11,16 +11,17 @@ import { GET as sessionGet } from "../../app/api/auth/session/route";
 import { GET as githubStart } from "../../app/api/auth/github/start/route";
 import { GET as githubCallback } from "../../app/oauth/callback/route";
 import { deleteAccount, exportAccount, loadAccount } from "../../components/auth/account.server";
-import { resetBackendFetch, setBackendFetch } from "../api/http";
+import { resetBackendFetch } from "../api/http";
 
 const BASE = process.env.AUTH_BASE_URL;
 const SITE = "http://localhost:3000";
 const PASSWORD = "Web-Real-Pass-123!";
 
-const post = (url: string, body: unknown, cookie?: string) =>
+let visitor = "10.0.0.1";
+const post = (url: string, body: unknown, cookie?: string, from?: string) =>
   new Request(SITE + url, {
     method: "POST",
-    headers: { "content-type": "application/json", origin: SITE, ...(cookie ? { cookie } : {}) },
+    headers: { "content-type": "application/json", origin: SITE, "fly-client-ip": from ?? visitor, ...(cookie ? { cookie } : {}) },
     body: JSON.stringify(body),
   });
 const cookiesOf = (r: Response) =>
@@ -44,14 +45,9 @@ describe.skipIf(!BASE)("the BFF auth handlers against the real authservice", () 
   beforeEach(() => {
     vi.stubEnv("Backend__Auth", BASE!);
     vi.stubEnv("Site__BaseUrl", SITE);
-    // authservice limits its auth endpoints to 20 a minute per client address. The CI instance trusts this header (Network__ClientIpHeader), so each test is its own address
-    // and the whole file does not queue behind one bucket. The handlers and their calls are otherwise untouched.
-    const ip = `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250) + 1}`;
-    setBackendFetch((input, init = {}) => {
-      const headers = new Headers(init.headers);
-      headers.set("X-Test-Client-Ip", ip);
-      return fetch(input, { ...init, headers });
-    });
+    // The instance runs with Network__ClientIpHeader=Fly-Client-IP, as deploy/fly/authservice.fly.toml: the handlers forward the visitor's address in it, so each test
+    // is its own visitor (a distinct fly-client-ip on the request) and the file does not queue behind one bucket.
+    visitor = `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250) + 1}`;
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -143,6 +139,21 @@ describe.skipIf(!BASE)("the BFF auth handlers against the real authservice", () 
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ authenticated: true, isAdmin: true });
   });
+
+  it("two visitors do not share a bucket: one exhausting the 20 a minute gets 429, another is still served", async () => {
+    // 30 logins at once from one address: 20 pass (as 401), 5 queue and the rest get 429 at once (authservice Program.cs). The queued ones outlast the handler's timeout (503).
+    const burst = await Promise.all(
+      Array.from({ length: 30 }, () => login(post("/api/auth/login", { email: email(), password: PASSWORD }, undefined, "10.200.200.1"))),
+    );
+    const codes = burst.map((r) => r.status);
+    expect(codes).toContain(429);
+    expect(codes).toContain(401);
+
+    const other = await login(post("/api/auth/login", { email: email(), password: PASSWORD }, undefined, "10.200.200.2"));
+    expect(other.status).toBe(401); // a wrong password, not "slow down"
+    const same = await login(post("/api/auth/login", { email: email(), password: PASSWORD }, undefined, "10.200.200.1"));
+    expect([429, 503]).toContain(same.status); // the first visitor is still limited
+  }, 40_000);
 
   it("an exchange code authservice never issued ends in the login page with github_failed", async () => {
     const start = await githubStart(new Request(SITE + "/api/auth/github/start"));

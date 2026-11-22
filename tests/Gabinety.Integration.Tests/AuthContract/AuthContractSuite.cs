@@ -23,12 +23,12 @@ public abstract class AuthContractSuite(HttpClient http) : IDisposable
     {
         var http = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(30) };
         // authservice rate-limits its auth endpoints to 20 a minute per client address (Program.cs). Every test runs from this one machine, so each client names a
-        // distinct address in the header an authservice configured with Network__ClientIpHeader=X-Test-Client-Ip trusts; one without that setting ignores it.
+        // distinct address in the header an authservice configured with Network__ClientIpHeader=Fly-Client-IP trusts; one without that setting ignores it.
         http.DefaultRequestHeaders.Add(ClientIpHeader, UniqueClientIp());
         return http;
     }
 
-    public const string ClientIpHeader = "X-Test-Client-Ip";
+    public const string ClientIpHeader = "Fly-Client-IP";
     private static int _clientIps;
     /// <summary>A distinct private address (10.x.y.z) per call, so a client gets its own rate-limit bucket.</summary>
     public static string UniqueClientIp()

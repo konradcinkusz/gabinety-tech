@@ -101,6 +101,7 @@ else
         .WithEnvironment("InitialAdmin__Email", adminEmail)
         .WithEnvironment("InitialAdmin__Password", adminPassword)
         .WithEnvironment("Cors__AllowedOrigins__0", "http://localhost:3000")
+        .WithEnvironment("Network__ClientIpHeader", "Fly-Client-IP") // as deploy/fly: the web forwards the visitor's address in it, so visitors do not share authservice's 20 a minute
         // GitHub sign-in stays off here: it needs a real OAuth app (OAuth__GitHub__ClientId and __ClientSecret). docs/operations/AUTH.md.
         .WithHttpHealthCheck("/health/ready")
         .WaitFor(authDb);

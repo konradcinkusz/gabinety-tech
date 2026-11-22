@@ -14,12 +14,21 @@ export type IdentityResult =
 
 const TIMEOUT_MS = 10_000;
 
-async function call(path: string, init: { method: string; body?: unknown; bearer?: string }): Promise<Response | null> {
+/**
+ * authservice limits its auth endpoints to 20 a minute per client address, and this server is the only caller, so without help every visitor shares one bucket.
+ * authservice is deployed with Network__ClientIpHeader=Fly-Client-IP (deploy/fly/authservice.fly.toml): it takes the address from this header. Public traffic reaches it
+ * through Fly's edge, which sets the header itself; this server reaches it over the private network, where nothing sets it, so the visitor's address is sent here and
+ * ONLY on this server-to-authservice call. The value is a validated IP address (clientAddressOf), never raw visitor input.
+ */
+export const AUTH_CLIENT_IP_HEADER = "Fly-Client-IP";
+
+async function call(path: string, init: { method: string; body?: unknown; bearer?: string; clientIp?: string }): Promise<Response | null> {
   const base = await resolveBackend("auth");
   if (!base) return null;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (init.body !== undefined) headers["Content-Type"] = "application/json";
   if (init.bearer) headers["Authorization"] = `Bearer ${init.bearer}`;
+  if (init.clientIp) headers[AUTH_CLIENT_IP_HEADER] = init.clientIp;
   try {
     return await backendFetch(base + path, {
       method: init.method,
@@ -62,20 +71,20 @@ async function classify(res: Response | null): Promise<IdentityResult> {
 }
 
 export const identity = {
-  login: async (email: string, password: string) =>
-    classify(await call("/api/v1/auth/login", { method: "POST", body: { email, password } })),
-  register: async (body: Record<string, unknown>) =>
-    classify(await call("/api/v1/auth/register", { method: "POST", body })),
-  refresh: async (refreshToken: string) =>
-    classify(await call("/api/v1/auth/refresh", { method: "POST", body: { refreshToken } })),
-  exchange: async (code: string) =>
-    classify(await call("/api/v1/external-auth/exchange", { method: "POST", body: { code } })),
+  login: async (email: string, password: string, clientIp?: string) =>
+    classify(await call("/api/v1/auth/login", { method: "POST", body: { email, password }, clientIp })),
+  register: async (body: Record<string, unknown>, clientIp?: string) =>
+    classify(await call("/api/v1/auth/register", { method: "POST", body, clientIp })),
+  refresh: async (refreshToken: string, clientIp?: string) =>
+    classify(await call("/api/v1/auth/refresh", { method: "POST", body: { refreshToken }, clientIp })),
+  exchange: async (code: string, clientIp?: string) =>
+    classify(await call("/api/v1/external-auth/exchange", { method: "POST", body: { code }, clientIp })),
   logout: async (accessToken: string) => {
     const res = await call("/api/v1/auth/logout", { method: "POST", bearer: accessToken });
     return res !== null && res.ok;
   },
-  consentVersions: async (): Promise<{ terms: string; privacy: string } | null> => {
-    const res = await call("/api/v1/auth/consents/versions", { method: "GET" });
+  consentVersions: async (clientIp?: string): Promise<{ terms: string; privacy: string } | null> => {
+    const res = await call("/api/v1/auth/consents/versions", { method: "GET", clientIp });
     if (!res?.ok) return null;
     const b = (await res.json().catch(() => null)) as { terms?: string; privacy?: string } | null;
     return b?.terms && b.privacy ? { terms: b.terms, privacy: b.privacy } : null;

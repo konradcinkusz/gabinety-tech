@@ -102,7 +102,7 @@ export async function handleProxy(request: Request, matched: string[] = []): Pro
 
   const renew = async () => {
     if (!refreshToken) return false;
-    renewed = await refreshOnce(refreshToken);
+    renewed = await refreshOnce(refreshToken, clientAddressOf(request.headers));
     if (!renewed) {
       refreshFailed = true;
       return false;

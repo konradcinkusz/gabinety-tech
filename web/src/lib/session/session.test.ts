@@ -74,6 +74,17 @@ describe("login", () => {
     fakeBackend(() => new Response("{}", { status: 429 }));
     expect((await register(json("/api/auth/register", { email: "a@example.test", password: "x", acceptedTermsVersion: "t", acceptedPrivacyVersion: "p" }))).status).toBe(429);
   });
+  it("forwards the visitor's address to authservice in Fly-Client-IP, only a valid one, and never the visitor's own header", async () => {
+    const calls = fakeBackend(() => tokenBody());
+    await login(json("/api/auth/login", { email: "a@example.test", password: "x" }, { "fly-client-ip": "203.0.113.7", "x-forwarded-for": "6.6.6.6, 203.0.113.9" }));
+    expect(calls[0]!.headers.get("fly-client-ip")).toBe("203.0.113.7");
+    calls.length = 0;
+    await login(json("/api/auth/login", { email: "a@example.test", password: "x" }, { "x-forwarded-for": "6.6.6.6, 203.0.113.9" }));
+    expect(calls[0]!.headers.get("fly-client-ip")).toBe("203.0.113.9"); // the proxy's entry, not the first one the visitor wrote
+    calls.length = 0;
+    await login(json("/api/auth/login", { email: "a@example.test", password: "x" }, { "fly-client-ip": "not an address <script>" }));
+    expect(calls[0]!.headers.has("fly-client-ip")).toBe(false);
+  });
   it("maps a 2FA challenge to two_factor_not_supported without cookies", async () => {
     fakeBackend(() => Response.json({ requiresTwoFactor: true, challengeToken: "c" }));
     const res = await login(json("/api/auth/login", { email: "a@example.test", password: "x" }));

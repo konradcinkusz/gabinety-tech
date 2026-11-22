@@ -5,11 +5,11 @@ import type { TokenSet } from "./cookies";
 // single-use token. The entry is dropped as soon as the promise settles.
 const inflight = new Map<string, Promise<TokenSet | null>>();
 
-export function refreshOnce(refreshToken: string): Promise<TokenSet | null> {
+export function refreshOnce(refreshToken: string, clientIp?: string): Promise<TokenSet | null> {
   const existing = inflight.get(refreshToken);
   if (existing) return existing;
   const p = identity
-    .refresh(refreshToken)
+    .refresh(refreshToken, clientIp)
     .then((r) => (r.kind === "tokens" ? r.tokens : null))
     .catch(() => null)
     .finally(() => inflight.delete(refreshToken));

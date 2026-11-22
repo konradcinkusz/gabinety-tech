@@ -1,0 +1,147 @@
+@page "/moje/rezerwacje/{BookingId:guid}/zmien-termin"
+@attribute [Authorize]
+@using System.Globalization
+@using Gabinety.Web.Components.Pages.Gabinet
+@using Gabinety.Web.Components.Pages.Shared
+@inject BookingClient Bookings
+@inject DirectoryClient Directory
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+@* The move of a confirmed booking to another free time of its own offer (CONTRACTS 4.2). The booking's summary, then the slot picker of that offer: each free time is a form button, a choice posts the new start,
+   and success is a redirect to the detail with a fixed key (?done=), so a reload never repeats it. The money is not part of it: the page says so. A booking that is not the caller's is the forbidden page (the service
+   answers 404 for a stranger and 403 for the practitioner of it). The page answers the service's refusal in words when the flag is off, whatever the way here. *@
+
+<PageTitle>@BookingsText.Reschedule.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+
+@if (_forbidden)
+{
+    <ForbiddenNotice />
+}
+else if (_failure is not null)
+{
+    <h1>@BookingsText.Reschedule.Title</h1>
+    <div class="callout callout--danger" role="alert" data-testid="unavailable">
+        <p>@ActionFailure.Text(_failure)</p>
+        <a class="btn btn--secondary" href="@PagePath">@BookingsText.ReloadHint</a>
+    </div>
+}
+else if (_booking is { } b)
+{
+    <h1>@BookingsText.Reschedule.Title</h1>
+    <div class="stack">
+        <section class="card" aria-labelledby="booking-title">
+            <h2 id="booking-title">@b.OfferingTitle</h2>
+            <dl class="dl">
+                <dt>@BookingsText.PartyPractitioner</dt><dd>@b.Practitioner.DisplayName</dd>
+                <dt>@BookingsText.Reschedule.Current</dt><dd>@BookingFormat.When(b.StartUtc, b.EndUtc)<br /><span class="muted">@BookingsText.Detail.Zone</span></dd>
+            </dl>
+            <p class="muted" data-testid="reschedule-policy">@BookingsText.Reschedule.Policy</p>
+        </section>
+
+        @if (_error is not null)
+        {
+            <div class="callout callout--danger" role="alert" data-testid="reschedule-error">
+                <p>@_error</p>
+                @if (_refresh) {<a class="btn btn--secondary" href="@PagePath">@BookingsText.Errors.Refresh</a>}
+            </div>
+        }
+
+        @if (!b.CanReschedule)
+        {
+            <div class="callout callout--warning" data-testid="reschedule-refused"><p>@BookingsText.Reschedule.Refused</p></div>
+        }
+        else if (_offering is null)
+        {
+            <div class="callout callout--warning" data-testid="reschedule-no-offering"><p>@BookingsText.Reschedule.NoOffering</p></div>
+        }
+        else
+        {
+            <section class="card" aria-labelledby="pick-title">
+                <h2 id="pick-title">@BookingsText.Reschedule.Pick</h2>
+                <form method="post" @onsubmit="RescheduleAsync" @formname="reschedule" novalidate>
+                    <AntiforgeryToken />
+                    <SlotPicker RescheduleBookingId="BookingId" Slug="@_slug" Offering="_offering" Slots="_slots" Windows="_windows" Today="_today" SelectedDay="_day" />
+                </form>
+            </section>
+        }
+        <p><a href="@DetailPath">@BookingsText.Reschedule.Back</a></p>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid BookingId { get; set; }
+    [SupplyParameterFromQuery(Name = "okna")] public string? OknaParam { get; set; }
+    [SupplyParameterFromQuery(Name = "dzien")] public string? DzienParam { get; set; }
+    [SupplyParameterFromForm(FormName = "reschedule", Name = "Model")] RescheduleForm? RescheduleModel { get; set; }
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+
+    public sealed class RescheduleForm { public string? StartUtc { get; set; } }
+
+    BookingDetailDto? _booking;
+    OfferingDto? _offering;
+    OfferSlots _slots = OfferSlots.Failed;
+    string _slug = "";
+    int _windows = 1;
+    DateOnly _today;
+    DateOnly? _day;
+    ApiFailure? _failure;
+    string? _error;
+    bool _refresh, _forbidden;
+
+    string PagePath => $"/moje/rezerwacje/{BookingId}/zmien-termin";
+    string DetailPath => $"/moje/rezerwacje/{BookingId}?role={BookingClient.ClientRole}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        RescheduleModel ??= new();
+        var result = await Bookings.GetAsync(BookingId);
+        if (result.IsOk) _booking = result.Value;
+        else if (result.Failure!.IsUnauthenticated) { SignIn(); return; }
+        else if (result.Failure.Status is 403 or 404) { Forbidden(); return; } // not this user's booking: the answer of an unknown id too
+        else { _failure = result.Failure; return; }
+
+        var b = _booking!;
+        _slug = b.Practitioner.Slug;
+        _windows = SlotPickerModel.ClampWindows(OknaParam);
+        var now = Clock.GetUtcNow();
+        _today = PlFormat.TodayWarsaw(now);
+        _day = DateOnly.TryParseExact(DzienParam, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day) ? day : null;
+        if (!b.CanReschedule) return; // the service's flag decides; the page offers nothing more to read
+
+        var profile = await Directory.ProfileAsync(_slug);
+        if (!profile.IsOk) return;
+        _offering = RescheduleRules.OfferingOf(profile.Value!, b.OfferingTitle);
+        if (_offering is null) return;
+        _slots = await ReadSlotsAsync(b.Practitioner.Id, _offering.Id, now);
+    }
+
+    /// <summary>Free times of the offer in the windows the page shows (one request per 14 days, as the profile reads them): a failed read is the picker's unavailable state, never an exception.</summary>
+    async Task<OfferSlots> ReadSlotsAsync(Guid practitionerId, Guid offeringId, DateTimeOffset now)
+    {
+        var windows = Enumerable.Range(0, _windows).Select(i => SlotPickerModel.Window(_today, i)).OfType<SlotWindow>().ToList();
+        var results = await Task.WhenAll(windows.Select(w => Bookings.SlotsAsync(practitionerId, offeringId, w.From.ToString("yyyy-MM-dd"), w.To.ToString("yyyy-MM-dd"))));
+        if (results.Any(r => !r.IsOk)) return OfferSlots.Failed;
+        return new OfferSlots(true, SlotPickerModel.GroupByDay(SlotPickerModel.WithinHorizon(results.SelectMany(r => r.Value!.Slots), now)));
+    }
+
+    /// <summary>The choice of a time: the service moves the booking, or refuses it in one of its codes, which the page names in words at the place of the action.</summary>
+    async Task RescheduleAsync()
+    {
+        (_error, _refresh) = (null, false);
+        if (RescheduleRules.ParseStart(RescheduleModel?.StartUtc) is not { } start) { _error = BookingsText.Reschedule.Invalid; return; }
+        var result = await Bookings.RescheduleAsync(BookingId, start);
+        if (result.IsOk) { Navigation.NavigateTo(DetailPath + "&done=rescheduled"); return; }
+        if (result.Failure!.IsUnauthenticated) { SignIn(); return; }
+        _error = RescheduleRules.FailureText(result.Failure);
+        _refresh = result.Failure.Code == "invalid_transition"; // the state changed under the user: the way out is to read it again
+    }
+
+    void Forbidden()
+    {
+        HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+        _forbidden = true;
+    }
+
+    void SignIn() => Navigation.NavigateTo(ReturnTarget.LoginUrl(ReturnTarget.Safe(PagePath)));
+}

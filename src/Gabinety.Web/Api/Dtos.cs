@@ -68,6 +68,9 @@ public sealed record BriefDto(string Text, string? ProblemSlug, bool AiAssisted)
 
 public sealed record CreateBookingRequestDto(Guid OfferingId, [property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantWriter))] DateTimeOffset StartUtc, BriefDto Brief);
 
+/// <summary>Body of <c>POST /api/v1/bookings/{id}/reschedule</c> (CONTRACTS 4.2): the new start, a UTC instant written with <c>Z</c>.</summary>
+public sealed record RescheduleRequestDto([property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantWriter))] DateTimeOffset StartUtc);
+
 /// <summary>The service insists on a UTC instant written with <c>Z</c> (CONTRACTS 0): <c>2026-12-08T11:00:00Z</c>, never <c>+00:00</c> or a local offset.</summary>
 public sealed class UtcInstantWriter : System.Text.Json.Serialization.JsonConverter<DateTimeOffset>
 {

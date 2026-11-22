@@ -21,6 +21,10 @@ public sealed partial class BookingClient
     public async Task<ApiResult<BookingDetailDto>> CancelAsync(Guid id, string? reason, CancellationToken ct = default) =>
         await PostAsync<BookingDetailDto>($"/api/v1/bookings/{Id(id)}/cancel", string.IsNullOrWhiteSpace(reason) ? new { } : new { reason = reason.Trim() }, await tokens.AccessTokenAsync(ct), ct);
 
+    /// <summary>Moves a Confirmed booking once, at least 24 h before its start (CONTRACTS 4.2). The answer is the booking view; a refusal is named by its code (<c>reschedule_not_allowed</c>, <c>slot_taken</c>, <c>slot_unavailable</c>, <c>invalid_transition</c>).</summary>
+    public async Task<ApiResult<BookingDetailDto>> RescheduleAsync(Guid id, DateTimeOffset startUtc, CancellationToken ct = default) =>
+        await PostAsync<BookingDetailDto>($"/api/v1/bookings/{Id(id)}/reschedule", new RescheduleRequestDto(startUtc), await tokens.AccessTokenAsync(ct), ct);
+
     /// <param name="kind">The wire name: <c>not_as_described</c>, <c>practitioner_no_show</c> or <c>other</c>.</param>
     public async Task<ApiResult<BookingDetailDto>> DisputeAsync(Guid id, string kind, string text, CancellationToken ct = default) =>
         await PostAsync<BookingDetailDto>($"/api/v1/bookings/{Id(id)}/dispute", new { kind, text = text.Trim() }, await tokens.AccessTokenAsync(ct), ct);

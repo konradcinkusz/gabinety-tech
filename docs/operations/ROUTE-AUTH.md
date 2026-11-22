@@ -167,6 +167,7 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings (client and practitioner tabs), static server rendering |
 | Web | PAGE | `/moje/rezerwacje/{BookingId}` | Authenticated | all | booking detail with cancel, dispute and no-show (form posts, antiforgery) |
 | Web | GET | `/moje/rezerwacje/{BookingId}/kalendarz.ics` | Authenticated | all | the booking as an iCalendar attachment (`text/calendar`, no-store), read with the user's own bearer; only for Confirmed or Completed bookings, 404 otherwise and for another user's booking |
+| Web | PAGE | `/moje/rezerwacje/{BookingId}/zmien-termin` | Authenticated | all | the client moves a confirmed booking once, 24 h or more before its start (form posts, antiforgery); a booking that is not the caller's is the forbidden page; T-11.11 |
 | Web | PAGE | `/moje/opinie` | Authenticated | all | the practitioner's own reviews and replies |
 | Web | PAGE | `/moje/opinie/{BookingId}` | Authenticated | all | write a review (form post, antiforgery) |
 | Web | PAGE | `/rezerwacja/{OfferingId}` | Authenticated | all | booking form: brief, assistant suggestion, pay (form posts, antiforgery) |

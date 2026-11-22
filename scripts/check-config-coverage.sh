@@ -24,7 +24,7 @@ dirs_of() {
 }
 has_source() { # app env-name
   local app="$1" n="$2" toml="$root/deploy/fly/$1.fly.toml"
-  grep -Eq "^[[:space:]]*$n[[:space:]]*=" "$toml" 2>/dev/null && return 0
+  grep -Eq "^[[:space:]]*${n}[[:space:]]*=" "$toml" 2>/dev/null && return 0
   awk -v a="$app" -v n="$n" '$1 == a && $2 == n {f=1} END {exit !f}' "$secrets" && return 0
   return 1
 }

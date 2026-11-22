@@ -25,6 +25,7 @@ public static class NotificationTemplates
         NotificationKind.DisputeOpened => new("Zgłoszono spór dotyczący rezerwacji", "Do rezerwacji zgłoszono spór. Wypłata jest wstrzymana do jego rozstrzygnięcia.", "Szczegóły rezerwacji", Booking),
         NotificationKind.DisputeResolved => new("Spór dotyczący rezerwacji został rozstrzygnięty", "Spór dotyczący rezerwacji został rozstrzygnięty.", "Szczegóły rezerwacji", Booking),
         NotificationKind.PayoutSent => new("Wypłata została wysłana", "Wypłata za konsultację została wysłana.", "Szczegóły rezerwacji", Booking),
+        NotificationKind.Rescheduled => new("Termin konsultacji został zmieniony", "Termin konsultacji został zmieniony. Nowy termin jest podany poniżej.", "Szczegóły rezerwacji", Booking),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "no template for this kind"),
     };
 

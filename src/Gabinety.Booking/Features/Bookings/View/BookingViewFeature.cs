@@ -70,7 +70,8 @@ public sealed class BookingViewFeature : IServiceFeature
             isPractitioner || admin ? money(b.FeeMinor) : null, isPractitioner || admin ? money(b.PayoutMinor) : null,
             flags.CanCancel, flags.CanDispute, flags.CanReportNoShow, flags.CanReview,
             // The same planner the cancel endpoint runs, so what the dialog says is what the money does.
-            flags.CanCancel && CancelPlanner.Plan(b, byClient: isClient, time?.GetUtcNow() ?? TimeProvider.System.GetUtcNow()) is { } plan ? plan.ToDto() : null);
+            flags.CanCancel && CancelPlanner.Plan(b, byClient: isClient, time?.GetUtcNow() ?? TimeProvider.System.GetUtcNow()) is { } plan ? plan.ToDto() : null,
+            flags.CanReschedule);
     }
 }
 

@@ -237,6 +237,16 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("price_minor");
 
+                    b.Property<short>("RescheduleCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)0)
+                        .HasColumnName("reschedule_count");
+
+                    b.Property<DateTimeOffset?>("RescheduledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rescheduled_at");
+
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("resolved_at");

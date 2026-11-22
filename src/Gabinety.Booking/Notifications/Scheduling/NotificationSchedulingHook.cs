@@ -55,7 +55,11 @@ public sealed class NotificationSchedulingHook(INotificationWriter writer) : IBo
 /// <summary>Registers the scheduling hook; <see cref="BookingTransitions"/> runs it inside every transition.</summary>
 public sealed class NotificationSchedulingFeature : IServiceFeature
 {
-    public void Add(IHostApplicationBuilder builder) => builder.Services.AddScoped<IBookingTransitionHook, NotificationSchedulingHook>();
+    public void Add(IHostApplicationBuilder builder)
+    {
+        builder.Services.AddScoped<IBookingTransitionHook, NotificationSchedulingHook>();
+        builder.Services.AddScoped<RescheduleNotifications>();
+    }
 
     public void Map(IEndpointRouteBuilder endpoints) { }
 }

@@ -7,14 +7,14 @@ using BookingEntity = Gabinety.Booking.Features.Bookings.Entities.Booking;
 
 namespace Gabinety.Booking.Features.Bookings.View;
 
-/// <summary>What the caller may do with a booking right now (CONTRACTS 4.4: the four booleans of <c>BookingView</c>).</summary>
-public readonly record struct BookingFlags(bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview)
+/// <summary>What the caller may do with a booking right now (CONTRACTS 4.4: the booleans of <c>BookingView</c>).</summary>
+public readonly record struct BookingFlags(bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview, bool CanReschedule = false)
 {
     public static readonly BookingFlags None = default;
 }
 
 /// <summary>
-/// The four <c>BookingView</c> flags for one caller at <c>time.GetUtcNow()</c>. Pure: no I/O, no clock of its own. Each flag asks the same rule the endpoint
+/// The <c>BookingView</c> flags for one caller at <c>time.GetUtcNow()</c>. Pure: no I/O, no clock of its own. Each flag asks the same rule the endpoint
 /// enforces, so the two cannot drift: the state table (<see cref="BookingStateMachine"/>), <see cref="DisputeFeature.InWindow"/>,
 /// <see cref="ReportClientNoShowFeature.InWindow"/> and <see cref="ReviewabilityFeature.Window"/>. The cancel rules, and the outcome of a cancel, are in <see cref="CancelPlanner"/>.
 /// <para><c>CanReview</c> is an upper bound: Reputation owns "already reviewed", which Booking cannot see.</para>
@@ -36,7 +36,9 @@ public static class BookingPermissions
         var canDispute = isClient && Allowed(s, BookingTrigger.ClientDisputes, b, now) && DisputeFeature.InWindow(b, "practitioner_no_show", now);
         var canReportNoShow = isPractitioner && Allowed(s, BookingTrigger.ClientNoShowReported, b, now) && ReportClientNoShowFeature.InWindow(b, now);
         var canReview = isClient && CanReview(b, now);
-        return new(canCancel, canDispute, canReportNoShow, canReview);
+        // The client only; the decision is the one the endpoint takes (status, once, 24 h), so the flag and the refusal cannot drift.
+        var canReschedule = isClient && Reschedule.Decide(s, b.StartUtc, now, b.RescheduleCount) == RescheduleDecision.Allowed;
+        return new(canCancel, canDispute, canReportNoShow, canReview, canReschedule);
     }
 
     static bool Allowed(BookingStatus from, BookingTrigger trigger, BookingEntity b, DateTimeOffset now) =>

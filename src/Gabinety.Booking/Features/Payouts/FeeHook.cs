@@ -32,6 +32,11 @@ public sealed class FeeHook(IConfiguration config, PlatformFeeClaims claims) : I
     public async Task OnTransitionAsync(BookingTransitionContext context, CancellationToken ct)
     {
         var b = context.Booking;
+        if (context.From == BookingStatus.Completed && context.To == BookingStatus.Disputed)
+        {
+            claims.Release(PairKey.For(b.ClientUserId, b.PractitionerId)); // the dispute reopened the money: its unpaid PlatformFee row was removed (DisputeFeature), so the InMemory stand-in lets go too
+            return;
+        }
         if (b.FeeMinor is not null) return; // computed once
         var price = Money.Pln(b.PriceMinor);
         // refund_partial: `kept` reads payment.RefundedMinor, so the refunded amount must be set BEFORE the hooks run (T-04.07c's effects do this for a
@@ -81,6 +86,8 @@ public sealed class PlatformFeeClaims
 {
     readonly object gate = new();
     readonly HashSet<string> claimed = [];
+
+    public void Release(string pairKey) { lock (gate) claimed.Remove(pairKey); }
 
     public async Task<bool> TryClaimAsync(BookingDbContext db, string pairKey, CancellationToken ct)
     {

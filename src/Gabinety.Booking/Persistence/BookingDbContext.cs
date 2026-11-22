@@ -36,6 +36,7 @@ public sealed class BookingDbContext(DbContextOptions<BookingDbContext> options)
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
     public DbSet<Payout> Payouts => Set<Payout>();
+    public DbSet<PaymentAccount> PaymentAccounts => Set<PaymentAccount>();
     public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>

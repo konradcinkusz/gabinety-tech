@@ -28,6 +28,8 @@ export function RegisterForm({
     if (data.get("consent") !== "on") return setError(at("register.consentRequired"));
     const password = String(data.get("password") ?? "");
     if (password.length < 8) return setError(at("register.passwordTooShort"));
+    // authservice's password rules (ASP.NET Identity options, Program.cs): a digit, a lower-case and an upper-case letter and a non-alphanumeric character.
+    if (!/\d/.test(password) || !/\p{Ll}/u.test(password) || !/\p{Lu}/u.test(password) || !/[^\p{L}\p{N}]/u.test(password)) return setError(at("register.passwordWeak"));
     setPending(true);
     setError(undefined);
     try {
@@ -44,7 +46,7 @@ export function RegisterForm({
       });
       if (res.status === 202) return setSent(true);
       if (res.ok) return navigate(safeReturnTo(returnTo));
-      setError(res.status >= 500 ? at("register.unavailable") : at("register.failed"));
+      setError(res.status === 429 ? at("register.rateLimited") : res.status >= 500 ? at("register.unavailable") : at("register.failed"));
     } catch {
       setError(at("register.unavailable"));
     } finally {

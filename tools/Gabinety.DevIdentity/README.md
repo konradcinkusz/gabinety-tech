@@ -4,6 +4,8 @@ A development stand-in for the authservice (ADR-0003). It serves the subset of t
 
 Rules: it lives under `tools/`, no project under `src/` is referenced by it (the AppHost starts it, only when the fake profile is on), it is in no Dockerfile, and **it refuses to start unless `GABINETY_FAKE=1`** (exit code 1, the reason on stderr). Everything is lost on restart. The RSA key is generated in memory at start.
 
+The stand-in must mimic the real service, so every difference found is fixed here: the contract suite (`tests/Gabinety.Integration.Tests/AuthContract`) holds the observable behaviour and runs on both. Known differences that remain: no two-factor, no GitHub, no e-mail confirmation (`202`), no rate limit, no admin API, `userName` is the e-mail, and demo users get `demo-` subjects.
+
 The real surface is proven separately: `tests/Gabinety.Integration.Tests/AuthContract` runs one suite against this tool (unit tier) and against the real authservice image (integration tier, when `AUTH_BASE_URL` is set), so the stand-in cannot drift.
 
 ## Run
@@ -18,12 +20,16 @@ GABINETY_FAKE=1 ASPNETCORE_URLS=http://localhost:5100 dotnet run --project tools
 
 | Method and path (also under `/api/auth/...`) | Notes |
 |---|---|
-| `GET /api/v1/auth/consents/versions` | `{terms, privacy, cookies}`, one fixed string `dev-1` |
-| `POST /api/v1/auth/register` | `{email, password (8-100), acceptedTermsVersion, acceptedPrivacyVersion, locale?}`. Always `200` with a token response: there is no e-mail verification step, so never `202` |
-| `POST /api/v1/auth/login` | `{email, password}`; `200` token response, `401` otherwise. Never the two-factor shape, never `403` |
+| `GET /api/v1/auth/consents/versions` | `{terms, privacy, cookies}`, `2026-01-01` for all three, authservice's default |
+| `POST /api/v1/auth/register` | `{email, password (8-100), acceptedTermsVersion, acceptedPrivacyVersion, locale?}`. `200` with a token response (no e-mail verification step, so never `202`); `400 {errors:[...]}` for an unaccepted consent version, a password without a digit, a lower-case letter, an upper-case letter and a special character, or an address already taken |
+| `POST /api/v1/auth/login` | `{email, password}`; `200` token response, `401 {error}` otherwise (one answer for an unknown address and a wrong password). Five wrong passwords lock the account for five minutes: then the right password gets `401 {error, lockedOut:true, lockoutEnd}`. Never the two-factor shape, never `403` |
 | `POST /api/v1/auth/refresh` | `{refreshToken}`; rotates; a used token is `401` and revokes its family |
 | `POST /api/v1/auth/logout` | Bearer; revokes every refresh token of the user |
 | `GET /api/v1/auth/me` | Bearer; the fields the spike lists |
+| `GET /api/v1/auth/consents`, `POST /api/v1/auth/consents` | Bearer; required and accepted versions (`/konto`) |
+| `GET /api/v1/auth/export` | Bearer; profile, consents, empty lists |
+| `DELETE /api/v1/auth/account` | Bearer, body `{password, confirmation:"DELETE"}`; soft delete: the account can no longer sign in or refresh |
+| `GET /api/v1/external-auth/providers` | `{providers:[]}`: no provider is configured |
 | `GET /.well-known/jwks.json` | one key |
 | `GET /.well-known/openid-configuration` | `issuer` and `jwks_uri` |
 

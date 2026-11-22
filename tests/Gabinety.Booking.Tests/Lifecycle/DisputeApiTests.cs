@@ -99,11 +99,11 @@ public class DisputeApiTests
         Assert.Equal(Text, row.DisputeText);
     }
 
-    public static TheoryData<BookingStatus> Illegal => new(Enum.GetValues<BookingStatus>().Where(s => s != BookingStatus.Confirmed));
+    public static TheoryData<BookingStatus> Illegal => new(Enum.GetValues<BookingStatus>().Where(s => s is not (BookingStatus.Confirmed or BookingStatus.Completed))); // Completed: DisputeFromCompletedTests
 
     [Theory]
     [MemberData(nameof(Illegal))]
-    public async Task From_any_status_but_Confirmed_it_is_409_invalid_transition(BookingStatus status)
+    public async Task From_any_status_but_Confirmed_and_Completed_it_is_409_invalid_transition(BookingStatus status)
     {
         await using var h = Life.Host(new RecordingProvider());
         var id = await Life.Seed(h, status, -2 * H);

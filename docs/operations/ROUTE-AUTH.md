@@ -66,6 +66,8 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | GET | `/api/v1/practitioners/{practitionerId}/slots` | Anonymous | all | public read |
 | Booking | POST | `/webhooks/payments/{provider}` | Anonymous | all | guarded by the provider signature |
 | Booking | POST | `/api/v1/payments/simulate` | Authenticated | fake | Mock provider only, and only the booking's client (F-01, T-10.08); not mapped when deployed |
+| Booking | GET | `/api/v1/me/payments/account` | Authenticated | all | practitioner only; 404 when the provider has no connected accounts (Mock); T-09.05 |
+| Booking | POST | `/api/v1/me/payments/account/onboarding` | Authenticated | all | practitioner only; creates the connected account and returns a single-use onboarding link; T-09.05 |
 | Booking | GET | `/api/v1/me/availability` | Authenticated | all | |
 | Booking | PUT | `/api/v1/me/availability` | Authenticated | all | |
 | Booking | POST | `/api/v1/bookings` | Authenticated | all | |

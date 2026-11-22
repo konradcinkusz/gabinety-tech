@@ -72,9 +72,12 @@ public class BookingPermissionsTests
     }
 
     [Fact]
-    public void Dispute_is_false_from_every_status_but_Confirmed()
+    public void Dispute_is_false_from_every_status_but_Confirmed_and_Completed_and_only_the_client_may_from_Completed()
     {
-        foreach (var s in All.Where(s => s != BookingStatus.Confirmed))
+        Assert.True(Flags(Row(BookingStatus.Completed), Client, Start + 2 * H).CanDispute);
+        Assert.False(Flags(Row(BookingStatus.Completed), Client, Start + 72 * H).CanDispute); // start + 72 h: the right is over
+        Assert.False(Flags(Row(BookingStatus.Completed), Practitioner, Start + 2 * H).CanDispute);
+        foreach (var s in All.Where(s => s is not (BookingStatus.Confirmed or BookingStatus.Completed)))
             foreach (var who in new[] { Client, Practitioner, Stranger })
                 Assert.False(Flags(Row(s), who, Start + 2 * H).CanDispute, $"{s}/{who}");
     }

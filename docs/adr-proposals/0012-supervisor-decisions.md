@@ -61,8 +61,9 @@ cannot reach Booking on a suspension, the profile stays suspended and the answer
 **New wiring.** Directory holds a key for Booking: GitHub secret `INTERNAL_KEY_DIRECTORY_TO_BOOKING` = `Internal__Keys__Booking` on Directory = `Internal__Callers__Directory` on Booking
 (`deploy/secrets.map`, `deploy/fly/*.toml`, DEPLOY.md); Directory gets `Backend__Booking`. Route row in `docs/operations/ROUTE-AUTH.md`; the callers matrix of SECURITY-REVIEW section 4 has the new pair.
 
-**Open points for the owner or supervisor.** (a) The cascade counts in `practitioner_cancel_count` (CONTRACTS 8.1 counts every practitioner cancel), which lowers the reliability share of a
-practitioner the administrator suspended. Decide whether a `practitioner_suspended` cancel should be excluded from `StatsCalculator`. (b) A `Cancelled` e-mail now also goes to the client when a
+**Supervisor decision (deviation from CONTRACTS 8.1).** A cancellation caused by the cascade (`status_reason = practitioner_suspended`) is **not** counted in `practitioner_cancel_count`; a voluntary practitioner cancel still is. `StatsCalculator` does this, tested in `StatsPushCalculationTests`. Caveat: erasing the practitioner clears `status_reason` of their bookings (Booking erasure), after which those rows would count; an erased practitioner has no ranking, so it does not matter. CONTRACTS 8.1 should say "`practitioner_cancel_count` + 1, except for a cancel made by suspension".
+
+**Open points.** (b) accepted by the supervisor: a `Cancelled` e-mail now also goes to the client when a
 practitioner cancels by themselves (it was only a template before); CONTRACTS 8.1 should list it. (c) A booking that has started but not ended when the suspension happens is not cancelled.
 
 **CONTRACTS / SPEC to change.** CONTRACTS 3.4 `suspend`: "then Booking cancels the practitioner's future bookings with a full refund (4.3)"; 3.6 `DELETE /internal/v1/subjects/{userId}`: "first the same cancellation";

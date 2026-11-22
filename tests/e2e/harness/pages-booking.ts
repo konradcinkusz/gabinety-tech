@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { gotoInteractive, watchCircuit } from "./circuit";
+import { awaitCircuitIfInteractive, gotoInteractive, watchCircuit } from "./circuit";
 import { bookingIdFromUrl } from "./booking-api";
 
 /** Page objects of the booking and review flow (J3, J4). Role and label locators; texts are the Polish strings of web/src/components/{booking,bookings,reviews,profile}/strings.ts. */
@@ -44,12 +44,14 @@ export class PractitionerProfilePage {
     }
     return first;
   }
-  /** Clicks a free time and waits for the booking form. The form is an interactive page: on the Blazor host nothing typed before its circuit is live would count (awaitCircuit). */
+  /** Clicks a free time and waits for the booking form. If the host renders it interactively, nothing typed before its circuit is live would count, so the circuit is awaited. */
   async openBookingForm(slot: Locator) {
     const circuit = watchCircuit(this.page);
+    const answer = this.page.waitForResponse((r) => ["document", "fetch", "xhr"].includes(r.request().resourceType()) && /\/rezerwacja\/[0-9a-f-]{36}/.test(new URL(r.url()).pathname));
     await slot.click();
+    const res = await answer;
     await this.page.waitForURL(/\/rezerwacja\//);
-    await circuit;
+    await awaitCircuitIfInteractive(res, circuit); // enhanced navigation answers a fetch, not a document; a static form has no circuit, an interactive one is awaited
   }
   newBadge(): Locator { return this.page.getByText("Nowy", { exact: true }); }
   reviewsSection(): Locator { return this.page.getByRole("region", { name: "Opinie" }); }

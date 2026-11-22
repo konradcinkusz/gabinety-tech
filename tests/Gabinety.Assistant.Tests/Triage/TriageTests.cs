@@ -136,6 +136,20 @@ public class TriageTests
     }
 
     [Fact]
+    public async Task Rigs_running_side_by_side_at_the_same_instant_each_see_only_their_own_usage_rows()
+    {
+        // Regression: the host's InMemory store was one shared name, so a row written by another test's rig could show up here.
+        using var a = new TriageRig();
+        using var b = new TriageRig();
+        Assert.Equal(a.Clock.Now, b.Clock.Now);
+        await Task.WhenAll(
+            a.Post(5, Clean), a.Post(5, Clean), a.Post(5, "[[unavailable]] tekst opinii"),
+            b.Post(5, "[[unavailable]] tekst opinii"));
+        Assert.Equal(3, (await a.Rows()).Count);
+        Assert.Equal("unavailable", Assert.Single(await b.Rows()).Outcome);
+    }
+
+    [Fact]
     public async Task A_slow_model_ends_in_503_within_the_timeout_without_a_repair_and_the_session_is_aborted()
     {
         var gw = new StubGateway();

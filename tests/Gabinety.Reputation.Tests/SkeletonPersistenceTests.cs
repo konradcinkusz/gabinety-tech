@@ -1,6 +1,7 @@
 using Gabinety.Reputation.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -41,7 +42,16 @@ public class SkeletonMigrationStateTests
 [Trait("tier", "integration")]
 public class SkeletonMigrationIntegrationTests
 {
-    const string Migration = "20261116100000_T-05.01_Entities";
+    // The migrations already released, in order. Never edit or reorder these; a new migration is NOT added here: the applied history must equal the assembly's own list
+    // (a missing, extra or reordered migration fails) and must start with this pinned prefix (an edited, renamed or reordered released one fails).
+    static readonly string[] Shipped = ["20261116100000_T-05.01_Entities"];
+    static readonly string[] Expected = [.. new ReputationDbContextFactory().CreateDbContext([]).Database.GetMigrations()];
+
+    static void AssertHistory(IReadOnlyList<string> applied)
+    {
+        Assert.Equal(Expected, applied);                                  // everything in the assembly, applied once, in order
+        Assert.Equal(Shipped, applied.Take(Shipped.Length).ToArray());    // the released part is untouched
+    }
 
     static WebApplicationFactory<Program> Host(string cs) => new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
     {
@@ -75,12 +85,12 @@ public class SkeletonMigrationIntegrationTests
         await using var pg = new PostgreSqlBuilder("postgres:17-alpine").Build();
         await pg.StartAsync();
         var cs = pg.GetConnectionString();
-        const string history = """select "MigrationId" from "__EFMigrationsHistory" """;
+        const string history = """select "MigrationId" from "__EFMigrationsHistory" order by "MigrationId" collate "C" """;
 
         await MigrateOnce(cs);
-        Assert.Equal([Migration], await Query(cs, history));
+        AssertHistory(await Query(cs, history));
         await MigrateOnce(cs);
-        Assert.Equal([Migration], await Query(cs, history));
+        AssertHistory(await Query(cs, history));
 
         Assert.Equal(["moderation_events", "rating_summaries", "reviews"], await Query(cs,
             "select table_name from information_schema.tables where table_schema = 'public' and table_name in ('reviews','rating_summaries','moderation_events') order by 1"));

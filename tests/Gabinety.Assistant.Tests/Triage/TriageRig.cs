@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Gabinety.Assistant.Persistence;
 using Gabinety.Assistant.Tests.Brief;
 using Gabinety.Assistant.Tests.Usage;
@@ -14,18 +13,17 @@ using Microsoft.Extensions.Logging;
 namespace Gabinety.Assistant.Tests.Triage;
 
 /// <summary>An Assistant host for the internal triage endpoint: X-Internal-Key, fake clock, optional gateway and settings.
-/// The InMemory database is shared by name in one process, so each rig owns a random UTC day far in the future and reads only that day's rows.</summary>
+/// Every rig owns a private InMemory database (the host's own is registered under one shared name, which all hosts of a process would otherwise see), so Rows() is exactly this rig's rows.</summary>
 public sealed class TriageRig : IDisposable
 {
     public const string Key = "demo-internal-key-not-a-secret";
-    public readonly FakeClock Clock = new(new DateTimeOffset(2100, 1, 1, 12, 0, 0, TimeSpan.Zero).AddDays(RandomNumberGenerator.GetInt32(0, 20_000)));
+    public readonly FakeClock Clock = new(new DateTimeOffset(2100, 1, 1, 12, 0, 0, TimeSpan.Zero));
     public readonly CaptureLogger Logs = new();
     public readonly WebApplicationFactory<Program> Factory;
-    readonly DateTimeOffset _dayStart;
+    readonly string _dbName = "triage-" + Guid.NewGuid();
 
     public TriageRig(ILlmGateway? gateway = null, params (string Key, string Value)[] settings)
     {
-        _dayStart = new DateTimeOffset(Clock.Now.UtcDateTime.Date, TimeSpan.Zero);
         Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseSetting("Llm:Provider", "Fake");
@@ -35,6 +33,8 @@ public sealed class TriageRig : IDisposable
             b.ConfigureServices(s =>
             {
                 s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(Clock);
+                s.RemoveAll<DbContextOptions<AssistantDbContext>>(); s.RemoveAll<DbContextOptions>();
+                s.AddDbContext<AssistantDbContext>(o => o.UseInMemoryDatabase(_dbName));
                 if (gateway is not null) { s.RemoveAll<ILlmGateway>(); s.AddSingleton(gateway); }
             });
         });
@@ -52,9 +52,7 @@ public sealed class TriageRig : IDisposable
     public async Task<List<UsageRow>> Rows()
     {
         using var scope = Factory.Services.CreateScope();
-        var from = _dayStart; var to = _dayStart.AddDays(1);
-        return await scope.ServiceProvider.GetRequiredService<AssistantDbContext>().Usage
-            .Where(u => u.At >= from && u.At < to).OrderBy(u => u.At).ToListAsync();
+        return await scope.ServiceProvider.GetRequiredService<AssistantDbContext>().Usage.OrderBy(u => u.At).ToListAsync();
     }
 
     public void Dispose() => Factory.Dispose();

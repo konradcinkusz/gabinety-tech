@@ -1,0 +1,99 @@
+@page "/zasady-rankingu"
+@attribute [AllowAnonymous]
+@attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = Gabinety.Web.Hosting.PublicPageCachePolicy.Name)]
+@inject DirectoryClient Directory
+@* A failing Directory is a 503 with an error state: stale numbers are never shown as the rules. *@
+
+<PageMeta Title="@PlPages.Ranking.MetaTitle" Description="@PlPages.Ranking.MetaDescription" Path="/zasady-rankingu" />
+
+<div class="prose">
+    <header class="page-header">
+        <h1>@PlPages.Ranking.Title</h1>
+        <p class="lead">@PlPages.Ranking.Intro</p>
+        @if (_rules is { } meta)
+        {
+            <p class="cluster muted">
+                <span>@string.Format(PlPages.Ranking.Version, meta.Version)</span>
+                <span>@string.Format(PlPages.Ranking.EffectiveFrom, PlFormat.NumericDate(meta.EffectiveFrom.ToString("yyyy-MM-dd")))</span>
+            </p>
+        }
+        <Alert Variant="AlertVariant.Info"><strong>@PlPages.Ranking.NothingPaid</strong></Alert>
+    </header>
+
+    @if (_rules is null)
+    {
+        <Alert Variant="AlertVariant.Danger" TestId="unavailable">@PlPages.Ranking.Unavailable</Alert>
+    }
+    else
+    {
+        var rules = _rules;
+        var (parts, score) = RankingModel.Worked(rules);
+        var i = RankingModel.Example;
+        <section class="section" aria-labelledby="rank-weights">
+            <h2 id="rank-weights">@PlPages.Ranking.WeightsTitle</h2>
+            <ScrollTable Caption="@PlPages.Ranking.WeightsCaption">
+                <thead><tr><th scope="col">@PlPages.Ranking.ColPart</th><th scope="col" class="num">@PlPages.Ranking.ColWeight</th><th scope="col">@PlPages.Ranking.ColMeaning</th></tr></thead>
+                <tbody>
+                    <tr><th scope="row">@PlPages.Ranking.Rating</th><td class="num">@PlFormat.Percent(rules.Weights.Rating)</td><td>@PlPages.Ranking.RatingMeaning</td></tr>
+                    <tr><th scope="row">@PlPages.Ranking.Reliability</th><td class="num">@PlFormat.Percent(rules.Weights.Reliability)</td><td>@PlPages.Ranking.ReliabilityMeaning</td></tr>
+                    <tr><th scope="row">@PlPages.Ranking.Availability</th><td class="num">@PlFormat.Percent(rules.Weights.Availability)</td><td>@PlPages.Ranking.AvailabilityMeaning</td></tr>
+                    <tr><th scope="row">@PlPages.Ranking.Completeness</th><td class="num">@PlFormat.Percent(rules.Weights.Completeness)</td><td>@PlPages.Ranking.CompletenessMeaning</td></tr>
+                </tbody>
+            </ScrollTable>
+            <p>@PlPages.Ranking.ScoreLine @PlPages.Ranking.TieBreak</p>
+        </section>
+
+        <section class="section" aria-labelledby="rank-constants">
+            <h2 id="rank-constants">@PlPages.Ranking.ConstantsTitle</h2>
+            <ScrollTable Caption="@PlPages.Ranking.ConstantsCaption">
+                <thead><tr><th scope="col">@PlPages.Ranking.ColConstant</th><th scope="col" class="num">@PlPages.Ranking.ColValue</th></tr></thead>
+                <tbody>
+                    <tr><th scope="row">@PlPages.Ranking.ConstM</th><td class="num">@PlFormat.Number(rules.Constants.M)</td></tr>
+                    <tr><th scope="row">@PlPages.Ranking.ConstMu</th><td class="num">@PlFormat.Number(rules.Constants.Mu)</td></tr>
+                    <tr><th scope="row">@PlPages.Ranking.ConstMin</th><td class="num">@PlFormat.Number(rules.Constants.MinReviewsToShowRating)</td></tr>
+                    <tr><th scope="row">@PlPages.Ranking.ConstSlots</th><td class="num">@PlFormat.Number(rules.Constants.SlotsForFullAvailability)</td></tr>
+                </tbody>
+            </ScrollTable>
+            <p>@PlPages.Ranking.SmallSample</p>
+        </section>
+
+        <section class="section" aria-labelledby="rank-example">
+            <h2 id="rank-example">@PlPages.Ranking.ExampleTitle</h2>
+            <p>@string.Format(PlPages.Ranking.ExampleIntro, i.N, PlFormat.Number(i.R), i.C, i.X, PlFormat.Number(i.P), i.K)</p>
+            <ScrollTable Caption="@PlPages.Ranking.ExampleCaption">
+                <thead>
+                    <tr><th scope="col">@PlPages.Ranking.ColPart</th><th scope="col" class="num">@PlPages.Ranking.ColInput</th><th scope="col" class="num">@PlPages.Ranking.ColWeight</th><th scope="col" class="num">@PlPages.Ranking.ColContribution</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in parts)
+                    {
+                        <tr><th scope="row">@PartName(p.Key)</th><td class="num">@PlFormat.Fixed(p.Value, 3)</td><td class="num">@PlFormat.Percent(p.Weight)</td><td class="num">@PlFormat.Fixed(p.Points)</td></tr>
+                    }
+                </tbody>
+                @* F-12: the total is a row with its value, in the table's own columns. *@
+                <tfoot><tr><th scope="row" colspan="3">@PlPages.Ranking.ExampleTotal</th><td class="num" data-testid="ranking-total">@PlFormat.Fixed(score)</td></tr></tfoot>
+            </ScrollTable>
+        </section>
+    }
+</div>
+
+@code {
+    RankingRulesDto? _rules;
+
+    static string PartName(string key) => key switch
+    {
+        "rating" => PlPages.Ranking.Rating,
+        "reliability" => PlPages.Ranking.Reliability,
+        "availability" => PlPages.Ranking.Availability,
+        _ => PlPages.Ranking.Completeness,
+    };
+
+    [CascadingParameter] HttpContext? Http { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Directory.RankingRulesAsync();
+        _rules = result.Value;
+        if (_rules is null && Http is { Response.HasStarted: false }) Http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+    }
+}

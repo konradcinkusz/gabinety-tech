@@ -2,14 +2,15 @@
     <h2 class="practitioner-card__name"><a href="@($"/gabinet/{Practitioner.Slug}")">@Practitioner.DisplayName</a></h2>
     <p class="practitioner-card__headline">@Practitioner.Headline</p>
     <ul class="cluster">
-        @foreach (var badge in Practitioner.Badges)
+        @* One badge: the four checks are the same on every card and so carry no information; the full list is on the profile (P-LIST-2). *@
+        @if (Practitioner.Badges.Contains("approved"))
         {
-            <li><span class="@($"badge{(badge == "approved" ? " badge--success" : "")}")">@BadgeLabel(badge)</span></li>
+            <li><span class="badge badge--success">@PlPages.ListExtra.Verified</span></li>
         }
         <li>
             @if (Practitioner.Rating is { } rating && !Practitioner.IsNew)
             {
-                <span class="badge">@string.Format(Pl.Card.Rating, rating.Average.ToString("0.0", Invariant).Replace('.', ','), rating.Count)</span>
+                <span class="badge" aria-label="@string.Format(Pl.Card.Rating, PlFormat.Rating(rating.Average), rating.Count)">★ @PlFormat.Rating(rating.Average) (@rating.Count)</span>
             }
             else
             {

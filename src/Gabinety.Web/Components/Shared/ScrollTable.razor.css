@@ -1,0 +1,7 @@
+.table-wrap { border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-raised); }
+.table-wrap:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.table-wrap ::deep table { width: 100%; font-size: var(--text-sm); }
+.table-wrap ::deep caption { padding: var(--space-2) var(--space-3); text-align: left; font-weight: 600; color: var(--color-text-secondary); }
+.table-wrap ::deep thead th { background: var(--color-surface); }
+.table-wrap ::deep .num { text-align: right; }
+.table-wrap ::deep tfoot th, .table-wrap ::deep tfoot td { font-weight: 700; }

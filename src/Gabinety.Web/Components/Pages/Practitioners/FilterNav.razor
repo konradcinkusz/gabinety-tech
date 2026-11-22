@@ -1,10 +1,13 @@
 @* Filters as plain links (no JavaScript); each link keeps the other filters and returns to the first page. *@
-<nav aria-label="@Pl.Filters.Label" class="filters">
+@* The filters sit in a disclosure titled "Filtry (n)": open by default (it works without JavaScript and a visitor sees the filters at once); the phone can fold it away (P-LIST-1). *@
+<details class="filters" open>
+<summary>@Pl.Filters.Label@(ActiveCount > 0 ? $" ({ActiveCount})" : "")</summary>
+<nav aria-label="@Pl.Filters.Label">
     @foreach (var group in Groups)
     {
         <section class="filters__group">
             <h2>@group.Title</h2>
-            <ul class="link-list">
+            <ul class="@(group.Segmented ? "segmented" : "link-list")">
                 @foreach (var item in group.Items)
                 {
                     <li><a class="chip" href="@item.Href" aria-current="@(item.Current ? "true" : null)">@item.Label</a></li>
@@ -20,8 +23,10 @@
         <button class="btn" type="submit">@Pl.Filters.Search</button>
     </form>
 </nav>
+</details>
 
 @code {
     [Parameter, EditorRequired] public ListState State { get; set; } = default!;
     [Parameter, EditorRequired] public IReadOnlyList<FilterGroup> Groups { get; set; } = default!;
+    [Parameter] public int ActiveCount { get; set; }
 }

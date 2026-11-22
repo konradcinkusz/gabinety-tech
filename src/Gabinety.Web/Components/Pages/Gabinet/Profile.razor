@@ -1,0 +1,182 @@
+@page "/gabinet/{Slug}"
+@attribute [AllowAnonymous]
+@attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = Gabinety.Web.Hosting.PublicPageCachePolicy.Name)]
+@inject DirectoryClient Directory
+@inject BookingClient Booking
+@inject ReputationClient Reputation
+@inject TimeProvider Time
+@inject NavigationManager Navigation
+@inject Gabinety.Web.Hosting.WebOptions Site
+@* Static server rendering: everything, the offers' free times and the reviews included, is in the first response (J1 asserts the JSON-LD; a crawler gets the content without scripts). *@
+
+@if (_profile is { } p)
+{
+    <PageMeta Title="@string.Format(PlPages.Profile.MetaTitle, p.DisplayName)" Description="@string.Format(PlPages.Profile.MetaDescription, p.DisplayName, p.Headline)" Path="@($"/gabinet/{Uri.EscapeDataString(p.Slug)}")" Type="profile" Robots="index,follow">
+        <script type="application/ld+json">@((MarkupString)ProfileJsonLd.Build(p, Site.SiteBaseUrl + $"/gabinet/{Uri.EscapeDataString(p.Slug)}"))</script>
+    </PageMeta>
+    var portfolio = ProfileJsonLd.SafeHttps(p.PortfolioUrl);
+    <header class="page-header">
+        <h1>@p.DisplayName</h1>
+        <p class="lead">@p.Headline</p>
+        <ul class="cluster" aria-label="@PlPages.Profile.BadgesLabel">
+            @foreach (var b in p.Badges)
+            {
+                <li><span class="@($"badge{(b == "approved" ? " badge--success" : "")}")" title="@BadgeInfo(b)" aria-label="@($"{BadgeLabel(b)}. {BadgeInfo(b)}")">@BadgeLabel(b)</span></li>
+            }
+            <li>
+                @if (p.Rating is { } rating && !p.IsNew) {<span class="badge">@string.Format(PlPages.Profile.Rating, PlFormat.Rating(rating.Average), rating.Count)</span>}
+                else {<span class="badge">@PlPages.Profile.IsNew</span>}
+            </li>
+        </ul>
+        <ul class="facts muted" aria-label="@PlPages.Profile.FactsLabel">
+            <li>@string.Format(PlPages.Profile.Completed, p.CompletedCount)</li>
+            <li>@string.Format(PlPages.Profile.MemberSince, PlFormat.MonthYearGenitive(p.MemberSince))</li>
+        </ul>
+        @if (portfolio is not null || p.GithubLogin is { Length: > 0 })
+        {
+            <ul class="cluster" aria-label="@PlPages.Profile.LinksLabel">
+                @if (portfolio is not null) {<li><a class="btn" href="@portfolio" rel="noopener nofollow ugc">@PlPages.Profile.Portfolio</a></li>}
+                @if (p.GithubLogin is { Length: > 0 } login) {<li><a class="btn" href="@ProfileJsonLd.Github(login)" rel="noopener nofollow">@PlPages.Profile.Github</a></li>}
+            </ul>
+        }
+    </header>
+
+    <section class="section" aria-labelledby="about">
+        <h2 id="about">@PlPages.Profile.AboutTitle</h2>
+        <p class="bio">@p.Bio</p>
+    </section>
+
+    <section class="section" aria-labelledby="offerings">
+        <h2 id="offerings">@PlPages.Profile.OfferingsTitle</h2>
+        @if (p.Offerings.Count == 0)
+        {
+            <p data-testid="no-offerings">@PlPages.Profile.NoOfferings</p>
+        }
+        else
+        {
+            <ul class="offerings">
+                @foreach (var o in p.Offerings)
+                {
+                    <li id="@($"oferta-{o.Id}")">
+                        <div class="card">
+                            <h3>@o.Title</h3>
+                            <p class="description">@o.Description</p>
+                            <p class="cluster"><span>@string.Format(PlPages.Profile.Duration, o.DurationMinutes)</span><span class="num price">@Money.Pln(o.Price.AmountMinor)</span></p>
+                            <a class="btn btn--primary" href="@($"/rezerwacja/{o.Id}?gabinet={Uri.EscapeDataString(p.Slug)}")" aria-label="@string.Format(PlPages.Profile.BookOffering, o.Title)">@PlPages.Profile.Book</a>
+                            <SlotPicker Slug="@p.Slug" Offering="o" Slots="_slots.GetValueOrDefault(o.Id) ?? OfferSlots.Failed" Windows="_windows" Today="_today"
+                                        SelectedDay="@(Oferta == o.Id ? _day : null)" />
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="section" id="opinie" aria-labelledby="reviews-title">
+        <h2 id="reviews-title">@PlPages.Profile.ReviewsTitle</h2>
+        @if (_reviews is null)
+        {
+            <Alert Variant="AlertVariant.Warning" TestId="reviews-unavailable">@PlPages.Profile.ReviewsUnavailable</Alert>
+            <a class="btn" href="@($"/gabinet/{Uri.EscapeDataString(p.Slug)}#opinie")">@PlPages.Profile.Retry</a>
+        }
+        else if (_reviews.Items.Count == 0 && ReviewCursor is null)
+        {
+            @* One sentence, not two (P-PROF-1): a new practitioner and an established one with no reviews yet each say one thing. *@
+            <p>@(p.IsNew ? PlPages.Profile.ReviewsNew : PlPages.Profile.ReviewsEmpty)</p>
+        }
+        else
+        {
+            <ul class="reviews">
+                @foreach (var r in _reviews.Items)
+                {
+                    <li class="card">
+                        <p class="muted">@PlPages.Profile.Reviewer · @string.Format(PlPages.Profile.ReviewRating, r.Rating) · @PlFormat.DayLong(r.CreatedAt)</p>
+                        <p class="description">@r.Text</p>
+                        @if (r.Reply is { } reply)
+                        {
+                            <div class="reply"><strong>@PlPages.Profile.ReplyHeading</strong><p class="description">@reply.Text</p></div>
+                        }
+                    </li>
+                }
+            </ul>
+            @if (_reviews.NextCursor is { } next)
+            {
+                <a class="btn" href="@($"/gabinet/{Uri.EscapeDataString(p.Slug)}?opinie={Uri.EscapeDataString(next)}#opinie")">@PlPages.Profile.ReviewsMore</a>
+            }
+        }
+    </section>
+}
+else if (_gone)
+{
+    @* A profile the Directory calls gone is a 410 with the same page as a 404 (F-09). The 404 itself is the router's not-found page, which says the same for /gabinet/... *@
+    <PageMeta Title="@(PlPages.Profile.NotFoundTitle + " | " + Pl.Site.Name)" Description="@PlPages.Profile.NotFoundBody" Path="@($"/gabinet/{Uri.EscapeDataString(Slug)}")" Robots="noindex,follow" />
+    <ProfileNotFoundBlock Suggestions="_suggestions" />
+}
+else
+{
+    <PageMeta Title="@(Pl.Site.Name)" Description="@PlPages.Profile.Unavailable" Path="@($"/gabinet/{Uri.EscapeDataString(Slug)}")" Robots="noindex,follow" />
+    <h1>@PlPages.Profile.NotFoundTitle</h1>
+    <Alert Variant="AlertVariant.Danger" TestId="unavailable">@PlPages.Profile.Unavailable</Alert>
+}
+
+@code {
+    [CascadingParameter] HttpContext? Http { get; set; }
+    [Parameter] public string Slug { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "okna")] public string? OknaParam { get; set; }
+    [SupplyParameterFromQuery(Name = "oferta")] public Guid? Oferta { get; set; }
+    [SupplyParameterFromQuery(Name = "dzien")] public string? DzienParam { get; set; }
+    [SupplyParameterFromQuery(Name = "opinie")] public string? ReviewCursor { get; set; }
+
+    PractitionerProfileDto? _profile;
+    bool _gone;
+    int _windows = 1;
+    DateOnly _today;
+    DateOnly? _day;
+    Dictionary<Guid, OfferSlots> _slots = [];
+    PageDto<ReviewDto>? _reviews;
+    IReadOnlyList<CategoryDto> _suggestions = [];
+
+    static string BadgeLabel(string b) => b switch { "email" => PlPages.Profile.Email, "github" => PlPages.Profile.GithubBadge, "nip" => PlPages.Profile.Nip, "approved" => PlPages.Profile.Approved, _ => b };
+    static string BadgeInfo(string b) => b switch { "email" => PlPages.Profile.EmailInfo, "github" => PlPages.Profile.GithubInfo, "nip" => PlPages.Profile.NipInfo, "approved" => PlPages.Profile.ApprovedInfo, _ => "" };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        (_profile, _gone, _slots, _reviews) = (null, false, [], null);
+        var result = await Directory.ProfileAsync(Slug);
+        if (result.Failure is { Status: 404 }) { Navigation.NotFound(); return; } // the not-found page names the missing programmer (NotFound.razor)
+        if (result.Failure is { Status: 410 })
+        {
+            _gone = true;
+            Status(StatusCodes.Status410Gone);
+            _suggestions = (await Directory.TaxonomyAsync()).Value?.Problems.Take(3).ToList() ?? [];
+            return;
+        }
+        if (!result.IsOk) { Status(StatusCodes.Status503ServiceUnavailable); return; } // an error page must not be indexed as a 200
+        var p = result.Value!;
+        _windows = SlotPickerModel.ClampWindows(OknaParam);
+        var now = Time.GetUtcNow();
+        _today = PlFormat.TodayWarsaw(now);
+        _day = DateOnly.TryParseExact(DzienParam, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d : null;
+
+        // Independent reads: the slots of every offer (one request per 14-day window) and the reviews. Each is a region: a failure of one never takes the page down.
+        var slotTasks = p.Offerings.ToDictionary(o => o.Id, o => ReadSlotsAsync(p.Id, o.Id, now));
+        var reviewsTask = Reputation.ReviewsAsync(p.Id, ReviewCursor);
+        await Task.WhenAll([.. slotTasks.Values, reviewsTask]);
+        _slots = slotTasks.ToDictionary(t => t.Key, t => t.Value.Result);
+        _reviews = reviewsTask.Result.Value;
+        _profile = p;
+    }
+
+    async Task<OfferSlots> ReadSlotsAsync(Guid practitionerId, Guid offeringId, DateTimeOffset now)
+    {
+        var windows = Enumerable.Range(0, _windows).Select(i => SlotPickerModel.Window(_today, i)).OfType<SlotWindow>().ToList();
+        var results = await Task.WhenAll(windows.Select(w => Booking.SlotsAsync(practitionerId, offeringId, w.From.ToString("yyyy-MM-dd"), w.To.ToString("yyyy-MM-dd"))));
+        if (results.Any(r => !r.IsOk)) return OfferSlots.Failed;
+        return new OfferSlots(true, SlotPickerModel.GroupByDay(SlotPickerModel.WithinHorizon(results.SelectMany(r => r.Value!.Slots), now)));
+    }
+
+    void Status(int code)
+    {
+        if (Http is { Response.HasStarted: false }) Http.Response.StatusCode = code;
+    }
+}

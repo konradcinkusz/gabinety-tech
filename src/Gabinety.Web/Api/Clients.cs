@@ -13,6 +13,11 @@ public sealed class DirectoryClient(HttpClient http, VisitorAddressAccessor visi
 
     public Task<ApiResult<SitemapDto>> SitemapAsync(CancellationToken ct = default) => GetAsync<SitemapDto>("/api/v1/sitemap", null, ct);
 
+    public Task<ApiResult<PractitionerProfileDto>> ProfileAsync(string slug, CancellationToken ct = default) =>
+        GetAsync<PractitionerProfileDto>($"/api/v1/practitioners/{Uri.EscapeDataString(slug)}", null, ct);
+
+    public Task<ApiResult<RankingRulesDto>> RankingRulesAsync(CancellationToken ct = default) => GetAsync<RankingRulesDto>("/api/v1/ranking-rules", null, ct);
+
     public Task<ApiResult<PageDto<PractitionerCardDto>>> PractitionersAsync(PractitionerQuery query, CancellationToken ct = default)
     {
         var parts = new List<string>();
@@ -31,6 +36,10 @@ public sealed class DirectoryClient(HttpClient http, VisitorAddressAccessor visi
 public sealed class BookingClient(HttpClient http, VisitorAddressAccessor visitor, IAccessTokenSource tokens) : ApiClient(http, visitor)
 {
     public const string ClientRole = "client", PractitionerRole = "practitioner";
+
+    /// <summary>Free slots of one offering between two Warsaw dates (inclusive, CONTRACTS 4.2). Public: no bearer is sent.</summary>
+    public Task<ApiResult<SlotsDto>> SlotsAsync(Guid practitionerId, Guid offeringId, string fromDate, string toDate, CancellationToken ct = default) =>
+        GetAsync<SlotsDto>($"/api/v1/practitioners/{practitionerId}/slots?offeringId={offeringId}&from={Uri.EscapeDataString(fromDate)}&to={Uri.EscapeDataString(toDate)}", null, ct);
 
     public async Task<ApiResult<PageDto<BookingViewDto>>> MyBookingsAsync(string role, string? status, string? cursor, CancellationToken ct = default)
     {

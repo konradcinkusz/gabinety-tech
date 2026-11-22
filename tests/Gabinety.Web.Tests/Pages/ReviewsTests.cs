@@ -169,14 +169,14 @@ public class ReviewsTests
     [Fact]
     public async Task A_401_goes_to_sign_in_and_the_review_text_is_never_logged()
     {
-        const string secret = "SEKRET-OPINII-NIE-DO-LOGOW syntetyczna treść opinii";
+        const string userText = "Znacznik opinii syntetyczna treść opinii";
         await using var f = await Open(_ => FakeBackend.Problem(HttpStatusCode.Unauthorized, "unauthenticated"));
-        var page = await f.Post(Form, "review", ("Model.Rating", "5"), ("Model.Text", secret));
+        var page = await f.Post(Form, "review", ("Model.Rating", "5"), ("Model.Text", userText));
         Assert.Equal(HttpStatusCode.Found, page.Status);
         Assert.StartsWith("/logowanie?redirect=", page.Location);
         f.Web.Reputation.Respond = FakeBackend.Throw(new HttpRequestException("down"));
-        await f.Post(Form, "review", ("Model.Rating", "5"), ("Model.Text", secret));
-        Assert.DoesNotContain(f.Logs.Lines, l => l.Contains("SEKRET-OPINII", StringComparison.Ordinal));
+        await f.Post(Form, "review", ("Model.Rating", "5"), ("Model.Text", userText));
+        Assert.DoesNotContain(f.Logs.Lines, l => l.Contains("Znacznik opinii", StringComparison.Ordinal));
         Assert.Equal(2, f.Web.Reputation.Calls); // never retried by itself
     }
 

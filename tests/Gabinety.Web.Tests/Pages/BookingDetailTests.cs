@@ -380,12 +380,12 @@ public class BookingDetailTests
     [Fact]
     public async Task The_dispute_text_is_never_written_to_a_log_or_a_url()
     {
-        const string text = "SEKRET-SPORU-NIE-DO-LOGOW opis syntetyczny";
+        const string text = "Znacznik sporu opis syntetyczny";
         await using var f = await Open(Detail(dispute: true, cancel: true), post: _ => FakeBackend.Problem(HttpStatusCode.InternalServerError, "boom"));
         var page = await f.Post(Client + "&action=dispute", "dispute", ("Model.Kind", "other"), ("Model.Text", text));
         await f.Post(Client + "&action=cancel", "cancel", ("Model.Reason", text));
-        Assert.DoesNotContain(f.Logs.Lines, l => l.Contains("SEKRET-SPORU", StringComparison.Ordinal));
-        Assert.DoesNotContain(f.Web.Booking.Requests, r => r.PathAndQuery.Contains("SEKRET"));
+        Assert.DoesNotContain(f.Logs.Lines, l => l.Contains("Znacznik sporu", StringComparison.Ordinal));
+        Assert.DoesNotContain(f.Web.Booking.Requests, r => r.PathAndQuery.Contains("Znacznik"));
         Assert.Null(page.Location);
     }
 

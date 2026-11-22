@@ -363,14 +363,14 @@ public class BookingFormTests
     [Fact]
     public async Task The_brief_is_never_written_to_a_log_whatever_happens()
     {
-        var secret = "SEKRET-OPIS-NIE-DO-LOGOW-12345 reszta opisu problemu";
-        await using var f = await Open(booking: _ => FakeBackend.Problem(HttpStatusCode.UnprocessableEntity, "slot_taken"), assistant: _ => Suggestion(summary: "PODPOWIEDZ-ASYSTENTA-NIE-DO-LOGOW"));
-        await f.Post(BookingUrl, "booking", Intent("assist"), ("Model.Brief", secret));
-        await f.Post(BookingUrl, "booking", Intent("pay"), ("Model.Brief", secret));
+        var userText = "Znacznik opisu brief reszta opisu problemu";
+        await using var f = await Open(booking: _ => FakeBackend.Problem(HttpStatusCode.UnprocessableEntity, "slot_taken"), assistant: _ => Suggestion(summary: "Znacznik podpowiedzi asystenta"));
+        await f.Post(BookingUrl, "booking", Intent("assist"), ("Model.Brief", userText));
+        await f.Post(BookingUrl, "booking", Intent("pay"), ("Model.Brief", userText));
         f.Web.Booking.Respond = FakeBackend.Throw(new HttpRequestException("boom"));
-        await f.Post(BookingUrl, "booking", Intent("pay"), ("Model.Brief", secret));
+        await f.Post(BookingUrl, "booking", Intent("pay"), ("Model.Brief", userText));
         Assert.NotEmpty(f.Logs.Lines);
-        Assert.DoesNotContain(f.Logs.Lines, l => l.Contains("SEKRET-OPIS", StringComparison.Ordinal) || l.Contains("PODPOWIEDZ-ASYSTENTA", StringComparison.Ordinal));
+        Assert.DoesNotContain(f.Logs.Lines, l => l.Contains("Znacznik opisu", StringComparison.Ordinal) || l.Contains("Znacznik podpowiedzi", StringComparison.Ordinal));
     }
 
     [Fact]

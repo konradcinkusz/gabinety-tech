@@ -31,6 +31,12 @@ public class ClientTests : IClassFixture<WebFactory>
         Assert.Equal(2, page.Value!.Items.Count);
         Assert.Equal("NEXT", page.Value.NextCursor);
         Assert.Equal("/api/v1/practitioners?problem=audyt-kodu&tech=dotnet&q=a%26b%20c&duration=30&maxPriceMinor=15000&cursor=CUR%2B%2F%3D", _web.Directory.Requests[before].PathAndQuery);
+
+        // the order is the Directory's wire value; none (the rank order) is not sent (T-11.05)
+        await client.PractitionersAsync(new PractitionerQuery(Sort: "next_slot"));
+        Assert.Equal("/api/v1/practitioners?sort=next_slot", _web.Directory.Requests[^1].PathAndQuery);
+        await client.PractitionersAsync(new PractitionerQuery());
+        Assert.Equal("/api/v1/practitioners", _web.Directory.Requests[^1].PathAndQuery);
     }
 
     [Fact]

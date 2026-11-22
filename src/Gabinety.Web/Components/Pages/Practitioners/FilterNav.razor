@@ -7,6 +7,7 @@
     <form method="get" action="@State.Path" role="search" class="search-form">
         @if (State.Duration is { } duration) {<input type="hidden" name="duration" value="@duration" />}
         @if (State.MaxPriceMinor is { } price) {<input type="hidden" name="maxPriceMinor" value="@price" />}
+        @if (State.Sort is { } sort) {<input type="hidden" name="sortuj" value="@sort" />}
         <input name="q" type="search" maxlength="60" value="@State.Q" aria-label="@Pl.Filters.SearchLabel" placeholder="@Pl.Filters.SearchPlaceholder" />
         <button class="btn" type="submit">@Pl.Filters.Search</button>
     </form>

@@ -8,6 +8,9 @@ public sealed record FilterItem(string Label, string Href, bool Current);
 
 public sealed record FilterGroup(string Title, IReadOnlyList<FilterItem> Items, bool Segmented = false);
 
+/// <summary>One option of the sort control: its <c>sortuj</c> value, its label and whether it is the current order.</summary>
+public sealed record SortOption(string Value, string Label, bool Selected);
+
 /// <summary>
 /// What a list page says about itself, from its state and what the Directory returned: titles, counts, the filter links and the SEO verdict. Plain C#: the component only renders it.
 /// SEO rules (SPEC 6.5): unique title and description, canonical URL (a variant points at the plain list), <c>noindex,follow</c> on a category with fewer than 3 approved practitioners
@@ -42,6 +45,18 @@ public sealed class ListView(ListState state, TaxonomyDto taxonomy, SitemapDto s
 
     /// <summary>The Polish names of the problem categories, by slug: a card shows its problems by name, and a slug the taxonomy does not know is not shown.</summary>
     public IReadOnlyDictionary<string, string> ProblemNames { get; } = taxonomy.Problems.DistinctBy(c => c.Slug).ToDictionary(c => c.Slug, c => c.NamePl);
+
+    /// <summary>The Polish names of the technologies, by slug: a card shows its technologies by name, and a slug the taxonomy does not know is not shown.</summary>
+    public IReadOnlyDictionary<string, string> TechNames { get; } = taxonomy.Techs.DistinctBy(c => c.Slug).ToDictionary(c => c.Slug, c => c.NamePl);
+
+    /// <summary>The options of the sort control, in the order of the page: rank first (the default, which is no sort in the URL).</summary>
+    public IReadOnlyList<SortOption> SortOptions() =>
+    [
+        new(ListState.DefaultSortKey, Pl.ListPage.SortRelevance, State.Sort is null),
+        new("cena-rosnaco", Pl.ListPage.SortPriceAsc, State.Sort == "cena-rosnaco"),
+        new("cena-malejaco", Pl.ListPage.SortPriceDesc, State.Sort == "cena-malejaco"),
+        new("termin", Pl.ListPage.SortNextSlot, State.Sort == "termin"),
+    ];
 
     /// <summary>
     /// The active narrowing filters as removable chips: each link drops that one filter and keeps the rest. The problem and the technology are the page itself (its path, heading and

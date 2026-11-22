@@ -77,6 +77,8 @@ public static class Pl
         public const string CountPhrase = "{0} {1}", PractitionerOne = "programista", PractitionerMany = "programistów";
         public const string EmptyTitle = "Nie ma programistów dla tych filtrów", EmptyBody = "Zmień albo usuń filtry, żeby zobaczyć programistów z innymi kryteriami.";
         public const string ActiveFilters = "Aktywne filtry", RemoveFilter = "usuń filtr", SearchChip = "Szukaj: „{0}”";
+        /// <summary>The sort control of the result header (T-11.05): a select that applies on change, with a button for a page without script.</summary>
+        public const string SortLabel = "Sortuj", SortSubmit = "Sortuj", SortRelevance = "Trafność", SortPriceAsc = "Cena rosnąco", SortPriceDesc = "Cena malejąco", SortNextSlot = "Najbliższy termin";
         public const string Unavailable = "Nie udało się teraz wczytać listy programistów. Spróbuj ponownie za chwilę.";
         public const string MetaAllTitle = "Programiści do konsultacji online | Gabinety Tech";
         public const string MetaAllDescription = "Przeglądaj zweryfikowanych programistów i umów płatną konsultację online: audyt kodu, migracja, integracja AI i więcej.";
@@ -94,7 +96,7 @@ public static class Pl
 
     public static class Card
     {
-        public const string From = "od", IsNew = "Nowy", Rating = "Ocena {0} ({1})";
+        public const string From = "od", IsNew = "Nowy", Rating = "Ocena {0} ({1})", NextSlot = "Najbliższy termin:";
         public const string BadgeEmail = "E-mail zweryfikowany", BadgeGithub = "GitHub połączony", BadgeNip = "NIP zweryfikowany", BadgeApproved = "Zatwierdzony";
     }
 

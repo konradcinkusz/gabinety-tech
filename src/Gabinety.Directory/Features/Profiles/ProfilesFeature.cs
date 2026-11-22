@@ -43,6 +43,12 @@ public sealed class ProfilesFeature : IServiceFeature
 
     static string? UserId(ClaimsPrincipal u) => u.FindFirst("sub")?.Value ?? u.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
+    /// <summary>Keeps the e-mail snapshot of the token (<see cref="Practitioner.ContactEmail"/>) current. A token without a usable address leaves the stored one alone. Does not save.</summary>
+    static void Snapshot(Practitioner p, ClaimsPrincipal user)
+    {
+        if (UserEmail.From(user) is { } e && e != p.ContactEmail) p.ContactEmail = e;
+    }
+
     static string? Bearer(HttpContext ctx) =>
         ctx.Request.Headers.Authorization.ToString() is { } h && h.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? h[7..].Trim() : null;
 
@@ -70,7 +76,7 @@ public sealed class ProfilesFeature : IServiceFeature
         {
             var slug = SlugGenerator.WithSuffix(baseSlug, n);
             if (await db.Practitioners.AnyAsync(x => x.Slug == slug, ct)) { continue; }
-            var p = new Practitioner { Id = Guid.NewGuid(), UserId = uid, Slug = slug, DisplayName = name, Status = PractitionerStatus.Draft, CreatedAt = now, UpdatedAt = now };
+            var p = new Practitioner { Id = Guid.NewGuid(), UserId = uid, Slug = slug, DisplayName = name, ContactEmail = UserEmail.From(user), Status = PractitionerStatus.Draft, CreatedAt = now, UpdatedAt = now };
             db.Practitioners.Add(p);
             try { await db.SaveChangesAsync(ct); }
             catch (DbUpdateException)
@@ -88,8 +94,11 @@ public sealed class ProfilesFeature : IServiceFeature
     static async Task<IResult> Get(ClaimsPrincipal user, HttpContext ctx, DirectoryDbContext db, IEmailVerifiedLookup email, CancellationToken ct)
     {
         if (UserId(user) is not { } uid) return Results.Unauthorized();
-        var p = await db.Practitioners.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == uid, ct);
-        return p is null ? Problem(404, ErrorCodes.NotFound, "Not found") : Results.Ok(await View(p, ctx, email, ct));
+        var p = await db.Practitioners.SingleOrDefaultAsync(x => x.UserId == uid, ct);
+        if (p is null) return Problem(404, ErrorCodes.NotFound, "Not found");
+        Snapshot(p, user); // the dashboard loads this on sign-in: the address follows a change made in authservice
+        if (db.Entry(p).State == EntityState.Modified) await db.SaveChangesAsync(ct);
+        return Results.Ok(await View(p, ctx, email, ct));
     }
 
     static async Task<IResult> Update(UpdatePractitionerRequest req, ClaimsPrincipal user, HttpContext ctx, DirectoryDbContext db,
@@ -130,6 +139,7 @@ public sealed class ProfilesFeature : IServiceFeature
         }
         p.DisplayName = name; p.Headline = headline; p.Bio = bio; p.PortfolioUrl = portfolio; p.MeetingUrlDefault = meeting;
         p.Nip = nip; p.NipValid = nip is not null; // a stored NIP has passed the checksum
+        Snapshot(p, user);
         p.ProfileCompleteness = ProfileCompleteness.Compute(headline.Length > 0, bio.Length >= 200,
             await facts.ActiveOfferingCountAsync(p.Id, ct) > 0, p.GithubLinked, portfolio is not null, p.NipValid, p.OpenSlots14d > 0);
         Ranking.RankingRecalculator.Recompute(p);
@@ -159,6 +169,7 @@ public sealed class ProfilesFeature : IServiceFeature
             return Results.Json(new { type = "urn:gabinety:error:submit_incomplete", title = "Profile is incomplete", status = 422,
                 code = ErrorCodes.SubmitIncomplete, unmetItems = new SubmitIncomplete(unmet).UnmetItems }, statusCode: 422, contentType: "application/problem+json");
 
+        Snapshot(p, user);
         p.Status = next; p.StatusReason = null; p.UpdatedAt = time.GetUtcNow();
         Verification.VerificationEvents.Record(db, p.Id, Verification.VerificationEventKind.Submitted, uid, null, time);
         await db.SaveChangesAsync(ct);

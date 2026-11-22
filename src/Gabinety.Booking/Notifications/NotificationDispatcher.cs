@@ -61,7 +61,7 @@ public sealed class NotificationDispatcher(IServiceScopeFactory scopes, TimeProv
         if (n is null || n.SentAt != null || n.Attempts >= MaxAttempts || n.DueAt > now) return false;
 
         var booking = await db.Bookings.AsNoTracking().Where(b => b.Id == n.BookingId)
-            .Select(b => new { b.StartUtc, b.PractitionerUserId }).SingleOrDefaultAsync(ct);
+            .Select(b => new { b.StartUtc, b.PractitionerUserId, b.ClientEmail }).SingleOrDefaultAsync(ct);
         if (booking is not null && IsReminder(n.Kind) && booking.StartUtc <= now)
         {
             n.Attempts = MaxAttempts; // the give-up state: never selected again, sent_at stays null
@@ -78,12 +78,13 @@ public sealed class NotificationDispatcher(IServiceScopeFactory scopes, TimeProv
 
         if (booking is null) return Failed(n, "the booking does not exist");
 
+        var forPractitioner = n.ToUserId == booking.PractitionerUserId;
         string? address;
-        try { address = await sp.GetRequiredService<IContactResolver>().ResolveAddressAsync(n.ToUserId, ct); }
+        try { address = await sp.GetRequiredService<IContactResolver>().ResolveAddressAsync(new ContactLookup(n.ToUserId, forPractitioner, booking.ClientEmail), ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { return Failed(n, "the address lookup failed: " + ex.GetType().Name); }
         if (string.IsNullOrWhiteSpace(address)) return Failed(n, "the user has no address");
 
-        var mail = NotificationTemplates.Render(n.Kind, SiteUrl.From(sp.GetRequiredService<IConfiguration>()), n.BookingId, booking.StartUtc, n.ToUserId == booking.PractitionerUserId);
+        var mail = NotificationTemplates.Render(n.Kind, SiteUrl.From(sp.GetRequiredService<IConfiguration>()), n.BookingId, booking.StartUtc, forPractitioner);
         try { await sp.GetRequiredService<IEmailSender>().SendAsync(new EmailMessage(address, n.ToUserId, n.Kind, mail.Subject, mail.Text, mail.Html), ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { return Failed(n, "the sender failed: " + ex.GetType().Name); }
 

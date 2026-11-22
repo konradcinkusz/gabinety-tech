@@ -19,7 +19,7 @@ Runs: `ci` https://github.com/konradcinkusz/gabinety-tech/actions/runs/439081886
 |---|---|---|
 | `build-test` | .NET SDK from `global.json` (`setup-dotnet`), NuGet packages | internet |
 | `web` | pnpm, Node 22, npm packages (frozen lockfile) | internet |
-| `integration` | .NET SDK, NuGet, the image `postgres:17-alpine` (Testcontainers) | Docker daemon |
+| `integration` | .NET SDK, NuGet, the images `postgres:17-alpine` and `axllent/mailpit:v1.29.7` (Testcontainers; Mailpit is the real SMTP server of the notification test) | Docker daemon |
 | `e2e` | .NET SDK, Node 22, pnpm, npm packages, NuGet (incl. the Aspire orchestration packages) | internet; no Docker (the fake profile starts none) |
 | `secret-scan` | the gitleaks action | internet |
 

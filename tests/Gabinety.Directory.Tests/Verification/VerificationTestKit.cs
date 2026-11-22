@@ -49,12 +49,13 @@ public class VerificationFactory : OfferingFactory
     public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
     public FakeGithub Github { get; } = new();
 
-    public HttpClient As(string? sub, string? role = null)
+    public HttpClient As(string? sub, string? role = null, string? email = null)
     {
         var c = CreateClient();
         if (sub is null) return c;
         var claims = new Dictionary<string, object> { ["sub"] = sub };
         if (role is not null) claims[RoleClaim] = role;
+        if (email is not null) claims["email"] = email;
         var token = new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = Issuer, Audience = Audience, Expires = DateTime.UtcNow.AddMinutes(5), Claims = claims,

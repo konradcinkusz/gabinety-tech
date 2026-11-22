@@ -133,6 +133,11 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("cancelled_at");
 
+                    b.Property<string>("ClientEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("client_email");
+
                     b.Property<string>("ClientUserId")
                         .IsRequired()
                         .HasMaxLength(64)

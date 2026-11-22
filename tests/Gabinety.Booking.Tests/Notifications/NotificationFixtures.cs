@@ -35,8 +35,8 @@ sealed class FakeContacts : IContactResolver
 {
     public readonly ConcurrentDictionary<string, string?> Addresses = new();
     public string? Default;
-    public Task<string?> ResolveAddressAsync(string userId, CancellationToken ct) =>
-        Task.FromResult(Addresses.TryGetValue(userId, out var a) ? a : Default);
+    public Task<string?> ResolveAddressAsync(ContactLookup recipient, CancellationToken ct) =>
+        Task.FromResult(Addresses.TryGetValue(recipient.UserId, out var a) ? a : Default);
 }
 
 /// <summary>A Booking host with its OWN in-memory database (the shared one would let another test's dispatcher claim these rows) and the doubles above.</summary>

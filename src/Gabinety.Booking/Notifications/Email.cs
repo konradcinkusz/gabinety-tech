@@ -9,19 +9,19 @@ public interface IEmailSender
     Task SendAsync(EmailMessage message, CancellationToken ct);
 }
 
-/// <summary>The address of a user, asked from authservice by user id. Null when there is none (counts as a failed attempt).</summary>
+/// <summary>Who a notification is for, as far as an address lookup needs: the user, the side of the booking, and the client's e-mail snapshot from the booking row.</summary>
+public sealed record ContactLookup(string UserId, bool IsPractitioner, string? ClientEmailSnapshot);
+
+/// <summary>The address of a notification's recipient. Null when there is none (counts as a failed attempt, so the dispatcher retries). Must not throw for an outage.</summary>
 public interface IContactResolver
 {
-    Task<string?> ResolveAddressAsync(string userId, CancellationToken ct);
+    Task<string?> ResolveAddressAsync(ContactLookup recipient, CancellationToken ct);
 }
 
-/// <summary>
-/// Default until the authservice user lookup contract is known (neither docs/spikes/authservice.md nor CONTRACTS section 1 gives an endpoint that
-/// returns an address by user id): always null, so every notification is retried and finally given up. Replace it by registering another resolver.
-/// </summary>
+/// <summary>Used only when <c>Backend:Directory</c> is not configured (no practitioner address can be found): always null, so every notification is retried and finally given up.</summary>
 public sealed class NullContactResolver : IContactResolver
 {
-    public Task<string?> ResolveAddressAsync(string userId, CancellationToken ct) => Task.FromResult<string?>(null);
+    public Task<string?> ResolveAddressAsync(ContactLookup recipient, CancellationToken ct) => Task.FromResult<string?>(null);
 }
 
 /// <summary><c>Notifications:Provider=Log</c> (default): logs the recipient USER id, the kind and the subject LENGTH. Never the address, never the body.</summary>

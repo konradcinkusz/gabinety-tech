@@ -34,6 +34,10 @@ public sealed class EnumWireTests
         { typeof(LedgerKind), LedgerKind.PractitionerPayout, "PractitionerPayout" },
         { typeof(ReviewStatus), ReviewStatus.Held, "Held" },
         { typeof(AssistantState), AssistantState.NotAuthenticated, "NotAuthenticated" },
+        { typeof(ProposalKind), ProposalKind.LongTerm, "LongTerm" },
+        { typeof(ProposalStatus), ProposalStatus.AwaitingPractitioner, "AwaitingPractitioner" },
+        { typeof(ProposalActor), ProposalActor.System, "System" },
+        { typeof(ProposalAction), ProposalAction.Countered, "Countered" },
     };
 
     [Theory, MemberData(nameof(Lower))]

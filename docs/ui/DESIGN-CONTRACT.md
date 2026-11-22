@@ -341,7 +341,7 @@ A single persistent `.flash-region` (`role="status"`, `aria-live="polite"`) exis
 
 - Imperative verbs on actions with the object ("Zapłać 180 zł", "Wyślij opinię"), sentence case, no full stops on buttons.
 - Months and weekdays lowercase and in the genitive: `wtorek, 24 listopada`; "od listopada 2026"; money `180,00 zł` in lists and totals, `180 zł` in compact card prices; durations `60 min`.
-- One word per concept: **konsultacja** (the service), **rezerwacja** (the booking record), **termin** (the time), **programista** (practitioner; the product name "gabinet" stays in the URL and title), **opinia** (review), **spór** (dispute).
+- One word per concept: **konsultacja** (the service), **rezerwacja** (the booking record), **termin** (the time), **programista** (practitioner; the product name "gabinet" stays in the URL and title), **opinia** (review), **spór** (dispute), **propozycja** (a collaboration proposal a client sends to a programmer; never "oferta", which stays the programmer's consultation listing), **współpraca** (the contract-work availability a programmer advertises; the calendar tab keeps "Dostępność"). The assistant's suggestion in the booking form is "Propozycja opisu" and keeps its hooks.
 - Never print internal versions, ids or codes (`wersja dev-1`, GUIDs) as primary text.
 - Empty and error texts say what happened and what to do next in one or two sentences.
 - All strings stay in one resource per area (the current `strings.ts` become `*.resx` or constant classes); the hook texts of section 9 are copied verbatim.

@@ -31,5 +31,11 @@ public static class ErrorCodes
         AssistantUnavailable = "assistant_unavailable", DependencyUnavailable = "dependency_unavailable",
         CrossSiteRequest = "cross_site_request",
         /// <summary>The practitioner has no connected payment account that can receive money yet (T-09.05, ADR proposal 0011); CONTRACTS 10.1 does not list it yet.</summary>
-        PractitionerPaymentsNotReady = "practitioner_payments_not_ready";
+        PractitionerPaymentsNotReady = "practitioner_payments_not_ready",
+        /// <summary>ADR proposal 0013: a proposal to one's own profile.</summary>
+        OwnProfile = "own_profile",
+        /// <summary>ADR proposal 0013: the practitioner is not approved or does not advertise contract availability.</summary>
+        PractitionerNotAvailable = "practitioner_not_available",
+        /// <summary>ADR proposal 0013: an open proposal between this client and practitioner already exists.</summary>
+        ProposalExists = "proposal_exists";
 }

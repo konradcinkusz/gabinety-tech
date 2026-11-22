@@ -17,7 +17,19 @@ public sealed record RatingDto(double Average, int Count);
 
 public sealed record PractitionerCard(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin,
     IReadOnlyList<Badge> Badges, RatingDto? Rating, bool IsNew, MoneyDto FromPrice,
-    IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations);
+    IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations, ContractAvailabilityDto? Contract = null);
+
+/// <summary>What the practitioner advertises for contract work (ADR proposal 0013). Absent on a card means "not available". <c>AvailableFrom</c> null or in the past means available now.</summary>
+public sealed record ContractAvailabilityDto(DateOnly? AvailableFrom, int HoursPerWeek, MoneyDto? Rate);
+
+[JsonConverter(typeof(Gabinety.Contracts.Common.SnakeCaseLowerEnumConverter))]
+public enum ContractStatus { NotAvailable, AvailableNow, AvailableFrom }
+
+/// <summary>The practitioner's own contract-availability form (GET/PUT <c>/api/v1/me/practitioner/contract-availability</c>).</summary>
+public sealed record ContractAvailabilitySettings(ContractStatus Status, DateOnly? AvailableFrom, int? HoursPerWeek, long? RateMinor);
+
+/// <summary>Internal lookup for Booking (<c>GET /internal/v1/practitioners/{id}/contract</c>): who the proposal goes to and whether it may be sent.</summary>
+public sealed record InternalContractTargetDto(Guid PractitionerId, string PractitionerUserId, PractitionerStatus Status, string DisplayName, string Slug, bool AcceptsProposals);
 
 public sealed record Offering(Guid Id, string Title, string Description, int DurationMinutes, MoneyDto Price,
     string ProblemSlug, IReadOnlyList<string> TechSlugs);

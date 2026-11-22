@@ -10,7 +10,7 @@ public static class PlPractitioner
 
     public static class Tabs
     {
-        public const string Overview = "Start", Profile = "Profil", Offers = "Oferty", Availability = "Dostępność", Payments = "Płatności";
+        public const string Overview = "Start", Profile = "Profil", Offers = "Oferty", Availability = "Dostępność", Payments = "Płatności", Calendar = "Kalendarz";
     }
 
     public static class Common
@@ -152,6 +152,17 @@ public static class PlPractitioner
         public const string ServerRow = "sprawdź dzień i godziny", Failed = "Nie udało się zapisać dostępności. Spróbuj ponownie.", SummaryTitle = "Popraw godziny przed zapisem";
         public const string Unsaved = "Zmiany w liście godzin są zapisane dopiero po kliknięciu „Zapisz”.";
         public const string CopyToWeekdays = "Skopiuj na pozostałe dni robocze", DayEmpty = "Brak godzin tego dnia.";
+    }
+
+    /// <summary>The week view of the practitioner's consultations (<c>/gabinet-programisty/kalendarz</c>, DESIGN-CONTRACT 5.9, 5.10).</summary>
+    public static class Calendar
+    {
+        public const string Title = "Kalendarz", MetaTitle = "Kalendarz | Gabinety Tech", WeekLabel = "Wybór tygodnia", DaysLabel = "Konsultacje w tygodniu";
+        public const string Intro = "Konsultacje w wybranym tygodniu, według czasu polskiego (Europe/Warsaw). Pokazujemy potwierdzone, zakończone i sporne konsultacje.";
+        public const string Previous = "Poprzedni tydzień", Next = "Następny tydzień", Details = "Szczegóły", NoConsultations = "Brak konsultacji";
+        public const string EmptyTitle = "Brak konsultacji w tym tygodniu", EmptyBody = "Nie masz w tym tygodniu potwierdzonych ani zakończonych konsultacji. Zajrzyj do poprzedniego lub następnego tygodnia.";
+        public const string Retry = "Spróbuj ponownie";
+        public const string ForbiddenTitle = "Brak dostępu", ForbiddenBody = "Kalendarz jest dla programistów z założonym gabinetem.", Home = "Wróć na stronę główną";
     }
 
     public static class Payments

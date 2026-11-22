@@ -1,0 +1,143 @@
+@page "/gabinet-programisty/kalendarz"
+@attribute [Authorize]
+@layout PractitionerLayout
+@using System.Globalization
+@using Microsoft.AspNetCore.Http
+@using Gabinety.Web.Components.Pages.Bookings
+@using Gabinety.Web.Components.Pages.Shared
+@inherits PractitionerPage
+@inject PractitionerSchedulingClient Scheduling
+@inject TimeProvider Clock
+@* The week of the practitioner's consultations, static server rendering (no script): ?tydzien=<any day> picks the week (its Monday; this week when absent or not a date), the links step a week back or forward.
+   Seven day columns from 56 rem, the same days as a stacked list below that. Only Confirmed, Completed, Disputed and ClientNoShow are drawn (the states a practitioner plans around). An account without a practitioner profile gets the forbidden notice with status 403. *@
+
+<PageTitle>@PlPractitioner.Calendar.MetaTitle</PageTitle>
+<h1>@PlPractitioner.Calendar.Title</h1>
+
+@if (LoadFailure is not null)
+{
+    <Alert Variant="AlertVariant.Danger" TestId="unavailable">@FailureText(LoadFailure) <a href="@PractitionerPaths.Calendar">@PlPractitioner.Common.Retry</a></Alert>
+}
+else if (NoProfile)
+{
+    <div class="callout callout--danger" role="alert" data-testid="forbidden">
+        <h2 class="callout__title">@PlPractitioner.Calendar.ForbiddenTitle</h2>
+        <p>@PlPractitioner.Calendar.ForbiddenBody</p>
+        <p><a href="/">@PlPractitioner.Calendar.Home</a></p>
+    </div>
+}
+else
+{
+    <p class="lead">@PlPractitioner.Calendar.Intro</p>
+
+    <nav class="cluster cluster--between calendar-weeks" aria-label="@PlPractitioner.Calendar.WeekLabel">
+        <a class="btn btn--secondary" href="@WeekHref(_monday.AddDays(-7))" rel="prev">@PlPractitioner.Calendar.Previous</a>
+        <p class="calendar-weeks__range" data-testid="week-range">@_range</p>
+        <a class="btn btn--secondary" href="@WeekHref(_monday.AddDays(7))" rel="next">@PlPractitioner.Calendar.Next</a>
+    </nav>
+
+    @if (_failure is not null)
+    {
+        <div class="callout callout--danger" role="alert" data-testid="unavailable">
+            <p>@FailureText(_failure)</p>
+            <a class="btn btn--secondary" href="@WeekHref(_monday)">@PlPractitioner.Calendar.Retry</a>
+        </div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="empty-state" data-testid="calendar-empty">
+            <h2>@PlPractitioner.Calendar.EmptyTitle</h2>
+            <p>@PlPractitioner.Calendar.EmptyBody</p>
+        </div>
+    }
+    else
+    {
+        <ol class="week" aria-label="@PlPractitioner.Calendar.DaysLabel">
+            @for (var i = 0; i < 7; i++)
+            {
+                var day = _monday.AddDays(i);
+                var items = Items(day);
+                <li class="week__day" data-day="@Iso(day)">
+                    <h2 class="week__title">@PlFormat.DayHeading(day)</h2>
+                    @if (items.Count == 0)
+                    {
+                        <p class="muted week__empty">@PlPractitioner.Calendar.NoConsultations</p>
+                    }
+                    else
+                    {
+                        <ul class="week__list">
+                            @foreach (var b in items)
+                            {
+                                <li class="card week__item" data-testid="calendar-booking" data-booking="@b.Id">
+                                    <p class="week__time num">@Range(b)</p>
+                                    <p class="week__offering" id="@($"calendar-{b.Id:N}")">@b.OfferingTitle</p>
+                                    <p class="muted">@BookingFormat.OtherParty(b, BookingClient.PractitionerRole)</p>
+                                    <div class="cluster cluster--between">
+                                        <BookingBadge Badge="Badge.ForBooking(b.Status)" />
+                                        <a class="week__link" href="@($"/moje/rezerwacje/{b.Id}?role={BookingClient.PractitionerRole}")" aria-describedby="@($"calendar-{b.Id:N}")">@PlPractitioner.Calendar.Details</a>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </li>
+            }
+        </ol>
+    }
+}
+
+@code {
+    /// <summary>The states a practitioner plans around. Awaiting payment, cancelled, expired and resolved bookings are not on the calendar.</summary>
+    static readonly string[] Drawn = ["Confirmed", "Completed", "Disputed", "ClientNoShow"];
+
+    [SupplyParameterFromQuery(Name = "tydzien")] public string? WeekParam { get; set; }
+
+    DateOnly _monday;
+    string _range = "";
+    IReadOnlyList<BookingViewDto> _rows = [];
+    ApiFailure? _failure;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _monday = MondayOf(ParseDay(WeekParam) ?? PlFormat.TodayWarsaw(Clock.GetUtcNow()));
+        _range = RangeText(_monday);
+        if (!await LoadProfileAsync(missingIsState: true))
+        {
+            if (NoProfile && HttpContext is { Response.HasStarted: false }) HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+        var last = _monday.AddDays(6);
+        var r = await Scheduling.CalendarBookingsAsync(_monday, last);
+        if (r.IsOk) _rows = [.. r.Value!.Where(b => Drawn.Contains(b.Status) && DayOf(b) >= _monday && DayOf(b) <= last)];
+        else _failure = r.Failure;
+    }
+
+    /// <summary>The consultations of one Warsaw day, soonest first.</summary>
+    IReadOnlyList<BookingViewDto> Items(DateOnly day) => [.. _rows.Where(b => DayOf(b) == day).OrderBy(b => b.StartUtc)];
+
+    /// <summary>The Warsaw calendar day a booking starts on (a booking at 00:30 on a Monday in Warsaw is a Monday, whatever its UTC date).</summary>
+    static DateOnly DayOf(BookingViewDto b) => DateOnly.FromDateTime(PlFormat.ToWarsaw(b.StartUtc));
+
+    static string Range(BookingViewDto b) => $"{PlFormat.Time(b.StartUtc)}–{PlFormat.Time(b.EndUtc)}";
+
+    /// <summary>The Monday of the week that holds <paramref name="day"/> (Sunday belongs to the week that began six days before it).</summary>
+    static DateOnly MondayOf(DateOnly day) => day.AddDays(-(((int)day.DayOfWeek + 6) % 7));
+
+    static DateOnly? ParseDay(string? raw) =>
+        raw is not null && DateOnly.TryParseExact(raw, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+
+    static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    static string WeekHref(DateOnly monday) => $"{PractitionerPaths.Calendar}?tydzien={Iso(monday)}";
+
+    /// <summary><c>23–29 listopada 2026</c>; a week across two months or years names both.</summary>
+    static string RangeText(DateOnly monday)
+    {
+        var sunday = monday.AddDays(6);
+        var months = Pl.Format.MonthsGenitive;
+        var end = $"{sunday.Day} {months[sunday.Month - 1]} {sunday.Year}";
+        if (monday.Month == sunday.Month && monday.Year == sunday.Year) return $"{monday.Day}–{sunday.Day} {months[sunday.Month - 1]} {sunday.Year}";
+        var start = monday.Year == sunday.Year ? $"{monday.Day} {months[monday.Month - 1]}" : $"{monday.Day} {months[monday.Month - 1]} {monday.Year}";
+        return $"{start} – {end}";
+    }
+}

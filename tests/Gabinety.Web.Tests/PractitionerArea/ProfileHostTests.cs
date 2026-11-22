@@ -150,7 +150,7 @@ public class ProfileHostTests
         var page = await browser.GetAsync("/gabinet-programisty/profil");
         var nav = page.One("nav.tabs")!;
         Assert.Equal("Sekcje panelu programisty", nav.GetAttribute("aria-label"));
-        Assert.Equal(["Start", "Profil", "Oferty", "Dostępność", "Płatności"], nav.QuerySelectorAll("a").Select(a => a.TextContent));
+        Assert.Equal(["Start", "Kalendarz", "Profil", "Oferty", "Dostępność", "Płatności"], nav.QuerySelectorAll("a").Select(a => a.TextContent));
         Assert.Equal(["Profil"], nav.QuerySelectorAll("a[aria-current=page]").Select(a => a.TextContent));
         Assert.Equal("noindex,nofollow", page.One("meta[name=robots]")!.GetAttribute("content"));
         var start = await browser.GetAsync("/gabinet-programisty");

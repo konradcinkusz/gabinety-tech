@@ -266,7 +266,7 @@ public class StaticPagesTests
         var page = await web.NewBrowser().GetAsync("/");
         Assert.Equal(["Audyt kodu", "Migracja"], page.All("[data-testid=categories] a").Select(a => a.TextContent));
         Assert.Equal(2, page.All("[data-testid=categories] li.card").Count);
-        Assert.Contains("Zweryfikowanych programistów: 6", page.TextOf("[data-testid=trust]"));
+        Assert.Contains("6 zweryfikowanych programistów", page.TextOf("[data-testid=trust]"));
         Assert.Contains("Płatność z góry, programista dostaje pieniądze po konsultacji", page.TextOf("[data-testid=trust]"));
         Assert.Equal(3, page.All("ol.steps > li").Count);
         Assert.Equal("Szukaj", page.One("form[role=search] button")!.TextContent); // the field and the button in one form row (G-7)

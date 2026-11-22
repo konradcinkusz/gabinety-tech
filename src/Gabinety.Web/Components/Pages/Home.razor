@@ -1,8 +1,10 @@
 @page "/"
 @attribute [AllowAnonymous]
 @attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = Gabinety.Web.Hosting.PublicPageCachePolicy.Name)]
+@using Gabinety.Web.Components.Shared
 @inject DirectoryClient Directory
-@* Static server rendering: the HTML below is what a crawler and a visitor without JavaScript get. Pattern 5.2 of the design contract: hero, category tiles, three steps, trust row. *@
+@* Static server rendering: the HTML below is what a crawler and a visitor without JavaScript get. Pattern 5.2 of the design contract: hero with examples, category tiles, featured practitioners
+   (a region that fails soft), three steps, trust band, call to action for programmers, questions and answers. *@
 
 <PageMeta Title="@Pl.Home.MetaTitle" Description="@Pl.Home.MetaDescription" Path="/" />
 
@@ -17,6 +19,12 @@
         </div>
         <button class="btn btn--primary" type="submit">@Pl.Home.SearchButton</button>
     </form>
+    <p class="cluster examples">
+        <span class="muted">@PlPages.HomeExtra.ExamplesLead</span>
+        <a class="chip" href="/programisci?q=audyt%20kodu">@PlPages.HomeExtra.ExampleAudit</a>
+        <a class="chip" href="/programisci?q=migracja%20.NET">@PlPages.HomeExtra.ExampleMigration</a>
+        <a class="chip" href="/programisci?q=integracja%20AI">@PlPages.HomeExtra.ExampleAi</a>
+    </p>
 </header>
 
 <section class="section" aria-labelledby="home-categories">
@@ -30,15 +38,39 @@
         <ul class="tiles" aria-label="@Pl.Home.CategoriesLabel" data-testid="categories">
             @foreach (var c in _problems)
             {
-                <li class="card tile">
+                var count = CountOf(c.Slug);
+                <li class="card card--link tile">
                     <a class="tile__link" href="@($"/programisci/{Uri.EscapeDataString(c.Slug)}")">@c.NamePl</a>
-                    <p class="muted">@PlPages.HomeExtra.CategoryHint</p>
+                    <p class="tile__text">@DescriptionOf(c)</p>
+                    @if (count is { } total)
+                    {
+                        <p class="tile__count muted">@Practitioners(total)</p>
+                    }
                 </li>
             }
         </ul>
     }
     <a href="/programisci">@Pl.Home.AllPractitioners</a>
 </section>
+
+@if (_featured is { Count: > 0 } featured)
+{
+    @* A region of its own: when the Directory does not answer, the region is absent with no message, and the rest of the page stays. *@
+    <section class="section" aria-labelledby="home-featured">
+        <h2 id="home-featured">@PlPages.HomeExtra.FeaturedTitle</h2>
+        <p class="muted">@PlPages.HomeExtra.FeaturedIntro</p>
+        <ul class="featured" data-testid="featured">
+            @foreach (var p in featured)
+            {
+                <li class="card card--link featured__card">
+                    <h3 class="featured__name"><a href="@($"/gabinet/{p.Slug}")">@p.DisplayName</a></h3>
+                    <p class="featured__headline">@p.Headline</p>
+                    <p class="num featured__price">@string.Format(PlPages.HomeExtra.FeaturedFrom, Money.Pln(p.FromPrice.AmountMinor))</p>
+                </li>
+            }
+        </ul>
+    </section>
+}
 
 <section class="band" aria-labelledby="home-steps">
     <h2 id="home-steps">@Pl.Home.StepsTitle</h2>
@@ -54,25 +86,79 @@
     <h2 id="home-rules">@Pl.Home.RulesTitle</h2>
     <p class="prose">@Pl.Home.RulesBody</p>
     <ul class="trust" aria-label="@PlPages.HomeExtra.TrustLabel" data-testid="trust">
-        @if (_verified is { } n and > 0) {<li>@string.Format(PlPages.HomeExtra.TrustPractitioners, n)</li>}
+        @if (_verified is { } verified and > 0)
+        {
+            <li>@Plural(verified, PlPages.HomeExtra.VerifiedOne, PlPages.HomeExtra.VerifiedFew, PlPages.HomeExtra.VerifiedMany)</li>
+        }
         <li>@PlPages.HomeExtra.TrustPayment</li>
         <li>@PlPages.HomeExtra.TrustRanking</li>
     </ul>
     <p><a href="/zasady-rankingu">@PlPages.HomeExtra.RulesLink</a> · <a href="/cennik">@PlPages.HomeExtra.PricingLink</a></p>
 </section>
 
+<section class="card join" aria-labelledby="home-join">
+    <h2 id="home-join">@PlPages.HomeExtra.ForPractitionersTitle</h2>
+    <p class="prose">@PlPages.HomeExtra.ForPractitionersBody</p>
+    <p><a class="btn btn--secondary" href="/rejestracja">@PlPages.HomeExtra.ForPractitionersLink</a></p>
+</section>
+
+<section class="section" aria-labelledby="home-faq">
+    <h2 id="home-faq">@PlPages.HomeExtra.FaqTitle</h2>
+    <div class="faq">
+        <details>
+            <summary>@PlPages.HomeExtra.FaqPayWhenQ</summary>
+            <p>@PlPages.HomeExtra.FaqPayWhenA</p>
+        </details>
+        <details>
+            <summary>@PlPages.HomeExtra.FaqCancelQ</summary>
+            <p>@PlPages.HomeExtra.FaqCancelA</p>
+        </details>
+        <details>
+            <summary>@PlPages.HomeExtra.FaqFeeQ</summary>
+            <p>@PlPages.HomeExtra.FaqFeeA <a href="/cennik">@PlPages.HomeExtra.FaqFeeLink</a></p>
+        </details>
+        <details>
+            <summary>@PlPages.HomeExtra.FaqDisputeQ</summary>
+            <p>@PlPages.HomeExtra.FaqDisputeA</p>
+        </details>
+    </div>
+</section>
+
 @code {
     IReadOnlyList<CategoryDto>? _problems;
+    IReadOnlyList<SitemapCategoryDto> _sitemap = [];
+    IReadOnlyList<PractitionerCardDto>? _featured;
     int? _verified;
 
-    // The categories are a region of the page: a failing Directory shows an error state there and the rest of the page stays (SPEC 6.5). The H1 is always rendered.
+    // Each region is independent (SPEC 6.5): the categories show an error state of their own, the featured row shows nothing, and the H1 is always rendered.
     protected override async Task OnInitializedAsync()
     {
         var taxonomyTask = Directory.TaxonomyAsync();
         var sitemapTask = Directory.SitemapAsync();
-        await Task.WhenAll(taxonomyTask, sitemapTask);
+        var featuredTask = Directory.PractitionersAsync(new PractitionerQuery());
+        await Task.WhenAll(taxonomyTask, sitemapTask, featuredTask);
         _problems = taxonomyTask.Result.IsOk ? taxonomyTask.Result.Value!.Problems : null;
+        _sitemap = sitemapTask.Result.Value?.Categories ?? [];
         // The trust row counts the approved practitioners (the plain list's count); with no answer the row simply omits the number.
-        _verified = sitemapTask.Result.Value?.Categories.FirstOrDefault(c => c.Path == "/programisci")?.PractitionerCount;
+        _verified = _sitemap.FirstOrDefault(c => c.Path == "/programisci")?.PractitionerCount;
+        // The first page of the list, three of it. A failed read leaves the region out.
+        _featured = featuredTask.Result.IsOk ? featuredTask.Result.Value!.Items.Take(3).ToList() : null;
+    }
+
+    /// <summary>The practitioner count of a category from the sitemap; absent when the sitemap does not answer or does not list it.</summary>
+    int? CountOf(string slug) => _sitemap.FirstOrDefault(c => c.Path == $"/programisci/{slug}")?.PractitionerCount;
+
+    static string DescriptionOf(CategoryDto c) =>
+        PlPages.HomeExtra.CategoryDescriptions.TryGetValue(c.Slug, out var text) ? text : string.Format(PlPages.HomeExtra.CategoryFallback, c.NamePl);
+
+    static string Practitioners(int n) => Plural(n, PlPages.HomeExtra.PractitionersOne, PlPages.HomeExtra.PractitionersFew, PlPages.HomeExtra.PractitionersMany);
+
+    /// <summary>Polish plural: 1 takes the singular form, 2 to 4 (but not 12 to 14) the few form, everything else the many form.</summary>
+    static string Plural(int n, string one, string few, string many)
+    {
+        var last = n % 10;
+        var lastTwo = n % 100;
+        var form = n == 1 ? one : (last is >= 2 and <= 4) && !(lastTwo is >= 12 and <= 14) ? few : many;
+        return string.Format(form, n);
     }
 }

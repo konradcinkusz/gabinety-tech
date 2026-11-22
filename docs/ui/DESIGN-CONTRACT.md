@@ -31,6 +31,8 @@ What the current app gets wrong and the contract changes (summary): session-blin
 
 The authoritative block is [`tokens.css`](tokens.css) (light default, dark redefinition, both complete). Summary:
 
+**Names (UX-001).** The host kept the token names it was built with; the values are the contract's. Where this document says `--surface-page`, `--surface`, `--surface-sunken`, the files say `--color-bg`, `--color-surface-raised`, `--color-surface-sunken` (`--color-surface` is an older alias of the sunken surface that scoped sheets still use); every other colour token is the name below with the prefix `--color-` (`--text` is `--color-text`, `--accent-soft-text` is `--color-accent-soft-text`); `--font-body` is `--font-sans`, `--fs-*` is `--text-*`, `--lh-*` is `--leading-*`. The shipped file is `src/Gabinety.Web/wwwroot/tokens.css`; `docs/ui/tokens.css` is a byte-identical copy and a test compares them.
+
 ### 3.1 Colour tokens (redefined in dark)
 
 `--surface-page`, `--surface`, `--surface-sunken`; `--text`, `--text-secondary`, `--text-muted`; `--border`, `--border-strong`; `--accent`, `--accent-hover`, `--accent-contrast`, `--accent-soft`, `--accent-soft-text`; `--success`, `--success-soft`, `--warning`, `--warning-soft`, `--danger`, `--danger-soft`, `--danger-contrast`; `--focus`; `--shadow-sm`, `--shadow-md`, `--scrim`.
@@ -51,7 +53,7 @@ Use: page background `--surface-page`; cards, inputs, tables `--surface`; table 
 
 ### 3.3 Contrast, computed
 
-Computed by `python3 tests/e2e/tools/ui-audit/contrast.py` from `tokens.css` (WCAG 2.x relative luminance). Text pairs need 4.5, controls and the focus ring 3.0. All 28 pairs pass in both themes; a stylesheet test reruns the same arithmetic.
+Computed by `python3 tests/e2e/tools/ui-audit/contrast.py` from the shipped `tokens.css` (WCAG 2.x relative luminance). Text pairs need 4.5, controls and the focus ring 3.0. All 28 pairs pass in both themes; a stylesheet test reruns the same arithmetic.
 
 | Foreground on background | Use | Min | Light | Dark |
 |---|---|---|---|---|

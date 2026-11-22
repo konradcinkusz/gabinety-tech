@@ -11,7 +11,7 @@ pnpm --dir tests/e2e install --frozen-lockfile
 PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node tests/e2e/tools/ui-audit/audit.mjs      # about 6 minutes; AUDIT_ONLY=flows | visitor | client | practitioner | admin
 python3 -I tests/e2e/tools/ui-audit/compress.py docs/ui/audit                           # palette PNG, each file under 150 KB (needs Pillow)
 python3 tests/e2e/tools/ui-audit/summarize.py docs/ui/audit/findings.json               # one line per page visit
-python3 tests/e2e/tools/ui-audit/contrast.py                                            # contrast table of docs/ui/tokens.css (exit 1 on a failing pair)
+python3 tests/e2e/tools/ui-audit/contrast.py                                            # contrast table of src/Gabinety.Web/wwwroot/tokens.css (exit 1 on a failing pair)
 ```
 
 Env: `E2E_WEB_URL` (default `http://localhost:3000`), `AUDIT_OUT` (default `docs/ui/audit`), `PW_CHROMIUM_PATH`.

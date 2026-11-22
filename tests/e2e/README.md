@@ -14,11 +14,14 @@ pnpm --dir tests/e2e test                                           # terminal 2
 
 ## Two web hosts (ADR-0010)
 
-The same journeys run against the Next.js app and the Blazor Web App: `HOST=next|blazor` (default `next`), `BASE_URL` (or `E2E_WEB_URL`) overrides the address (3000 for Next, 3001 for Blazor in the fake profile). CI runs both in the `e2e` matrix (`e2e` = Next, `e2e-blazor`), each on its own fresh fake profile.
+The same journeys run against the Next.js app and the Blazor Web App. `harness/host.ts` is the one place that reads `HOST=next|blazor` (default `next`) and `BASE_URL` (alias `E2E_WEB_URL`; 3000 for Next, 3001 for Blazor in the fake profile). CI runs both in the `e2e` matrix (`e2e` = Next, `e2e-blazor`), each on its own fresh fake profile.
 
 - **Interactive Blazor pages.** The page is HTML first and interactive only after the websocket answers `StartCircuit`; input before that is discarded without an error. Use `gotoInteractive(page, url)` (in `harness/circuit.ts`) instead of `page.goto` for a page that may be interactive (it waits only when the prerendered HTML carries a server component marker), and `watchCircuit(page)` taken **before** a click that navigates to one (`await circuit.ready()` after). On Next they are no-ops. Never sleep for a circuit.
 - **Pages not ported yet.** Start a test with `await requirePorted(page.request, "/route", ...)` (`harness/parity.ts`): on `HOST=blazor` it skips the test with `not ported yet: <route> (owner <branch>; docs/operations/PARITY.md)` when the host answers 404 for a route, so the skips disappear as pages land. `PARITY_STRICT=1` (the cutover gate) turns them into failures. Add the owner prefix to `OWNERS` for a new route family.
 - **No BFF on Blazor.** `signInAs`/`signInViaBff` sign the browser context in through the real form and keep the user's token for the context; `bff(ctx, ..., "/api/proxy/<service>/...")` and the booking helpers call the service directly with it on `HOST=blazor`. What a journey is about still goes through the UI.
+- **Which specs run where** (`playwright.config.ts`): both hosts run every journey; `*.blazor.spec.ts` is Blazor-only (J7's variant against `/logowanie`), `*.next.spec.ts` and the original `j7-foreign-origin.spec.ts` (it posts through the BFF) are Next-only. Name a Blazor-only spec `jN-....blazor.spec.ts`; there is no spec list to edit.
+- **Sign-in on Blazor** is the form post of `signInViaFormPost` (the session cookie `gt_session`); `signInViaBff` also fetches the user's token from the identity service for API set-up (`accessTokenOf`).
+
 
 ## What the harness gives you
 

@@ -1,16 +1,15 @@
 // Waits until every service answers /health, the Directory lists the seeded practitioners AND the demo seeder has finished. Used by globalSetup. Exit 1 on timeout.
 const { execFile } = require("node:child_process");
 const e = (n, d) => process.env[n] || d;
+const blazor = (process.env.HOST || "next").trim().toLowerCase() === "blazor"; // same rules as harness/host.ts
+const webUrl = (process.env.BASE_URL || process.env.E2E_WEB_URL || (blazor ? "http://localhost:3001" : "http://localhost:3000")).replace(/\/$/, "");
 const urls = {
   devidentity: `${e("E2E_IDENTITY_URL", "http://localhost:5100")}/health`,
   directory: `${e("E2E_DIRECTORY_URL", "http://localhost:5101")}/health`,
   booking: `${e("E2E_BOOKING_URL", "http://localhost:5102")}/health`,
   reputation: `${e("E2E_REPUTATION_URL", "http://localhost:5103")}/health`,
   assistant: `${e("E2E_ASSISTANT_URL", "http://localhost:5104")}/health`,
-  // HOST=next|blazor (harness/env.ts): the Blazor host listens on 3001 and answers the kernel's /health; BASE_URL overrides the address.
-  web: process.env.HOST === "blazor"
-    ? `${process.env.BASE_URL || e("E2E_WEB_URL", "http://localhost:3001")}/health`
-    : `${process.env.BASE_URL || e("E2E_WEB_URL", "http://localhost:3000")}/api/health`,
+  web: `${webUrl}${blazor ? "/health" : "/api/health"}`,
 };
 const list = `${e("E2E_DIRECTORY_URL", "http://localhost:5101")}/api/v1/practitioners?limit=50`;
 const want = Number(e("WANT_PRACTITIONERS", "6"));

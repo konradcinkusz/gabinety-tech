@@ -49,7 +49,7 @@ export class PractitionerProfilePage {
     const circuit = watchCircuit(this.page);
     await slot.click();
     await this.page.waitForURL(/\/rezerwacja\//);
-    await circuit.ready();
+    await circuit;
   }
   newBadge(): Locator { return this.page.getByText("Nowy", { exact: true }); }
   reviewsSection(): Locator { return this.page.getByRole("region", { name: "Opinie" }); }

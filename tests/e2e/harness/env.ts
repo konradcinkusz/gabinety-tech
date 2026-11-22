@@ -1,16 +1,10 @@
 /** Where the fake profile listens (AppHost `Program.cs`, `scripts/check-fake-profile.sh`). Overridable for a non-default setup. */
+import { webBaseUrl, webHealthPath } from "./host";
+
 const e = (name: string, fallback: string) => process.env[name] || fallback;
 
-/**
- * Which web host the journeys run against (ADR-0010): `next` (web/, port 3000, the default) or `blazor` (src/Gabinety.Web, port 3001 in the fake profile).
- * `BASE_URL` (or the older `E2E_WEB_URL`) overrides the address. At the cutover the default flips and `next` goes.
- */
-export const host: "next" | "blazor" = process.env.HOST === "blazor" ? "blazor" : "next";
-export const isBlazor = host === "blazor";
-const defaultWeb = isBlazor ? "http://localhost:3001" : "http://localhost:3000";
-
 export const urls = {
-  web: process.env.BASE_URL || e("E2E_WEB_URL", defaultWeb),
+  web: webBaseUrl, // HOST / BASE_URL / E2E_WEB_URL: see host.ts
   devidentity: e("E2E_IDENTITY_URL", "http://localhost:5100"),
   directory: e("E2E_DIRECTORY_URL", "http://localhost:5101"),
   booking: e("E2E_BOOKING_URL", "http://localhost:5102"),
@@ -18,14 +12,14 @@ export const urls = {
   assistant: e("E2E_ASSISTANT_URL", "http://localhost:5104"),
 } as const;
 
-/** `/health` of every service, in start order (the Next web app's is `/api/health`, the Blazor host's `/health`). */
+/** `/health` of every service, in start order (the web app's is `/api/health`). */
 export const healthUrls: Record<string, string> = {
   devidentity: `${urls.devidentity}/health`,
   directory: `${urls.directory}/health`,
   booking: `${urls.booking}/health`,
   reputation: `${urls.reputation}/health`,
   assistant: `${urls.assistant}/health`,
-  web: `${urls.web}${isBlazor ? "/health" : "/api/health"}`, // the kernel's /health on the Blazor host, the BFF's /api/health on Next
+  web: `${urls.web}${webHealthPath}`,
 };
 
 /**

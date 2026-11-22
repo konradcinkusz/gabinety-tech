@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, type APIRequestContext, type APIResponse, type Browser, type BrowserContext } from "@playwright/test";
-import { demoPassword, emailOf, isBlazor, urls } from "./env";
+import { demoPassword, emailOf, urls } from "./env";
+import { isBlazor } from "./host";
 import { accessTokenOf, registerAtIdentity, signInViaBff } from "./auth";
 import { fetchRetrying, json } from "./http";
 

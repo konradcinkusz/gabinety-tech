@@ -1,0 +1,117 @@
+@page "/konto"
+@attribute [Authorize]
+@inject AccountClient Accounts
+@inject SignInService SignIn
+@inject NavigationManager Navigation
+@* Static server rendering: plain forms with antiforgery, no JavaScript needed. The page always renders its h1, the e-mail of the session and the sign-out link, whatever the identity service says (F-09). *@
+
+<PageTitle>@Pl.Account.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<h1>@Pl.Account.Title</h1>
+
+<div class="stack">
+    <section class="card" aria-labelledby="account-email-label">
+        <dl class="dl">
+            <dt id="account-email-label">@Pl.Account.Email</dt>
+            <dd data-testid="account-email">@SessionEmail</dd>
+        </dl>
+        @if (_account is { } a)
+        {
+            <Alert Variant="@(a.EmailConfirmed ? AlertVariant.Success : AlertVariant.Warning)" TestId="account-email-state">@(a.EmailConfirmed ? Pl.Account.Verified : Pl.Account.NotVerified)</Alert>
+        }
+    </section>
+
+    @if (_account is null)
+    {
+        <Alert Variant="AlertVariant.Danger" TestId="unavailable">@Pl.Account.Unavailable</Alert>
+    }
+    else
+    {
+        <section class="card" aria-labelledby="account-consents">
+            <h2 id="account-consents">@Pl.Account.Consents</h2>
+            <ul class="stack stack--tight" data-testid="consents">
+                <li title="@string.Format(Pl.Account.VersionTitle, _account.Terms.Version)">@(_account.Terms.Accepted ? Pl.Account.TermsAccepted : Pl.Account.TermsPending)</li>
+                <li title="@string.Format(Pl.Account.VersionTitle, _account.Privacy.Version)">@(_account.Privacy.Accepted ? Pl.Account.PrivacyAccepted : Pl.Account.PrivacyPending)</li>
+            </ul>
+            @if (_account.ConsentPending)
+            {
+                @if (_acceptFailed) { <Alert Variant="AlertVariant.Danger" TestId="accept-error">@Pl.Account.AcceptFailed</Alert> }
+                <EditForm Model="Accept!" FormName="accept-consents" OnSubmit="AcceptAsync">
+                    <button class="btn btn--primary" type="submit">@Pl.Account.AcceptCurrent</button>
+                </EditForm>
+            }
+        </section>
+
+        <section class="card" aria-labelledby="account-data">
+            <h2 id="account-data">@Pl.Account.Data</h2>
+            <a class="btn btn--secondary" href="/konto/export" download>@Pl.Account.Export</a>
+        </section>
+
+        <section class="card" aria-labelledby="account-delete">
+            <h2 id="account-delete">@Pl.Account.DeleteTitle</h2>
+            <p>@Pl.Account.DeleteBody</p>
+            @if (_deleteMessage is not null) { <Alert Variant="AlertVariant.Danger" TestId="delete-error">@_deleteMessage</Alert> }
+            <EditForm Model="Delete!" FormName="delete-account" OnSubmit="DeleteAsync" class="form stack" novalidate>
+                @if (_account.HasPassword)
+                {
+                    <div class="field">
+                        <label for="delete-password">@Pl.Account.DeletePassword</label>
+                        <InputText id="delete-password" type="password" @bind-Value="Delete!.Password" autocomplete="current-password" />
+                    </div>
+                }
+                <label class="option"><InputCheckbox id="delete-confirm" @bind-Value="Delete!.Confirm" /> @Pl.Account.DeleteConfirm</label>
+                <div><button class="btn btn--danger" type="submit">@Pl.Account.DeleteSubmit</button></div>
+            </EditForm>
+        </section>
+    }
+
+    <p><a class="btn btn--ghost" href="@ReturnTarget.LogoutPath">@Pl.Account.SignOut</a></p>
+</div>
+
+@code {
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "delete-account")] DeleteAccountForm? Delete { get; set; }
+    [SupplyParameterFromForm(FormName = "accept-consents")] AcceptConsentsForm? Accept { get; set; }
+
+    AccountDto? _account;
+    string? _deleteMessage;
+    bool _acceptFailed;
+
+    /// <summary>The e-mail of the session (the cookie's claim): shown even when the identity service cannot be asked.</summary>
+    string? SessionEmail => HttpContext.User.FindFirst("email")?.Value;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Delete ??= new();
+        Accept ??= new();
+        var result = await Accounts.LoadAsync(ct: HttpContext.RequestAborted);
+        if (result.IsOk) _account = result.Value;
+        else if (result.Failure!.IsUnauthenticated) Navigation.NavigateTo(ReturnTarget.LoginUrl("/konto"), forceLoad: true);
+    }
+
+    async Task AcceptAsync()
+    {
+        if (await Accounts.AcceptCurrentConsentsAsync(ct: HttpContext.RequestAborted)) { Navigation.NavigateTo("/konto"); return; }
+        _acceptFailed = true;
+    }
+
+    async Task DeleteAsync()
+    {
+        var form = Delete!;
+        _deleteMessage = form.Problem(_account!.HasPassword);
+        if (_deleteMessage is null)
+        {
+            var outcome = await Accounts.DeleteAsync(_account.HasPassword ? form.Password : null, ct: HttpContext.RequestAborted);
+            if (outcome == DeleteOutcome.Deleted)
+            {
+                await SignIn.SignOutAsync(HttpContext, HttpContext.RequestAborted); // the account is gone: so is the session (the identity service's logout is best effort)
+                Navigation.NavigateTo("/");
+                return;
+            }
+            if (outcome == DeleteOutcome.Unauthenticated) { Navigation.NavigateTo(ReturnTarget.LoginUrl("/konto"), forceLoad: true); return; }
+            _deleteMessage = DeleteAccountForm.MessageFor(outcome);
+        }
+        Delete = new DeleteAccountForm(); // the password is not sent back to the browser
+    }
+}

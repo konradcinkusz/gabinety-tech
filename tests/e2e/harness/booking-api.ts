@@ -2,7 +2,8 @@ import { expect, type APIRequestContext, type APIResponse } from "@playwright/te
 import { randomUUID } from "node:crypto";
 import { resetAndReseed } from "./demo-data";
 import { accessTokenOf } from "./auth";
-import { isBlazor, urls } from "./env";
+import { urls } from "./env";
+import { isBlazor } from "./host";
 import { fetchRetrying, json } from "./http";
 
 /**

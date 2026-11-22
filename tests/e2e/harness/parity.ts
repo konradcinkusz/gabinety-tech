@@ -1,5 +1,6 @@
 import { test, type APIRequestContext } from "@playwright/test";
-import { isBlazor, urls } from "./env";
+import { urls } from "./env";
+import { isBlazor } from "./host";
 
 /**
  * Page-by-page parity between the two hosts (docs/operations/PARITY.md). On HOST=blazor a journey step that needs a page the Blazor host does not serve

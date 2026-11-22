@@ -85,13 +85,36 @@ for a suspension, reason `practitioner_suspended`, notification `Cancelled` to t
 Decided by the `port/ops` session on the supervisor's behalf; revisable.
 
 1. **Both hosts are required checks until the cutover.** CI `e2e` is a matrix on `host: [next, blazor]`, each leg on its own fresh fake profile and in parallel (the journeys write data and J3 cannot run twice on one stack), so wall time is that of one run. The Next leg keeps the job name `e2e` (the required check by that name stays valid); the Blazor leg is `e2e-blazor`. Two jobs would have cost the same time and duplicated 35 lines.
-2. **The Blazor journeys skip, they do not guess.** A journey whose page the Blazor host does not serve (the probe is a live anonymous GET: 404 means not ported) is skipped with the owning port branch in the reason; `PARITY_STRICT=1` makes it a failure, which is what the cutover gate runs. J7's Blazor variant is `port/auth`'s; until it lands J7 is skipped on `HOST=blazor`.
+2. **The Blazor journeys skip, they do not guess.** A journey whose page the Blazor host does not serve (the probe is a live anonymous GET: 404 means not ported) is skipped with the owning port branch in the reason; `PARITY_STRICT=1` makes it a failure, which is what the cutover gate runs. Both hosts run every journey (`playwright.config.ts` no longer lists the specs the Blazor host supports); J7 has a Next variant (via the BFF) and a Blazor variant (`*.blazor.spec.ts`, `port/auth`), each ignored on the other host.
 3. **No BFF on Blazor means set-up goes to the backends.** On `HOST=blazor` the journeys' API set-up and verification use the user's bearer token directly against the service (the token comes from DevIdentity); the browser context is signed in through the real form. This is a test-harness decision only; the product's browser never holds a token.
 4. **Parity gate** is `scripts/check-parity.mjs` (not a dotnet test): it reads `web/src/app` and `src/Gabinety.Web` as text, report-only by default, `CUTOVER_GATE=1` (the repository variable) makes a missing route fail. The `/api/*` BFF routes are exempt with a written reason (`scripts/parity-exemptions.json`). The text scan is a heuristic (`@page`, `MapGet`/`MapPost` literals, `...Path` constants); a route registered another way needs an exemption or a constant, and the final authority is the journeys under `PARITY_STRICT=1`.
 5. **The Blazor app is a new Fly app, `gabinety-web-blazor-staging`, beside the Next one.** The old app is the rollback and no deploy mutates the live site in place; the public host's certificate moves in a person's step (`CUTOVER.md` section 3). The cost is one more always-on machine for a week or two (about 3.3 USD a month while both exist).
 6. **The cutover is gated by a commented estate row**, not a flag: `#cutover# web-blazor ...` in `deploy/estate.conf` is invisible to every script until uncommented; `deploy.yml` already has the `deploy-web-blazor` job (gated on the row's output) and `_deploy-app.yml` knows the volume. `deploy.test.sh` checks the row as if enabled, so the cutover PR flips one switch.
 7. **Single machine, no scale to zero, a 1 GB volume for the Data Protection keys**, as the ADR says; plus the proxy's `connections` limits (soft 100, hard 150) as the load-shedding valve below the 512 MB budget. The volume is root-owned and the image is non-root: the workflow runs `chown -R app /data` after each deploy (idempotent) instead of changing the image to start as root (the image check asserts non-root).
 8. **Capacity is reported as a planning figure with its bounds**, measured in a CI-like container with a Release build and a GC heap cap emulating 512 MB, never as a Fly result (`PERFORMANCE.md` "Blazor circuits").
+
+## 6. Blazor web: stateless sealed session, header, registration (wave 2, port/auth, 2026-11-22)
+
+**Session (ADR-0010 cutover precondition, done).** `gt_session` is now the cookie handler's ticket sealed with Data Protection (`DataProtection__KeysPath`, a persisted shared key ring; the AppHost
+gives the fake profile a per-user temp path, Fly gets a volume). It holds the claims, a random session id and the identity service's **refresh token** (an authentication token of the ticket, not
+a claim); never the access token (about 1.5 KB sealed, under a 3.5 KB budget test). The access token is minted on demand from the refresh token and cached per session id (`SessionCache`, a
+process-wide cache, so a circuit and a request share it). Because authservice rotates the refresh token on every use and a replay revokes the family, and a circuit cannot write a cookie, whoever
+rotates leaves the newest refresh token in the cache and the **next response that can** writes it into the cookie (`OnValidatePrincipal` registers the catch-up on `OnStarting`). One rotation per
+session at a time (a keyed lock), the new refresh token is stored before anything can fail, a 429/5xx/outage keeps the session (the identity service is not asked again for 5 s), a refused refresh or
+a logout ends it (the dead cookie is deleted; logout revokes at authservice, which revokes every refresh token of the user). **Known limit:** a restart empties the cache; if a circuit had rotated
+the token and no response carried it into the cookie before the restart, the cookie's token is a spent one and the user signs in again (authservice treats it as a replay). Not solvable without
+server-side state; rare (an interactive page open over an hour across a deploy with no page load in between). Tests: tampered cookie, other key ring, key added to the ring, revoked ring, deploy,
+concurrency (16 callers, one rotation), mutation-checked.
+
+**Header.** Order of the main nav is `Programiści` first, other public pages append to `SiteNavigation.Primary`. A signed-in user sees `Moje rezerwacje` and `Panel programisty` (decision: any signed
+in user, because a practitioner is a profile in Directory, not a role of the identity service, and the panel is also where a client becomes one; the shell makes no extra backend call), an
+administrator also `Administracja` (role claim as a string or an array), the account menu holds `Konto` and `Wyloguj się` always. `Zostań programistą` (audit open question 1) is the panel link.
+Footer links `/regulamin` and `/polityka-prywatnosci` lead to pages the static-pages session ports.
+
+**Sign-in states.** `429` is its own text (wait), a lockout (`401 {lockedOut}`) its own text without a time, a wrong password and an unknown address stay one text. The 2FA second step is a real
+page, `/logowanie/kod`: the challenge token is sealed into a 5 minute `gt_2fa` cookie (HttpOnly, Lax, path `/logowanie`), never in a URL, a form or the page; authenticator codes lose spaces and
+hyphens, recovery codes only spaces (the hyphen is part of the code). A `202` registration goes to `/rejestracja/sprawdz-skrzynke`. Password rules are ASP.NET Identity's (ASCII letters, a
+Polish letter is not a lower- or upper-case letter for it). The consent versions come from authservice and travel in hidden fields; they are never printed (a `title` on the links).
 
 ## Wave 2, public pages of the Blazor host (branch `port/public-pages`, 2026-11-22)
 

@@ -21,6 +21,19 @@ public class SummaryPushPromptnessTests
         return h.Directory.For(practitioner);
     }
 
+    static async Task<long> WaitForPushedVersion(ReviewsHost h, Guid practitioner, long version)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        long seen = 0;
+        while (DateTime.UtcNow < deadline)
+        {
+            seen = (await h.SummaryOf(practitioner))?.PushedVersion ?? 0;
+            if (seen >= version) return seen;
+            await Task.Delay(25);
+        }
+        return seen;
+    }
+
     [Fact]
     public async Task A_published_review_is_pushed_to_Directory_without_waiting_for_the_next_tick()
     {
@@ -34,7 +47,8 @@ public class SummaryPushPromptnessTests
 
         var push = Assert.Single(await WaitForPushes(h, pract, 1));
         Assert.Equal(new ReputationPush(1, 4m, 1), push);
-        Assert.Equal(1, (await h.SummaryOf(pract))!.PushedVersion);
+        // The job records PushedVersion AFTER the Directory call returned (SummaryPushJob), so the push can be seen a moment before the row says so: wait for the row, do not read it once.
+        Assert.Equal(1, await WaitForPushedVersion(h, pract, 1));
     }
 
     [Fact]

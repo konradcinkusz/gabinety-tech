@@ -1,6 +1,6 @@
 import { expect, test } from "../harness/fixtures";
 import { randomUUID } from "node:crypto";
-import { urls } from "../harness/env";
+import { isBlazor, urls } from "../harness/env";
 import { addDays, bff, day, openSlots, publicProfile, registerDemoUser, uniqueDemoName } from "../harness/booking-support";
 import { restoreClock } from "../harness/clock";
 import { resetAndReseed } from "../harness/demo-data";
@@ -27,6 +27,9 @@ test.describe("J7 foreign Origin is refused", () => {
   });
 
   test("a foreign Origin and a cross-site fetch get 403 and create no booking", async ({ context, clock }) => {
+    // HOST=blazor: this variant posts to the Next BFF (/api/proxy/...). The Blazor host has no BFF; its variant (a foreign Origin against /logowanie and the
+    // circuit endpoint) is delivered by port/auth, and OriginGuardHostTests pin the guard in-process. Remove this line when that variant lands (PARITY.md).
+    test.skip(isBlazor, "J7 Blazor variant: owner port/auth (PARITY.md); the Next variant needs /api/proxy");
     await registerDemoUser(context, uniqueDemoName("j7"));
     const profile = await publicProfile("demo-celina-przykladowska");
     const offering = profile.offerings[0];

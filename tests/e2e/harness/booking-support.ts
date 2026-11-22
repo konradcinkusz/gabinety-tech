@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, type APIRequestContext, type APIResponse, type Browser, type BrowserContext } from "@playwright/test";
-import { demoPassword, emailOf, urls } from "./env";
-import { signInViaBff } from "./auth";
+import { demoPassword, emailOf, isBlazor, urls } from "./env";
+import { accessTokenOf, registerAtIdentity, signInViaBff } from "./auth";
 import { fetchRetrying, json } from "./http";
 
 /**
@@ -14,6 +14,18 @@ export const uniqueDemoName = (tag: string): string => `demo-${tag}-${randomUUID
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * The Blazor host has no `/api/proxy/<service>/...` (the browser never calls a backend), so on HOST=blazor the same path goes straight to the service with the
+ * user's bearer token (`signInViaBff` keeps it). Set-up and verification only: what a journey is ABOUT still goes through the UI.
+ */
+function direct(ctx: APIRequestContext, path: string, headers: Record<string, string> | undefined): { url: string; headers: Record<string, string> | undefined } {
+  const m = /^\/api\/proxy\/(directory|booking|reputation|assistant)\/(.*)$/.exec(path);
+  if (!m) return { url: path, headers }; // a path of the web origin itself (cross-site probes, downloads) stays there
+  const token = accessTokenOf(ctx);
+  if (!token) throw new Error(`no access token for this context: sign in with signInViaBff first (${m[1]})`);
+  return { url: `${urls[m[1] as "directory" | "booking" | "reputation" | "assistant"]}/${m[2]}`, headers: { ...headers, Authorization: `Bearer ${token}` } };
+}
+
 /** A request through the web origin that waits for a 429 or 503 (the Directory's 60 a minute per address) like `fetchRetrying` does. */
 export async function bff(
   ctx: APIRequestContext,
@@ -23,8 +35,9 @@ export async function bff(
 ): Promise<APIResponse> {
   const deadline = Date.now() + budgetMs;
   let delay = 500;
+  const target = isBlazor ? direct(ctx, path, headers) : { url: path, headers };
   for (;;) {
-    const res = await ctx.fetch(path, { method, headers, data: body, failOnStatusCode: false });
+    const res = await ctx.fetch(target.url, { method, headers: target.headers, data: body, failOnStatusCode: false });
     if ((res.status() !== 429 && res.status() !== 503) || Date.now() + delay > deadline) return res;
     const retryAfter = Number(res.headers()["retry-after"]);
     await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 65_000) : delay);
@@ -34,8 +47,11 @@ export async function bff(
 
 /** Registers a fresh demo user (DevIdentity gives a `demo-` address the `demo-` subject) and signs the context in as it. */
 export async function registerDemoUser(context: BrowserContext, userName: string): Promise<void> {
-  const res = await context.request.post("/api/auth/register", { data: { email: emailOf(userName), password: demoPassword } });
-  expect(res.status(), `register ${userName}`).toBe(200);
+  if (isBlazor) await registerAtIdentity(userName);
+  else {
+    const res = await context.request.post("/api/auth/register", { data: { email: emailOf(userName), password: demoPassword } });
+    expect(res.status(), `register ${userName}`).toBe(200);
+  }
   await signInViaBff(context, userName);
 }
 

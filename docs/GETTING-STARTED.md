@@ -27,15 +27,15 @@ The first run builds everything (about 1 to 2 minutes). The terminal prints only
 
 | Part | URL |
 |---|---|
-| Web app (open this) | http://localhost:3000 |
-| Web app, Blazor port (ADR-0010 proposal; same backends, same demo users, fewer pages) | http://localhost:3001 |
+| Web app, Next.js (`web/`, complete; the default until the cutover) | http://localhost:3000 |
+| Web app, Blazor Web App (`src/Gabinety.Web`, ADR-0010; same backends, same demo users; pages arrive as their port branches merge, see `docs/operations/PARITY.md`) | http://localhost:3001 |
 | Dev identity (stand-in for the auth service) | http://localhost:5100 |
 | Directory | http://localhost:5101 |
 | Booking | http://localhost:5102 |
 | Reputation | http://localhost:5103 |
 | Assistant | http://localhost:5104 |
 
-Each backend answers `GET /health` (the web app answers `/api/health`).
+Each backend answers `GET /health`; the Next web app answers `/api/health`, the Blazor host `/health` (and `/alive`).
 
 ### Is it ready?
 
@@ -98,7 +98,7 @@ Every caller (web server, seeder, services, browser) is one `localhost` address,
 
 ## 2. Demo users
 
-Sign in at http://localhost:3000/logowanie ("Zaloguj się"). One fixed **development** password for all seeded users (not a secret; it protects nothing and exists only in the stand-in identity provider):
+Sign in at http://localhost:3000/logowanie (Next) or http://localhost:3001/logowanie (Blazor): "Zaloguj się". One fixed **development** password for all seeded users (not a secret; it protects nothing and exists only in the stand-in identity provider):
 
 | | |
 |---|---|
@@ -249,7 +249,9 @@ done
 | .NET build and unit/contract tests | `dotnet build -warnaserror && dotnet test --filter "tier!=integration"` | .NET 10 SDK |
 | .NET integration tier | `dotnet test --filter "tier=integration"` | Docker (Testcontainers starts PostgreSQL 17); CI also starts the real auth service image for the auth contract suite (`AUTH_BASE_URL`) |
 | Web | `pnpm --dir web lint`, `typecheck`, `test`, `build` | pnpm, Node 22 |
-| End to end | `pnpm --dir tests/e2e install --frozen-lockfile`, then `pnpm --dir tests/e2e exec playwright install chromium` once, then `pnpm --dir tests/e2e test` | a running fake profile (section 1) |
+| End to end | `pnpm --dir tests/e2e install --frozen-lockfile`, then `pnpm --dir tests/e2e exec playwright install chromium` once, then `pnpm --dir tests/e2e test` (Next, the default) or `HOST=blazor pnpm --dir tests/e2e test` (the Blazor host on :3001; `BASE_URL` overrides the address) | a running fake profile (section 1) |
+| Parity of the two hosts | `node scripts/check-parity.mjs` (report), `CUTOVER_GATE=1 node scripts/check-parity.mjs` (the cutover gate), `PARITY_STRICT=1` makes a skipped Blazor journey step a failure | Node |
+| Memory per Blazor circuit | `ONLY_CIRCUITS=1 scripts/measure-performance.sh` (publishes a Release host, opens N interactive pages, reads the process memory; `docs/operations/PERFORMANCE.md`) | the fake profile, `pnpm --dir tests/e2e install`, Chromium |
 | Assistant evals (fake model) | part of the unit tier: `dotnet test tests/Gabinety.Assistant.Tests --filter "FullyQualifiedName~Evals"` | .NET |
 | Assistant evals (live model) and live smoke | `EVAL_LIVE=1 dotnet test tests/Gabinety.Assistant.Tests --filter "tier=live"`, `scripts/smoke-llm.sh` | owner's machine, a real model, **spends credits** (see `evals/README.md`) |
 
@@ -264,6 +266,7 @@ Results measured:
 End-to-end details:
 
 - Chromium at a fixed path (sandboxes, some CI images): `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`. Traces off: `--trace off`. Pick journeys: `pnpm --dir tests/e2e test -- --grep "J3|J4"`.
+- `HOST=blazor`: the journeys run against the Blazor host. A step that needs a page its port branch has not merged yet is **skipped**, with `not ported yet: <route> (owner <branch>)` as the reason; the skip goes away by itself when the route exists. Interactive Blazor pages are entered with `gotoInteractive`/`watchCircuit` (`tests/e2e/harness/circuit.ts`), which wait for the circuit (`StartCircuit` answered on the websocket) before anything is typed; nothing sleeps. The Blazor host has no `/api/proxy`, so the set-up and verification calls of the journeys go to the backends directly with the signed-in user's token (`harness/auth.ts`).
 - The run waits for the services and for the seeder to finish (section 1; up to `E2E_WAIT_SECONDS`, `E2E_SEEDER_WAIT_SECONDS`; `E2E_WAIT_FOR_SEEDER=0` skips it on a profile that has been seeded already).
 - The journeys write data (J3 adds three reviews to Celina Przykładowska and then she no longer shows "Nowy"). CI throws its stack away. On a long-lived local profile run with `E2E_RESEED=1`: after each journey that wrote data the harness removes the `demo-` data and seeds again (minutes per run), so the next run starts clean. Without it a second full run can fail J3 ("start from the seeded profile with no reviews"); restart the profile or reseed (section 1) first.
 - `scripts/smoke-llm.sh` makes ONE real model call. It refuses when `CI` is set or `Llm__Provider=Fake` (printed `smoke-llm: refusing to run when CI is set ...` and `smoke-llm: Llm:Provider is Fake; a smoke run needs a real model.`, exit 2).

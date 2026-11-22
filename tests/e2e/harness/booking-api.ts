@@ -1,7 +1,8 @@
 import { expect, type APIRequestContext, type APIResponse } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { resetAndReseed } from "./demo-data";
-import { urls } from "./env";
+import { accessTokenOf } from "./auth";
+import { isBlazor, urls } from "./env";
 import { fetchRetrying, json } from "./http";
 
 /**
@@ -9,8 +10,25 @@ import { fetchRetrying, json } from "./http";
  * Calls on behalf of a signed-in user go through the web app's BFF (`/api/proxy/...`) with that user's cookie jar, exactly as the browser does.
  * A helper never logs a body: briefs and review texts are user free text.
  */
-const BOOKING = "/api/proxy/booking/api/v1";
-const REPUTATION = "/api/proxy/reputation/api/v1";
+type Opts = Parameters<APIRequestContext["get"]>[1];
+/**
+ * `request.get/post` of one service's `/api/v1`: through the BFF proxy on HOST=next, straight to the service with the context's bearer token on HOST=blazor
+ * (the Blazor host has no proxy, see auth.ts). Same paths either way.
+ */
+function svc(request: APIRequestContext, service: "booking" | "reputation") {
+  const url = (path: string) => (isBlazor ? `${urls[service]}/api/v1${path}` : `/api/proxy/${service}/api/v1${path}`);
+  const withAuth = (o: Opts): Opts => {
+    if (!isBlazor) return o;
+    const token = accessTokenOf(request);
+    return { ...o, headers: { ...(o?.headers ?? {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) } };
+  };
+  return {
+    get: (path: string, o?: Opts) => request.get(url(path), withAuth(o)),
+    post: (path: string, o?: Opts) => request.post(url(path), withAuth(o)),
+  };
+}
+const booking = (r: APIRequestContext) => svc(r, "booking");
+const reputation = (r: APIRequestContext) => svc(r, "reputation");
 
 /**
  * Every service limits each client address to 60 requests a minute and everything here is `localhost`, so a 429 (or a 503 while a service restarts)
@@ -65,7 +83,7 @@ export const warsawDate = (d: Date | string): string => warsawDay.format(new Dat
 export async function freeSlots(request: APIRequestContext, practitionerId: string, offeringId: string): Promise<Slot[]> {
   const from = warsawDate(new Date());
   const to = warsawDate(new Date(Date.now() + 13 * 86_400_000));
-  const res = await retrying(() => request.get(`${BOOKING}/practitioners/${practitionerId}/slots`, { params: { offeringId, from, to } }));
+  const res = await retrying(() => booking(request).get(`/practitioners/${practitionerId}/slots`, { params: { offeringId, from, to } }));
   expect(res.status(), "slots").toBe(200);
   return ((await res.json()) as { slots: Slot[] }).slots;
 }
@@ -88,7 +106,7 @@ export function earliestOnDistinctDays(slots: Slot[], count: number, avoidDays: 
 
 export async function createBooking(request: APIRequestContext, offeringId: string, startUtc: string, briefText: string): Promise<{ bookingId: string }> {
   const key = randomUUID(); // one key for every retry of this request: a replayed 429 never books twice
-  const res = await retrying(() => request.post(`${BOOKING}/bookings`, {
+  const res = await retrying(() => booking(request).post(`/bookings`, {
     headers: { "Idempotency-Key": key },
     data: { offeringId, startUtc, brief: { text: briefText, aiAssisted: false } },
   }));
@@ -97,12 +115,12 @@ export async function createBooking(request: APIRequestContext, offeringId: stri
 }
 
 export async function simulatePayment(request: APIRequestContext, bookingId: string, outcome: "succeeded" | "failed"): Promise<void> {
-  const res = await retrying(() => request.post(`${BOOKING}/payments/simulate`, { data: { bookingId, outcome } }));
+  const res = await retrying(() => booking(request).post(`/payments/simulate`, { data: { bookingId, outcome } }));
   expect(res.ok(), `simulate payment ${outcome} (HTTP ${res.status()})`).toBe(true);
 }
 
 export async function getBooking(request: APIRequestContext, bookingId: string): Promise<BookingState> {
-  const res = await retrying(() => request.get(`${BOOKING}/bookings/${bookingId}`));
+  const res = await retrying(() => booking(request).get(`/bookings/${bookingId}`));
   expect(res.status(), "BookingView").toBe(200);
   return (await res.json()) as BookingState;
 }
@@ -115,14 +133,14 @@ export async function waitForStatus(request: APIRequestContext, bookingId: strin
 }
 
 export async function createReview(request: APIRequestContext, bookingId: string, rating: number, text: string): Promise<{ status: string }> {
-  const res = await retrying(() => request.post(`${REPUTATION}/reviews`, { data: { bookingId, rating, text } }));
+  const res = await retrying(() => reputation(request).post(`/reviews`, { data: { bookingId, rating, text } }));
   expect(res.ok(), `create review (HTTP ${res.status()})`).toBe(true);
   return (await res.json()) as { status: string };
 }
 
 /** The status code of a review attempt, for the one that must be refused (a second review of the same booking: 409 `already_reviewed`). */
 export async function reviewAttemptStatus(request: APIRequestContext, bookingId: string, rating: number, text: string): Promise<number> {
-  return (await retrying(() => request.post(`${REPUTATION}/reviews`, { data: { bookingId, rating, text } }))).status();
+  return (await retrying(() => reputation(request).post(`/reviews`, { data: { bookingId, rating, text } }))).status();
 }
 
 /** The booking id out of a `/checkout/mock/<id>` or `/rezerwacja/potwierdzenie/<id>` address. */

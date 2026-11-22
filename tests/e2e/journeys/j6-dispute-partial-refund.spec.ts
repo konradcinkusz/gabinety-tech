@@ -1,4 +1,5 @@
 import { expect, test } from "../harness/fixtures";
+import { requirePorted } from "../harness/parity";
 import { restoreClock } from "../harness/clock";
 import { resetAndReseed } from "../harness/demo-data";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
@@ -38,6 +39,7 @@ test.describe("J6 dispute and partial refund", () => {
   });
 
   test("dispute, partial refund by the administrator, ledger CSV", async ({ page, context, browser, clock }) => {
+    await requirePorted(page.request, "/moje/rezerwacje/00000000-0000-0000-0000-000000000000", "/admin/spory", "/admin/ksiega", "/admin/ksiega/csv"); // HOST=blazor: skip with the owner named until the pages land (PARITY.md)
     test.setTimeout(4 * 60_000); // includes the payout job, which runs every 60 s
 
     // set-up: a practitioner's own 25000 offering, a fresh client, a paid booking

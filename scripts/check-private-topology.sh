@@ -6,10 +6,15 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0; bad() { echo "FAIL: $*" >&2; fail=1; }
 web=deploy/fly/web.fly.toml
-for k in directory booking reputation; do
-  grep -Eq "^[[:space:]]*Backend__${k^} = \"http://gabinety-${k}-staging\.internal:8080\"" "$web" || bad "$web: Backend__${k^} must be http://gabinety-${k}-staging.internal:8080"
+# both frontends (the Next BFF and, from the cutover, the Blazor host) reach the private apps the same way
+for web_cfg in "$web" deploy/fly/web-blazor.fly.toml; do
+  for k in directory booking reputation; do
+    grep -Eq "^[[:space:]]*Backend__${k^} = \"http://gabinety-${k}-staging\.internal:8080\"" "$web_cfg" || bad "$web_cfg: Backend__${k^} must be http://gabinety-${k}-staging.internal:8080"
+  done
+  grep -Eq '^[[:space:]]*Backend__Assistant = "http://gabinety-assistant-staging\.flycast"' "$web_cfg" || bad "$web_cfg: Backend__Assistant must be http://gabinety-assistant-staging.flycast"
+  grep -Eq '^[[:space:]]*Site__BaseUrl = "https://' "$web_cfg" || bad "$web_cfg: Site__BaseUrl must be an https URL (cookies are Secure only then)"
+  grep -Eq '^[[:space:]]*Identity__Audience = "[^"]+"' "$web_cfg" || bad "$web_cfg: Identity__Audience must be set"
 done
-grep -Eq '^[[:space:]]*Backend__Assistant = "http://gabinety-assistant-staging\.flycast"' "$web" || bad "$web: Backend__Assistant must be http://gabinety-assistant-staging.flycast"
 while read -r key _ _ _ _ _ _ _ _ network; do
   case "$key" in ''|'#'*|shared) continue;; esac
   [ "$network" = public ] && continue

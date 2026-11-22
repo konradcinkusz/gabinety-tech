@@ -12,6 +12,10 @@
 #   DB_PROFILE         label written to the report: postgres | inmemory                BOOKINGS  POST /bookings requests (default 120)
 #   CHROME_PATH        Chromium for Lighthouse (default /opt/pw-browsers/chromium-*/chrome-linux64/chrome)
 #   SKIP_LIGHTHOUSE=1  skip the Lighthouse rows                                  ONLY_PR113=1  run only the PR #113 comparison (needs BASELINE_WEB_URL)
+#   BLAZOR circuits (ADR-0010, "memory per circuit"): ONLY_CIRCUITS=1 measures only the Blazor host's memory under N open interactive pages and exits (needs the fake profile or perf-stack running, and
+#                      `pnpm --dir tests/e2e install`); without ONLY_CIRCUITS the section runs after the others when BLAZOR_CIRCUITS=1.
+#                      BLAZOR_START=1 (default) publishes and starts a RELEASE build on BLAZOR_PORT (3002), capped like the 512 MB Fly machine (scripts/perf/blazor-host.sh); BLAZOR_URL + BLAZOR_PID measure a host
+#                      you started yourself. CIRCUIT_LEVELS "10,25,50,100" (cumulative), CIRCUIT_PAGE (/moje/rezerwacje: an interactive page), MEMORY_LIMIT_MB (512).
 #   PR113_SIDES        order of the two web apps in the comparison (default "baseline current"; run it again as "current baseline" to see an order effect)
 # Tools: scripts/perf/load.mjs (HTTP load, exact percentiles; the reason it is not autocannon or hey is in its header) and Lighthouse, pinned below, fetched by npx
 # on demand (nothing is added to any package.json). Exit code: 0 when the measurement ran (a miss is a result, not a failure), 1 when it could not run.
@@ -32,6 +36,29 @@ run() { # id, command...  : records the command, runs it, keeps stdout as raw/<i
   say "== $id"
   "$@" > "$OUT/raw/$id.json"
 }
+
+# ---- Blazor circuits: memory of the Blazor host per open interactive page (a function, so it can run alone or after the other rows) ----
+circuits() {
+  local url="${BLAZOR_URL:-}" pid="${BLAZOR_PID:-}" started=0
+  if [ -z "$url" ]; then
+    BLAZOR_PORT="${BLAZOR_PORT:-3002}" MEMORY_LIMIT_MB="${MEMORY_LIMIT_MB:-512}" "$ROOT/scripts/perf/blazor-host.sh" start >&2 || return 1
+    url="http://localhost:${BLAZOR_PORT:-3002}"; pid="$("$ROOT/scripts/perf/blazor-host.sh" pid)"; started=1
+  fi
+  printf 'blazor-circuits\t%s\n' "node scripts/perf/measure-circuits.mjs --url $url --pid $pid --levels ${CIRCUIT_LEVELS:-10,25,50,100}" >> "$OUT/commands.txt"
+  say "== blazor-circuits"
+  local rc=0
+  node "$ROOT/scripts/perf/measure-circuits.mjs" --url "$url" --pid "$pid" --levels "${CIRCUIT_LEVELS:-10,25,50,100}" --page "${CIRCUIT_PAGE:-/moje/rezerwacje}" \
+    --budget-mb "${MEMORY_LIMIT_MB:-512}" --out "$OUT" >&2 || rc=$?
+  [ "$started" = 1 ] && "$ROOT/scripts/perf/blazor-host.sh" stop
+  return $rc
+}
+if [ "${ONLY_CIRCUITS:-0}" = 1 ]; then
+  for u in http://localhost:5100 http://localhost:5101 http://localhost:5102; do
+    [ "$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$u/health" || true)" = 200 ] || { say "FAIL: $u/health is not healthy; start the fake profile or scripts/perf-stack.sh"; exit 1; }
+  done
+  circuits || exit 1
+  say "wrote $OUT/blazor-circuits.json and blazor-circuits.md"; exit 0
+fi
 
 for u in http://localhost:5100 http://localhost:5101 http://localhost:5102 "$WEB_URL"; do
   path=/health; [ "$u" = "$WEB_URL" ] && path=/api/health
@@ -96,6 +123,9 @@ if [ -n "${BASELINE_WEB_URL:-}" ]; then
     done
   done
 fi
+
+# ---- Blazor circuits (opt-in here: it opens up to 100 browser pages) ----
+if [ "${BLAZOR_CIRCUITS:-0}" = 1 ]; then circuits || say "Blazor circuit measurement failed (the other rows stand)"; fi
 
 # the run is valid only if the stack stayed up to the end (a database that died mid-run once left cached pages answering 200 for a while)
 for u in http://localhost:5101/api/v1/sitemap http://localhost:5102/health "$WEB_URL/api/health"; do

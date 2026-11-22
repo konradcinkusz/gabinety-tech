@@ -7,7 +7,10 @@ const urls = {
   booking: `${e("E2E_BOOKING_URL", "http://localhost:5102")}/health`,
   reputation: `${e("E2E_REPUTATION_URL", "http://localhost:5103")}/health`,
   assistant: `${e("E2E_ASSISTANT_URL", "http://localhost:5104")}/health`,
-  web: `${e("E2E_WEB_URL", "http://localhost:3000")}/api/health`,
+  // HOST=next|blazor (harness/env.ts): the Blazor host listens on 3001 and answers the kernel's /health; BASE_URL overrides the address.
+  web: process.env.HOST === "blazor"
+    ? `${process.env.BASE_URL || e("E2E_WEB_URL", "http://localhost:3001")}/health`
+    : `${process.env.BASE_URL || e("E2E_WEB_URL", "http://localhost:3000")}/api/health`,
 };
 const list = `${e("E2E_DIRECTORY_URL", "http://localhost:5101")}/api/v1/practitioners?limit=50`;
 const want = Number(e("WANT_PRACTITIONERS", "6"));

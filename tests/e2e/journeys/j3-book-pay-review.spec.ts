@@ -1,4 +1,5 @@
 import { test, expect } from "../harness/fixtures";
+import { requirePorted } from "../harness/parity";
 import { signInViaBff } from "../harness/auth";
 import { restoreClock } from "../harness/clock";
 import { urls } from "../harness/env";
@@ -43,6 +44,7 @@ test.describe("J3 book, pay, complete, review", () => {
   });
 
   test("a client books and pays, the booking completes after 48 h, three reviews turn \"Nowy\" into an average", async ({ page, context, browser, signInAs, clock }) => {
+    await requirePorted(page.request, "/gabinet/demo-celina-przykladowska", "/rezerwacja/00000000-0000-0000-0000-000000000000", "/checkout/mock/00000000-0000-0000-0000-000000000000", "/moje/rezerwacje/00000000-0000-0000-0000-000000000000", "/moje/opinie/00000000-0000-0000-0000-000000000000"); // HOST=blazor: skip with the owner named until the pages land (PARITY.md)
     test.setTimeout(420_000); // two turns of Booking's 60 s auto-complete job plus the UI steps
     await signInAs("demo-client");
     const client = context.request;
@@ -64,8 +66,7 @@ test.describe("J3 book, pay, complete, review", () => {
     const link = new URL((await slot.getAttribute("href"))!, urls.web);
     const startUtc = link.searchParams.get("start")!;
     expect(link.searchParams.get("gabinet")).toBe(SLUG); // the slot link carries the profile slug (#99)
-    await slot.click();
-    await page.waitForURL(/\/rezerwacja\//);
+    await profile.openBookingForm(slot);
     const form = new BookingFormPage(page);
     await expect(page.getByRole("heading", { level: 1, name: "Rezerwacja konsultacji" })).toBeVisible();
     await expect(page.getByText(offering.title)).toBeVisible();

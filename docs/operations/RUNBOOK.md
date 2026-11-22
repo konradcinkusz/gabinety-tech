@@ -139,3 +139,18 @@ Order (SPEC §8): authservice deletes the account, then the owner calls the eras
 8. **Gap C (closed in code):** `Internal__PreviousKey` (task/hardening-webhook-key) and, with F-03, a second `Internal__Callers__<Name>` both give an overlap period during a rotation (5.3). CONTRACTS §10 lists neither setting yet, nor `Internal__Callers__*`, `Internal__RejectPublicEdge`, `Internal__EdgeHeaders`, `Internal__EnforceKeyStrength`.
 9. **Public-edge headers (F-03, owner or staging check):** the code guard treats a request carrying `Fly-Client-IP`, `X-Forwarded-For`, `Fly-Forwarded-Proto`, `Fly-Forwarded-Port`, `Fly-Forwarded-Ssl` or `X-Forwarded-Proto` as coming from the Internet (`Internal__EdgeHeaders` overrides the list). fly.io was not reachable when this was written, so it is **not verified** that `.internal` (direct 6PN) requests carry none and that `.flycast` requests (through the Fly proxy) carry them or not. Check on staging with a request header dump; until then the guard is **off for the Assistant** (`Internal__RejectPublicEdge=false` in `assistant.fly.toml`), which is safe because it has no public address. Also confirm the Directory and Reputation calls from Booking and Reputation still answer 200 after the first deploy (a 404 there would mean `.internal` carries an edge header).
 10. **Which apps are public** (owner decision, F-03): the repository now deploys only `web`, `authservice` and Booking publicly, as SPEC §4.3 says; Booking is filtered in code because Fly cannot expose one path. The alternative is a separate tiny webhook app.
+
+## 12. The Blazor web app (`gabinety-web-blazor-staging`; from the cutover, ADR-0010)
+
+Read `DEPLOY.md` section 5 first. This is the one app that keeps state in memory; its failure modes are different from the Next app's.
+
+| Symptom | Likely cause | Do |
+|---|---|---|
+| Everybody was signed out | a deploy or restart (the session store is in memory until the stateless cookie lands, ADR-0010) | expected; say so in the release note. After the stateless cookie: look for a changed Data Protection key ring (the volume was recreated) |
+| Open forms fail with a validation or antiforgery error after a deploy | the Data Protection keys are not on the volume | `fly ssh console -C "ls -l /data/keys"`: empty or not writable means the volume is missing or not owned by `app`: `fly ssh console -C "chown -R app /data"`, restart |
+| Pages load but do nothing (buttons, forms on interactive pages) | the circuit did not connect: websocket blocked, or `Site__BaseUrl` is wrong so the origin guard refuses `/_blazor` | browser DevTools, Network, WS; `fly logs` for `cross_site_request`; fix `Site__BaseUrl` |
+| 503 from the proxy under load; memory near 512 MB | too many circuits (`COST.md` and `PERFORMANCE.md` give the measured capacity) | lower `Circuit__DisconnectedMaxRetained` / `Circuit__DisconnectedRetentionSeconds`, or `fly scale memory 1024`; the proxy `hard_limit` of 200 connections sheds before the machine dies |
+| 429 for every visitor | `RateLimit__TrustedProxyKey` differs from the backends', so the visitor address is not trusted | set the same value on all five apps (section 5) |
+| The machine is stopped | someone ran `fly machine stop` / `fly scale`; auto-stop is off | `fly machine start`; circuits are gone and come back by reload |
+
+Memory: `fly machine status <id>` and `fly logs`; the host exposes the kernel's `/health` and `/alive` only. Never run more than one machine without session affinity (`DEPLOY.md` section 5).

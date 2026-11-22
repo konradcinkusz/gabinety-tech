@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { gotoInteractive } from "../../harness/circuit";
 
 /** Page objects of J1 and J2 (README: role and label first). Polish strings are the app's own. */
 
@@ -17,7 +18,7 @@ export class PublicProfilePage {
 export class RegisterPage {
   constructor(readonly page: Page) {}
   async registerAs(email: string, password: string) {
-    await this.page.goto("/rejestracja");
+    await gotoInteractive(this.page, "/rejestracja");
     await this.page.getByLabel("Adres e-mail").fill(email);
     await this.page.getByLabel("Hasło").fill(password);
     await this.page.getByRole("checkbox", { name: /Akceptuję Regulamin/ }).check();
@@ -30,7 +31,7 @@ export class RegisterPage {
 export class PractitionerArea {
   constructor(readonly page: Page) {}
   async createProfile(displayName: string) {
-    await this.page.goto("/gabinet-programisty");
+    await gotoInteractive(this.page, "/gabinet-programisty");
     await this.page.getByLabel("Nazwa wyświetlana").fill(displayName);
     await this.page.getByRole("button", { name: "Załóż gabinet" }).click();
     await expect(this.page.getByRole("heading", { level: 1, name: "Panel programisty" })).toBeVisible();
@@ -38,7 +39,7 @@ export class PractitionerArea {
   checklistItem(name: string): Locator { return this.page.getByRole("listitem").filter({ hasText: name }); }
 
   async fillProfile(p: { headline: string; bio: string; portfolioUrl: string; nip: string }) {
-    await this.page.goto("/gabinet-programisty/profil");
+    await gotoInteractive(this.page, "/gabinet-programisty/profil");
     await this.page.getByLabel("Nagłówek").fill(p.headline);
     await this.page.getByLabel("Opis").fill(p.bio);
     await this.page.getByLabel("Link do portfolio").fill(p.portfolioUrl);
@@ -48,7 +49,7 @@ export class PractitionerArea {
   }
 
   async addOffering(o: { title: string; description: string; price: string }) {
-    await this.page.goto("/gabinet-programisty/oferty");
+    await gotoInteractive(this.page, "/gabinet-programisty/oferty");
     await this.page.getByLabel("Nazwa oferty").fill(o.title);
     await this.page.getByLabel("Opis oferty").fill(o.description);
     await this.page.getByLabel("Cena (zł)").fill(o.price);
@@ -60,7 +61,7 @@ export class PractitionerArea {
   }
 
   async linkGithub(login: string) {
-    await this.page.goto("/gabinet-programisty");
+    await gotoInteractive(this.page, "/gabinet-programisty");
     await this.page.getByLabel("Login GitHub").fill(login);
     await this.page.getByRole("button", { name: "Pokaż kod" }).click();
     await this.page.getByRole("button", { name: "Sprawdź kod" }).click();
@@ -77,7 +78,7 @@ export class PractitionerArea {
 export class VerificationQueuePage {
   constructor(readonly page: Page) {}
   async goto(status?: "Submitted" | "Approved") {
-    await this.page.goto(status ? `/admin/weryfikacja?status=${status}` : "/admin/weryfikacja");
+    await gotoInteractive(this.page, status ? `/admin/weryfikacja?status=${status}` : "/admin/weryfikacja");
     await expect(this.page.getByRole("heading", { level: 1, name: "Weryfikacja programistów" })).toBeVisible();
   }
   row(displayName: string): Locator {

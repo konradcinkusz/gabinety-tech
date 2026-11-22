@@ -36,6 +36,22 @@ for f in files:
     if "vm" not in t: fail(f, "[[vm]] size is missing")
     prov = str(t.get("env", {}).get("Payments__Provider", "")).strip().lower()
     if prov == "mock": fail(f, "Payments__Provider must not be Mock in a deployed config (security review F-01: Mock is the fake profile's and Booking refuses to start with it)")
+    if stem == "web-blazor":
+        # ADR-0010 "Hosting", BLAZOR-WEB-APP section 14: a stateful frontend. These are the settings a circuit's survival depends on.
+        hs = hs or {}
+        if hs.get("min_machines_running") != 1: fail(f, "min_machines_running must be 1 (a stopped machine ends every circuit; no scale to zero)")
+        if hs.get("auto_stop_machines") not in ("off", False): fail(f, 'auto_stop_machines must be "off"')
+        if not any(c.get("path") == "/alive" for c in hs.get("checks", [])): fail(f, "the Fly check must ask /alive")
+        mounts = t.get("mounts")
+        dest = (mounts[0] if isinstance(mounts, list) and mounts else mounts or {}).get("destination")
+        keys = str(t.get("env", {}).get("DataProtection__KeysPath", ""))
+        if not dest: fail(f, "a [mounts] volume is required for the Data Protection keys")
+        elif not (keys == dest or keys.startswith(dest.rstrip("/") + "/")): fail(f, f"DataProtection__KeysPath {keys!r} is not on the mounted volume {dest!r}")
+        if str(t.get("env", {}).get("ASPNETCORE_FORWARDEDHEADERS_ENABLED", "")).lower() != "true": fail(f, "ASPNETCORE_FORWARDEDHEADERS_ENABLED must be true (the scheme behind Fly's proxy; the origin guard)")
+        if not str(t.get("env", {}).get("Site__BaseUrl", "")).startswith("https://"): fail(f, "Site__BaseUrl must be an https URL (cookies are Secure only then; the origin guard allows exactly it)")
+        if "processes" in t or t.get("http_service", {}).get("processes"): fail(f, "one process only (one machine, one session store)")
+        mem = str(t["vm"][0].get("memory", "")) if isinstance(t.get("vm"), list) and t["vm"] else ""
+        if not mem: fail(f, "[[vm]] memory must be stated (the budget is in PERFORMANCE.md)")
     print(f"ok   {f}")
 if len(files) < 7: fail("deploy/fly", f"expected 7 *.fly.toml (SPEC 4.3), found {len(files)}")
 sys.exit(1 if bad else 0)

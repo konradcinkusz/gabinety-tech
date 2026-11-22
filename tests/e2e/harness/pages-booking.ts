@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { gotoInteractive, watchCircuit } from "./circuit";
 import { bookingIdFromUrl } from "./booking-api";
 
 /** Page objects of the booking and review flow (J3, J4). Role and label locators; texts are the Polish strings of web/src/components/{booking,bookings,reviews,profile}/strings.ts. */
@@ -10,7 +11,7 @@ export class PractitionerProfilePage {
    */
   async goto(slug: string, displayName: string) {
     const h1 = this.page.getByRole("heading", { level: 1, name: displayName });
-    await this.page.goto(`/gabinet/${slug}`);
+    await gotoInteractive(this.page, `/gabinet/${slug}`);
     try {
       await expect(async () => {
         if (!(await h1.isVisible())) await this.page.reload();
@@ -42,6 +43,13 @@ export class PractitionerProfilePage {
       throw new Error(`no free time shown for "${offeringTitle}"; the card said: ${shown.map((t) => t.slice(0, 80)).join(" | ")}`, { cause: err });
     }
     return first;
+  }
+  /** Clicks a free time and waits for the booking form. The form is an interactive page: on the Blazor host nothing typed before its circuit is live would count (awaitCircuit). */
+  async openBookingForm(slot: Locator) {
+    const circuit = watchCircuit(this.page);
+    await slot.click();
+    await this.page.waitForURL(/\/rezerwacja\//);
+    await circuit.ready();
   }
   newBadge(): Locator { return this.page.getByText("Nowy", { exact: true }); }
   reviewsSection(): Locator { return this.page.getByRole("region", { name: "Opinie" }); }
@@ -94,7 +102,7 @@ export class MockCheckoutPage {
 export class ReviewFormPage {
   constructor(readonly page: Page) {}
   async goto(bookingId: string) {
-    await this.page.goto(`/moje/opinie/${bookingId}`);
+    await gotoInteractive(this.page, `/moje/opinie/${bookingId}`);
     await expect(this.page.getByRole("button", { name: "Wyślij opinię" })).toBeVisible();
   }
   async submit(rating: number, text: string) {

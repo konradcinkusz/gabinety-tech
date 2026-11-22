@@ -12,6 +12,14 @@ pnpm --dir tests/e2e test                                           # terminal 2
 
 `globalSetup` waits (up to 4 min, `E2E_WAIT_SECONDS`) for `/health` of DevIdentity, Directory, Booking, Reputation, Assistant and the web app, then for the seeded practitioners, then until the demo seeder has **finished** (no seeder process, both test clocks at 0, held for 10 s; up to 8 min, `E2E_SEEDER_WAIT_SECONDS`; `E2E_WAIT_FOR_SEEDER=0` skips it for an already seeded profile), because the seeder moves the global test clock while it runs. Chromium at a fixed path (sandbox, some CI images): `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`. Other overrides: `E2E_WEB_URL`, `E2E_DIRECTORY_URL`, ... (`harness/env.ts`). Traces and screenshots are kept on failure only.
 
+## Two web hosts (ADR-0010)
+
+The same journeys run against the Next.js app and the Blazor Web App: `HOST=next|blazor` (default `next`), `BASE_URL` (or `E2E_WEB_URL`) overrides the address (3000 for Next, 3001 for Blazor in the fake profile). CI runs both in the `e2e` matrix (`e2e` = Next, `e2e-blazor`), each on its own fresh fake profile.
+
+- **Interactive Blazor pages.** The page is HTML first and interactive only after the websocket answers `StartCircuit`; input before that is discarded without an error. Use `gotoInteractive(page, url)` (in `harness/circuit.ts`) instead of `page.goto` for a page that may be interactive (it waits only when the prerendered HTML carries a server component marker), and `watchCircuit(page)` taken **before** a click that navigates to one (`await circuit.ready()` after). On Next they are no-ops. Never sleep for a circuit.
+- **Pages not ported yet.** Start a test with `await requirePorted(page.request, "/route", ...)` (`harness/parity.ts`): on `HOST=blazor` it skips the test with `not ported yet: <route> (owner <branch>; docs/operations/PARITY.md)` when the host answers 404 for a route, so the skips disappear as pages land. `PARITY_STRICT=1` (the cutover gate) turns them into failures. Add the owner prefix to `OWNERS` for a new route family.
+- **No BFF on Blazor.** `signInAs`/`signInViaBff` sign the browser context in through the real form and keep the user's token for the context; `bff(ctx, ..., "/api/proxy/<service>/...")` and the booking helpers call the service directly with it on `HOST=blazor`. What a journey is about still goes through the UI.
+
 ## What the harness gives you
 
 Import `test` and `expect` from `../harness/fixtures`, never from `@playwright/test`.

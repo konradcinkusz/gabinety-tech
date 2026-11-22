@@ -3,6 +3,7 @@ import { signInViaBff } from "../harness/auth";
 import { expectNoSeriousA11yViolations } from "../harness/a11y";
 import { demoPassword, urls } from "../harness/env";
 import { expect, test } from "../harness/fixtures";
+import { requirePorted } from "../harness/parity";
 import { PractitionerListPage } from "../harness/pages";
 import { publicProfile } from "./support/directory-api";
 import { PractitionerArea, PublicProfilePage, RegisterPage, VerificationQueuePage } from "./support/pages";
@@ -36,6 +37,7 @@ test.describe("J2 practitioner onboards, administrator approves, profile becomes
   });
 
   test("onboarding to approval to a public profile", async ({ page, browser }) => {
+    await requirePorted(page.request, "/rejestracja", "/gabinet-programisty", "/gabinet-programisty/profil", "/gabinet-programisty/oferty", "/admin/weryfikacja", "/admin/weryfikacja/00000000-0000-0000-0000-000000000000", "/gabinet/demo-anna-demowska", "/programisci"); // HOST=blazor: skip with the owner named until the pages land (PARITY.md)
     test.setTimeout(240_000); // many page loads against the Directory (60 requests a minute per address: the harness retries only direct calls)
 
     const uid = randomBytes(4).toString("hex");

@@ -57,7 +57,7 @@ check "an unreadable base selects everything" bash -c "$(declare -f sel); tmp=$t
 
 # ---------- estate and map consistency ----------
 check "secrets.map apps are all in estate.conf" bash -c "
-  for a in \$(awk '!/^#/ && NF {print \$1}' '$root/deploy/secrets.map' | sort -u); do grep -Eq \"^\$a +\" '$root/deploy/estate.conf' || { echo \"unknown app \$a\"; exit 1; }; done"
+  for a in \$(awk '!/^#/ && NF {print \$1}' '$root/deploy/secrets.map' | sort -u); do grep -Eq \"^(#cutover# )?\$a +\" '$root/deploy/estate.conf' || { echo \"unknown app \$a\"; exit 1; }; done"
 check "secrets.map holds no value (only \${NAME} references and fixed text)" bash -c "! grep -Ev '^#|^\$' '$root/deploy/secrets.map' | grep -Eq 'BEGIN|password=[^\$]'"
 
 # ---------- the two workflows pin the same flyctl ----------
@@ -104,10 +104,35 @@ check "every app of estate.conf has deploy/fly/<key>.fly.toml naming its Fly app
     grep -q \"^app = \\\"\$fly\\\"\" \"\$f\" || { echo \"\$f does not name \$fly\"; exit 1; }
   done < '$root/deploy/estate.conf'"
 check "every deploy/fly/*.fly.toml is an app of estate.conf" bash -c "
-  for f in '$root'/deploy/fly/*.fly.toml; do k=\$(basename \"\$f\" .fly.toml); grep -Eq \"^\$k +\" '$root/deploy/estate.conf' || { echo \"\$k not in estate.conf\"; exit 1; }; done"
+  for f in '$root'/deploy/fly/*.fly.toml; do k=\$(basename \"\$f\" .fly.toml); grep -Eq \"^(#cutover# )?\$k +\" '$root/deploy/estate.conf' || { echo \"\$k not in estate.conf\"; exit 1; }; done"
 check "network is public, private or flycast for every app, Assistant is flycast" bash -c "
   awk '!/^#/ && NF && \$1 != \"shared\" {print \$1, \$NF}' '$root/deploy/estate.conf' | grep -Evq ' (public|private|flycast)\$' && exit 1
   awk '\$1 == \"assistant\" {print \$NF}' '$root/deploy/estate.conf' | grep -qx flycast"
+
+# ---------- the cutover row (ADR-0010): ready, tested as if enabled, and dormant until the cutover PR uncomments it ----------
+cut="$tmp/estate-cutover.conf"; sed 's/^#cutover# //' "$root/deploy/estate.conf" > "$cut"
+check "the cutover row is commented out in the live estate (nothing deploys it yet)" bash -c "grep -q '^#cutover# web-blazor ' '$root/deploy/estate.conf' && ! grep -q '^web-blazor ' '$root/deploy/estate.conf'"
+cutover_row_ok() { # fields of the enabled row: key fly_app kind dockerfile context shared paths smoke smoke_path network
+  local row; row="$(grep '^web-blazor ' "$cut")" || { echo "no cutover row"; return 1; }
+  set -- $row
+  [ $# = 10 ] || { echo "fields: $#"; return 1; }
+  [ "$2" = gabinety-web-blazor-staging ] && [ "$3" = built ] && [ -f "$root/$4" ] && [ "$8" = public ] && [ "$9" = /alive ] && [ "${10}" = public ] &&
+    grep -q '^app = "gabinety-web-blazor-staging"' "$root/deploy/fly/web-blazor.fly.toml"
+}
+check "enabled, the cutover row is well formed: 10 fields, a Dockerfile and a config that exist and name the app, public, /alive" cutover_row_ok
+check "enabled, the cutover row has shape of the web row (kind, network, columns)" bash -c "
+  [ \$(awk '\$1==\"web-blazor\" {print NF}' '$cut') = \$(awk '\$1==\"web\" {print NF}' '$cut') ] &&
+  [ \"\$(awk '\$1==\"web-blazor\" {print \$3, \$(NF)}' '$cut')\" = \"built public\" ]"
+: > "$tmp/out"; "$d/detect-changes.sh" --estate "$root/deploy/estate.conf" --existing-apps "$all" --head HEAD --changed-files <(printf 'src/Gabinety.Web/Foo.cs\n') --github-output "$tmp/out" > "$tmp/table"
+check "live estate: a change in src/Gabinety.Web selects no app (the Blazor host is not deployed)" bash -c "! grep -q '^web-blazor=' '$tmp/out' && ! grep -qx 'web=true' '$tmp/out'"
+sed -n 's/^[a-z-]* *\(gabinety-[a-z-]*\) .*/\1/p' "$cut" > "$tmp/all-cutover"
+: > "$tmp/out"; "$d/detect-changes.sh" --estate "$cut" --existing-apps "$tmp/all-cutover" --head HEAD --changed-files <(printf 'src/Gabinety.Web/Foo.cs\n') --github-output "$tmp/out" > "$tmp/table"
+check "enabled: a change in src/Gabinety.Web selects web-blazor only, and it is in the build matrix" bash -c "grep -qx 'web-blazor=true' '$tmp/out' && grep -qx 'web=false' '$tmp/out' && grep -q 'web-blazor' '$tmp/out' && grep -q 'src/Gabinety.Web/Dockerfile' '$tmp/out'"
+: > "$tmp/out"; "$d/detect-changes.sh" --estate "$cut" --existing-apps "$tmp/all-cutover" --head HEAD --changed-files <(printf 'Directory.Packages.props\n') --github-output "$tmp/out" > "$tmp/table"
+check "enabled: a shared path selects web-blazor (shared = yes: it references ServiceDefaults)" grep -qx 'web-blazor=true' "$tmp/out"
+check "secrets.map has the Blazor host's rows and set-secrets stages them" bash -c "grep -Eq '^web-blazor +RateLimit__TrustedProxyKey ' '$root/deploy/secrets.map'"
+check "deploy.yml has the dormant deploy-web-blazor job gated on the detect output" bash -c "grep -q 'deploy-web-blazor:' '$root/.github/workflows/deploy.yml' && grep -q \"outputs.web-blazor == 'true'\" '$root/.github/workflows/deploy.yml'"
+check "_deploy-app.yml creates the web-blazor volume and fixes its owner" bash -c "grep -q 'webdata 1 fra' '$root/.github/workflows/_deploy-app.yml' && grep -q 'chown -R app /data' '$root/.github/workflows/_deploy-app.yml'"
 
 # ---------- the web BFF reaches the private apps only over .internal / .flycast (F-03) ----------
 check "private topology: web uses .internal/.flycast, no private app has [[services.ports]]" "$root/scripts/check-private-topology.sh"

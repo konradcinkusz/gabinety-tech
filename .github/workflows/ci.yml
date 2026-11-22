@@ -39,9 +39,18 @@ jobs:
       - run: pnpm --dir web typecheck
       - run: pnpm --dir web test
       - run: pnpm --dir web build
+  # e2e runs the journeys J1-J7 against BOTH web hosts (ADR-0010, docs/operations/PARITY.md), each on its own fresh fake profile (the journeys write data, J3 cannot run twice on one stack),
+  # in parallel, so the wall time is that of one run. The job that runs HOST=next keeps its old name `e2e` (a required check by that name stays valid); the Blazor one is `e2e-blazor`.
+  # Both are required until the cutover removes web/ (docs/operations/CUTOVER.md). On the Blazor host a step that needs a page its owner has not ported yet is SKIPPED with the owner's branch
+  # in the reason; PARITY_STRICT=1 (the cutover gate) turns those skips into failures.
   e2e:
+    name: ${{ matrix.host == 'next' && 'e2e' || format('e2e-{0}', matrix.host) }}
     runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [next, blazor]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -59,6 +68,11 @@ jobs:
           nohup dotnet run --project src/Gabinety.AppHost --launch-profile fake > apphost.log 2>&1 &
       - name: Every service answers /health
         run: scripts/check-fake-profile.sh
+      - name: Route parity (Next page routes have a Blazor route; report only, a gate under CUTOVER_GATE=1)
+        if: matrix.host == 'blazor'
+        run: node --test scripts/tests/check-parity.test.mjs && node scripts/check-parity.mjs
+        env:
+          CUTOVER_GATE: ${{ vars.CUTOVER_GATE || '0' }} # the cutover PR sets the repository variable (or this value) to 1: from then on a missing route fails CI
       # --- e2e harness (T-08.03a): Playwright against the running fake profile. Journeys J1-J7 only add specs under tests/e2e/journeys. ---
       - run: pnpm --dir tests/e2e install --frozen-lockfile
       - run: pnpm --dir tests/e2e exec playwright install --with-deps chromium
@@ -66,11 +80,12 @@ jobs:
         run: pnpm --dir tests/e2e test
         env:
           CI: "true"
+          HOST: ${{ matrix.host }} # next = web/ on :3000, blazor = src/Gabinety.Web on :3001 (tests/e2e/harness/env.ts)
       - name: Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-report
+          name: e2e-report-${{ matrix.host }}
           path: |
             tests/e2e/playwright-report
             tests/e2e/test-results

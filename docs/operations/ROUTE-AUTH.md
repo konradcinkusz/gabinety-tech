@@ -118,3 +118,33 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Assistant | GET | `/api/v1/assistant/status` | Anonymous | all | CONTRACTS 6 |
 | Assistant | POST | `/api/v1/assistant/brief` | Authenticated | all | own limiter |
 | Assistant | POST | `/internal/v1/assistant/review-triage` | Internal | all | caller: Reputation |
+
+## Web (the Blazor host, `src/Gabinety.Web`, ADR-0010 proposal)
+
+The Blazor web host is not one of the four services, but it is held to the same rule: deny by default (`Security.RequireAuthenticatedByDefault`), a route is public only when it says so, and `tests/Gabinety.Web.Tests` (`RouteAuditTests`) fails on any route or policy that differs from this table.
+`PAGE` is a Razor component endpoint (it answers GET, and POST for its forms). Component pages carry their policy as an attribute (`@attribute [AllowAnonymous]` or `@attribute [Authorize]`); the framework's circuit endpoints (`/_blazor/*`, `/_framework/*`) are marked anonymous by one convention in `WebHostingExtensions`, never by a blanket `AllowAnonymous` on the component endpoints (that would override `[Authorize]`).
+Static assets (the stylesheets, the framework script) are mapped by `MapStaticAssets().AllowAnonymous()`; their fingerprinted names change with their content, so the test checks them as a group (all anonymous) and they are not listed.
+The middleware is UX, the services are the boundary: a signed-in page still calls the backend with the user's bearer, and the backend enforces its own policy (SPEC 11).
+
+| Service | Method | Route | Policy | Profile | Note |
+|---|---|---|---|---|---|
+| Web | ANY | `/health` | Anonymous | all | liveness/readiness (kernel) |
+| Web | ANY | `/alive` | Anonymous | all | liveness (kernel) |
+| Web | PAGE | `/` | Anonymous | all | home, static server rendering |
+| Web | PAGE | `/programisci` | Anonymous | all | public list, static server rendering |
+| Web | PAGE | `/programisci/{Problem}` | Anonymous | all | public list of a category |
+| Web | PAGE | `/programisci/{Problem}/{Tech}` | Anonymous | all | public list of a category and a technology |
+| Web | PAGE | `/logowanie` | Anonymous | all | sign-in form (the POST is handled by the page, antiforgery) |
+| Web | PAGE | `/wyloguj` | Anonymous | all | sign-out form |
+| Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |
+| Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect, state checked against the cookie, code exchanged |
+| Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings, interactive server rendering |
+| Web | PAGE | `/not-found` | Anonymous | all | status code re-execution target |
+| Web | PAGE | `/Error` | Anonymous | all | exception handler target |
+| Web | ANY | `/_blazor` | Anonymous | all | circuit websocket: refused first by the origin guard for a foreign page |
+| Web | ANY | `/_blazor/negotiate` | Anonymous | all | circuit negotiation |
+| Web | ANY | `/_blazor/disconnect` | Anonymous | all | circuit |
+| Web | ANY | `/_blazor/initializers` | Anonymous | all | circuit |
+| Web | GET | `/_framework/opaque-redirect` | Anonymous | all | framework |
+| Web | GET | `/{**path:file}` | Anonymous | all | the static-asset fallback for files under `wwwroot` (public files, never data); anonymous through the group in `MapWebEndpoints` |
+| Web | HEAD | `/{**path:file}` | Anonymous | all | as above |

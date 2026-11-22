@@ -1,0 +1,97 @@
+@page "/programisci"
+@page "/programisci/{Problem}"
+@page "/programisci/{Problem}/{Tech}"
+@attribute [AllowAnonymous]
+@inject DirectoryClient Directory
+@inject NavigationManager Navigation
+@inject Gabinety.Web.Hosting.WebOptions Site
+@* Static server rendering with the state in the URL (route values and query): the list, the filters and the pagination are plain links and a GET form, so the page is complete HTML. *@
+
+@if (_view is { } view)
+{
+    <PageTitle>@view.MetaTitle</PageTitle>
+    <HeadContent>
+        <meta name="description" content="@view.MetaDescription" />
+        <link rel="canonical" href="@(Site.SiteBaseUrl + view.CanonicalPath)" />
+        <meta name="robots" content="@view.Robots" />
+        <meta property="og:title" content="@view.MetaTitle" />
+        <meta property="og:description" content="@view.MetaDescription" />
+        <meta property="og:url" content="@(Site.SiteBaseUrl + view.CanonicalPath)" />
+        <meta property="og:type" content="website" />
+        <meta property="og:locale" content="pl_PL" />
+    </HeadContent>
+    <header class="page-header">
+        <h1>@view.Heading</h1>
+        <p class="lead">@view.Intro</p>
+        <p>@view.CountText</p>
+    </header>
+    <div class="list-layout">
+        <FilterNav State="view.State" Groups="view.Filters()" />
+        <section aria-label="@Pl.ListPage.ResultsLabel">
+            @if (_page is { Items.Count: 0 })
+            {
+                <div class="empty-state">
+                    <Alert Variant="AlertVariant.Warning" TestId="empty">@Pl.ListPage.Empty</Alert>
+                    <a class="btn" href="@view.State.Cleared().Href()">@Pl.ListPage.ClearFilters</a>
+                </div>
+            }
+            else if (_page is not null)
+            {
+                <ul class="results" data-testid="practitioner-list">
+                    @foreach (var p in _page.Items)
+                    {
+                        <li><PractitionerCard Practitioner="p" /></li>
+                    }
+                </ul>
+            }
+            <Pagination PreviousHref="@(view.State.Cursor is null ? null : view.State.FirstPage().Href())"
+                        NextHref="@(_page?.NextCursor is { } next ? (view.State with { Cursor = next }).Href() : null)" />
+        </section>
+    </div>
+}
+else
+{
+    <PageTitle>@Pl.ListPage.MetaAllTitle</PageTitle>
+    <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+    <h1>@Pl.ListPage.AllTitle</h1>
+    <Alert Variant="AlertVariant.Danger" TestId="list-error">@Pl.ListPage.Unavailable</Alert>
+}
+
+@code {
+    [CascadingParameter] HttpContext? Http { get; set; }
+    [Parameter] public string? Problem { get; set; }
+    [Parameter] public string? Tech { get; set; }
+    [SupplyParameterFromQuery(Name = "duration")] public string? DurationParam { get; set; }
+    [SupplyParameterFromQuery(Name = "maxPriceMinor")] public string? MaxPriceParam { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? QueryParam { get; set; }
+    [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+
+    ListView? _view;
+    PageDto<PractitionerCardDto>? _page;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var state = ListState.Parse(Problem, Tech, DurationParam, MaxPriceParam, QueryParam, CursorParam);
+        var query = new PractitionerQuery(state.Problem, state.Tech, state.Q, state.Duration, state.MaxPriceMinor, state.Cursor);
+        // Three independent reads: a failure of any is an error state of this page, never an exception (BLAZOR-WEB-APP section 5).
+        var taxonomyTask = Directory.TaxonomyAsync();
+        var sitemapTask = Directory.SitemapAsync();
+        var pageTask = Directory.PractitionersAsync(query);
+        await Task.WhenAll(taxonomyTask, sitemapTask, pageTask);
+        var (taxonomy, sitemap, page) = (taxonomyTask.Result, sitemapTask.Result, pageTask.Result);
+
+        if (!taxonomy.IsOk || !sitemap.IsOk) { Unavailable(); return; }
+        var view = new ListView(state, taxonomy.Value!, sitemap.Value!);
+        if (!view.IsKnown) { Navigation.NotFound(); return; } // an unknown problem or technology is a 404, not an empty list
+        if (page.Failure is { Status: 400 or 404 or 422 }) { Navigation.NotFound(); return; } // the Directory refused the cursor: a stale or forged link
+        if (!page.IsOk) { Unavailable(); return; }
+        (_view, _page) = (view, page.Value);
+
+        void Unavailable()
+        {
+            (_view, _page) = (null, null);
+            // 503 for a crawler: an error page must not be indexed as a 200. Only possible while the response has not started (static rendering).
+            if (Http is { Response.HasStarted: false }) Http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        }
+    }
+}

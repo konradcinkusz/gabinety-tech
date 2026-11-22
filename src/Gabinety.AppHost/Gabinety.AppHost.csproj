@@ -12,6 +12,7 @@
     <ProjectReference Include="../Gabinety.Booking/Gabinety.Booking.csproj" />
     <ProjectReference Include="../Gabinety.Reputation/Gabinety.Reputation.csproj" />
     <ProjectReference Include="../Gabinety.Assistant/Gabinety.Assistant.csproj" />
+    <ProjectReference Include="../Gabinety.Web/Gabinety.Web.csproj" />
     <ProjectReference Include="../../tools/Gabinety.DevIdentity/Gabinety.DevIdentity.csproj" />
     <ProjectReference Include="../../tools/Gabinety.DemoSeeder/Gabinety.DemoSeeder.csproj" />
   </ItemGroup>

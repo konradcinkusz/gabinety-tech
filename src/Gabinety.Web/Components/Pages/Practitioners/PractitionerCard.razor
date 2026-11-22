@@ -1,0 +1,39 @@
+<article class="card practitioner-card" data-testid="practitioner-card">
+    <h2 class="practitioner-card__name"><a href="@($"/gabinet/{Practitioner.Slug}")">@Practitioner.DisplayName</a></h2>
+    <p class="practitioner-card__headline">@Practitioner.Headline</p>
+    <ul class="cluster">
+        @foreach (var badge in Practitioner.Badges)
+        {
+            <li><span class="@($"badge{(badge == "approved" ? " badge--success" : "")}")">@BadgeLabel(badge)</span></li>
+        }
+        <li>
+            @if (Practitioner.Rating is { } rating && !Practitioner.IsNew)
+            {
+                <span class="badge">@string.Format(Pl.Card.Rating, rating.Average.ToString("0.0", Invariant).Replace('.', ','), rating.Count)</span>
+            }
+            else
+            {
+                <span class="badge">@Pl.Card.IsNew</span>
+            }
+        </li>
+    </ul>
+    <p class="cluster">
+        <span>@Pl.Card.From <span class="num">@Money.Pln(Practitioner.FromPrice.AmountMinor)</span></span>
+        <span>@string.Join(", ", Practitioner.Durations.Select(d => string.Format(Pl.Filters.Minutes, d)))</span>
+    </p>
+</article>
+
+@code {
+    static readonly System.Globalization.CultureInfo Invariant = System.Globalization.CultureInfo.InvariantCulture;
+
+    [Parameter, EditorRequired] public PractitionerCardDto Practitioner { get; set; } = default!;
+
+    static string BadgeLabel(string badge) => badge switch
+    {
+        "email" => Pl.Card.BadgeEmail,
+        "github" => Pl.Card.BadgeGithub,
+        "nip" => Pl.Card.BadgeNip,
+        "approved" => Pl.Card.BadgeApproved,
+        _ => badge,
+    };
+}

@@ -5,4 +5,9 @@ useDefault = true
 description = "synthetic development values are not secrets"
 paths = ['''web/pnpm-lock\.yaml''']
 # The pinned authservice image digest is a public registry fact, not a secret (docs/spikes/authservice.md section 4). It is named in the fly toml, the AppHost, the tests and CI.
-regexes = ['''d0309a94f6b6300d4b8091381786c160ae7717a022416debaaa6d8d19a244645''']
+regexes = [
+  '''d0309a94f6b6300d4b8091381786c160ae7717a022416debaaa6d8d19a244645''',
+  # The sample Sec-WebSocket-Key of RFC 6455 section 1.3 (a public documentation value) and a deliberately wrong synthetic password, both in tests/Gabinety.Web.Tests.
+  '''dGhlIHNhbXBsZSBub25jZQ==''',
+  '''Wrong-Passw0rd-xyz''',
+]

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- ADR-0010: the Blazor Web App frontend. References the kernel and its Edge project and nothing else (BLAZOR-WEB-APP section 4): DTOs are copies, the contract is HTTP (P3).
+       No PackageReference of its own: the ASP.NET Core shared framework only (no component library, no JS packages). -->
+  <ItemGroup>
+    <ProjectReference Include="../Gabinety.ServiceDefaults/Gabinety.ServiceDefaults.csproj" />
+    <ProjectReference Include="../Gabinety.ServiceDefaults.Edge/Gabinety.ServiceDefaults.Edge.csproj" />
+    <InternalsVisibleTo Include="Gabinety.Web.Tests" />
+  </ItemGroup>
+</Project>

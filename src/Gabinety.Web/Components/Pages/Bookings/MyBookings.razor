@@ -1,0 +1,119 @@
+@page "/moje/rezerwacje"
+@attribute [Authorize]
+@* The one interactive page of this PR: INTERACTIVE SERVER on this page only, not on the roots (ADR-0010). It is an authenticated area with controls (role, status, "show more"). It is still
+   prerendered, so the first load is HTML; OnInitializedAsync therefore runs twice (once for the HTML, once on the circuit): a read, so the double call is accepted (BLAZOR-WEB-APP section 3). *@
+@rendermode InteractiveServer
+@implements IDisposable
+@inject BookingClient Bookings
+@inject NavigationManager Navigation
+
+<PageTitle>@Pl.Bookings.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@Pl.Bookings.Title</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="controls">
+            <div role="group" aria-label="@Pl.Bookings.RoleLabel" class="cluster">
+                @foreach (var r in new[] { BookingClient.ClientRole, BookingClient.PractitionerRole })
+                {
+                    <button type="button" class="@($"btn{(r == _role ? " btn--primary" : "")}")" aria-pressed="@(r == _role ? "true" : "false")" data-testid="@($"role-{r}")" @onclick="() => SetRoleAsync(r)">
+                        @(r == BookingClient.ClientRole ? Pl.Bookings.Client : Pl.Bookings.Practitioner)
+                    </button>
+                }
+            </div>
+            <label class="field field--inline">
+                @Pl.Bookings.StatusLabel
+                <select data-testid="status-filter" value="@_status" @onchange="e => SetStatusAsync(e.Value?.ToString())">
+                    <option value="">@Pl.Bookings.AllStatuses</option>
+                    @foreach (var s in BookingFormat.Statuses)
+                    {
+                        <option value="@s" selected="@(s == _status)">@BookingFormat.StatusLabel(s)</option>
+                    }
+                </select>
+            </label>
+        </div>
+
+        @if (_failure is { } failure)
+        {
+            if (failure.IsUnauthenticated)
+            {
+                <Alert Variant="AlertVariant.Danger" TestId="bookings-error">@Pl.Bookings.SignedOut <a href="@ReturnTarget.LoginUrl("/moje/rezerwacje")">@Pl.Bookings.SignInAgain</a></Alert>
+            }
+            else
+            {
+                <Alert Variant="AlertVariant.Danger" TestId="bookings-error">@BookingFormat.FailureText(failure)</Alert>
+            }
+        }
+        else if (_items.Count == 0 && !_loading)
+        {
+            <p class="empty-state" data-testid="bookings-empty">@Pl.Bookings.Empty</p>
+        }
+
+        <ul class="stack bookings" data-testid="bookings">
+            @foreach (var b in _items)
+            {
+                <li class="card" data-testid="booking-row">
+                    <h2 class="booking__title">@b.OfferingTitle</h2>
+                    <p class="muted">@BookingFormat.OtherParty(b, _role) · @BookingFormat.When(b) · <span class="num">@Money.Pln(b.Price.AmountMinor)</span></p>
+                    <p><span class="badge">@BookingFormat.StatusLabel(b.Status)</span></p>
+                </li>
+            }
+        </ul>
+        @if (_loading) {<p role="status" data-testid="bookings-loading">@Pl.Bookings.Loading</p>}
+        @if (_next is not null && !_loading) {<button type="button" class="btn" data-testid="bookings-more" @onclick="MoreAsync">@Pl.Bookings.More</button>}
+    </Authorized>
+    <NotAuthorized>
+        @* The sign-in ended while the page was open (the cookie's expiry, a closed session): said here, because a circuit does not re-authenticate on every call. *@
+        <Alert Variant="AlertVariant.Danger" TestId="bookings-signed-out">@Pl.Bookings.SignedOut <a href="@ReturnTarget.LoginUrl("/moje/rezerwacje")">@Pl.Bookings.SignInAgain</a></Alert>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    /// <summary>The view is shareable: <c>?role=practitioner&amp;status=Confirmed</c> reopens the same listing.</summary>
+    [SupplyParameterFromQuery(Name = "role")] public string? RoleParam { get; set; }
+    [SupplyParameterFromQuery(Name = "status")] public string? StatusParam { get; set; }
+
+    readonly List<BookingViewDto> _items = [];
+    string _role = BookingClient.ClientRole, _status = "";
+    string? _next;
+    bool _loading;
+    ApiFailure? _failure;
+    CancellationTokenSource? _load; // the one load in flight: a newer request cancels it, and Dispose cancels it when the circuit ends (BLAZOR-WEB-APP section 6)
+
+    protected override Task OnInitializedAsync()
+    {
+        (_role, _status) = (BookingFormat.Role(RoleParam), BookingFormat.StatusFilter(StatusParam));
+        return LoadAsync(append: false);
+    }
+
+    Task SetRoleAsync(string role) { if (role == _role) return Task.CompletedTask; _role = role; return LoadAsync(append: false); }
+
+    Task SetStatusAsync(string? status) { _status = BookingFormat.StatusFilter(status); return LoadAsync(append: false); }
+
+    Task MoreAsync() => LoadAsync(append: true);
+
+    async Task LoadAsync(bool append)
+    {
+        _load?.Cancel();
+        var mine = _load = new CancellationTokenSource();
+        var cursor = append ? _next : null;
+        if (!append) { _items.Clear(); _next = null; _failure = null; }
+        _loading = true;
+        try
+        {
+            var result = await Bookings.MyBookingsAsync(_role, _status, cursor, mine.Token);
+            if (mine.IsCancellationRequested) return; // a newer request owns the list
+            if (result.IsOk) { _items.AddRange(result.Value!.Items); _next = result.Value.NextCursor; }
+            else (_next, _failure) = (null, result.Failure);
+        }
+        catch (OperationCanceledException) { return; }
+        finally { if (_load == mine) _loading = false; }
+    }
+
+    public void Dispose()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+    }
+}

@@ -1,0 +1,64 @@
+@page "/logowanie"
+@attribute [AllowAnonymous]
+@inject SignInService SignIn
+@inject NavigationManager Navigation
+@* Static server rendering: a form post handled by the host with [SupplyParameterFromForm]; it works with JavaScript disabled and is protected by antiforgery. *@
+
+<PageTitle>@Pl.Login.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@Pl.Login.Title</h1>
+
+@if (_message is not null)
+{
+    <Alert Variant="AlertVariant.Danger" TestId="login-error">@_message</Alert>
+}
+
+<EditForm Model="Model!" FormName="login" OnValidSubmit="SubmitAsync" class="stack form-narrow" novalidate>
+    <DataAnnotationsValidator />
+    <div class="field">
+        <label for="login-email">@Pl.Login.Email</label>
+        <InputText id="login-email" type="email" @bind-Value="Model!.Email" autocomplete="username" />
+        <div class="field__error"><ValidationMessage For="() => Model!.Email" /></div>
+    </div>
+    <div class="field">
+        <label for="login-password">@Pl.Login.Password</label>
+        <InputText id="login-password" type="password" @bind-Value="Model!.Password" autocomplete="current-password" />
+        <div class="field__error"><ValidationMessage For="() => Model!.Password" /></div>
+    </div>
+    <div><button class="btn btn--primary" type="submit">@Pl.Login.Submit</button></div>
+</EditForm>
+
+@code {
+    [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+
+    /// <summary><c>?redirect=</c>: where to go after signing in; filtered by <see cref="ReturnTarget.Safe"/> before use.</summary>
+    [SupplyParameterFromQuery(Name = ReturnTarget.Parameter)] public string? Redirect { get; set; }
+
+    /// <summary><c>?error=</c> from the GitHub callback: a fixed set of keys, the text is ours.</summary>
+    [SupplyParameterFromQuery(Name = "error")] public string? Error { get; set; }
+
+    [SupplyParameterFromForm] LoginModel? Model { get; set; }
+
+    string? _message;
+
+    protected override void OnInitialized()
+    {
+        Model ??= new();
+        if (HttpContext.User.Identity?.IsAuthenticated == true) { Navigation.NavigateTo(ReturnTarget.Safe(Redirect)); return; }
+        _message = Error switch { "github_failed" => Pl.Login.GithubFailed, "two_factor_not_supported" => Pl.Login.TwoFactor, _ => null };
+    }
+
+    async Task SubmitAsync()
+    {
+        var outcome = await SignIn.SignInAsync(HttpContext, Model!.Email!.Trim(), Model!.Password!);
+        if (outcome == SignInOutcome.SignedIn) { Navigation.NavigateTo(ReturnTarget.Safe(Redirect)); return; }
+        _message = outcome switch
+        {
+            SignInOutcome.InvalidCredentials => Pl.Login.InvalidCredentials,
+            SignInOutcome.VerificationRequired => Pl.Login.VerificationRequired,
+            SignInOutcome.TwoFactor => Pl.Login.TwoFactor,
+            _ => Pl.Login.Unavailable,
+        };
+        Model = new LoginModel { Email = Model!.Email }; // the password is not sent back to the browser
+    }
+}

@@ -1,0 +1,39 @@
+@inherits LayoutComponentBase
+@inject TimeProvider Time
+@inject NavigationManager Navigation
+
+<a class="skip-link" href="#main">@Pl.A11y.SkipToContent</a>
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="brand" href="/">@Pl.Site.Name</a>
+        <nav aria-label="@Pl.Nav.Label">
+            <ul class="nav-list">
+                <AuthorizeView>
+                    <Authorized>@foreach (var item in SiteNavigation.Items(true)) {<li><a href="@item.Href">@item.Label</a></li>}</Authorized>
+                    <NotAuthorized>@foreach (var item in SiteNavigation.Items(false)) {<li><a href="@item.Href">@item.Label</a></li>}</NotAuthorized>
+                </AuthorizeView>
+            </ul>
+        </nav>
+    </div>
+</header>
+@* The flash area: messages are looked up by a fixed key, never rendered from the query string. *@
+<div class="flash" role="status" aria-live="polite" aria-label="@Pl.A11y.Flash" data-testid="flash">@FlashText</div>
+<main id="main" tabindex="-1" class="site-main">
+    <ErrorBoundary>
+        <ChildContent>@Body</ChildContent>
+        <ErrorContent>
+            @* Nothing of the exception is rendered: its text could carry user content (SPEC 5 rule 2). *@
+            <div class="callout callout--danger" role="alert" data-testid="error-boundary">
+                <h2>@Pl.Errors.GenericTitle</h2>
+                <p>@Pl.Errors.GenericBody</p>
+            </div>
+        </ErrorContent>
+    </ErrorBoundary>
+</main>
+<footer class="site-footer">
+    <div class="site-footer__inner"><p>@string.Format(Pl.Site.Copyright, Time.GetUtcNow().Year)</p></div>
+</footer>
+
+@code {
+    string? FlashText => FlashKey.Resolve(Navigation.Uri);
+}

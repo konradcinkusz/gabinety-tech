@@ -7,9 +7,10 @@ declare -A URLS=(
   [devidentity]=http://localhost:5100/health [directory]=http://localhost:5101/health
   [booking]=http://localhost:5102/health [reputation]=http://localhost:5103/health
   [assistant]=http://localhost:5104/health [web]=http://localhost:3000/api/health
+  [webblazor]=http://localhost:3001/health
 )
 fail=0
-for name in devidentity directory booking reputation assistant web; do
+for name in devidentity directory booking reputation assistant web webblazor; do
   ok=0
   for ((i = 0; i < LIMIT; i++)); do
     code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 "${URLS[$name]}" || true)
@@ -37,4 +38,12 @@ for ((i = 0; i < LIMIT; i++)); do
   sleep 1
 done
 if [ "$code" = "200" ]; then echo "ok   web /programisci"; else echo "FAIL web /programisci (last status: $code)"; fail=1; fi
+# The Blazor host (ADR-0010 proposal) renders the same list as static HTML: the Directory's rows are in the first response, no script needed.
+code=000
+for ((i = 0; i < LIMIT; i++)); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://localhost:3001/programisci || true)
+  if [ "$code" = "200" ]; then break; fi
+  sleep 1
+done
+if [ "$code" = "200" ]; then echo "ok   webblazor /programisci"; else echo "FAIL webblazor /programisci (last status: $code)"; fail=1; fi
 exit $fail

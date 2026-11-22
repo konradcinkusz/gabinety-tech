@@ -1,0 +1,12 @@
+@if (PreviousHref is not null || NextHref is not null)
+{
+    <nav aria-label="@Pl.A11y.Pagination" class="pagination">
+        @if (PreviousHref is not null) {<a class="btn" rel="prev" href="@PreviousHref">@Pl.A11y.PreviousPage</a>}
+        @if (NextHref is not null) {<a class="btn" rel="next" href="@NextHref">@Pl.A11y.NextPage</a>}
+    </nav>
+}
+
+@code {
+    [Parameter] public string? PreviousHref { get; set; }
+    [Parameter] public string? NextHref { get; set; }
+}

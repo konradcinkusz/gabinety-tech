@@ -20,10 +20,10 @@ public class MyBookingsApiTests
     }
 
     static async Task<Guid> Seed(CreateHost h, Who w, TimeSpan startIn, BookingStatus status = BookingStatus.Confirmed, Guid? id = null,
-        string? clientOverride = null, string? practitionerOverride = null, long? fee = null, long? payout = null)
+        string? clientOverride = null, string? practitionerOverride = null, long? fee = null, long? payout = null, DateTimeOffset? at = null)
     {
         id ??= Guid.NewGuid();
-        var start = h.Clock.GetUtcNow() + startIn;
+        var start = at ?? h.Clock.GetUtcNow() + startIn;
         await h.Seed(db =>
         {
             db.Bookings.Add(new BookingEntity
@@ -73,7 +73,13 @@ public class MyBookingsApiTests
     [InlineData("?role=client&limit=0")]
     [InlineData("?role=client&limit=25")]
     [InlineData("?role=client&limit=abc")]
-    public async Task A_bad_role_status_cursor_or_limit_is_400_validation_failed(string query)
+    [InlineData("?role=client&from=2026-13-01")]
+    [InlineData("?role=client&from=yesterday")]
+    [InlineData("?role=client&to=2026-02-30")]
+    [InlineData("?role=client&to=2026-11-23T00:00:00Z")]
+    [InlineData("?role=client&from=2026-11-10&to=2026-11-09")]
+    [InlineData("?role=client&from=2026-01-01&to=2026-03-05")] // 63 days apart
+    public async Task A_bad_role_status_cursor_limit_or_date_range_is_400_validation_failed(string query)
     {
         await using var h = Host();
         var (code, body) = await List(h, "demo-anyone", query);
@@ -142,6 +148,71 @@ public class MyBookingsApiTests
         Assert.Equal(all.Count, seen.Count);
         Assert.Equal(all.OrderBy(x => x), seen.OrderBy(x => x));
         Assert.Equal(seen.Count, seen.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task A_range_of_62_days_is_accepted_and_either_bound_alone_is_accepted()
+    {
+        await using var h = Host();
+        var w = Who.New();
+        Assert.Equal(HttpStatusCode.OK, (await List(h, w.Client, "?role=client&from=2026-01-01&to=2026-03-04")).Item1);
+        Assert.Equal(HttpStatusCode.OK, (await List(h, w.Client, "?role=client&from=2026-02-01&to=2026-02-01")).Item1);
+        Assert.Equal(HttpStatusCode.OK, (await List(h, w.Client, "?role=client&from=2026-02-01")).Item1);
+        Assert.Equal(HttpStatusCode.OK, (await List(h, w.Client, "?role=client&to=2026-02-01")).Item1);
+    }
+
+    [Fact]
+    public async Task Days_are_Warsaw_days_inclusive_at_both_ends_including_the_25_hour_autumn_day_of_2026_10_25()
+    {
+        await using var h = Host();
+        var w = Who.New();
+        // 2026-10-25 is the change from CEST to CET in Warsaw: that day runs from 2026-10-24T22:00Z to 2026-10-25T23:00Z (25 hours).
+        var prevLast = await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 10, 24, 21, 59, 59, TimeSpan.Zero));  // 23:59:59 on the 24th
+        var dayFirst = await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 10, 24, 22, 0, 0, TimeSpan.Zero));    // 00:00 on the 25th (CEST)
+        var dayAfterChange = await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 10, 25, 1, 30, 0, TimeSpan.Zero)); // 02:30 CET on the 25th, after the change
+        var dayLast = await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 10, 25, 22, 30, 0, TimeSpan.Zero));   // 23:30 on the 25th (CET): in
+        var nextMidnight = await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 10, 25, 23, 30, 0, TimeSpan.Zero)); // 00:30 on the 26th: out
+
+        var (code, onTheDay) = await List(h, w.Client, "?role=client&from=2026-10-25&to=2026-10-25");
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.Equal(new HashSet<Guid> { dayFirst, dayAfterChange, dayLast }, Ids(onTheDay).ToHashSet());
+
+        // an ordinary day: 23:30 on 23 November (CET) is 22:30Z, 00:30 on the 24th is 23:30Z
+        var monLate = await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 11, 23, 22, 30, 0, TimeSpan.Zero));
+        var tueEarly = await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 11, 23, 23, 30, 0, TimeSpan.Zero));
+        var (_, monday) = await List(h, w.Client, "?role=client&from=2026-11-23&to=2026-11-23");
+        Assert.Equal([monLate], Ids(monday));
+
+        // one-sided bounds use the same day edges
+        var (_, upToThe24th) = await List(h, w.Client, "?role=client&to=2026-10-24");
+        Assert.Equal(new HashSet<Guid> { prevLast }, Ids(upToThe24th).ToHashSet());
+        var (_, fromThe25th) = await List(h, w.Client, "?role=client&from=2026-10-25");
+        Assert.Equal(new HashSet<Guid> { dayFirst, dayAfterChange, dayLast, nextMidnight, monLate, tueEarly }, Ids(fromThe25th).ToHashSet());
+    }
+
+    [Fact]
+    public async Task The_day_filter_keeps_the_newest_first_order_and_the_cursor_pages_through_a_range()
+    {
+        await using var h = Host();
+        var w = Who.New();
+        // 20 Nov 2026 in Warsaw (CET) starts at 2026-11-19T23:00Z and ends at 2026-11-20T23:00Z
+        await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 11, 19, 22, 59, 59, TimeSpan.Zero)); // 23:59:59 on the 19th: out
+        var inside = new List<Guid>();                                                                    // added oldest first
+        inside.Add(await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 11, 19, 23, 0, 0, TimeSpan.Zero)));   // 00:00 on the 20th
+        for (var i = 0; i < 4; i++) inside.Add(await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 11, 20, 9 + i, 0, 0, TimeSpan.Zero)));
+        await Seed(h, w, TimeSpan.Zero, at: new DateTimeOffset(2026, 11, 20, 23, 0, 0, TimeSpan.Zero));   // 00:00 on the 21st: out
+
+        var seen = new List<Guid>();
+        string? cursor = null;
+        for (var page = 0; page < 5; page++)
+        {
+            var (code, body) = await List(h, w.Client, "?role=client&from=2026-11-20&to=2026-11-20&limit=2" + (cursor is null ? "" : "&cursor=" + Uri.EscapeDataString(cursor)));
+            Assert.Equal(HttpStatusCode.OK, code);
+            seen.AddRange(Ids(body));
+            if (!body.TryGetProperty("nextCursor", out var next)) break;
+            cursor = next.GetString();
+        }
+        Assert.Equal(inside.AsEnumerable().Reverse(), seen); // newest start first
     }
 
     [Fact]

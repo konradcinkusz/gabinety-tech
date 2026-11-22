@@ -62,4 +62,44 @@ public class MyBookingsIntegrationTests : IAsyncLifetime
         Assert.Equal(ids.Count, seen.Count);
         Assert.Equal(ids.Order(), seen.Order());
     }
+
+    [Fact]
+    public async Task The_Warsaw_day_range_filters_on_start_utc_and_the_cursor_pages_it_on_PostgreSQL()
+    {
+        var client = "demo-c-" + Guid.NewGuid().ToString("N");
+        // 2026-10-25 in Warsaw is the 25 hour day: it runs from 2026-10-24T22:00Z to 2026-10-25T23:00Z
+        var starts = new (string Note, DateTimeOffset At, bool InRange)[]
+        {
+            ("23:59:59 on the 24th", new DateTimeOffset(2026, 10, 24, 21, 59, 59, TimeSpan.Zero), false),
+            ("00:00 on the 25th, CEST", new DateTimeOffset(2026, 10, 24, 22, 0, 0, TimeSpan.Zero), true),
+            ("02:30 on the 25th, CET", new DateTimeOffset(2026, 10, 25, 1, 30, 0, TimeSpan.Zero), true),
+            ("23:30 on the 25th, CET", new DateTimeOffset(2026, 10, 25, 22, 30, 0, TimeSpan.Zero), true),
+            ("00:30 on the 26th", new DateTimeOffset(2026, 10, 25, 23, 30, 0, TimeSpan.Zero), false),
+        };
+        var rows = starts.Select(s => (s.Note, s.InRange, Id: Guid.NewGuid(), s.At)).ToList();
+        await host.Seed(db =>
+        {
+            foreach (var r in rows)
+                db.Bookings.Add(new BookingEntity
+                {
+                    Id = r.Id, ClientUserId = client, PractitionerId = Guid.NewGuid(), PractitionerUserId = "demo-p", OfferingId = host.Offering, OfferingTitle = "demo-offering",
+                    DurationMinutes = 60, PriceMinor = 10000, StartUtc = r.At, EndUtc = r.At.AddHours(1), Status = BookingStatus.Expired, BriefText = "demo-brief",
+                    IdempotencyKey = Guid.NewGuid(), CreatedAt = host.Clock.GetUtcNow(),
+                });
+        });
+        var expected = rows.Where(r => r.InRange).OrderByDescending(r => r.At).Select(r => r.Id).ToList();
+
+        var seen = new List<Guid>();
+        string? cursor = null;
+        for (var page = 0; page < 10; page++)
+        {
+            var r = await host.ClientFor(client).GetAsync("/api/v1/me/bookings?role=client&from=2026-10-25&to=2026-10-25&limit=2" + (cursor is null ? "" : "&cursor=" + Uri.EscapeDataString(cursor)));
+            Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+            var body = await r.Body();
+            seen.AddRange(body.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()));
+            if (!body.TryGetProperty("nextCursor", out var next)) break;
+            cursor = next.GetString();
+        }
+        Assert.Equal(expected, seen);
+    }
 }

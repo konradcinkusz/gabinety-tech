@@ -84,7 +84,7 @@ public class SignInTests
         Assert.DoesNotContain("eyJ", page.Html); // and no token anywhere in the page, prerendered state included
         Assert.DoesNotContain(web.Identity.Backend.Requests[0].Body ?? "", page.Html);
         Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], page.All("header .site-nav a").Select(a => a.GetAttribute("href")));
-        Assert.Equal(["/moje/rezerwacje", "/konto", "/gabinet-programisty", "/wyloguj"], page.All("header .account-menu a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/moje/rezerwacje", "/moje/propozycje", "/konto", "/gabinet-programisty", "/wyloguj"], page.All("header .account-menu a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]

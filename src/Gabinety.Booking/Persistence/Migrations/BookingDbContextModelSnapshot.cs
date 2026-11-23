@@ -438,6 +438,182 @@ namespace Gabinety.Booking.Persistence.Migrations
                     b.ToTable("payouts", (string)null);
                 });
 
+            modelBuilder.Entity("Gabinety.Booking.Features.Proposals.Proposal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClientDisplayName")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("client_display_name");
+
+                    b.Property<string>("ClientEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("client_email");
+
+                    b.Property<string>("ClientUserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("client_user_id");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<string>("CompanyName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("company_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("DurationMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_months");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<int?>("HoursPerWeek")
+                        .HasColumnType("integer")
+                        .HasColumnName("hours_per_week");
+
+                    b.Property<Guid>("IdempotencyKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("LastActionAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_action_at");
+
+                    b.Property<Guid>("PractitionerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("practitioner_id");
+
+                    b.Property<string>("PractitionerUserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("practitioner_user_id");
+
+                    b.Property<long>("RateMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rate_minor");
+
+                    b.Property<int>("RoundCount")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("round_count");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<int?>("TotalHours")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_hours");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientUserId", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("ClientUserId", "PractitionerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_proposals_open_pair")
+                        .HasFilter("status IN ('AwaitingPractitioner','AwaitingClient')");
+
+                    b.HasIndex("Status", "ExpiresAt");
+
+                    b.HasIndex("ClientUserId", "CreatedAt", "Id");
+
+                    b.HasIndex("PractitionerUserId", "CreatedAt", "Id");
+
+                    b.ToTable("proposals", (string)null);
+                });
+
+            modelBuilder.Entity("Gabinety.Booking.Features.Proposals.ProposalRound", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("By")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("by");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("DurationMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_months");
+
+                    b.Property<int?>("HoursPerWeek")
+                        .HasColumnType("integer")
+                        .HasColumnName("hours_per_week");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<Guid>("ProposalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("proposal_id");
+
+                    b.Property<long?>("RateMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rate_minor");
+
+                    b.Property<DateOnly?>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
+
+                    b.Property<int?>("TotalHours")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_hours");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProposalId", "Number")
+                        .IsUnique();
+
+                    b.ToTable("proposal_rounds", (string)null);
+                });
+
             modelBuilder.Entity("Gabinety.Booking.Notifications.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -449,7 +625,7 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("attempts");
 
-                    b.Property<Guid>("BookingId")
+                    b.Property<Guid?>("BookingId")
                         .HasColumnType("uuid")
                         .HasColumnName("booking_id");
 
@@ -462,6 +638,14 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("kind");
+
+                    b.Property<Guid?>("ProposalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("proposal_id");
+
+                    b.Property<int>("Round")
+                        .HasColumnType("integer")
+                        .HasColumnName("round");
 
                     b.Property<DateTimeOffset?>("SentAt")
                         .HasColumnType("timestamp with time zone")
@@ -476,7 +660,12 @@ namespace Gabinety.Booking.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BookingId", "Kind", "ToUserId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("booking_id IS NOT NULL");
+
+                    b.HasIndex("ProposalId", "Kind", "ToUserId", "Round")
+                        .IsUnique()
+                        .HasFilter("proposal_id IS NOT NULL");
 
                     b.ToTable("notifications", (string)null);
                 });
@@ -551,6 +740,20 @@ namespace Gabinety.Booking.Persistence.Migrations
                     b.HasIndex("PractitionerId", "IsoWeekday");
 
                     b.ToTable("availability_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Gabinety.Booking.Features.Proposals.ProposalRound", b =>
+                {
+                    b.HasOne("Gabinety.Booking.Features.Proposals.Proposal", null)
+                        .WithMany("Rounds")
+                        .HasForeignKey("ProposalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Gabinety.Booking.Features.Proposals.Proposal", b =>
+                {
+                    b.Navigation("Rounds");
                 });
 #pragma warning restore 612, 618
         }

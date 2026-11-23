@@ -61,6 +61,22 @@
 
     <div class="layout">
     <div class="layout__main">
+    @if (p.Contract is { } contract)
+    {
+        <section class="section" aria-labelledby="contract-title" data-testid="contract-availability">
+            <h2 id="contract-title">@ProposalsText.Availability.Heading</h2>
+            <div class="callout callout--info">
+                <p><strong>@ContractAvailabilityFormat.ProfileLine(contract, _today)</strong></p>
+                <p class="muted">@ContractAvailabilityFormat.HoursLine(contract)@(ContractAvailabilityFormat.RateLine(contract) is { } rateLine ? " · " + rateLine : "")</p>
+                <p>@ProposalsText.Availability.Intro</p>
+                <div class="cluster">
+                    <a class="btn btn--secondary" href="@($"/propozycja/{Uri.EscapeDataString(p.Slug)}?kind=short")" data-testid="propose-short">@ProposalsText.Propose</a>
+                    <a class="btn btn--secondary" href="@($"/propozycja/{Uri.EscapeDataString(p.Slug)}")" data-testid="propose-long">@ProposalsText.ProposeLong</a>
+                </div>
+            </div>
+        </section>
+    }
+
     <section class="section" aria-labelledby="about">
         <h2 id="about">@PlPages.Profile.AboutTitle</h2>
         <p class="bio">@p.Bio</p>

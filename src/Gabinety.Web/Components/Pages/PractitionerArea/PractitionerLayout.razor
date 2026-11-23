@@ -17,9 +17,14 @@
     static readonly (string Href, string Label)[] Sections =
     [
         (PractitionerPaths.Home, PlPractitioner.Tabs.Overview), (PractitionerPaths.Calendar, PlPractitioner.Tabs.Calendar), (PractitionerPaths.Profile, PlPractitioner.Tabs.Profile), (PractitionerPaths.Offers, PlPractitioner.Tabs.Offers),
-        (PractitionerPaths.Availability, PlPractitioner.Tabs.Availability), (PractitionerPaths.Payments, PlPractitioner.Tabs.Payments),
+        (PractitionerPaths.Availability, PlPractitioner.Tabs.Availability), (PractitionerPaths.Proposals, PlPractitioner.Tabs.Proposals), (PractitionerPaths.Payments, PlPractitioner.Tabs.Payments),
     ];
 
-    /// <summary>The section whose path is the current one (query and fragment ignored); <c>Start</c> only on the dashboard itself.</summary>
-    bool IsCurrent(string href) => string.Equals(new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/'), href, StringComparison.OrdinalIgnoreCase);
+    /// <summary>The section whose path is the current one (query and fragment ignored); <c>Start</c> only on the dashboard itself. A page under a section ("/gabinet-programisty/propozycje/{id}") keeps its section current.</summary>
+    bool IsCurrent(string href)
+    {
+        var path = new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/');
+        return string.Equals(path, href, StringComparison.OrdinalIgnoreCase)
+            || (!string.Equals(href, PractitionerPaths.Home, StringComparison.OrdinalIgnoreCase) && path.StartsWith(href + "/", StringComparison.OrdinalIgnoreCase));
+    }
 }

@@ -84,6 +84,34 @@ public sealed class BookingApi(HttpClient http, SeedOptions options, TimeProvide
         return Need(r, "demo reset", HttpStatusCode.OK).GetProperty("bookings").GetInt32();
     }
 
+    // ---- collaboration proposals (ADR proposal 0013)
+
+    /// <summary>The practitioner ids of the proposals the user SENT (any state): enough to know whether a pair was already seeded.</summary>
+    public async Task<HashSet<Guid>> ProposalTargetsAsync(DemoUser client, CancellationToken ct)
+    {
+        var j = Need(await SendAsync(HttpMethod.Get, "/api/v1/me/proposals?role=client&limit=24", client.AccessToken, false, null, ct), "list proposals", HttpStatusCode.OK);
+        return j.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("practitioner").GetProperty("id").GetGuid()).ToHashSet();
+    }
+
+    /// <returns>the new proposal's id and its round number (1).</returns>
+    public async Task<(Guid Id, int Round)> CreateProposalAsync(DemoUser client, Guid practitionerId, string kind, object terms, string text, string? company, Guid key, CancellationToken ct)
+    {
+        var body = company is null ? (object)new { practitionerId, kind, terms, text } : new { practitionerId, kind, terms, text, companyName = company };
+        var j = Need(await SendAsync(HttpMethod.Post, "/api/v1/proposals", client.AccessToken, false, body, ct, key), "create proposal", HttpStatusCode.Created, HttpStatusCode.OK);
+        return (j.GetProperty("id").GetGuid(), j.GetProperty("round").GetInt32());
+    }
+
+    /// <returns>the round number after the counter.</returns>
+    public async Task<int> CounterProposalAsync(DemoUser party, Guid id, int round, object terms, string? text, CancellationToken ct)
+    {
+        var body = text is null ? (object)new { round, terms } : new { round, terms, text };
+        var j = Need(await SendAsync(HttpMethod.Post, $"/api/v1/proposals/{id}/counter", party.AccessToken, false, body, ct), "counter proposal", HttpStatusCode.OK);
+        return j.GetProperty("round").GetInt32();
+    }
+
+    public async Task AcceptProposalAsync(DemoUser party, Guid id, int round, CancellationToken ct) =>
+        Need(await SendAsync(HttpMethod.Post, $"/api/v1/proposals/{id}/accept", party.AccessToken, false, new { round }, ct), "accept proposal", HttpStatusCode.OK);
+
     // ---- availability and slots
 
     public async Task<List<(int Day, string Start, string End)>> GetAvailabilityAsync(DemoUser user, CancellationToken ct)

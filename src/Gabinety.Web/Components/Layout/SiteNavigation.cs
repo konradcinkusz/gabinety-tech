@@ -53,7 +53,7 @@ public static class SiteNavigation
     public static IReadOnlyList<NavItem> Product { get; } = [Practitioners, HowItWorks, Pricing, RankingRules];
 
     public static readonly NavItem SignIn = new(ReturnTarget.LoginPath, Pl.Nav.SignIn), Register = new(ReturnTarget.RegisterPath, Pl.Nav.Register);
-    public static readonly NavItem MyBookings = new("/moje/rezerwacje", Pl.Nav.MyBookings), Account = new("/konto", Pl.Nav.Account), SignOut = new(ReturnTarget.LogoutPath, Pl.Nav.SignOut);
+    public static readonly NavItem MyBookings = new("/moje/rezerwacje", Pl.Nav.MyBookings), MyProposals = new("/moje/propozycje", Pl.Nav.MyProposals), Account = new("/konto", Pl.Nav.Account), SignOut = new(ReturnTarget.LogoutPath, Pl.Nav.SignOut);
     public static readonly NavItem PractitionerArea = new("/gabinet-programisty", Pl.Nav.PractitionerArea), BecomePractitioner = new("/gabinet-programisty", Pl.Nav.BecomePractitioner);
     public static readonly NavItem Admin = new("/admin/weryfikacja", Pl.Nav.Admin, "/admin");
     public static readonly NavItem VisitorBecomePractitioner = new("/rejestracja", Pl.Nav.BecomePractitioner);
@@ -64,7 +64,7 @@ public static class SiteNavigation
     public static HeaderModel For(ClaimsPrincipal? user, string currentPath, string back = "/", bool practitioner = false)
     {
         if (user?.Identity?.IsAuthenticated != true) return new HeaderModel(Primary, SignIn with { Href = ReturnTarget.LoginUrl(back) }, Register with { Href = ReturnTarget.RegisterUrl(back) }, [], null, currentPath);
-        List<NavItem> menu = [MyBookings, Account, practitioner ? PractitionerArea : BecomePractitioner];
+        List<NavItem> menu = [MyBookings, MyProposals, Account, practitioner ? PractitionerArea : BecomePractitioner];
         if (ClaimMapping.IsAdmin(user)) menu.Add(Admin);
         menu.Add(SignOut);
         return new HeaderModel(Primary, null, null, menu, ClaimMapping.Email(user.Claims), currentPath);

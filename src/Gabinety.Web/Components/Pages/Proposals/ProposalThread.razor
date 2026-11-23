@@ -1,0 +1,15 @@
+@* The rounds of a negotiation, oldest first (ADR proposal 0013). Terms and text are shown as plain text nodes: a message is never markup. *@
+<ol class="stack proposal-thread" aria-label="@ProposalsText.Thread.Label" data-testid="proposal-thread">
+    @foreach (var r in Rounds.OrderBy(x => x.Number))
+    {
+        <li class="card" data-testid="proposal-round">
+            <h3 class="proposal-thread__title">@ProposalFormat.RoundHeading(r)</h3>
+            @if (r.Terms is { } t) {<p>@ProposalFormat.Summary(t)</p>}
+            @if (!string.IsNullOrWhiteSpace(r.Text)) {<p class="proposal-thread__text">@r.Text</p>}
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ProposalRoundDto> Rounds { get; set; } = [];
+}

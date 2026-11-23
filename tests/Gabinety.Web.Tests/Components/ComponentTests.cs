@@ -69,11 +69,12 @@ public class PresentationalComponentTests : BunitContext
         var view = new ListView(state, Sample.Taxonomy, Sample.Sitemap(5, true, "/programisci/audyt-kodu"));
         var cut = Render<FilterNav>(p => p.Add(f => f.State, state).Add(f => f.Groups, view.Filters()));
         Assert.Equal("Filtry", cut.Find("nav").GetAttribute("aria-label"));
-        Assert.Equal(["Problem", "Technologia", "Czas trwania", "Cena do"], cut.FindAll("h2").Select(h => h.TextContent));
+        Assert.Equal(["Problem", "Technologia", "Czas trwania", "Cena do", "Współpraca"], cut.FindAll("h2").Select(h => h.TextContent));
         var current = cut.FindAll("a[aria-current=true]").Select(a => a.TextContent).ToList();
-        Assert.Equal(["Audyt kodu", "Wszystkie", "60 min", "do 300,00 zł"], current);
+        Assert.Equal(["Audyt kodu", "Wszystkie", "60 min", "do 300,00 zł", "Wszyscy"], current); // the last is "Współpraca: Wszyscy" (contract availability, ADR proposal 0013)
         var form = cut.Find("form[role=search]");
         Assert.Equal(("get", "/programisci/audyt-kodu"), (form.GetAttribute("method"), form.GetAttribute("action")));
+        Assert.Null(form.QuerySelector("input[name=contract]")); // only carried when the filter is on
         Assert.Equal("60", form.QuerySelector("input[name=duration]")!.GetAttribute("value"));
         Assert.Equal("30000", form.QuerySelector("input[name=maxPriceMinor]")!.GetAttribute("value"));
         Assert.Equal("kod", form.QuerySelector("input[name=q]")!.GetAttribute("value"));
@@ -141,7 +142,7 @@ public class LayoutTests : BunitContext
         auth.SetAuthorized("demo-client@demo.example");
         var member = Render<MainLayout>(p => p.Add(l => l.Body, Body()));
         Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], member.FindAll("header .site-nav a").Select(a => a.GetAttribute("href")));
-        Assert.Equal(["/moje/rezerwacje", "/konto", "/gabinet-programisty", "/wyloguj"], member.FindAll("header .account-menu a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/moje/rezerwacje", "/moje/propozycje", "/konto", "/gabinet-programisty", "/wyloguj"], member.FindAll("header .account-menu a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]

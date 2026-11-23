@@ -53,6 +53,7 @@ booking       Notifications:Smtp:TlsMode               optional
 booking       Notifications:Smtp:User                  optional
 booking       Notifications:Smtp:Password              optional    secret
 booking       Jobs:IntervalSeconds                     optional
+booking       Proposals:ExpiryDays                     optional
 
 reputation    ConnectionStrings:reputationdb           required
 reputation    Internal:Callers:Owner                   optional

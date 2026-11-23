@@ -209,7 +209,7 @@ Every pattern lists its structure, then the rules that the audit found missing.
 <footer> © year · Regulamin · Polityka prywatności </footer>
 ```
 
-- Order of the primary nav is pinned by a test: **Programiści** first, then Jak to działa, Zasady rankingu, Cennik.
+- Order of the primary nav is pinned by a test: **Programiści** first, then Jak to działa, Zasady rankingu, Cennik. A signed-in user then has `Moje rezerwacje`, `Moje propozycje` (ADR proposal 0013) and `Panel programisty`, in that order.
 - Account area by session (read once in the layout from the authentication state, never from `HttpContext` in components, guide section 7): visitor `Zaloguj się` (`.btn--ghost`) + `Załóż konto` (`.btn--primary`); client `Moje rezerwacje` + account menu (`Konto`, `Wyloguj`); practitioner adds `Panel programisty`; administrator adds `Administracja`; a client sees `Zostań programistą` in the menu (open question 1 of the audit).
 - The current section carries `aria-current="page"`.
 - Under 40 rem the nav becomes one `Menu` button: a native `<details class="site-menu">` (works without JS, 44 px target, closes on navigation).
@@ -280,6 +280,7 @@ One component, `StatusBadge(kind, value)`, maps a state to a badge kind and Poli
 | Practitioner checks | `E-mail zweryfikowany`, `GitHub połączony`, `NIP zweryfikowany`, `Zatwierdzony` appear **only on the profile**, as one `.cluster` of `.badge--success`; the list card shows the single `Zweryfikowany` |
 | Dispute | `Otwarty` warning · `Rozstrzygnięty` neutral |
 | Review | `Opublikowana` success · `Do moderacji` warning |
+| Proposal (ADR proposal 0013) | AwaitingPractitioner `Czeka na programistę` warning · AwaitingClient `Czeka na klienta` warning · Accepted `Zaakceptowana` success · Rejected `Odrzucona` danger · Withdrawn `Wycofana` neutral · Expired `Wygasła` neutral. An unknown value reads `Nieznany stan`, neutral, so a state the page does not know still renders. Contract availability on a card is one `.badge--info`: `Dostępny do kontraktu` or `Kontrakt: za 3 miesiące` |
 
 ### 5.8 Admin tables with actions (P-ADM-1..5)
 
@@ -291,7 +292,7 @@ One component, `StatusBadge(kind, value)`, maps a state to a badge kind and Poli
 
 ### 5.9 Tabs and segmented controls (G-2)
 
-`.tabs` is `nav aria-label="…"` > `ul` > `li` > `a.tabs__link[aria-current="page"]`, 44 px high, 2 px bottom border in `--accent` for the active one, scrolls horizontally inside itself on the phone. Used for: practitioner area (Start, Profil, Oferty, Dostępność), admin sections, `Klient | Programista` in bookings. `.segmented` is for choices inside a page (status, date range) and is a radio group, not navigation.
+`.tabs` is `nav aria-label="…"` > `ul` > `li` > `a.tabs__link[aria-current="page"]`, 44 px high, 2 px bottom border in `--accent` for the active one, scrolls horizontally inside itself on the phone. Used for: the state of a list of proposals (`Wszystkie`, `Otwarte`, `Zamknięte`) and the kind of a new proposal (long term, short); practitioner area (Start, Profil, Oferty, Dostępność, Propozycje, Płatności; a page under a section keeps it current), admin sections, `Klient | Programista` in bookings. `.segmented` is for choices inside a page (status, date range) and is a radio group, not navigation.
 
 ### 5.10 Empty, error and loading states
 
@@ -344,7 +345,7 @@ A single persistent `.flash-region` (`role="status"`, `aria-live="polite"`) exis
 
 - Imperative verbs on actions with the object ("Zapłać 180 zł", "Wyślij opinię"), sentence case, no full stops on buttons.
 - Months and weekdays lowercase and in the genitive: `wtorek, 24 listopada`; "od listopada 2026"; money `180,00 zł` in lists and totals, `180 zł` in compact card prices; durations `60 min`.
-- One word per concept: **konsultacja** (the service), **rezerwacja** (the booking record), **termin** (the time), **programista** (practitioner; the product name "gabinet" stays in the URL and title), **opinia** (review), **spór** (dispute).
+- One word per concept: **konsultacja** (the service), **rezerwacja** (the booking record), **termin** (the time), **programista** (practitioner; the product name "gabinet" stays in the URL and title), **opinia** (review), **spór** (dispute), **propozycja** (a collaboration proposal a client sends to a programmer; never "oferta", which stays the programmer's consultation listing), **współpraca** (the contract-work availability a programmer advertises; the calendar tab keeps "Dostępność"). The assistant's suggestion in the booking form is "Propozycja opisu" and keeps its hooks.
 - Never print internal versions, ids or codes (`wersja dev-1`, GUIDs) as primary text.
 - Empty and error texts say what happened and what to do next in one or two sentences.
 - All strings stay in one resource per area (the current `strings.ts` become `*.resx` or constant classes); the hook texts of section 9 are copied verbatim.
@@ -356,6 +357,8 @@ Source: `tests/e2e/journeys/*` (J1 browse, J2 onboard+approve, J3 book+pay+revie
 ### 9.1 URLs (routes and query parameters)
 
 `/`, `/programisci`, `/programisci?q=<text>`, `/programisci/<problem>[/<tech>]`, `/gabinet/<slug>`, `/rezerwacja/<offeringId>?start=<utc>&gabinet=<slug>`, `/checkout/mock/<bookingId>`, `/rezerwacja/potwierdzenie/<bookingId>`, `/moje/rezerwacje`, `/moje/rezerwacje?role=practitioner`, `/moje/rezerwacje/<id>?role=client`, `/moje/opinie/<bookingId>`, `/logowanie?redirect=<path>`, `/rejestracja`, `/gabinet-programisty`, `/gabinet-programisty/{profil,oferty,dostepnosc}`, `/admin/{weryfikacja,spory,ksiega}` (`/admin/weryfikacja?status=Submitted|Approved`). Sign-in redirects back to `redirect`; a visitor on a protected route is redirected to `/logowanie?redirect=…`. `POST /api/auth/login`, `/api/auth/logout` stay available (the harness signs in through them; in Blazor: keep the same two endpoints on the host, J-harness `signInViaBff`).
+
+Collaboration proposals (ADR proposal 0013, new, no journey reads them yet): `/propozycja/<slug>[?kind=short]` (the client's form), `/moje/propozycje[?state=open|closed&cursor=]`, `/moje/propozycje/<id>[?action=accept|counter|reject|withdraw|&done=<key>]`, and the programmer's `/gabinet-programisty/propozycje[…]` and `/gabinet-programisty/propozycje/<id>[…]`. Test ids: `contract-availability`, `propose-short`, `propose-long`, `card-contract`, `proposal-row`, `your-turn`, `proposal-terms`, `proposal-thread`, `proposal-round`, `proposal-contact`, `contact-email`, `accept-dialog`, `reject-dialog`, `withdraw-dialog`, `counter-form`, `action-error`.
 
 ### 9.2 Landmarks, headings, regions
 

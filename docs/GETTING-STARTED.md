@@ -1,6 +1,6 @@
 # Getting started
 
-How to run Gabinety Tech on your machine, sign in, click through every journey (J1 to J7), pass business time, and run each test layer.
+How to run Gabinety Tech on your machine, sign in, click through every journey (J1 to J10), pass business time, and run each test layer.
 
 Every command below was run on Linux with the .NET SDK 10.0.404 (`global.json` asks for 10.0.100 or a later 10.0 feature band), Node 22 and pnpm 10, on 2026-11-17. Where a result is quoted it is what the command printed. Section 8 lists what could not be run in that environment.
 
@@ -121,7 +121,7 @@ The six approved practitioners that appear in the public list, with the account 
 
 You can also register a new account at `/rejestracja`; any e-mail works (no verification step in the stand-in).
 
-## 3. What to click: journeys J1 to J7
+## 3. What to click: journeys J1 to J10
 
 Each journey is an automated Playwright test in `tests/e2e/journeys/` (SPEC 10); the steps below are the same by hand. Polish button names are the app's own.
 
@@ -213,6 +213,14 @@ curl -s -o /dev/null -w "/moje/rezerwacje %{http_code}\n" $W/moje/rezerwacje    
 
 ### J7 A foreign origin is refused
 Automated only: the sign-in POST to the web origin with a foreign `Origin` header, or `Sec-Fetch-Site: cross-site`, gets `403` with code `cross_site_request` and creates nothing. Run `pnpm --dir tests/e2e test -- --grep J7`.
+
+
+### J10 Contract availability and a collaboration proposal (ADR proposal 0013)
+1. Sign in as `demo-practitioner-6`, open `/gabinet-programisty/profil`, scroll to "Współpraca kontraktowa": choose "Jestem dostępny od zaraz", "Godzin tygodniowo" `15`, optionally a rate, "Ustaw dostępność": "Zapisano.". (The seeded programmers 1, 2, 3 and 5 already advertise.)
+2. In another browser sign in as `demo-client` (or register), open `/gabinet/demo-filip-syntetyczny`: the section "Współpraca kontraktowa" says when the programmer is available and offers "Zaproponuj współpracę" (short) and "Zaproponuj współpracę długoterminową". The list `/programisci` has the filter "Współpraca: Dostępni do kontraktu" and a badge on the cards.
+3. Fill the form (rate in zł, hours a week, months, start, a message of at least 20 characters, optionally "Nazwa firmy") and "Wyślij propozycję": you land on `/moje/propozycje/<id>` ("Czeka na programistę"). An e-mail address or a phone number in the message is refused. Free, no fee.
+4. As the programmer open `/gabinet-programisty/propozycje`: the row says "Twoja kolej". Open it: "Przyjmij warunki", "Zaproponuj inne warunki" (a counter-proposal, up to six per thread) or "Odmów".
+5. The client sees "Czeka na klienta" and the new terms; "Przyjmij warunki" then "Tak, przyjmuję": both sides now see "Dane kontaktowe" with the other one's e-mail, and settle the rest outside the platform. A proposal nobody answers expires after 14 days; the client can "Wycofaj propozycję" while it is open.
 
 ## 4. Other pages
 

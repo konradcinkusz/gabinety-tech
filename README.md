@@ -33,8 +33,9 @@ Cały system uruchamia się lokalnie w profilu `fake`, bez Dockera i bez kluczy:
 - katalog i profile praktyków, rejestracja i logowanie, onboarding praktyka,
 - rezerwacja terminu z płatnością próbną, anulowanie i zwroty, spory,
 - opinie, panel administratora, asystent oparty o model językowy,
+- dostępność programistów do kontraktu i propozycje współpracy z negocjacją (bez opłat; adresy e-mail dopiero po obustronnej akceptacji),
 - dane demonstracyjne i zamiennik dostawcy tożsamości do prac lokalnych,
-- siedem automatycznych ścieżek end-to-end (J1 do J7).
+- dziesięć automatycznych ścieżek end-to-end (J1 do J10).
 
 Prawdziwy [authservice](https://github.com/konradcinkusz/authservice) jest dołączony do profilu domyślnego (potrzebuje Dockera) i sprawdzany w CI na wszystkich przepływach, których potrzebuje web (`docs/operations/AUTH.md`); samego profilu domyślnego nikt jeszcze nie uruchomił.
 

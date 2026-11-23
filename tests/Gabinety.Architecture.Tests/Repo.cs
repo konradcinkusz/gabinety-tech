@@ -104,7 +104,7 @@ static partial class CodeScan
     private static partial Regex LogCall();
 
     // A forbidden identifier as a whole word; `.Length` right after it (a length, not the text) is allowed.
-    [GeneratedRegex(@"(?<![\w])(Brief|BriefText|Bio|Text|Reply)\b(?!\s*\??\.\s*Length\b)")]
+    [GeneratedRegex(@"(?<![\w])(Brief|BriefText|Bio|Text|Reply|CompanyName)\b(?!\s*\??\.\s*Length\b)")]
     private static partial Regex FreeTextName();
 
     /// <summary>Logging calls in sanitized code whose argument list names a free-text member. Returns (line, offending name).</summary>

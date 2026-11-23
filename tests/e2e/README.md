@@ -1,6 +1,6 @@
 # tests/e2e: Playwright harness and journeys
 
-The harness (T-08.03a) runs Playwright against a **running fake profile**. It starts nothing itself. Journeys J1-J9 (T-08.03 to T-08.05, T-11.20) only add spec files under `journeys/`; `playwright.config.ts`, `harness/**` and `package.json` belong to the harness task.
+The harness (T-08.03a) runs Playwright against a **running fake profile**. It starts nothing itself. Journeys J1-J10 (T-08.03 to T-08.05, T-11.20; J10 is ADR proposal 0013) only add spec files under `journeys/`; `playwright.config.ts`, `harness/**` and `package.json` belong to the harness task.
 
 ## Run it
 

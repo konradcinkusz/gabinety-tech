@@ -12,6 +12,10 @@
             {
                 <span class="badge badge--success">@PlPages.ListExtra.Verified</span>
             }
+            @if (Practitioner.Contract is { } contract)
+            {
+                <span class="badge badge--info" data-testid="card-contract">@ContractAvailabilityFormat.CardLine(contract, PlFormat.TodayWarsaw(Now))</span>
+            }
             @if (Practitioner.Rating is { } rating && !Practitioner.IsNew)
             {
                 <span class="practitioner-card__rating num" role="img" aria-label="@string.Format(Pl.Card.Rating, PlFormat.Rating(rating.Average), rating.Count)">★ @PlFormat.Rating(rating.Average) (@rating.Count)</span>

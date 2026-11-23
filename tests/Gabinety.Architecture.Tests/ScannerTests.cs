@@ -12,6 +12,8 @@ public class ScannerTests
     [Fact] public void Interpolated_holes_are_flagged() => Assert.Equal(["Bio"], Flagged("""logger.LogDebug($"bio {p.Bio}");"""));
     [Fact] public void Text_in_a_string_or_comment_is_not_flagged() =>
         Assert.Empty(Flagged("logger.LogInformation(\"the Text and Reply\"); // logger.LogError(Brief)\n/* logger.LogError(Bio) */"));
+    [Fact] public void A_company_name_is_flagged() => Assert.Equal(["CompanyName"], Flagged("""logger.LogInformation("for {Company}", proposal.CompanyName);"""));
+    [Fact] public void A_company_name_length_is_not_flagged() => Assert.Empty(Flagged("""logger.LogInformation("n={Length}", proposal.CompanyName.Length);"""));
     [Fact] public void Non_logging_calls_are_not_flagged() => Assert.Empty(Flagged("var s = Compose(brief.Text);"));
     [Fact] public void Comments_are_stripped_but_clock_in_code_is_kept() =>
         Assert.Contains("DateTime.UtcNow", CodeScan.Sanitize("// DateTime.UtcNow\nvar t = DateTime.UtcNow;"));

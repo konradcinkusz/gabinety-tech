@@ -9,7 +9,10 @@ public class NotificationTemplateTests
     static readonly Guid BookingId = Guid.Parse("11111111-2222-3333-4444-555555555555");
     static readonly DateTimeOffset Start = new(2026, 12, 1, 9, 30, 0, TimeSpan.Zero); // 10:30 in Warsaw
 
-    public static IEnumerable<object[]> Kinds => Enum.GetValues<NotificationKind>().Select(k => new object[] { k });
+    /// <summary>The kinds of a booking; the proposal kinds have their own template and tests (ADR proposal 0013, <c>Proposals/ProposalNotificationTests</c>).</summary>
+    static IEnumerable<NotificationKind> BookingKinds => Enum.GetValues<NotificationKind>().Where(k => !NotificationTemplates.IsProposalKind(k));
+
+    public static IEnumerable<object[]> Kinds => BookingKinds.Select(k => new object[] { k });
 
     [Theory]
     [MemberData(nameof(Kinds))]
@@ -32,7 +35,7 @@ public class NotificationTemplateTests
     [Fact]
     public void Each_kind_has_its_own_subject()
     {
-        var subjects = Enum.GetValues<NotificationKind>().Select(k => NotificationTemplates.Render(k, Base, BookingId, Start).Subject).ToList();
+        var subjects = BookingKinds.Select(k => NotificationTemplates.Render(k, Base, BookingId, Start).Subject).ToList();
         Assert.Equal(subjects.Count, subjects.Distinct().Count());
     }
 
@@ -49,8 +52,8 @@ public class NotificationTemplateTests
     {
         using var t = new NotificationHost(setup: h => h.Settings["Site:BaseUrl"] = "https://site.demo.invalid/");
         var booking = await t.AddBooking();
-        foreach (var kind in Enum.GetValues<NotificationKind>()) t.Add(booking.Id, kind, "demo-client");
-        Assert.Equal(Enum.GetValues<NotificationKind>().Length, await t.Run());
+        foreach (var kind in BookingKinds) t.Add(booking.Id, kind, "demo-client");
+        Assert.Equal(BookingKinds.Count(), await t.Run());
         foreach (var m in t.Sender.Sent)
             foreach (var link in LinksIn(m.TextBody).Concat(LinksIn(m.HtmlBody)))
             {
@@ -73,10 +76,10 @@ public class NotificationTemplateTests
             b.StatusReason = marker + "-reason";
             b.MeetingUrlSnapshot = "https://meet.demo.invalid/" + marker;
         });
-        foreach (var kind in Enum.GetValues<NotificationKind>()) t.Add(booking.Id, kind, "demo-client");
+        foreach (var kind in BookingKinds) t.Add(booking.Id, kind, "demo-client");
 
-        Assert.Equal(Enum.GetValues<NotificationKind>().Length, await t.Run());
-        Assert.Equal(Enum.GetValues<NotificationKind>().Length, t.Sender.Sent.Count);
+        Assert.Equal(BookingKinds.Count(), await t.Run());
+        Assert.Equal(BookingKinds.Count(), t.Sender.Sent.Count);
         foreach (var m in t.Sender.Sent)
             Assert.DoesNotContain("MARKER", m.Subject + m.TextBody + m.HtmlBody);
     }

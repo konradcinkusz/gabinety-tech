@@ -1,3 +1,4 @@
+using Gabinety.Booking.Features.Proposals;
 using Gabinety.Booking.Persistence;
 using Microsoft.EntityFrameworkCore;
 using BookingEntity = Gabinety.Booking.Features.Bookings.Entities.Booking;
@@ -15,6 +16,9 @@ public interface INotificationWriter
 
     /// <summary>As <see cref="Schedule"/> but also false when the row is already saved: use it when a transition may run for a booking that was scheduled before.</summary>
     Task<bool> ScheduleAsync(BookingEntity booking, NotificationKind kind, string toUserId, DateTimeOffset dueAt, CancellationToken ct);
+
+    /// <summary>Adds the row of a proposal round (ADR proposal 0013) without saving. False (and no row) when the same (proposal, kind, user, round) is already tracked in this context.</summary>
+    bool ScheduleProposal(Proposal proposal, NotificationKind kind, string toUserId, int round, DateTimeOffset dueAt);
 
     /// <summary>Removes the unsent rows (saved or just scheduled) of the named kinds for the booking, without saving. Sent rows stay. Returns the number removed.</summary>
     Task<int> CancelUnsentAsync(Guid bookingId, IReadOnlyCollection<NotificationKind> kinds, CancellationToken ct);
@@ -36,6 +40,14 @@ public sealed class NotificationWriter(BookingDbContext db) : INotificationWrite
         if (db.Notifications.Local.Any(n => n.BookingId == id && n.Kind == kind && n.ToUserId == toUserId)) return false;
         if (await db.Notifications.AnyAsync(n => n.BookingId == id && n.Kind == kind && n.ToUserId == toUserId, ct)) return false;
         return Schedule(booking, kind, toUserId, dueAt);
+    }
+
+    public bool ScheduleProposal(Proposal proposal, NotificationKind kind, string toUserId, int round, DateTimeOffset dueAt)
+    {
+        var id = proposal.Id;
+        if (db.Notifications.Local.Any(n => n.ProposalId == id && n.Kind == kind && n.ToUserId == toUserId && n.Round == round)) return false;
+        db.Notifications.Add(new Notification { Id = Guid.NewGuid(), ProposalId = id, Round = round, Kind = kind, ToUserId = toUserId, DueAt = dueAt });
+        return true;
     }
 
     public async Task<int> CancelUnsentAsync(Guid bookingId, IReadOnlyCollection<NotificationKind> kinds, CancellationToken ct)

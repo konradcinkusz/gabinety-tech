@@ -12,8 +12,8 @@ const PROFILE = "/gabinet/demo-celina-przykladowska";
 
 const ROUTES: Record<string, string[]> = {
   visitor: ["/", "/programisci", "/programisci/audyt-kodu", PROFILE, "/jak-to-dziala", "/zasady-rankingu", "/cennik", "/regulamin", "/polityka-prywatnosci", "/pomoc", "/logowanie", "/zapomniane-haslo", "/rejestracja", "/rejestracja/sprawdz-skrzynke"],
-  "demo-client": ["/konto", "/moje/rezerwacje"],
-  "demo-practitioner-3": ["/gabinet-programisty", "/gabinet-programisty/profil", "/gabinet-programisty/oferty", "/gabinet-programisty/dostepnosc", "/gabinet-programisty/platnosci", "/gabinet-programisty/kalendarz", "/moje/rezerwacje?role=practitioner"],
+  "demo-client": ["/konto", "/moje/rezerwacje", "/moje/propozycje"],
+  "demo-practitioner-3": ["/gabinet-programisty", "/gabinet-programisty/profil", "/gabinet-programisty/oferty", "/gabinet-programisty/dostepnosc", "/gabinet-programisty/platnosci", "/gabinet-programisty/propozycje", "/gabinet-programisty/kalendarz", "/moje/rezerwacje?role=practitioner"],
   "demo-admin": ["/admin/weryfikacja", "/admin/spory", "/admin/ksiega", "/admin/opinie", "/admin/podejrzane"],
 };
 

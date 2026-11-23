@@ -155,7 +155,7 @@ public class SiteNavigationTests
         var m = SiteNavigation.For(User("User"), "/");
         Assert.True(m.SignedIn);
         Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], m.Links.Select(i => i.Href));
-        Assert.Equal(["/moje/rezerwacje", "/konto", "/gabinet-programisty", "/wyloguj"], m.AccountMenu.Select(i => i.Href));
+        Assert.Equal(["/moje/rezerwacje", "/moje/propozycje", "/konto", "/gabinet-programisty", "/wyloguj"], m.AccountMenu.Select(i => i.Href));
         Assert.Equal("demo-client@demo.example", m.Email);
         Assert.Equal("DC", m.Initials);
         Assert.DoesNotContain(m.Flat, i => i.Href.StartsWith("/admin"));

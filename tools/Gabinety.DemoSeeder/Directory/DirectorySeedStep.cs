@@ -66,6 +66,7 @@ public sealed class DirectorySeedStep : ISeedStep
 
         var seeded = new SeededPractitioner(demo.UserName, user.UserId, mine.Id, mine.Slug) { Status = mine.Status };
         changes += await EnsureOfferingsAsync(api, user, taxonomy, demo, seeded, ct);
+        changes += await EnsureContractAsync(context, api, user, demo, ct);
 
         foreach (var trigger in StatusPlan.Triggers(Enum.Parse<DemoStatus>(mine.Status), demo.Target))
         {
@@ -103,6 +104,22 @@ public sealed class DirectorySeedStep : ISeedStep
             }
         }
         return changes;
+    }
+
+    /// <summary>
+    /// Contract availability (ADR proposal 0013). Idempotent: nothing is written when the status, the hours and the rate are already as wanted and, for "available from", the stored date is still in the future
+    /// (the date is relative to the day of the run, so a later run must not move it every day).
+    /// </summary>
+    static async Task<int> EnsureContractAsync(SeedContext context, DirectoryApi api, DemoUser user, DemoPractitioner demo, CancellationToken ct)
+    {
+        if (demo.Contract is not { } wanted) return 0;
+        var today = DateOnly.FromDateTime(context.Time.GetUtcNow().UtcDateTime);
+        var have = await api.GetContractAsync(user, ct);
+        var same = have.Status == wanted.Status && have.HoursPerWeek == wanted.HoursPerWeek && have.RateMinor == wanted.RateMinor
+            && (wanted.Status != "available_from" || have.AvailableFrom > today);
+        if (same) return 0;
+        await api.SetContractAsync(user, new MyContract(wanted.Status, wanted.Status == "available_from" ? today.AddDays(wanted.DaysAhead) : null, wanted.HoursPerWeek, wanted.RateMinor), ct);
+        return 1;
     }
 
     static string Pick(string[] slugs, int slot) => slugs[slot % slugs.Length];

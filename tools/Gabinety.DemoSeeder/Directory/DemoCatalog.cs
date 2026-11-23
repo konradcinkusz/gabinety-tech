@@ -6,8 +6,11 @@ public sealed record DemoOffering(string Title, string Description, int Minutes,
 /// <summary>The ranking inputs the internal pushes carry (CONTRACTS 3.6). Reviews and Average go to /reputation, the rest to /booking-stats.</summary>
 public sealed record DemoStats(int Reviews, decimal Average, int Completed, int Cancellations, int NoShows, int OpenSlots);
 
+/// <summary>Contract availability (ADR proposal 0013): <c>Status</c> is the wire value (<c>available_now</c> or <c>available_from</c>); <c>DaysAhead</c> only matters for <c>available_from</c> (days from the day of the run).</summary>
+public sealed record DemoContract(string Status, int DaysAhead, int HoursPerWeek, long? RateMinor);
+
 public sealed record DemoPractitioner(int Number, string DisplayName, string Slug, DemoStatus Target, string Headline, string Bio,
-    DemoOffering[] Offerings, DemoStats? Stats, string? Reason = null)
+    DemoOffering[] Offerings, DemoStats? Stats, string? Reason = null, DemoContract? Contract = null)
 {
     /// <summary>demo-practitioner-1 to 8 exist in the DevIdentity; 9 and above are registered by the seeder.</summary>
     public string UserName => $"demo-practitioner-{Number}";
@@ -81,18 +84,18 @@ public static class DemoCatalog
             "Od kilkunastu lat piszę i recenzuję systemy w .NET. Pomagam zespołom ocenić stan kodu przed wdrożeniem: wskazuję długi techniczne, ryzyka wydajnościowe i miejsca, w których architektura zaczyna przeszkadzać. Dostajesz konkretną listę zmian w kolejności opłacalności.",
             [new("Audyt kodu aplikacji .NET", "Przeglądam wskazany fragment repozytorium i omawiam z Tobą najważniejsze ryzyka oraz kolejność poprawek.", 60, 24000, 0, [0, 1]),
              new("Szybka ocena jakości pull requesta", "Krótka konsultacja nad jednym dużym pull requestem: czytelność, testy, ryzyka.", 30, 12000, 5, [1])],
-            Stats(30, 1, 0, 6)),
+            Stats(30, 1, 0, 6), Contract: new("available_now", 0, 20, 15000)),
         new(2, "Bartosz Testowy", "demo-bartosz-testowy", DemoStatus.Approved,
             "Migracje legacy .NET Framework do nowoczesnego .NET bez przestoju",
             "Specjalizuję się w stopniowych migracjach aplikacji z .NET Framework do nowoczesnego .NET. Pracuję metodą strangler: nowe moduły obok starych, bez wielkiego przepisywania. Na konsultacji ustalamy kolejność kroków, testy zabezpieczające i plan wycofania zmian.",
             [new("Plan migracji z .NET Framework", "Wspólnie rozpisujemy etapy migracji Twojej aplikacji, zależności do wymiany i testy, które muszą przejść po każdym etapie.", 60, 32000, 1, [0, 2]),
              new("Konsultacja: co zrobić z WCF i Web Forms", "Omawiamy opcje dla starych technologii: przepisać, opakować czy wyłączyć.", 30, 15000, 1, [0, 2])],
-            Stats(8, 0, 0, 10)),
+            Stats(8, 0, 0, 10), Contract: new("available_from", 90, 12, 13000)),
         new(3, "Celina Przykładowska", "demo-celina-przykladowska", DemoStatus.Approved,
             "Integracja modeli językowych z istniejącą aplikacją firmową",
             "Pomagam wpiąć modele językowe w aplikacje, które już działają: wyszukiwanie w dokumentach, asystenci dla obsługi klienta, streszczenia zgłoszeń. Na konsultacji przechodzimy od pomysłu do prostego, mierzalnego prototypu i oceniamy koszty oraz ryzyka. Dopiero zaczynam na platformie.",
             [new("Pierwszy prototyp z modelem językowym", "Szkicujemy architekturę prostej integracji, dobieramy model i sposób oceny jakości odpowiedzi.", 60, 18000, 2, [3, 7])],
-            Stats(0, 0, 0, 4)),
+            Stats(0, 0, 0, 4), Contract: new("available_now", 0, 8, null)),
         new(4, "Dariusz Fikcyjny", "demo-dariusz-fikcyjny", DemoStatus.Approved,
             "Automatyzacja powtarzalnych procesów w małej firmie, bez nadmiaru narzędzi",
             "Pomagam małym firmom pozbyć się ręcznej pracy między arkuszami, skrzynkami i systemem księgowym. Wybieram najprostsze narzędzia, które da się utrzymać bez zespołu programistów. Podczas konsultacji mapujemy proces, wskazujemy kroki do automatyzacji i szacujemy oszczędność czasu.",
@@ -103,7 +106,7 @@ public static class DemoCatalog
             "Pracuję z zespołami nad decyzjami architektonicznymi: podział na moduły, granice usług, dane i zgodność. Pomagam spisać decyzje tak, żeby za rok było wiadomo, dlaczego je podjęto. Konsultacja kończy się krótką notatką z wyborem i kompromisami.",
             [new("Przegląd architektury modułowego monolitu", "Oceniamy granice modułów, zależności i miejsca, w których warto zostawić monolit.", 60, 28000, 4, [0, 5]),
              new("Konsultacja nad jedną decyzją architektoniczną", "Jedno konkretne pytanie, na przykład kolejka czy wywołanie synchroniczne.", 30, 13000, 4, [5])],
-            Stats(14, 3, 1, 2)),
+            Stats(14, 3, 1, 2), Contract: new("available_from", 30, 10, 16000)),
         new(6, "Filip Syntetyczny", "demo-filip-syntetyczny", DemoStatus.Approved,
             "Code review i mentoring: czytelny kod, testy i zdrowy proces zespołu",
             "Prowadzę przeglądy kodu i warsztaty dla zespołów, które chcą pracować spokojniej. Skupiam się na testach, nazewnictwie i małych pull requestach. Przeglądam kod na żywo, tłumaczę powody uwag i zostawiam listę nawyków do wdrożenia w zespole.",

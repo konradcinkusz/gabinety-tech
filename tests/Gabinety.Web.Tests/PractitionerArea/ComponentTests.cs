@@ -101,7 +101,7 @@ public class AreaComponentTests : BunitContext
         nav.NavigateTo("/gabinet-programisty/oferty?edit=1");
         var cut = Render<PractitionerLayout>(p => p.Add(l => l.Body, (RenderFragment)(b => b.AddContent(0, "treść"))));
         Assert.Equal(["Oferty"], cut.FindAll("a[aria-current=page]").Select(a => a.TextContent));
-        Assert.Equal(["/gabinet-programisty", "/gabinet-programisty/kalendarz", "/gabinet-programisty/profil", "/gabinet-programisty/oferty", "/gabinet-programisty/dostepnosc", "/gabinet-programisty/platnosci"], cut.FindAll("nav.tabs a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/gabinet-programisty", "/gabinet-programisty/kalendarz", "/gabinet-programisty/profil", "/gabinet-programisty/oferty", "/gabinet-programisty/dostepnosc", "/gabinet-programisty/propozycje", "/gabinet-programisty/platnosci"], cut.FindAll("nav.tabs a").Select(a => a.GetAttribute("href")));
         Assert.Contains("treść", cut.Markup);
     }
 

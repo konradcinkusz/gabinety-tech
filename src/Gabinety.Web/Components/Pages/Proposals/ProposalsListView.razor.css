@@ -1,0 +1,6 @@
+.proposals { list-style: none; padding: 0; margin-block: var(--space-4); }
+.proposal-row { position: relative; }
+.proposal-row__title { margin: 0; font-size: var(--text-lg); }
+/* The whole row is the link target (stretched link): the link keeps the accessible name and a 44 px high target. */
+.proposal-row__link { display: inline-block; padding-block: var(--space-3); font-weight: 600; }
+.proposal-row__link::after { content: ""; position: absolute; inset: 0; }

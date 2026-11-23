@@ -99,9 +99,13 @@ public class NotificationWriterTests
         using var db = new BookingDbContextFactory().CreateDbContext([]);
         var e = db.Model.FindEntityType(typeof(Notification))!;
         Assert.Equal("notifications", e.GetTableName());
-        Assert.Contains(e.GetIndexes(), i => i.IsUnique && i.Properties.Select(p => p.Name).SequenceEqual(["BookingId", "Kind", "ToUserId"]));
+        // two filtered unique keys (T-13.02): one per kind of row, because NULLs are distinct in PostgreSQL
+        var booking = Assert.Single(e.GetIndexes(), i => i.IsUnique && i.Properties.Select(p => p.Name).SequenceEqual(["BookingId", "Kind", "ToUserId"]));
+        Assert.Equal("booking_id IS NOT NULL", booking.GetFilter());
+        var proposal = Assert.Single(e.GetIndexes(), i => i.IsUnique && i.Properties.Select(p => p.Name).SequenceEqual(["ProposalId", "Kind", "ToUserId", "Round"]));
+        Assert.Equal("proposal_id IS NOT NULL", proposal.GetFilter());
         Assert.Equal(typeof(string), e.FindProperty("Kind")!.GetProviderClrType());
-        Assert.Equal(["attempts", "booking_id", "due_at", "id", "kind", "sent_at", "to_user_id"],
+        Assert.Equal(["attempts", "booking_id", "due_at", "id", "kind", "proposal_id", "round", "sent_at", "to_user_id"],
             e.GetProperties().Select(p => p.GetColumnName()).Order().ToArray());
     }
 }

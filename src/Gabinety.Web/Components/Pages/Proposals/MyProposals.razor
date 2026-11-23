@@ -1,0 +1,27 @@
+@page "/moje/propozycje"
+@attribute [Authorize]
+@inject ProposalsClient Proposals
+@* The client's panel (ADR proposal 0013): the proposals the signed-in user SENT, newest activity first. Static server rendering: the state is a tab (a link), "more" is a link with the cursor. *@
+
+<PageTitle>@ProposalsText.List.MetaTitle</PageTitle>
+<HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
+<h1>@ProposalsText.List.Title</h1>
+
+<ProposalsListView BasePath="/moje/propozycje" AsClient="true" State="@_state" Cursor="@_cursor" Items="_page" Failure="_failure" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "state")] public string? StateParam { get; set; }
+    [SupplyParameterFromQuery(Name = "cursor")] public string? CursorParam { get; set; }
+
+    string? _state, _cursor;
+    PageDto<ProposalSummaryDto>? _page;
+    ApiFailure? _failure;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        (_state, _cursor) = (ProposalFormat.StateFilter(StateParam), string.IsNullOrWhiteSpace(CursorParam) ? null : CursorParam);
+        (_page, _failure) = (null, null);
+        var result = await Proposals.ListAsync(ProposalsClient.ClientRole, _state, _cursor);
+        if (result.IsOk) _page = result.Value; else _failure = result.Failure;
+    }
+}

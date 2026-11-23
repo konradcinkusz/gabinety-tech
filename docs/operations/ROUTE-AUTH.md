@@ -39,6 +39,8 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Directory | POST | `/api/v1/me/practitioner/offerings/{id}/activate` | Authenticated | all | undo of deactivate; 422 `too_many_offerings` at 5 active |
 | Directory | POST | `/api/v1/me/practitioner/github-link` | Authenticated | all | |
 | Directory | POST | `/api/v1/me/practitioner/github-link/verify` | Authenticated | all | |
+| Directory | GET | `/api/v1/me/practitioner/contract-availability` | Authenticated | all | ADR proposal 0013 (T-13.01): own contract availability |
+| Directory | PUT | `/api/v1/me/practitioner/contract-availability` | Authenticated | all | replaces the four contract columns; a separate route because the profile PUT replaces every field it knows |
 | Directory | GET | `/api/v1/admin/practitioners` | Admin | all | |
 | Directory | GET | `/api/v1/admin/practitioners/{id}` | Admin | all | |
 | Directory | GET | `/api/v1/admin/practitioners/{id}/verification-events` | Admin | all | |
@@ -52,6 +54,7 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Directory | GET | `/internal/v1/practitioners/by-user/{userId}` | Internal | all | callers: Booking, Reputation |
 | Directory | GET | `/internal/v1/practitioners/{id}` | Internal | all | caller: Booking (display name and slug for the booking views, ADR-0012 section 6) |
 | Directory | GET | `/internal/v1/practitioners/{userId}/contact` | Internal | all | caller: Booking (T-03.09, notifications): the e-mail snapshot of the practitioner, `404` when none is held. Booking already holds `Internal__Keys__Directory`: no new key |
+| Directory | GET | `/internal/v1/practitioners/{id}/contract` | Internal | all | caller: Booking (ADR proposal 0013): user id, display name, slug and whether collaboration proposals are accepted. Booking already holds `Internal__Keys__Directory`: no new key |
 | Directory | PUT | `/internal/v1/practitioners/{id}/reputation` | Internal | all | caller: Reputation |
 | Directory | PUT | `/internal/v1/practitioners/{id}/booking-stats` | Internal | all | caller: Booking |
 | Directory | DELETE | `/internal/v1/subjects/{userId}` | Internal | all | owner runbook (erasure) |
@@ -86,6 +89,13 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | POST | `/api/v1/admin/bookings/{id}/resolve` | Admin | all | |
 | Booking | GET | `/api/v1/admin/ledger.csv` | Admin | all | |
 | Booking | GET | `/internal/v1/bookings/{id}/reviewability` | Internal | all | caller: Reputation |
+| Booking | POST | `/api/v1/proposals` | Authenticated | all | ADR proposal 0013 (T-13.02): a client sends a collaboration proposal; `Idempotency-Key` required; limited to 5 per hour and 20 per day per user |
+| Booking | GET | `/api/v1/proposals/{id}` | Authenticated | all | a party of the proposal; anyone else gets 404; the counterpart's e-mail only once Accepted |
+| Booking | GET | `/api/v1/me/proposals` | Authenticated | all | `role=client\|practitioner`, optional `state=open\|closed`, cursor paging |
+| Booking | POST | `/api/v1/proposals/{id}/accept` | Authenticated | all | the party whose turn it is; the round seen is in the body |
+| Booking | POST | `/api/v1/proposals/{id}/counter` | Authenticated | all | the party whose turn it is; new terms and an optional note |
+| Booking | POST | `/api/v1/proposals/{id}/reject` | Authenticated | all | the party whose turn it is |
+| Booking | POST | `/api/v1/proposals/{id}/withdraw` | Authenticated | all | the client only, while the proposal is open |
 | Booking | POST | `/internal/v1/practitioners/{id}/cancel-future-bookings` | Internal | all | caller: Directory (suspension and erasure, ADR-0012); idempotent |
 | Booking | DELETE | `/internal/v1/subjects/{userId}` | Internal | all | owner runbook (erasure) |
 | Booking | GET | `/internal/v1/analytics/pair-counts` | Internal | all | caller: Reputation (T-10.03) |
@@ -173,6 +183,11 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/moje/rezerwacje/{BookingId}/zmien-termin` | Authenticated | all | the client moves a confirmed booking once, 24 h or more before its start (form posts, antiforgery); a booking that is not the caller's is the forbidden page; T-11.11 |
 | Web | PAGE | `/moje/opinie` | Authenticated | all | the practitioner's own reviews and replies |
 | Web | PAGE | `/moje/opinie/{BookingId}` | Authenticated | all | write a review (form post, antiforgery) |
+| Web | PAGE | `/propozycja/{Slug}` | Authenticated | all | ADR proposal 0013: a client's collaboration proposal to one programmer (form post, antiforgery, `Idempotency-Key`); `?kind=short` for a short one |
+| Web | PAGE | `/moje/propozycje` | Authenticated | all | the proposals the user sent, tabs by state, static server rendering |
+| Web | PAGE | `/moje/propozycje/{Id}` | Authenticated | all | one proposal as its client: accept, counter, reject, withdraw (antiforgery posts, confirmation step); the counterpart's address only once accepted |
+| Web | PAGE | `/gabinet-programisty/propozycje` | Authenticated | all | the proposals sent to the programmer, tabs by state |
+| Web | PAGE | `/gabinet-programisty/propozycje/{Id}` | Authenticated | all | one proposal as its programmer: accept, counter, reject |
 | Web | PAGE | `/rezerwacja/{OfferingId}` | Authenticated | all | booking form: brief, assistant suggestion, pay (form posts, antiforgery) |
 | Web | PAGE | `/rezerwacja/potwierdzenie/{BookingId}` | Authenticated | all | confirmation |
 | Web | PAGE | `/checkout/mock/{BookingId}` | Authenticated | all | mock checkout: answers 404 unless the fake profile runs the mock provider (`WebOptions.MockPayments`); the clock alone is interactive |

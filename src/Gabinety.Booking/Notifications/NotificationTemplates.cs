@@ -31,6 +31,35 @@ public static class NotificationTemplates
 
     const string Booking = "/moje/rezerwacje/{0}";
 
+    /// <summary>The templates of collaboration proposals (ADR proposal 0013): a lead, and a link to the thread in the recipient's own area. No text of any party, no address.</summary>
+    static Template ForProposal(NotificationKind kind, bool forPractitioner)
+    {
+        var path = forPractitioner ? "/gabinet-programisty/propozycje/{0}" : "/moje/propozycje/{0}";
+        return kind switch
+        {
+            NotificationKind.ProposalReceived => new("Masz nową propozycję współpracy", "Otrzymałeś nową propozycję współpracy.", "Zobacz propozycję", path),
+            NotificationKind.ProposalCountered => new("Nowa kontrpropozycja współpracy", "Druga strona przesłała kontrpropozycję.", "Zobacz propozycję", path),
+            NotificationKind.ProposalAccepted => new("Propozycja współpracy została zaakceptowana", "Propozycja współpracy została zaakceptowana. Dane kontaktowe drugiej strony znajdziesz na stronie propozycji.", "Zobacz propozycję", path),
+            NotificationKind.ProposalRejected => new("Propozycja współpracy została odrzucona", "Druga strona odrzuciła propozycję współpracy.", "Zobacz propozycję", path),
+            NotificationKind.ProposalExpired => new("Propozycja współpracy wygasła", "Propozycja współpracy wygasła, bo nikt na nią nie odpowiedział w terminie.", "Zobacz propozycję", path),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "not a proposal kind"),
+        };
+    }
+
+    public static bool IsProposalKind(NotificationKind kind) =>
+        kind is NotificationKind.ProposalReceived or NotificationKind.ProposalCountered or NotificationKind.ProposalAccepted or NotificationKind.ProposalRejected or NotificationKind.ProposalExpired;
+
+    /// <summary>A proposal e-mail: the lead and a link, no date line (a proposal has no start time of its own).</summary>
+    public static RenderedEmail RenderProposal(NotificationKind kind, string siteBaseUrl, Guid proposalId, bool forPractitioner)
+    {
+        var t = ForProposal(kind, forPractitioner);
+        var link = siteBaseUrl.TrimEnd('/') + string.Format(CultureInfo.InvariantCulture, t.Path, proposalId);
+        var text = $"{t.Lead}\n\n{t.LinkLabel}: {link}\n\nGabinety Tech\n";
+        var html = $"<!doctype html>\n<html lang=\"pl\"><head><meta charset=\"utf-8\"><title>{t.Subject}</title></head>\n"
+                 + $"<body><p>{t.Lead}</p><p><a href=\"{link}\">{t.LinkLabel}</a></p><p>Gabinety Tech</p></body></html>\n";
+        return new RenderedEmail(t.Subject, text, html);
+    }
+
     /// <param name="siteBaseUrl"><c>Site:BaseUrl</c>; a trailing slash is trimmed here too.</param>
     public static RenderedEmail Render(NotificationKind kind, string siteBaseUrl, Guid bookingId, DateTimeOffset startUtc, bool forPractitioner = false)
     {

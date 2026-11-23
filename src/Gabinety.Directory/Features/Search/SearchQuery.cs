@@ -93,6 +93,8 @@ public sealed class SearchQuery
 
     public OfferingFilter Filter { get; private set; } = new(null, null, null, null);
     public string? Q { get; private set; }
+    /// <summary><c>contract=1</c>: only practitioners who advertise contract availability.</summary>
+    public bool Contract { get; private set; }
     public Cursor? After { get; private set; }
     public SearchSort Sort { get; private set; } = SearchSort.Rank;
     public int Limit { get; private set; } = DefaultLimit;
@@ -114,10 +116,15 @@ public sealed class SearchQuery
         }
 
         if (!Single("problem", out problem) || !Single("tech", out tech) || !Single("q", out q) || !Single("cursor", out cursor)
-            || !Single("sort", out var sort) || !Single("duration", out var d) || !Single("maxPriceMinor", out var m) || !Single("limit", out var l)) return s;
+            || !Single("contract", out var contract) || !Single("sort", out var sort) || !Single("duration", out var d) || !Single("maxPriceMinor", out var m) || !Single("limit", out var l)) return s;
 
         if (problem is not null && !ValidSlug(problem)) { s.Fail("problem", "a slug of a-z, 0-9 and single hyphens"); return s; }
         if (tech is not null && !ValidSlug(tech)) { s.Fail("tech", "a slug of a-z, 0-9 and single hyphens"); return s; }
+        if (contract is not null)
+        {
+            if (contract != "1") { s.Fail("contract", "1"); return s; }
+            s.Contract = true;
+        }
         if (d is not null)
         {
             if (d is not ("30" or "60")) { s.Fail("duration", "30 or 60"); return s; }

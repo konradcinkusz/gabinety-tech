@@ -72,7 +72,7 @@ public sealed class ListView(ListState state, TaxonomyDto taxonomy, SitemapDto s
     }
 
     /// <summary>The number of active narrowing filters: the "Filtry (2)" of the phone disclosure.</summary>
-    public int ActiveFilters => (State.Problem is null ? 0 : 1) + (State.Tech is null ? 0 : 1) + (State.Duration is null ? 0 : 1) + (State.MaxPriceMinor is null ? 0 : 1) + (string.IsNullOrEmpty(State.Q) ? 0 : 1);
+    public int ActiveFilters => (State.Problem is null ? 0 : 1) + (State.Tech is null ? 0 : 1) + (State.Duration is null ? 0 : 1) + (State.MaxPriceMinor is null ? 0 : 1) + (State.Contract ? 1 : 0) + (string.IsNullOrEmpty(State.Q) ? 0 : 1);
 
     /// <summary>The path to this category: Programiści, the problem, the technology (the last is the current page).</summary>
     public IReadOnlyList<(string Label, string? Href)> Breadcrumb()
@@ -111,6 +111,8 @@ public sealed class ListView(ListState state, TaxonomyDto taxonomy, SitemapDto s
         var prices = new List<FilterItem> { new(Pl.Filters.AnyPrice, State.WithMaxPrice(null).Href(), State.MaxPriceMinor is null) };
         prices.AddRange(ListState.PricePresets.Select(p => new FilterItem(string.Format(Pl.Filters.UpTo, Money.Pln(p)), State.WithMaxPrice(p).Href(), State.MaxPriceMinor == p)));
         groups.Add(new FilterGroup(Pl.Filters.Price, prices, Segmented: true));
+        var contract = new List<FilterItem> { new(ProposalsText.Availability.FilterAny, State.WithContract(false).Href(), !State.Contract), new(ProposalsText.Availability.FilterContract, State.WithContract(true).Href(), State.Contract) };
+        groups.Add(new FilterGroup(ProposalsText.Availability.FilterTitle, contract, Segmented: true));
         return groups;
     }
 

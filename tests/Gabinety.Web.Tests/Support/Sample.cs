@@ -10,8 +10,8 @@ public static class Sample
         [new("dotnet", ".NET"), new("react", "React")]);
 
     public static PractitionerCardDto Card(string slug = "demo-anna-demowska", string name = "Anna Demowska", string headline = "Audyty kodu .NET i konsultacje architektury", string[]? badges = null,
-        RatingDto? rating = null, bool isNew = true, long fromPrice = 25000, int[]? durations = null) =>
-        new(Guid.NewGuid(), slug, name, headline, null, badges ?? ["email", "github", "approved"], rating, isNew, new MoneyDto(fromPrice, "PLN"), ["audyt-kodu"], durations ?? [30, 60]);
+        RatingDto? rating = null, bool isNew = true, long fromPrice = 25000, int[]? durations = null, ContractAvailabilityDto? contract = null) =>
+        new(Guid.NewGuid(), slug, name, headline, null, badges ?? ["email", "github", "approved"], rating, isNew, new MoneyDto(fromPrice, "PLN"), ["audyt-kodu"], durations ?? [30, 60], Contract: contract);
 
     public static SitemapDto Sitemap(int count = 6, bool indexable = true, string path = "/programisci") => new([new SitemapCategoryDto(path, count, indexable)]);
 

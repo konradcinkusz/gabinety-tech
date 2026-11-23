@@ -249,6 +249,7 @@ public class SlotsConstraintIntegrationTests : IAsyncLifetime
         public Task<Gabinety.Booking.Clients.DirectoryPractitioner?> GetPractitionerByUserAsync(string userId, CancellationToken ct) => Task.FromResult<Gabinety.Booking.Clients.DirectoryPractitioner?>(null);
         public Task<Gabinety.Booking.Clients.DirectoryPractitionerName?> GetPractitionerNameAsync(Guid id, CancellationToken ct) => Task.FromResult<Gabinety.Booking.Clients.DirectoryPractitionerName?>(null);
         public Task<Gabinety.Booking.Clients.DirectoryContact?> GetPractitionerContactAsync(string userId, CancellationToken ct) => Task.FromResult<Gabinety.Booking.Clients.DirectoryContact?>(null);
+        public Task<Gabinety.Booking.Clients.DirectoryContractTarget?> GetContractTargetAsync(Guid practitionerId, CancellationToken ct) => Task.FromResult<Gabinety.Booking.Clients.DirectoryContractTarget?>(null);
         public Task<bool> IsAliveAsync(CancellationToken ct) => Task.FromResult(true);
     }
 }

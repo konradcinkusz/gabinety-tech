@@ -18,10 +18,10 @@ public class FilterNavTests : BunitContext
     {
         var cut = Nav(new ListState("audyt-kodu"));
         var segmented = cut.FindAll("nav[aria-label=Filtry] ul.segmented");
-        Assert.Equal(2, segmented.Count);
+        Assert.Equal(3, segmented.Count); // duration, price and contract availability (ADR proposal 0013)
         Assert.Equal(["Wszystkie", "30 min", "60 min"], segmented[0].QuerySelectorAll("a").Select(a => a.TextContent));
         Assert.Equal(["Dowolna", "do 150,00 zł", "do 300,00 zł", "do 500,00 zł"], segmented[1].QuerySelectorAll("a").Select(a => a.TextContent.Replace('\u00A0', ' '))); // Money puts a no-break space before zł
-        foreach (var ul in segmented)
+        foreach (var ul in segmented.Take(2))
         {
             foreach (var li in ul.Children)
             {
@@ -47,7 +47,7 @@ public class FilterNavTests : BunitContext
     {
         var cut = Nav(new ListState("audyt-kodu", Duration: 30));
         // problem: Audyt kodu; technology: Wszystkie (none chosen); duration: 30 min; price: Dowolna (none chosen)
-        Assert.Equal(["Audyt kodu", "Wszystkie", "30 min", "Dowolna"], cut.FindAll("a[aria-current=true]").Select(a => a.TextContent));
+        Assert.Equal(["Audyt kodu", "Wszystkie", "30 min", "Dowolna", "Wszyscy"], cut.FindAll("a[aria-current=true]").Select(a => a.TextContent));
         Assert.All(cut.FindAll("a[aria-current=true]"), a => Assert.True(a.ClassList.Contains("chip")));
     }
 

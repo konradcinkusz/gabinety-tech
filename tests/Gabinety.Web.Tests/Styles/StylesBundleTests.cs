@@ -63,7 +63,7 @@ public partial class StylesBundleTests
         var browser = web.NewBrowser();
         var list = await browser.GetAsync("/programisci");
         var bundle = await browser.GetAsync("/" + StylesheetLink().Matches(list.Html).Last().Groups[1].Value.TrimStart('/'));
-        var cardScope = Regex.Match(list.Html, @"<article class=""card practitioner-card"" data-testid=""practitioner-card"" (b-\w+)").Groups[1].Value;
+        var cardScope = Regex.Match(list.Html, @"<article class=""card card--link practitioner-card"" data-testid=""practitioner-card"" (b-\w+)").Groups[1].Value;
         Assert.NotEmpty(cardScope);
         Assert.Contains($".practitioner-card__name[{cardScope}]", bundle.Html);
     }

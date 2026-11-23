@@ -19,7 +19,7 @@ public class AdminAccessTests
         Assert.Equal(HttpStatusCode.Redirect, page.Status);
         Assert.StartsWith("/logowanie?redirect=", page.Location);
         Assert.Equal(route, Uri.UnescapeDataString(page.Location!["/logowanie?redirect=".Length..]));
-        Assert.All([web.Directory, web.Booking, web.Reputation], b => Assert.Equal(0, b.Calls));
+        Assert.All([web.Directory, web.Booking, web.Reputation], b => Assert.Equal(0, b.CallsExceptShellCheck));
     }
 
     [Theory, MemberData(nameof(Routes))]
@@ -38,7 +38,7 @@ public class AdminAccessTests
         Assert.Equal("/", page.One("[data-testid=forbidden] a")!.GetAttribute("href"));
         Assert.Contains("noindex", page.One("meta[name=robots]")!.GetAttribute("content"));
         Assert.DoesNotContain("Weryfikacja programistów", page.TextOf("main")); // nothing of the area is rendered
-        Assert.All([host.Web.Directory, host.Web.Booking, host.Web.Reputation], b => Assert.Equal(0, b.Calls));
+        Assert.All([host.Web.Directory, host.Web.Booking, host.Web.Reputation], b => Assert.Equal(0, b.CallsExceptShellCheck));
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class AdminAccessTests
         var id = Guid.NewGuid();
         var answer = await host.PostRawAsync("/admin/weryfikacja", [KeyValuePair.Create("_handler", $"approve-{id}")]);
         Assert.Equal(HttpStatusCode.Forbidden, answer.Status);
-        Assert.Equal(0, host.Web.Directory.Calls);
+        Assert.Equal(0, host.Web.Directory.CallsExceptShellCheck);
         Assert.Empty(host.Web.Errors);
     }
 
@@ -107,7 +107,7 @@ public class AdminAccessTests
         Assert.Equal(HttpStatusCode.OK, page.Status);
         Assert.Equal("Administracja", Assert.Single(page.All("h1")).TextContent);
         Assert.Equal(["/admin/weryfikacja", "/admin/spory", "/admin/ksiega", "/admin/opinie", "/admin/podejrzane"], page.All("main ul[aria-label] h2 a").Select(a => a.GetAttribute("href")));
-        Assert.All([host.Web.Directory, host.Web.Booking, host.Web.Reputation], b => Assert.Equal(0, b.Calls));
+        Assert.All([host.Web.Directory, host.Web.Booking, host.Web.Reputation], b => Assert.Equal(0, b.CallsExceptShellCheck));
     }
 
     [Fact]

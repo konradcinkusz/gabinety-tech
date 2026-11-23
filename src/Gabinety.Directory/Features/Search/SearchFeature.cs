@@ -47,13 +47,55 @@ public sealed class SearchFeature : IServiceFeature
             var needle = text.ToLowerInvariant(); // Contains escapes % and _ itself on both providers: the user's text is always literal
             q = q.Where(p => p.DisplayName.ToLower().Contains(needle) || p.Headline.ToLower().Contains(needle));
         }
-        if (s.After is { } a)
-            q = q.Where(p => p.RankingScore < a.Score
-                || (p.RankingScore == a.Score && p.ApprovedAt > a.ApprovedAt)
-                || (p.RankingScore == a.Score && p.ApprovedAt == a.ApprovedAt && p.Id.CompareTo(a.Id) > 0));
+        // The keyset of the ranking order (score desc, approved_at asc, id asc) is the tail of every sort.
+        var after = s.After;
+        System.Linq.Expressions.Expression<Func<Practitioner, bool>>? afterRank = after is null ? null
+            : p => p.RankingScore < after.Score
+                || (p.RankingScore == after.Score && p.ApprovedAt > after.ApprovedAt)
+                || (p.RankingScore == after.Score && p.ApprovedAt == after.ApprovedAt && p.Id.CompareTo(after.Id) > 0);
 
-        // Order BEFORE any projection; the total order is (score desc, approved_at asc, id asc).
-        var rows = await q.OrderByDescending(p => p.RankingScore).ThenBy(p => p.ApprovedAt).ThenBy(p => p.Id).Take(s.Limit + 1).ToListAsync(ct);
+        // Order BEFORE any projection (lesson #78): the order is on the entity, or on an anonymous (entity, price) pair, never on a constructed record.
+        List<Practitioner> rows; List<long> prices = [];
+        if (s.Sort == SearchSort.Rank)
+        {
+            if (afterRank is not null) q = q.Where(afterRank);
+            rows = await q.OrderByDescending(p => p.RankingScore).ThenBy(p => p.ApprovedAt).ThenBy(p => p.Id).Take(s.Limit + 1).ToListAsync(ct);
+        }
+        else if (s.Sort == SearchSort.NextSlot)
+        {
+            // Ascending by the next free slot, practitioners without one last, then the ranking order. Ordered on the entity itself.
+            if (after is not null)
+            {
+                var slot = after.Slot;
+                q = slot is { } at
+                    ? q.Where(p => p.NextFreeSlotUtc == null || p.NextFreeSlotUtc > at || (p.NextFreeSlotUtc == at && (p.RankingScore < after.Score
+                        || (p.RankingScore == after.Score && p.ApprovedAt > after.ApprovedAt)
+                        || (p.RankingScore == after.Score && p.ApprovedAt == after.ApprovedAt && p.Id.CompareTo(after.Id) > 0))))
+                    : q.Where(p => p.NextFreeSlotUtc == null && (p.RankingScore < after.Score
+                        || (p.RankingScore == after.Score && p.ApprovedAt > after.ApprovedAt)
+                        || (p.RankingScore == after.Score && p.ApprovedAt == after.ApprovedAt && p.Id.CompareTo(after.Id) > 0)));
+            }
+            rows = await q.OrderBy(p => p.NextFreeSlotUtc == null).ThenBy(p => p.NextFreeSlotUtc)
+                .ThenByDescending(p => p.RankingScore).ThenBy(p => p.ApprovedAt).ThenBy(p => p.Id).Take(s.Limit + 1).ToListAsync(ct);
+        }
+        else
+        {
+            // The lowest price among the offerings that match the filters, i.e. the `fromPrice` the card shows.
+            var priced = q.Select(p => new { P = p, Price = offerings.Where(o => o.PractitionerId == p.Id).Min(o => (long?)o.PriceMinor) ?? 0L });
+            var asc = s.Sort == SearchSort.PriceAsc;
+            if (after is not null)
+                priced = asc
+                    ? priced.Where(x => x.Price > after.Price || (x.Price == after.Price && (x.P.RankingScore < after.Score
+                        || (x.P.RankingScore == after.Score && x.P.ApprovedAt > after.ApprovedAt)
+                        || (x.P.RankingScore == after.Score && x.P.ApprovedAt == after.ApprovedAt && x.P.Id.CompareTo(after.Id) > 0))))
+                    : priced.Where(x => x.Price < after.Price || (x.Price == after.Price && (x.P.RankingScore < after.Score
+                        || (x.P.RankingScore == after.Score && x.P.ApprovedAt > after.ApprovedAt)
+                        || (x.P.RankingScore == after.Score && x.P.ApprovedAt == after.ApprovedAt && x.P.Id.CompareTo(after.Id) > 0))));
+            var ordered = asc ? priced.OrderBy(x => x.Price) : priced.OrderByDescending(x => x.Price);
+            var withPrice = await ordered.ThenByDescending(x => x.P.RankingScore).ThenBy(x => x.P.ApprovedAt).ThenBy(x => x.P.Id).Take(s.Limit + 1).ToListAsync(ct);
+            rows = withPrice.Select(x => x.P).ToList();
+            prices = withPrice.Take(s.Limit).Select(x => x.Price).ToList();
+        }
         var page = rows.Take(s.Limit).ToList();
 
         var ids = page.Select(p => p.Id).ToList();
@@ -61,10 +103,17 @@ public sealed class SearchFeature : IServiceFeature
         var byPractitioner = all.ToLookup(o => o.PractitionerId);
 
         var today = ContractAvailabilityRules.TodayWarsaw(time);
-        var items = page.Select(p => Card(p, byPractitioner[p.Id].ToList(), s.Filter, today)).ToList();
-        var next = rows.Count > s.Limit ? new Cursor(page[^1].RankingScore, page[^1].ApprovedAt ?? DateTimeOffset.MinValue, page[^1].Id).Encode() : null;
-        return PublicJson.Respond(ctx, new Page<PractitionerCard>(items, next), "public, max-age=60");
+        var items = page.Select(p => { var active = byPractitioner[p.Id].ToList(); return CardWire.Of(Card(p, active, s.Filter, today), TechSlugs(active), p.NextFreeSlotUtc); }).ToList();
+        var next = rows.Count > s.Limit
+            ? new Cursor(s.Sort, prices.Count == 0 ? 0 : prices[^1], page[^1].RankingScore, page[^1].ApprovedAt ?? DateTimeOffset.MinValue, page[^1].Id, s.Sort == SearchSort.NextSlot ? page[^1].NextFreeSlotUtc : null).Encode() : null;
+        return PublicJson.Respond(ctx, new Page<CardWire>(items, next), "public, max-age=60");
     }
+
+    public const int MaxTechSlugs = 6;
+
+    /// <summary>The sorted union of `tech_slugs` over the practitioner's active offerings (all of them, not only those matching the filters), at most six (CONTRACTS 3.2).</summary>
+    static List<string> TechSlugs(List<Offering> active) =>
+        active.Where(o => o.IsActive).SelectMany(o => o.TechSlugs).Distinct().Order(StringComparer.Ordinal).Take(MaxTechSlugs).ToList();
 
     static PractitionerCard Card(Practitioner p, List<Offering> active, OfferingFilter? filter, DateOnly today)
     {
@@ -90,7 +139,7 @@ public sealed class SearchFeature : IServiceFeature
         var active = await db.Offerings.AsNoTracking().Where(o => o.PractitionerId == p.Id && o.IsActive).OrderBy(o => o.CreatedAt).ThenBy(o => o.Id).ToListAsync(ct);
         var offerings = active.Select(o => new Gabinety.Contracts.Directory.Offering(o.Id, o.Title, o.Description, o.DurationMinutes, new MoneyDto(o.PriceMinor, o.Currency),
             o.ProblemSlug, o.TechSlugs.ToList())).ToList();
-        var body = ProfileWire.Of(new PractitionerProfile(Card(p, active, null, ContractAvailabilityRules.TodayWarsaw(time)), p.Bio, p.PortfolioUrl, offerings, p.CompletedCount, p.ApprovedAt ?? p.CreatedAt));
+        var body = ProfileWire.Of(new PractitionerProfile(Card(p, active, null, ContractAvailabilityRules.TodayWarsaw(time)), p.Bio, p.PortfolioUrl, offerings, p.CompletedCount, p.ApprovedAt ?? p.CreatedAt), TechSlugs(active), p.NextFreeSlotUtc);
         return PublicJson.Respond(ctx, body, "public, max-age=300, stale-while-revalidate=3600", etag: true);
     }
 
@@ -122,14 +171,28 @@ public sealed class SearchFeature : IServiceFeature
     }
 }
 
+/// <summary>
+/// The wire shape of `PractitionerCard` including the wave 3 `techSlugs` and `nextFreeSlotUtc` (CONTRACTS 3.2). The shared contract record in `Gabinety.Contracts` does not carry
+/// the field yet (that file is outside T-11.02), so the Directory serializes this record, which is the card plus those two (`nextFreeSlotUtc` is omitted when null).
+/// </summary>
+internal sealed record CardWire(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin,
+    IReadOnlyList<Badge> Badges, RatingDto? Rating, bool IsNew, MoneyDto FromPrice,
+    IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations, IReadOnlyList<string> TechSlugs, ContractAvailabilityDto? Contract,
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantNullableConverter))] DateTimeOffset? NextFreeSlotUtc)
+{
+    public static CardWire Of(PractitionerCard c, IReadOnlyList<string> techSlugs, DateTimeOffset? nextFreeSlotUtc) => new(c.Id, c.Slug, c.DisplayName, c.Headline, c.GithubLogin,
+        c.Badges, c.Rating, c.IsNew, c.FromPrice, c.ProblemSlugs, c.Durations, techSlugs, c.Contract, nextFreeSlotUtc);
+}
+
 /// <summary>The wire shape of `PractitionerProfile` (CONTRACTS 3.2): the card's fields and the extras side by side (flat), not the card nested under `card`.</summary>
 internal sealed record ProfileWire(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin,
     IReadOnlyList<Badge> Badges, RatingDto? Rating, bool IsNew, MoneyDto FromPrice,
-    IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations, ContractAvailabilityDto? Contract,
+    IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations, IReadOnlyList<string> TechSlugs, ContractAvailabilityDto? Contract,
     string Bio, string? PortfolioUrl, IReadOnlyList<Gabinety.Contracts.Directory.Offering> Offerings, int CompletedCount,
-    [property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantConverter))] DateTimeOffset MemberSince)
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantConverter))] DateTimeOffset MemberSince,
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantNullableConverter))] DateTimeOffset? NextFreeSlotUtc)
 {
-    public static ProfileWire Of(PractitionerProfile p) => new(p.Card.Id, p.Card.Slug, p.Card.DisplayName, p.Card.Headline, p.Card.GithubLogin,
-        p.Card.Badges, p.Card.Rating, p.Card.IsNew, p.Card.FromPrice, p.Card.ProblemSlugs, p.Card.Durations, p.Card.Contract,
-        p.Bio, p.PortfolioUrl, p.Offerings, p.CompletedCount, p.MemberSince);
+    public static ProfileWire Of(PractitionerProfile p, IReadOnlyList<string> techSlugs, DateTimeOffset? nextFreeSlotUtc) => new(p.Card.Id, p.Card.Slug, p.Card.DisplayName, p.Card.Headline, p.Card.GithubLogin,
+        p.Card.Badges, p.Card.Rating, p.Card.IsNew, p.Card.FromPrice, p.Card.ProblemSlugs, p.Card.Durations, techSlugs, p.Card.Contract,
+        p.Bio, p.PortfolioUrl, p.Offerings, p.CompletedCount, p.MemberSince, nextFreeSlotUtc);
 }

@@ -83,6 +83,17 @@ public class AreaComponentTests : BunitContext
         Assert.Empty(span.Children); // a text node, not an element or CSS content (contract 9.6)
     }
 
+    [Theory]
+    [InlineData(PaymentsState.Ready, "badge badge--success", "Gotowe")]
+    [InlineData(PaymentsState.Pending, "badge badge--warning", "Wymaga uzupełnienia")]
+    [InlineData(PaymentsState.None, "badge badge--neutral", "Nie rozpoczęto")]
+    public void The_payments_status_badge_has_the_kind_and_the_label_for_each_state(PaymentsState state, string className, string label)
+    {
+        var cut = Render<KindBadge>(p => p.Add(b => b.Label, PaymentsView.Label(state)).Add(b => b.Kind, PaymentsView.Kind(state)).Add(b => b.TestId, "payments-status"));
+        var badge = cut.Find("[data-testid=payments-status]");
+        Assert.Equal((className, label), (badge.ClassName, badge.TextContent));
+    }
+
     [Fact]
     public void The_tabs_mark_only_the_current_section_and_a_query_string_does_not_change_it()
     {
@@ -90,7 +101,7 @@ public class AreaComponentTests : BunitContext
         nav.NavigateTo("/gabinet-programisty/oferty?edit=1");
         var cut = Render<PractitionerLayout>(p => p.Add(l => l.Body, (RenderFragment)(b => b.AddContent(0, "treść"))));
         Assert.Equal(["Oferty"], cut.FindAll("a[aria-current=page]").Select(a => a.TextContent));
-        Assert.Equal(["/gabinet-programisty", "/gabinet-programisty/profil", "/gabinet-programisty/oferty", "/gabinet-programisty/dostepnosc", "/gabinet-programisty/propozycje", "/gabinet-programisty/platnosci"], cut.FindAll("nav.tabs a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/gabinet-programisty", "/gabinet-programisty/kalendarz", "/gabinet-programisty/profil", "/gabinet-programisty/oferty", "/gabinet-programisty/dostepnosc", "/gabinet-programisty/propozycje", "/gabinet-programisty/platnosci"], cut.FindAll("nav.tabs a").Select(a => a.GetAttribute("href")));
         Assert.Contains("treść", cut.Markup);
     }
 

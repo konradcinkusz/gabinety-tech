@@ -92,7 +92,52 @@ public class SiteNavigationTests
     static ClaimsPrincipal User(params string[] roles) =>
         new(new ClaimsIdentity([new Claim("sub", "u1"), new Claim("email", "demo-client@demo.example"), .. roles.Select(r => new Claim(ClaimTypes.Role, r))], "Cookies", ClaimTypes.Name, ClaimTypes.Role));
 
-    [Fact] public void The_practitioner_list_comes_first_for_everybody() { Assert.Equal("/programisci", SiteNavigation.For(null, "/").Links[0].Href); Assert.Equal("/programisci", SiteNavigation.For(User(), "/").Links[0].Href); }
+    /// <summary>The primary order is a product decision (DESIGN-CONTRACT 5.1, UX-010): Programiści, Jak to działa, Cennik. Zasady rankingu is in the footer, not here.</summary>
+    [Fact]
+    public void The_primary_links_are_in_order_for_everybody_and_the_ranking_rules_are_in_the_footer()
+    {
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], SiteNavigation.For(null, "/").Links.Select(i => i.Href));
+        Assert.Equal(["Programiści", "Jak to działa", "Cennik"], SiteNavigation.For(null, "/").Links.Select(i => i.Label));
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], SiteNavigation.For(User("User"), "/", practitioner: true).Links.Select(i => i.Href));
+        Assert.DoesNotContain(SiteNavigation.For(null, "/").Flat, i => i.Href == "/zasady-rankingu");
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik", "/zasady-rankingu"], SiteNavigation.Product.Select(i => i.Href));
+    }
+
+    [Fact]
+    public void The_practitioner_panel_is_for_practitioners_and_everybody_else_signed_in_is_offered_the_way_in()
+    {
+        var practitioner = SiteNavigation.For(User("User"), "/", practitioner: true);
+        Assert.Contains(practitioner.AccountMenu, i => i.Label == "Panel programisty" && i.Href == "/gabinet-programisty");
+        Assert.DoesNotContain(practitioner.AccountMenu, i => i.Label == "Zostań programistą");
+
+        var client = SiteNavigation.For(User("User"), "/");
+        Assert.Contains(client.AccountMenu, i => i.Label == "Zostań programistą" && i.Href == "/gabinet-programisty");
+        Assert.DoesNotContain(client.AccountMenu, i => i.Label == "Panel programisty");
+        Assert.DoesNotContain(client.Flat, i => i.Label == "Panel programisty");
+    }
+
+    [Fact]
+    public void The_footer_offers_the_way_in_to_a_visitor_and_to_a_client_and_the_panel_to_a_practitioner()
+    {
+        var visitor = SiteNavigation.Footer(null, practitioner: false);
+        Assert.Equal(("/rejestracja", "Zostań programistą"), (visitor.Practitioner.Href, visitor.Practitioner.Label));
+        Assert.Equal(("/gabinet-programisty", "Zostań programistą"), (SiteNavigation.Footer(User("User"), false).Practitioner.Href, SiteNavigation.Footer(User("User"), false).Practitioner.Label));
+        var member = SiteNavigation.Footer(User("User"), practitioner: true).Practitioner;
+        Assert.Equal(("/gabinet-programisty", "Panel programisty"), (member.Href, member.Label));
+        Assert.Equal(["/regulamin", "/polityka-prywatnosci"], visitor.Legal.Select(i => i.Href));
+    }
+
+    [Theory]
+    [InlineData("demo-client@demo.example", "DC")]
+    [InlineData("jan.kowalski@example.test", "JK")]
+    [InlineData("anna@example.test", "AN")]
+    [InlineData("a_b+c@example.test", "AB")]
+    [InlineData("x@example.test", "X")]
+    [InlineData("@example.test", "")]
+    [InlineData("", "")]
+    [InlineData(null, "")]
+    [InlineData("...@example.test", "")]
+    public void The_initials_of_the_avatar_come_from_the_e_mail_alone(string? email, string expected) => Assert.Equal(expected, AccountInitials.From(email));
 
     [Fact]
     public void A_visitor_gets_the_two_buttons_and_no_account_menu()
@@ -105,20 +150,30 @@ public class SiteNavigationTests
     }
 
     [Fact]
-    public void A_client_gets_bookings_the_practitioner_panel_and_the_account_menu_with_sign_out_always()
+    public void A_client_gets_bookings_the_account_menu_and_sign_out_always_and_no_administration()
     {
         var m = SiteNavigation.For(User("User"), "/");
         Assert.True(m.SignedIn);
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/moje/propozycje", "/gabinet-programisty"], m.Links.Select(i => i.Href));
-        Assert.Equal(["/konto", "/wyloguj"], m.AccountMenu.Select(i => i.Href));
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], m.Links.Select(i => i.Href));
+        Assert.Equal(["/moje/rezerwacje", "/moje/propozycje", "/konto", "/gabinet-programisty", "/wyloguj"], m.AccountMenu.Select(i => i.Href));
         Assert.Equal("demo-client@demo.example", m.Email);
+        Assert.Equal("DC", m.Initials);
         Assert.DoesNotContain(m.Flat, i => i.Href.StartsWith("/admin"));
     }
 
-    [Theory] [InlineData("Admin")] [InlineData("SuperAdmin")]
-    public void An_administrator_also_gets_administration(string role) => Assert.Contains(SiteNavigation.For(User(role), "/").Links, i => i.Href == "/admin/weryfikacja");
+    [Fact]
+    public void A_visitor_has_no_initials_and_a_signed_in_account_with_no_e_mail_has_no_e_mail_text()
+    {
+        Assert.Equal("", SiteNavigation.For(null, "/").Initials);
+        var noEmail = SiteNavigation.For(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "u1")], "Cookies")), "/");
+        Assert.Null(noEmail.Email);
+        Assert.Equal("", noEmail.Initials);
+    }
 
-    [Fact] public void Administration_is_not_shown_for_a_look_alike_role() => Assert.DoesNotContain(SiteNavigation.For(User("administrator", "Moderator"), "/").Links, i => i.Href.StartsWith("/admin"));
+    [Theory] [InlineData("Admin")] [InlineData("SuperAdmin")]
+    public void An_administrator_also_gets_administration_in_the_account_menu(string role) => Assert.Contains(SiteNavigation.For(User(role), "/").AccountMenu, i => i.Href == "/admin/weryfikacja");
+
+    [Fact] public void Administration_is_not_shown_for_a_look_alike_role() => Assert.DoesNotContain(SiteNavigation.For(User("administrator", "Moderator"), "/").AccountMenu, i => i.Href.StartsWith("/admin"));
 
     [Theory]
     [InlineData("/programisci", "/programisci", true)] [InlineData("/programisci/audyt-kodu", "/programisci", true)] [InlineData("/programisci/", "/programisci", true)] [InlineData("/PROGRAMISCI", "/programisci", true)]

@@ -24,6 +24,9 @@ public sealed class WebOptions
     /// <summary><c>Identity:PublicUrl</c>: the address of the identity service as the BROWSER reaches it (the GitHub leg redirects the browser there); the first <c>Backend:Auth</c> candidate when unset (the fake profile, where both are localhost).</summary>
     public string? IdentityPublicUrl { get; init; }
 
+    /// <summary><c>Support:Email</c>: the address of the help page's contact sentence. Absent means the page shows neither the sentence nor a link (no address is invented).</summary>
+    public string? SupportEmail { get; init; }
+
     /// <summary><c>Backend:&lt;Name&gt;</c>: an ordered, comma separated candidate list of base addresses per backend. They become service-discovery endpoints (see <see cref="ServiceConfiguration"/>).</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>> Backends { get; init; } = new Dictionary<string, IReadOnlyList<string>>();
 
@@ -51,6 +54,7 @@ public sealed class WebOptions
             IdentityIssuer = Opt(config["Identity:Issuer"]),
             IdentityAudience = Opt(config["Identity:Audience"]),
             IdentityPublicUrl = Opt(config["Identity:PublicUrl"])?.TrimEnd('/'),
+            SupportEmail = Opt(config["Support:Email"]),
             MockPayments = IsMockPayments(config),
             Backends = backends,
         };

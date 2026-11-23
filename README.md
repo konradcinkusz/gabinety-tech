@@ -13,6 +13,19 @@
 
 **Gabinety Tech** to polski marketplace płatnych konsultacji w stałej cenie ze zweryfikowanymi programistami: klient znajduje specjalistę, rezerwuje termin, płaci, a po spotkaniu wystawia opinię.
 
+## Dane logowania (profil fake)
+
+Po uruchomieniu profilu `fake` zaloguj się na <http://localhost:3000/logowanie> (e-mail i hasło). **Hasło każdego zasianego konta: `Demo-Dev-Passw0rd!`** (hasło deweloperskie, nic nie chroni; działa tylko w zamienniku dostawcy tożsamości).
+
+| Konto | E-mail | Do czego |
+|---|---|---|
+| klient | `demo-client@demo.example` | rezerwacje, płatność próbna, opinie, anulowanie, spór |
+| administrator | `demo-admin@demo.example` | panel `/admin` (weryfikacja, spory, opinie, księga) |
+| praktyk (6 zatwierdzonych) | `demo-practitioner-1@demo.example` do `demo-practitioner-6@demo.example` | Anna Demowska, Bartosz Testowy, Celina Przykładowska, Dariusz Fikcyjny, Ewa Wzorcowa, Filip Syntetyczny |
+| praktyk (bez zatwierdzenia) | `demo-practitioner-7@demo.example`, `demo-practitioner-8@demo.example` | konta, których nie ma na publicznej liście |
+
+Własne konto założysz w `/rejestracja` (dowolny e-mail, bez weryfikacji). Dane są w pamięci: po restarcie znikają i seeder zakłada je od nowa (około 4,5 minuty od startu; do końca seedowania nie rezerwuj, bo seeder przesuwa zegar Booking). Szczegóły i ścieżki do przeklikania: [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
+
 ## Co działa
 
 Cały system uruchamia się lokalnie w profilu `fake`, bez Dockera i bez kluczy:
@@ -22,7 +35,7 @@ Cały system uruchamia się lokalnie w profilu `fake`, bez Dockera i bez kluczy:
 - opinie, panel administratora, asystent oparty o model językowy,
 - dostępność programistów do kontraktu i propozycje współpracy z negocjacją (bez opłat; adresy e-mail dopiero po obustronnej akceptacji),
 - dane demonstracyjne i zamiennik dostawcy tożsamości do prac lokalnych,
-- osiem automatycznych ścieżek end-to-end (J1 do J8).
+- dziesięć automatycznych ścieżek end-to-end (J1 do J10).
 
 Prawdziwy [authservice](https://github.com/konradcinkusz/authservice) jest dołączony do profilu domyślnego (potrzebuje Dockera) i sprawdzany w CI na wszystkich przepływach, których potrzebuje web (`docs/operations/AUTH.md`); samego profilu domyślnego nikt jeszcze nie uruchomił.
 

@@ -121,4 +121,45 @@ public class StatsPushCalculationTests : IDisposable
         await StatsFx.Seed(h, BookingStatus.Completed);
         Assert.Equal(0, (await StatsFx.StatsOf(h)).OpenSlots14d);
     }
+
+    // clock: Mon 2026-11-16 12:00 UTC; the lead time (12 h) puts the first offered start at Tue 2026-11-17 09:00 Warsaw = 08:00 UTC
+    static readonly DateTimeOffset FirstSlot = new(2026, 11, 17, 8, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task Next_free_slot_is_the_first_start_the_slots_endpoint_offers()
+    {
+        h.Minutes = 30;
+        await h.WorkWeek();
+        var r = await h.CreateClient().GetAsync($"/api/v1/practitioners/{h.Practitioner}/slots?offeringId={h.Offering}&from=2026-11-16&to=2026-11-29");
+        var first = JsonDocument.Parse(await r.Content.ReadAsStringAsync()).RootElement.GetProperty("slots")[0].GetProperty("startUtc").GetDateTimeOffset();
+        Assert.Equal(FirstSlot, first); // fixture sanity: lead time and the 09:00 rule start
+        Assert.Equal(first, (await StatsFx.StatsOf(h)).NextFreeSlotUtc);
+    }
+
+    [Fact]
+    public async Task Next_free_slot_moves_when_the_first_slot_is_booked()
+    {
+        await h.WorkWeek();
+        await StatsFx.Seed(h, BookingStatus.Completed, minutes: 30); // the shortest snapshot sets the duration the window is computed for
+        Assert.Equal(FirstSlot, (await StatsFx.StatsOf(h)).NextFreeSlotUtc);
+
+        await StatsFx.Seed(h, BookingStatus.Confirmed, minutes: 30, startIn: FirstSlot - h.Clock.GetUtcNow());
+        // 09:00 is taken and 09:30 falls inside its 15 minute buffer, so the following slot is 10:00 Warsaw
+        Assert.Equal(FirstSlot.AddHours(1), (await StatsFx.StatsOf(h)).NextFreeSlotUtc);
+    }
+
+    [Fact]
+    public async Task Next_free_slot_skips_a_blocked_day()
+    {
+        await h.WorkWeek();
+        await h.Seed(db => db.Exceptions.Add(new() { Id = Guid.NewGuid(), PractitionerId = h.Practitioner, DateLocal = new(2026, 11, 17) }));
+        Assert.Equal(FirstSlot.AddDays(1), (await StatsFx.StatsOf(h)).NextFreeSlotUtc);
+    }
+
+    [Fact]
+    public async Task Next_free_slot_is_null_without_availability()
+    {
+        await StatsFx.Seed(h, BookingStatus.Completed); // no rules: nothing is bookable
+        Assert.Null((await StatsFx.StatsOf(h)).NextFreeSlotUtc);
+    }
 }

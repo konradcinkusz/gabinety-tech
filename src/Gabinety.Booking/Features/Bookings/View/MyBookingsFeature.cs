@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Gabinety.Billing;
 using Gabinety.Booking.Features.Payments;
+using Gabinety.Booking.Features.Slots;
 using Gabinety.Booking.Persistence;
 using Gabinety.Contracts.Booking;
 using Gabinety.Contracts.Common;
@@ -14,8 +15,10 @@ using BookingStatus = Gabinety.Billing.BookingStatus;
 namespace Gabinety.Booking.Features.Bookings.View;
 
 /// <summary>
-/// GET /api/v1/me/bookings?role=client|practitioner&amp;status=&amp;limit=&amp;cursor= (CONTRACTS 4.2, 0). The caller's own rows for one role, newest
-/// <c>start_utc</c> first, ties by id descending, so the order is total. Each item is the single view of that booking for the caller
+/// GET /api/v1/me/bookings?role=client|practitioner&amp;status=&amp;from=&amp;to=&amp;limit=&amp;cursor= (CONTRACTS 4.2, 0). The caller's own rows for one role, newest
+/// <c>start_utc</c> first, ties by id descending, so the order is total. <c>from</c> and <c>to</c> are optional <c>yyyy-MM-dd</c> days, both inclusive,
+/// in <c>Europe/Warsaw</c>: they filter <c>start_utc</c> to <c>[start of from, start of the day after to)</c> in UTC, so a 25-hour autumn day is whole.
+/// The range is at most 62 days; <c>to</c> before <c>from</c> is a validation error. Each item is the single view of that booking for the caller
 /// (<see cref="BookingViewFeature.ToView"/>): the same visibility of brief, meeting URL and fee. Two queries per page whatever its size (rows, then their payments).
 /// <para>The cursor is opaque: the position of the last row plus the role and status it was made for, and a short checksum. It is not a secret and not
 /// a signature: a forged one can only move the position within the caller's own rows; the checksum and the role/status binding catch a cursor that was
@@ -23,15 +26,15 @@ namespace Gabinety.Booking.Features.Bookings.View;
 /// </summary>
 public sealed class MyBookingsFeature : IServiceFeature
 {
-    public const int DefaultLimit = 12, MaxLimit = 24;
+    public const int DefaultLimit = 12, MaxLimit = 24, MaxDayRange = 62;
 
     public void Add(IHostApplicationBuilder builder) { }
 
     public void Map(IEndpointRouteBuilder endpoints) =>
         endpoints.MapGet("/api/v1/me/bookings", ListAsync).RequireAuthorization("Authenticated");
 
-    static async Task<IResult> ListAsync(string? role, string? status, string? cursor, string? limit, ClaimsPrincipal user, BookingDbContext db,
-        PartyNamesLookup names, TimeProvider time, CancellationToken ct)
+    static async Task<IResult> ListAsync(string? role, string? status, string? from, string? to, string? cursor, string? limit, ClaimsPrincipal user,
+        BookingDbContext db, PartyNamesLookup names, TimeProvider time, CancellationToken ct)
     {
         var sub = BookingViewFeature.CallerId(user);
         if (sub is null) return Results.Unauthorized();
@@ -43,6 +46,22 @@ public sealed class MyBookingsFeature : IServiceFeature
         {
             if (Enum.TryParse<BookingStatus>(status, ignoreCase: false, out var st) && Enum.IsDefined(st) && !char.IsDigit(status[0])) statusFilter = st;
             else errors["status"] = ["The status is not a booking status."];
+        }
+        DateOnly? fromDay = null, toDay = null;
+        if (!string.IsNullOrEmpty(from))
+        {
+            if (ParseDay(from) is { } f) fromDay = f;
+            else errors["from"] = ["The from date is yyyy-MM-dd."];
+        }
+        if (!string.IsNullOrEmpty(to))
+        {
+            if (ParseDay(to) is { } t) toDay = t;
+            else errors["to"] = ["The to date is yyyy-MM-dd."];
+        }
+        if (fromDay is { } fd && toDay is { } td)
+        {
+            if (td < fd) errors["to"] = ["The to date is before from."];
+            else if (td.DayNumber - fd.DayNumber > MaxDayRange) errors["to"] = [$"The range is at most {MaxDayRange} days."];
         }
         var take = DefaultLimit;
         if (limit is not null && !(int.TryParse(limit, NumberStyles.None, CultureInfo.InvariantCulture, out take) && take is >= 1 and <= MaxLimit))
@@ -58,6 +77,8 @@ public sealed class MyBookingsFeature : IServiceFeature
         var asClient = role == "client";
         var q = db.Bookings.AsNoTracking().Where(b => asClient ? b.ClientUserId == sub : b.PractitionerUserId == sub);
         if (statusFilter is { } s) q = q.Where(b => b.Status == s);
+        if (fromDay is { } lowDay && WarsawDayStart(lowDay) is { } lo) q = q.Where(b => b.StartUtc >= lo);
+        if (toDay is { } highDay && highDay < DateOnly.MaxValue && WarsawDayStart(highDay.AddDays(1)) is { } hi) q = q.Where(b => b.StartUtc < hi);
         if (after is { } p) q = q.Where(b => b.StartUtc < p.Start || (b.StartUtc == p.Start && b.Id.CompareTo(p.Id) < 0));
 
         var rows = await q.OrderByDescending(b => b.StartUtc).ThenByDescending(b => b.Id).Take(take + 1).ToListAsync(ct);
@@ -73,6 +94,20 @@ public sealed class MyBookingsFeature : IServiceFeature
         return Results.Ok(more && rows.Count > 0
             ? new MyBookingsPage(items, Encode(new Position(rows[^1].StartUtc, rows[^1].Id), role!, statusFilter))
             : new MyBookingsPage(items, null));
+    }
+
+    static DateOnly? ParseDay(string s) =>
+        DateOnly.TryParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+
+    /// <summary>The UTC instant of midnight at the start of a <c>Europe/Warsaw</c> day, or null when it is outside the representable range
+    /// (then the bound is left open: no booking can lie beyond it).</summary>
+    static DateTimeOffset? WarsawDayStart(DateOnly day)
+    {
+        try
+        {
+            return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(day.ToDateTime(TimeOnly.MinValue), SlotCalculator.Warsaw), TimeSpan.Zero);
+        }
+        catch (ArgumentOutOfRangeException) { return null; }
     }
 
     readonly record struct Position(DateTimeOffset Start, Guid Id);

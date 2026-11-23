@@ -184,6 +184,10 @@ namespace Gabinety.Directory.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("meeting_url_default");
 
+                    b.Property<DateTimeOffset?>("NextFreeSlotUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_free_slot_utc");
+
                     b.Property<string>("Nip")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// UI audit: visits every route of web/src/app as visitor, client, practitioner and administrator at 1440x900 and 390x844, light and dark,
+// UI audit: visits every route of src/Gabinety.Web (Blazor host) as visitor, client, practitioner and administrator at 1440x900 and 390x844, light and dark,
 // records mechanical findings (overflow, overlap, clipping, contrast via axe, focus, tap targets, alt, console, requests, layout shift, empties)
 // and writes screenshots + findings.json under docs/ui/audit. Usage: node tools/ui-audit/audit.mjs   (from tests/e2e, fake profile running).
 // Env: PW_CHROMIUM_PATH, E2E_WEB_URL, AUDIT_OUT (default ../../docs/ui/audit), AUDIT_ONLY=<role>.
@@ -27,8 +27,11 @@ const PUBLIC_ROUTES = [
   { id: "cennik", path: "/cennik", dark: true },
   { id: "regulamin", path: "/regulamin", shots: "desktop" },
   { id: "polityka-prywatnosci", path: "/polityka-prywatnosci", shots: "none" },
+  { id: "pomoc", path: "/pomoc", shots: "mobile" },
   { id: "logowanie", path: "/logowanie", dark: true },
+  { id: "zapomniane-haslo", path: "/zapomniane-haslo", shots: "mobile" },
   { id: "rejestracja", path: "/rejestracja", shots: "none" },
+  { id: "rejestracja-sprawdz-skrzynke", path: "/rejestracja/sprawdz-skrzynke", shots: "mobile" },
   { id: "not-found", path: "/nie-ma-takiej-strony", shots: "mobile" },
 ];
 const AUTH_GUARDS = ["/konto", "/moje/rezerwacje", "/gabinet-programisty", "/admin/spory", "/checkout/mock/00000000-0000-0000-0000-000000000000"];
@@ -50,6 +53,8 @@ const ROLE_ROUTES = {
     { id: "gabinet-programisty-profil", path: "/gabinet-programisty/profil" },
     { id: "gabinet-programisty-oferty", path: "/gabinet-programisty/oferty" },
     { id: "gabinet-programisty-dostepnosc", path: "/gabinet-programisty/dostepnosc", dark: true },
+    { id: "gabinet-programisty-platnosci", path: "/gabinet-programisty/platnosci", shots: "desktop" },
+    { id: "gabinet-programisty-kalendarz", path: "/gabinet-programisty/kalendarz", dark: true },
     { id: "moje-rezerwacje-practitioner", path: "/moje/rezerwacje?role=practitioner" },
     { id: "konto", path: "/konto", shots: "none" },
     { id: "booking-detail-practitioner", path: "/moje/rezerwacje/{practitionerBooking}?role=practitioner" },
@@ -194,7 +199,7 @@ const deadLinks = [];
 for (const role of roles) {
   const ctx = await newContext(browser, { userName: USERS[role], vp: 1440, scheme: "light" });
   for (const h of links[role] ?? []) {
-    if (/\/api\/|\/csv|\/export|logout/.test(h)) continue;
+    if (/\/api\/|\/csv|\/export|logout|\/oauth\//.test(h)) continue; // /oauth/github/start is a redirect that needs a sign-in context: a bare GET is a 400 by design
     const r = await ctx.request.get(h, { timeout: 20000 }).catch((e) => ({ status: () => 0, err: e }));
     if (r.status() >= 400 || r.status() === 0) deadLinks.push({ role, href: h, status: r.status() });
   }

@@ -20,6 +20,32 @@ public class PaymentsHostTests
         Assert.Null(page.One("[data-testid=payments-link]"));
     }
 
+    [Theory]
+    [InlineData("none", "badge badge--neutral")]
+    [InlineData("pending", "badge badge--warning")]
+    public async Task A_card_with_one_badge_one_primary_action_and_what_the_client_sees_while_not_ready(string state, string badgeClass)
+    {
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile("Approved"); w.PaymentState = state; });
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty/platnosci");
+        var card = page.One("section.card")!;
+        Assert.Single(card.QuerySelectorAll(".badge"));
+        Assert.Equal(badgeClass, page.One("[data-testid=payments-status]")!.ClassName);
+        Assert.Single(card.QuerySelectorAll(".btn--primary")); // the next step is the one primary action of the card
+        Assert.Equal("btn btn--primary", card.QuerySelector("form button")!.ClassName);
+        Assert.StartsWith("Co widzi klient w międzyczasie:", page.TextOf("[data-testid=payments-client-view]"));
+    }
+
+    [Fact]
+    public async Task A_ready_account_has_no_client_sentence_and_a_success_badge()
+    {
+        var (web, browser, _) = await PractitionerBrowsers.SignedIn(w => { w.HaveProfile("Approved"); w.PaymentState = "ready"; });
+        await using var _ = web;
+        var page = await browser.GetAsync("/gabinet-programisty/platnosci");
+        Assert.Equal("badge badge--success", page.One("[data-testid=payments-status]")!.ClassName);
+        Assert.Null(page.One("[data-testid=payments-client-view]"));
+    }
+
     [Fact]
     public async Task A_ready_account_says_gotowe_and_has_no_button_and_no_warning()
     {

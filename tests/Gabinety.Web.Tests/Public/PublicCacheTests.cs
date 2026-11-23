@@ -22,7 +22,7 @@ public class PublicCacheTests
 
     [Theory]
     [InlineData("/")] [InlineData("/programisci")] [InlineData("/programisci/audyt-kodu")] [InlineData("/gabinet/demo-anna-demowska")] [InlineData("/jak-to-dziala")] [InlineData("/cennik")]
-    [InlineData("/zasady-rankingu")] [InlineData("/regulamin")] [InlineData("/polityka-prywatnosci")] [InlineData("/sitemap.xml")] [InlineData("/robots.txt")]
+    [InlineData("/zasady-rankingu")] [InlineData("/regulamin")] [InlineData("/polityka-prywatnosci")] [InlineData("/pomoc")] [InlineData("/sitemap.xml")] [InlineData("/robots.txt")]
     public async Task An_anonymous_get_of_a_public_page_is_served_from_the_cache_the_second_time(string path)
     {
         await using var web = PublicSupport.Host();

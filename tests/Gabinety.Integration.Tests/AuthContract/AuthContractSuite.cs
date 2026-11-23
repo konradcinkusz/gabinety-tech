@@ -10,7 +10,7 @@ namespace Gabinety.Integration.Tests.AuthContract;
 /// and against the real authservice image in the integration tier, so the stand-in cannot drift from the real surface.
 /// Wire names are those of docs/spikes/authservice.md.
 /// </summary>
-public abstract class AuthContractSuite(HttpClient http) : IDisposable
+public abstract partial class AuthContractSuite(HttpClient http) : IDisposable
 {
     public const string RoleClaim = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
     // Fixed synthetic value for users this suite registers; not a secret.

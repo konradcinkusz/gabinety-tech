@@ -31,6 +31,8 @@ public sealed class Practitioner
     public int PractitionerCancelCount { get; set; }
     public int NoShowUpheldCount { get; set; }
     public int OpenSlots14d { get; set; }
+    /// <summary>Start of the earliest bookable slot in the next 14 days, pushed by Booking with the stats (T-11.03). Null: none, or Booking has not pushed it.</summary>
+    public DateTimeOffset? NextFreeSlotUtc { get; set; }
     public long StatsVersion { get; set; }
     public decimal ProfileCompleteness { get; set; }
     public decimal RankingScore { get; set; }
@@ -82,6 +84,7 @@ public sealed class PractitionerConfiguration : IEntityTypeConfiguration<Practit
         b.Property(x => x.PractitionerCancelCount).HasColumnName("practitioner_cancel_count");
         b.Property(x => x.NoShowUpheldCount).HasColumnName("no_show_upheld_count");
         b.Property(x => x.OpenSlots14d).HasColumnName("open_slots_14d");
+        b.Property(x => x.NextFreeSlotUtc).HasColumnName("next_free_slot_utc");
         b.Property(x => x.StatsVersion).HasColumnName("stats_version");
         b.Property(x => x.ProfileCompleteness).HasColumnName("profile_completeness").HasPrecision(3, 2);
         b.Property(x => x.RankingScore).HasColumnName("ranking_score").HasPrecision(5, 2);

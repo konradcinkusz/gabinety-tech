@@ -1,13 +1,49 @@
+@* The footer (UX-010, finding 9): product, programmers, legal, in columns from 40 rem. Static, like the header; the programmer link follows the session (D-2). *@
 @inject TimeProvider Time
+@inject MeClient Me
 
 <footer class="site-footer">
     <div class="site-footer__inner">
-        <p>@string.Format(Pl.Site.Copyright, Time.GetUtcNow().Year)</p>
-        <nav aria-label="@Pl.Site.FooterLabel">
-            <ul class="nav-list">
-                <li><a href="/regulamin">@Pl.Site.Terms</a></li>
-                <li><a href="/polityka-prywatnosci">@Pl.Site.Privacy</a></li>
-            </ul>
-        </nav>
+        <div class="site-footer__columns">
+            <nav class="site-footer__column" aria-labelledby="site-footer-product">
+                <p id="site-footer-product" class="site-footer__title">@Pl.Site.ProductColumn</p>
+                <ul>
+                    @foreach (var item in Model.Product)
+                    {
+                        <li><a href="@item.Href">@item.Label</a></li>
+                    }
+                    <li><a href="/pomoc">@PlPages.Help.Link</a></li>
+                </ul>
+            </nav>
+            <nav class="site-footer__column" aria-labelledby="site-footer-practitioners">
+                <p id="site-footer-practitioners" class="site-footer__title">@Pl.Site.PractitionersColumn</p>
+                <ul>
+                    <li><a href="@Model.Practitioner.Href">@Model.Practitioner.Label</a></li>
+                </ul>
+            </nav>
+            <nav class="site-footer__column" aria-labelledby="site-footer-legal">
+                <p id="site-footer-legal" class="site-footer__title">@Pl.Site.LegalColumn</p>
+                <ul>
+                    @foreach (var item in Model.Legal)
+                    {
+                        <li><a href="@item.Href">@item.Label</a></li>
+                    }
+                </ul>
+            </nav>
+        </div>
+        <p class="site-footer__copy">@string.Format(Pl.Site.Copyright, Time.GetUtcNow().Year)</p>
     </div>
 </footer>
+
+@code {
+    [CascadingParameter] Task<AuthenticationState>? AuthState { get; set; }
+
+    FooterModel Model { get; set; } = SiteNavigation.Footer(null, false);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        var practitioner = await PractitionerProfileCheck.HasProfileAsync(user, Me, Time);
+        Model = SiteNavigation.Footer(user, practitioner);
+    }
+}

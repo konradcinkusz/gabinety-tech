@@ -72,7 +72,7 @@ public class BookingFormTests
     {
         await using var f = await Open();
         await f.Browser.GetAsync(BookingUrl);
-        Assert.Equal(["/api/v1/practitioners/demo-anna-demowska"], f.Web.Directory.Requests.Select(r => r.PathAndQuery));
+        Assert.Equal(["/api/v1/practitioners/demo-anna-demowska"], f.Web.Directory.Requests.Where(r => r.PathAndQuery != "/api/v1/me").Select(r => r.PathAndQuery));
         Assert.Empty(f.Web.Booking.Requests);
         Assert.Empty(f.Web.Assistant.Requests);
     }
@@ -322,8 +322,16 @@ public class BookingFormTests
         var proposal = page.One("[data-testid=proposal]")!;
         Assert.Equal("Propozycja opisu (możesz ją edytować)", proposal.QuerySelector("label")!.TextContent);
         Assert.Equal("Prototyp z modelem językowym: zakres, koszty, ryzyka.", proposal.QuerySelector("textarea")!.TextContent);
-        Assert.Equal("Sugerowana kategoria: Audyt kodu", proposal.QuerySelector("p.field__hint")!.TextContent); // the name, not the slug
-        Assert.Contains("Jaki jest budżet?", proposal.TextContent);
+        Assert.Equal("Sugerowana kategoria: Audyt kodu", proposal.QuerySelector("p.assist__category")!.TextContent.Trim()); // the name, not the slug
+        Assert.Equal("Audyt kodu", proposal.QuerySelector(".badge--info")!.TextContent);
+        Assert.Contains("card", proposal.ClassName); // a clearly separated block inside the form
+        Assert.NotNull(proposal.Closest("form"));
+        Assert.Equal("Warto jeszcze opisać", proposal.QuerySelector("h3")!.TextContent);
+        Assert.Contains("Jaki jest budżet?", proposal.QuerySelectorAll("ul > li").Select(li => li.TextContent));
+        var buttons = page.All("form button");
+        Assert.Contains("Zapłać", buttons[^1].TextContent); // the pay button stays the last element of the form
+        Assert.Equal(buttons[^1], page.All("form *").Last(e => e.TagName == "BUTTON"));
+        Assert.Single(page.All("button"), b => b.TextContent.Contains("Zapłać", StringComparison.OrdinalIgnoreCase));
         Assert.Equal("Dodaj propozycję do opisu", proposal.QuerySelector("button")!.TextContent);
         Assert.Equal(Brief, page.One("#brief")!.TextContent); // only the click adds it
         var call = Assert.Single(f.Web.Assistant.Requests);

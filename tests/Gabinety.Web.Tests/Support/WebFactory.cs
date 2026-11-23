@@ -94,6 +94,19 @@ public sealed class Browser(WebFactory factory)
         return new Page(response, await response.Content.ReadAsStringAsync());
     }
 
+    /// <summary>
+    /// As <see cref="PostFormAsync(string, IEnumerable{KeyValuePair{string, string}}, string?, (string Name, string Value)[])"/>, for a page with more than one form: the form is the one whose handler is <paramref name="formName"/>.
+    /// </summary>
+    public async Task<Page> PostFormAsync(string formPage, string formName, IEnumerable<KeyValuePair<string, string>> fields)
+    {
+        var page = await GetAsync(formPage);
+        var form = page.Dom.QuerySelectorAll("form[method=post]").FirstOrDefault(f => f.QuerySelector($"input[name=_handler][value='{formName}']") is not null)
+            ?? throw new InvalidOperationException($"no form {formName} on {formPage}: {page.Status}");
+        var all = form.QuerySelectorAll("input[type=hidden]").Select(i => KeyValuePair.Create(i.GetAttribute("name")!, i.GetAttribute("value") ?? "")).Concat(fields).ToList();
+        var request = new HttpRequestMessage(HttpMethod.Post, form.GetAttribute("action") ?? formPage) { Content = new FormUrlEncodedContent(all) };
+        return await SendAsync(request);
+    }
+
     /// <summary>Opens <paramref name="formPage"/>, copies its hidden fields (antiforgery token, form handler) and posts <paramref name="fields"/> to <paramref name="postTo"/>.</summary>
     public async Task<Page> PostFormAsync(string formPage, IEnumerable<KeyValuePair<string, string>> fields, string? postTo = null, params (string Name, string Value)[] headers)
     {

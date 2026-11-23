@@ -12,17 +12,21 @@ public static class Pl
         public const string Name = "Gabinety Tech", Tagline = "Płatna konsultacja ze zweryfikowanym programistą";
         public const string Copyright = "© {0} Gabinety Tech";
         public const string Terms = "Regulamin", Privacy = "Polityka prywatności", FooterLabel = "Informacje prawne";
+        // UX-010: the footer's column titles (the legal column is named by FooterLabel for assistive technology).
+        public const string ProductColumn = "Produkt", PractitionersColumn = "Dla programistów", LegalColumn = "Prawne";
     }
 
     public static class Nav
     {
         public const string Label = "Menu główne", Search = "Programiści", SignIn = "Zaloguj się", Register = "Załóż konto", MyBookings = "Moje rezerwacje", MyProposals = ProposalsText.MyProposals, SignOut = "Wyloguj się";
         public const string Account = "Konto", PractitionerArea = "Panel programisty", Admin = "Administracja", Menu = "Menu", AccountMenu = "Twoje konto";
+        // UX-010: the public links of the header and footer, and the account menu's entry for a signed-in user without a practitioner profile (D-2).
+        public const string HowItWorks = "Jak to działa", Pricing = "Cennik", RankingRules = "Zasady rankingu", BecomePractitioner = "Zostań programistą";
     }
 
     public static class A11y
     {
-        public const string SkipToContent = "Przejdź do treści", Flash = "Komunikaty", Pagination = "Paginacja", PreviousPage = "Poprzednia strona", NextPage = "Następna strona";
+        public const string SkipToContent = "Przejdź do treści", Flash = "Komunikaty", Pagination = "Paginacja", DismissFlash = "Zamknij komunikat", PreviousPage = "Poprzednia strona", NextPage = "Następna strona";
         /// <summary>Read before a field error by a screen reader (the error text itself is not colour only).</summary>
         public const string ErrorPrefix = "Błąd:";
     }
@@ -32,6 +36,10 @@ public static class Pl
         public const string GenericTitle = "Coś poszło nie tak", GenericBody = "Wystąpił nieoczekiwany błąd. Spróbuj ponownie za chwilę.";
         public const string NotFoundTitle = "Nie znaleziono strony", NotFoundBody = "Strona, której szukasz, nie istnieje lub została przeniesiona.";
         public const string Reconnecting = "Łączenie z serwerem…", ReconnectFailed = "Utracono połączenie z serwerem. Odśwież stronę.";
+        // V-12: the 404 search and category links (DESIGN-CONTRACT 5.10).
+        public const string NotFoundSearchRegion = "Wyszukiwarka programistów", NotFoundSearchLabel = "Czego szukasz?", NotFoundSearchButton = "Szukaj";
+        // V-12: the error page's way back and retry.
+        public const string RetryLink = "Spróbuj ponownie", HomeLink = "Wróć na stronę główną";
     }
 
     /// <summary>Flash messages are looked up by a fixed key (<c>?flash=signed-out</c>); text from a query string is never rendered.</summary>
@@ -64,7 +72,13 @@ public static class Pl
         public const string AllIntro = "Zweryfikowani programiści, z którymi umówisz płatną konsultację online. Wybierz problem, technologię i czas trwania.";
         public const string CategoryIntro = "Konsultacje „{0}” ze zweryfikowanymi programistami. Wybierz technologię, czas i budżet, a potem zarezerwuj termin.";
         public const string CategoryTechIntro = "Konsultacje „{0}” ze zweryfikowanymi programistami. Przeglądasz wyniki zawężone do wybranej technologii.";
-        public const string Count = "Wyniki: {0}", Empty = "Brak programistów dla wybranych filtrów.", ClearFilters = "Wyczyść filtry", ResultsLabel = "Lista programistów";
+        public const string Count = "Wyniki: {0}", ClearFilters = "Wyczyść filtry", ResultsLabel = "Lista programistów";
+        /// <summary>The count line of the result header: <c>6 programistów</c>, <c>1 programista</c>. Numerals 2 to 4 take the genitive plural too: the noun is masculine personal.</summary>
+        public const string CountPhrase = "{0} {1}", PractitionerOne = "programista", PractitionerMany = "programistów";
+        public const string EmptyTitle = "Nie ma programistów dla tych filtrów", EmptyBody = "Zmień albo usuń filtry, żeby zobaczyć programistów z innymi kryteriami.";
+        public const string ActiveFilters = "Aktywne filtry", RemoveFilter = "usuń filtr", SearchChip = "Szukaj: „{0}”";
+        /// <summary>The sort control of the result header (T-11.05): a select that applies on change, with a button for a page without script.</summary>
+        public const string SortLabel = "Sortuj", SortSubmit = "Sortuj", SortRelevance = "Trafność", SortPriceAsc = "Cena rosnąco", SortPriceDesc = "Cena malejąco", SortNextSlot = "Najbliższy termin";
         public const string Unavailable = "Nie udało się teraz wczytać listy programistów. Spróbuj ponownie za chwilę.";
         public const string MetaAllTitle = "Programiści do konsultacji online | Gabinety Tech";
         public const string MetaAllDescription = "Przeglądaj zweryfikowanych programistów i umów płatną konsultację online: audyt kodu, migracja, integracja AI i więcej.";
@@ -82,7 +96,7 @@ public static class Pl
 
     public static class Card
     {
-        public const string From = "od", IsNew = "Nowy", Rating = "Ocena {0} ({1})";
+        public const string From = "od", IsNew = "Nowy", Rating = "Ocena {0} ({1})", NextSlot = "Najbliższy termin:";
         public const string BadgeEmail = "E-mail zweryfikowany", BadgeGithub = "GitHub połączony", BadgeNip = "NIP zweryfikowany", BadgeApproved = "Zatwierdzony";
     }
 
@@ -100,6 +114,35 @@ public static class Pl
         public const string Github = "Zaloguj się przez GitHub", Or = "albo", NoAccount = "Nie masz konta?", Summary = "Popraw dane logowania";
         public const string EmailRequired = "Podaj adres e-mail.", PasswordRequired = "Podaj hasło.", EmailInvalid = "Podaj poprawny adres e-mail.";
         public const string SessionExpired = "Sesja wygasła. Zaloguj się ponownie.";
+        public const string BookingContext = "Zaloguj się, aby dokończyć rezerwację.", ShowPassword = "Pokaż hasło";
+        public const string ForgotLink = "Nie pamiętasz hasła?";
+    }
+
+    /// <summary>/zapomniane-haslo: one answer for every address.</summary>
+    public static class Forgot
+    {
+        public const string Title = "Nie pamiętasz hasła?", MetaTitle = "Zapomniane hasło | Gabinety Tech";
+        public const string Lead = "Podaj adres e-mail konta. Jeśli takie konto istnieje, wyślemy wiadomość z linkiem do ustawienia nowego hasła.";
+        public const string Email = "Adres e-mail", Submit = "Wyślij link";
+        public const string Answer = "Jeśli konto o tym adresie istnieje, wysłaliśmy wiadomość z linkiem.";
+        public const string OAuthOnly = "Jeśli to konto korzysta z logowania przez GitHub, nie ma hasła: zaloguj się przez GitHub.";
+        public const string RateLimited = "Zbyt wiele prób. Spróbuj ponownie za minutę.";
+        public const string Unavailable = "Nie udało się teraz wysłać wiadomości. Spróbuj ponownie za chwilę.";
+        public const string BackToLogin = "Wróć do logowania";
+    }
+
+    /// <summary>/reset-password: the new password after the mailed link.</summary>
+    public static class Reset
+    {
+        public const string Title = "Ustaw nowe hasło", MetaTitle = "Nowe hasło | Gabinety Tech";
+        public const string Password = "Nowe hasło", Confirmation = "Powtórz nowe hasło", Submit = "Zmień hasło", ShowPassword = "Pokaż hasło";
+        public const string ConfirmationRequired = "Powtórz nowe hasło.", Mismatch = "Hasła nie są takie same.";
+        public const string PasswordRejected = "Hasło nie spełnia wymagań. Wybierz inne hasło.";
+        public const string BadToken = "Link do zmiany hasła jest nieprawidłowy, został już użyty albo wygasł.";
+        public const string RequestNew = "Poproś o nowy link";
+        public const string Flash = "Hasło zostało zmienione. Zaloguj się.";
+        public const string RateLimited = "Zbyt wiele prób. Spróbuj ponownie za minutę.";
+        public const string Unavailable = "Nie udało się teraz zmienić hasła. Spróbuj ponownie za chwilę.";
     }
 
     /// <summary>The second step of a two-factor sign-in (<c>/logowanie/kod</c>). The challenge itself is a sealed cookie; nothing of it is shown.</summary>
@@ -119,7 +162,8 @@ public static class Pl
     public static class Register
     {
         public const string Title = "Załóż konto", MetaTitle = "Załóż konto | Gabinety Tech", Email = "Adres e-mail", Password = "Hasło", Submit = "Załóż konto";
-        public const string PasswordHint = "Co najmniej 8 znaków, w tym mała i wielka litera, cyfra i znak specjalny.";
+        public const string BookingContext = "Załóż konto, aby dokończyć rezerwację.", ShowPassword = "Pokaż hasło";
+        public const string RuleLength = "co najmniej 8 znaków", RuleCase = "mała i wielka litera", RuleDigit = "cyfra", RuleSymbol = "znak specjalny";
         public const string ConsentPrefix = "Akceptuję ", ConsentAnd = " i ", ConsentSuffix = ".", Terms = "Regulamin", Privacy = "Politykę prywatności";
         public const string VersionTitle = "Wersja z dnia {0}";
         public const string EmailRequired = "Podaj adres e-mail.", EmailInvalid = "Podaj poprawny adres e-mail.", EmailTooLong = "Adres e-mail może mieć najwyżej 254 znaki.";
@@ -160,6 +204,7 @@ public static class Pl
     public static class Bookings
     {
         public const string Title = "Moje rezerwacje", MetaTitle = "Moje rezerwacje | Gabinety Tech";
+        public const string Upcoming = "Nadchodzące", Past = "Minione", Today = "dziś", Tomorrow = "jutro", InDays = "za {0} dni", StatusFilterLabel = "Filtruj według statusu";
         public const string RoleLabel = "Pokaż rezerwacje jako", Client = "Klient", Practitioner = "Programista";
         public const string StatusLabel = "Status", AllStatuses = "Wszystkie", Loading = "Ładowanie rezerwacji…", Empty = "Brak rezerwacji w tym widoku.", More = "Pokaż więcej";
         public const string PartyPractitioner = "Programista", PartyClient = "Klient";
@@ -196,21 +241,36 @@ public static class Pl
     public static class Account
     {
         public const string Title = "Konto", MetaTitle = "Konto | Gabinety Tech", Email = "Adres e-mail";
-        public const string Verified = "Adres e-mail potwierdzony", NotVerified = "Adres e-mail niepotwierdzony. Sprawdź skrzynkę i kliknij link z wiadomości.";
+        public const string Verified = "Adres e-mail potwierdzony", NotVerified = "Adres e-mail niepotwierdzony", NotVerifiedHint = "Sprawdź skrzynkę i kliknij link z wiadomości.";
         public const string Consents = "Zgody";
         public const string TermsAccepted = "Regulamin: zaakceptowany", TermsPending = "Regulamin: wymaga ponownej akceptacji";
         public const string PrivacyAccepted = "Polityka prywatności: zaakceptowana", PrivacyPending = "Polityka prywatności: wymaga ponownej akceptacji";
+        public const string TermsPendingExplanation = "Zaktualizowaliśmy regulamin. Zaakceptuj nową wersję, aby potwierdzić zgodę na aktualne warunki.";
+        public const string PrivacyPendingExplanation = "Zaktualizowaliśmy politykę prywatności. Zaakceptuj nową wersję, aby potwierdzić zgodę na aktualne zasady przetwarzania danych.";
         public const string VersionTitle = "Wersja dokumentu: {0}";
         public const string AcceptCurrent = "Zaakceptuj aktualne wersje";
         public const string Data = "Twoje dane", Export = "Pobierz moje dane (JSON)", SignOut = "Wyloguj się";
         public const string DeleteTitle = "Usunięcie konta";
         public const string DeleteBody = "Konto zostanie usunięte, a dane po okresie przechowywania zanonimizowane. Tej operacji nie da się cofnąć.";
-        public const string DeleteConfirm = "Rozumiem i chcę usunąć konto", DeletePassword = "Hasło (potwierdzenie)", DeleteSubmit = "Usuń konto";
+        public const string DeleteConfirm = "Rozumiem i chcę usunąć konto", DeletePassword = "Hasło (potwierdzenie)", DeleteSubmit = "Usuń konto", DeleteOpen = "Usuń konto";
         public const string DeleteFailed = "Nie udało się usunąć konta. Sprawdź hasło i spróbuj ponownie.";
         public const string DeleteConfirmRequired = "Zaznacz potwierdzenie, aby usunąć konto.";
         public const string DeletePasswordRequired = "Podaj hasło, aby potwierdzić usunięcie konta.";
         public const string DeleteUnavailable = "Usuwanie konta jest chwilowo niedostępne. Spróbuj ponownie za chwilę.";
         public const string AcceptFailed = "Nie udało się zapisać zgód. Spróbuj ponownie za chwilę.";
         public const string Unavailable = "Dane konta są chwilowo niedostępne. Spróbuj ponownie za chwilę.";
+        public const string ChangeTitle = "Zmień hasło", CurrentPassword = "Obecne hasło", NewPassword = "Nowe hasło", ChangeConfirmation = "Powtórz nowe hasło";
+        public const string CurrentRequired = "Podaj obecne hasło.", CurrentWrong = "Obecne hasło jest nieprawidłowe.", NewRejected = "Nowe hasło nie spełnia wymagań. Wybierz inne hasło.";
+        public const string Changed = "Hasło zostało zmienione. Pozostałe sesje zostały zakończone.", ChangedSignedOutFlash = "Hasło zostało zmienione. Zaloguj się nowym hasłem.";
+        public const string ChangeRateLimited = "Zbyt wiele prób. Spróbuj ponownie za minutę.", ChangeUnavailable = "Nie udało się teraz zmienić hasła. Spróbuj ponownie za chwilę.";
+        public const string NotificationsTitle = "Powiadomienia e-mail", Saved = "Zapisano.";
+        public const string NotificationsAlways = "Potwierdzenia rezerwacji, anulowania, spory i wypłaty wysyłamy zawsze. Nie da się ich wyłączyć.";
+        public const string NotificationsLegend = "Wysyłaj także te wiadomości";
+        public const string Reminder24h = "Przypomnienie 24 godziny przed", Reminder24hHint = "E-mail na dobę przed rozpoczęciem konsultacji.";
+        public const string Reminder1h = "Przypomnienie godzinę przed", Reminder1hHint = "E-mail godzinę przed rozpoczęciem konsultacji.";
+        public const string ReviewRequest = "Prośba o opinię po konsultacji", ReviewRequestHint = "E-mail po zakończonej konsultacji z prośbą o opinię o specjaliście.";
+        public const string NotificationsSave = "Zapisz ustawienia powiadomień";
+        public const string NotificationsUnavailable = "Ustawienia powiadomień są chwilowo niedostępne. Spróbuj ponownie za chwilę.";
+        public const string NotificationsSaveFailed = "Nie udało się zapisać ustawień powiadomień. Spróbuj ponownie za chwilę.";
     }
 }

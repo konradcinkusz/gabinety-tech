@@ -6,7 +6,7 @@ namespace Gabinety.Booking.Notifications;
 /// <summary>The kinds of CONTRACTS 4.1 <c>notifications.kind</c>. Stored as the enum NAME.</summary>
 public enum NotificationKind
 {
-    BookingConfirmed, Reminder24h, Reminder1h, Cancelled, ReviewRequest, DisputeOpened, DisputeResolved, PayoutSent,
+    BookingConfirmed, Reminder24h, Reminder1h, Cancelled, ReviewRequest, DisputeOpened, DisputeResolved, PayoutSent, Rescheduled,
     /// <summary>ADR proposal 0013: collaboration proposals. Their rows carry <c>ProposalId</c> instead of <c>BookingId</c>.</summary>
     ProposalReceived, ProposalCountered, ProposalAccepted, ProposalRejected, ProposalExpired,
 }

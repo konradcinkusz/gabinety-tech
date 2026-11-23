@@ -6,7 +6,7 @@ import { VIEWPORTS, axeCheck, inPageChecks, newContext, settle } from "./lib.mjs
 
 export async function runFlows(browser, { OUT, shotCount, findings }) {
   const log = [];
-  const MOBILE_SHOTS = new Set(["02-booking-form", "03-booking-validation", "05-checkout", "08-booking-detail", "09-cancel-dialog", "11-dispute-validation", "13-review-validation", "04-dashboard-draft", "05-profile-validation", "06-offerings-validation", "01-dispute-resolve-form", "01-register-validation"]);
+  const MOBILE_SHOTS = new Set(["02-booking-form", "03-booking-validation", "05-checkout", "08-booking-detail", "08a-reschedule","09-cancel-dialog", "11-dispute-validation", "13-review-validation", "04-dashboard-draft", "05-profile-validation", "06-offerings-validation", "01-dispute-resolve-form", "01-register-validation"]);
   async function snap(page, role, id, note) {
     const rec = { flow: role, step: id, note, url: page.url().replace(/^https?:\/\/[^/]+/, "") };
     for (const vp of [1440, 390]) {
@@ -60,6 +60,12 @@ export async function runFlows(browser, { OUT, shotCount, findings }) {
       await snap(page, "client", "06-confirmation", "confirmation");
     });
     await attempt("my bookings", async () => { await page.goto("/moje/rezerwacje"); await settle(page); await snap(page, "client", "07-my-bookings", "list with the new booking"); });
+    await attempt("reschedule", async () => {
+      // the booking just paid is Confirmed and far enough ahead (the first free slot), so the service offers the one move; the page is read, nothing is posted
+      await page.goto(`/moje/rezerwacje/${bookingId}?role=client`); await settle(page);
+      await page.getByRole("link", { name: "Zmień termin" }).click(); await page.waitForURL(/zmien-termin/); await settle(page, 1500);
+      await snap(page, "client", "08a-reschedule", "the move page with the free times of the offer");
+    });
     await attempt("detail+cancel", async () => {
       await page.goto(`/moje/rezerwacje/${bookingId}?role=client`); await settle(page);
       await snap(page, "client", "08-booking-detail", "new booking, confirmed");
@@ -67,23 +73,6 @@ export async function runFlows(browser, { OUT, shotCount, findings }) {
       await snap(page, "client", "09-cancel-dialog", "cancel confirmation dialog");
       await page.getByRole("button", { name: "Tak, anuluj rezerwację" }).click(); await page.getByText("Rezerwacja została anulowana.").waitFor(); await settle(page, 500);
       await snap(page, "client", "10-cancelled", "after cancel");
-    });
-    await attempt("dispute", async () => {
-      await page.goto("/moje/rezerwacje"); await settle(page);
-      const hrefs = await page.$$eval('a[href^="/moje/rezerwacje/"]', (as) => as.map((a) => a.getAttribute("href")));
-      let done = false;
-      for (const h of hrefs) {
-        await page.goto(h); await settle(page, 500);
-        if (await page.getByRole("button", { name: "Zgłoś spór" }).count()) {
-          await page.getByRole("button", { name: "Zgłoś spór" }).click(); await page.waitForTimeout(300);
-          await page.getByRole("button", { name: "Wyślij zgłoszenie" }).click(); await page.waitForTimeout(400);
-          await snap(page, "client", "11-dispute-validation", "dispute form submitted empty");
-          await page.getByLabel("Opis sporu").fill("Konsultacja nie odbyła się w umówionym terminie, programista się nie połączył.");
-          await page.getByRole("button", { name: "Wyślij zgłoszenie" }).click(); await page.waitForTimeout(1500);
-          await snap(page, "client", "12-dispute-sent", "after sending the dispute"); done = true; break;
-        }
-      }
-      if (!done) throw new Error("no seeded booking offers 'Zgłoś spór' (canDispute false for all four) - the client dispute form is not reachable in the seeded state");
     });
     await attempt("review", async () => {
       // the review form is reached from a completed booking's detail page ("Wystaw opinię"), not from the list
@@ -103,6 +92,23 @@ export async function runFlows(browser, { OUT, shotCount, findings }) {
       await page.getByLabel("Treść opinii").fill("Konkretna rozmowa, dostałem plan działania i listę ryzyk. Polecam.");
       await page.getByRole("button", { name: "Wyślij opinię" }).click(); await page.waitForTimeout(1500);
       await snap(page, "client", "14-review-sent", "after sending the review");
+    });
+    await attempt("dispute", async () => {
+      await page.goto("/moje/rezerwacje"); await settle(page);
+      const hrefs = await page.$$eval('a[href^="/moje/rezerwacje/"]', (as) => as.map((a) => a.getAttribute("href")));
+      let done = false;
+      for (const h of hrefs) {
+        await page.goto(h); await settle(page, 500);
+        if (await page.getByRole("button", { name: "Zgłoś spór" }).count()) {
+          await page.getByRole("button", { name: "Zgłoś spór" }).click(); await page.waitForTimeout(300);
+          await page.getByRole("button", { name: "Wyślij zgłoszenie" }).click(); await page.waitForTimeout(400);
+          await snap(page, "client", "11-dispute-validation", "dispute form submitted empty");
+          await page.getByLabel("Opis sporu").fill("Konsultacja nie odbyła się w umówionym terminie, programista się nie połączył.");
+          await page.getByRole("button", { name: "Wyślij zgłoszenie" }).click(); await page.waitForTimeout(1500);
+          await snap(page, "client", "12-dispute-sent", "after sending the dispute"); done = true; break;
+        }
+      }
+      if (!done) throw new Error("no seeded booking offers 'Zgłoś spór' (canDispute false for all four) - the client dispute form is not reachable in the seeded state");
     });
     await ctx.close();
   }
@@ -138,7 +144,7 @@ export async function runFlows(browser, { OUT, shotCount, findings }) {
       await page.goto("/gabinet-programisty/profil"); await settle(page);
       await page.getByRole("button", { name: "Zapisz" }).click(); await page.waitForTimeout(600);
       await snap(page, "newpractitioner", "05-profile-validation", "profile saved empty");
-      await page.goto("/gabinet-programisty/oferty"); await settle(page);
+      await page.goto("/gabinet-programisty/oferty?nowa=1"); await settle(page);
       await page.getByRole("button", { name: "Zapisz" }).click(); await page.waitForTimeout(600);
       await snap(page, "newpractitioner", "06-offerings-validation", "offer saved empty");
       await page.goto("/gabinet-programisty/dostepnosc"); await settle(page);

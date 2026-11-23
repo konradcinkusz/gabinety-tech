@@ -1,4 +1,8 @@
 .brief { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .refund-line { margin-inline-start: var(--space-2); }
-.dialog { position: static; display: block; margin: 0; max-width: 32rem; }
+.head { display: grid; justify-items: start; gap: var(--space-2); margin-bottom: var(--space-4); }
+.head p { margin: 0; }
+.head__when { font-size: var(--text-lg); font-weight: 600; }
+/* without script the dialog is a block in the page; enhance.js makes it a modal, and a modal keeps the browser's own placement */
+.dialog:not(:modal) { position: static; display: block; margin: 0; max-width: var(--form-width); }
 .dialog h2:focus { outline: none; }

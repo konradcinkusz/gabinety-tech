@@ -30,9 +30,13 @@ public static class WebHostingExtensions
         // The backends' candidates become the configuration service discovery reads (see WebOptions.ServiceConfiguration); the typed clients only know logical names.
         builder.Configuration.AddInMemoryCollection(options.ServiceConfiguration());
         builder.Services.AddSingleton(TimeProvider.System);
+        // The framework's "Request starting/finished" lines carry the full URL with its query string. The password-reset link is /reset-password?token=&email= (T-11.07): a token and an address in a
+        // log line is exactly what must not exist, so those two lines are not written (warnings and errors of the same category still are). Nothing else of the host's logging changes.
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddPublicPageCache(); // five minutes, anonymous public GETs only (Hosting/PublicPageCache.cs)
         builder.Services.AddScoped<CircuitHandler, VisitorCircuitHandler>();
+        builder.Services.AddAvatarClient(); // GitHub's avatar of a verified practitioner (ADR-0013)
 
         builder.Services.AddRazorComponents().AddInteractiveServerComponents(o =>
         {
@@ -71,6 +75,8 @@ public static class WebHostingExtensions
         app.MapOAuth();
         app.MapAdminEndpoints(); // the ledger download (a stream, not a page)
         app.MapAccountEndpoints(); // /konto/export
+        app.MapCalendarEndpoints(); // /moje/rezerwacje/{id}/kalendarz.ics
+        app.MapAvatarEndpoint(); // /avatar/{slug}
 
         app.MapSeoEndpoints(); // sitemap.xml, robots.txt
         // Interactive server rendering is registered for the pages that ask for it. The circuit endpoints (/_blazor/*) and the framework's own (/_framework/*) are anonymous: an interactive page

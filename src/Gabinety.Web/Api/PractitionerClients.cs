@@ -1,3 +1,4 @@
+using System.Globalization;
 using Gabinety.Web.Auth;
 
 namespace Gabinety.Web.Api;
@@ -57,6 +58,38 @@ public sealed class PractitionerSchedulingClient(HttpClient http, VisitorAddress
 
     public async Task<ApiResult<AvailabilityDto>> SaveAvailabilityAsync(AvailabilityDto body, CancellationToken ct = default) =>
         await WriteAsync<AvailabilityDto>(HttpMethod.Put, "/api/v1/me/availability", await tokens.AccessTokenAsync(ct), body, ct);
+
+    /// <summary>The practitioner's earnings (CONTRACTS 4.2). Both dates are Warsaw days, inclusive; without them the service answers the current Warsaw month. 403 means the account is not a practitioner.</summary>
+    public Task<ApiResult<EarningsDto>> EarningsAsync(DateOnly? from, DateOnly? to, CancellationToken ct = default)
+    {
+        var parts = new List<string>();
+        if (from is { } f) parts.Add("from=" + f.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        if (to is { } t) parts.Add("to=" + t.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        return Get<EarningsDto>("/api/v1/me/earnings" + (parts.Count == 0 ? "" : "?" + string.Join('&', parts)), ct);
+    }
+
+    /// <summary>
+    /// The practitioner's bookings that start on Warsaw days from <paramref name="from"/> to <paramref name="to"/> (both inclusive, CONTRACTS 4.2 wave 3), every page of the cursor.
+    /// A page that never ends is a failure, not a loop: the cap is far above a week of one practitioner's bookings.
+    /// </summary>
+    public async Task<ApiResult<IReadOnlyList<BookingViewDto>>> CalendarBookingsAsync(DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        var items = new List<BookingViewDto>();
+        string? cursor = null;
+        for (var page = 0; page < MaxBookingPages; page++)
+        {
+            var path = $"/api/v1/me/bookings?role=practitioner&from={from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&to={to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}"
+                + (cursor is null ? "" : "&cursor=" + Uri.EscapeDataString(cursor));
+            var r = await Get<PageDto<BookingViewDto>>(path, ct);
+            if (!r.IsOk) return ApiResult<IReadOnlyList<BookingViewDto>>.Fail(r.Failure!);
+            items.AddRange(r.Value!.Items);
+            if (r.Value.NextCursor is null) return ApiResult<IReadOnlyList<BookingViewDto>>.Ok(items);
+            cursor = r.Value.NextCursor;
+        }
+        return ApiResult<IReadOnlyList<BookingViewDto>>.Fail(new ApiFailure(200, ApiFailure.InvalidResponse));
+    }
+
+    const int MaxBookingPages = 20;
 
     /// <summary>404 means the payment provider has no connected accounts (the mock of the fake profile): nothing to set up.</summary>
     public Task<ApiResult<PaymentAccountDto>> PaymentAccountAsync(CancellationToken ct = default) => Get<PaymentAccountDto>("/api/v1/me/payments/account", ct);

@@ -7,32 +7,51 @@
 
 <PageTitle>@Pl.Login.MetaTitle</PageTitle>
 <HeadContent><meta name="robots" content="noindex,follow" /></HeadContent>
-<h1>@Pl.Login.Title</h1>
 
-<FormSummary Problems="_problems" />
-@if (_message is not null)
-{
-    <Alert Variant="AlertVariant.Danger" TestId="login-error">@_message</Alert>
-}
+<div class="container--form auth-page">
+    <div class="card">
+        <h1>@Pl.Login.Title</h1>
 
-<EditForm Model="Model!" FormName="login" OnSubmit="SubmitAsync" class="form form-narrow" novalidate>
-    <div class="field @(_problems.For(LoginModel.EmailId) is null ? "" : "field--invalid")">
-        <label class="field__label" for="@LoginModel.EmailId">@Pl.Login.Email</label>
-        <input id="@LoginModel.EmailId" name="Model.Email" value="@Model!.Email" class="field__control" type="email" autocomplete="username" inputmode="email" maxlength="254"
-                   aria-invalid="@(_problems.For(LoginModel.EmailId) is null ? null : "true")" aria-describedby="@(_problems.For(LoginModel.EmailId) is null ? null : LoginModel.EmailId + "-error")" />
-        <FieldError FieldId="@LoginModel.EmailId" Problem="_problems.For(LoginModel.EmailId)" />
+        @if (ForBooking)
+        {
+            <p class="callout callout--info" data-testid="booking-context">@Pl.Login.BookingContext</p>
+        }
+
+        <FormSummary Problems="_problems" />
+        @* The live region exists before any message does, so a message that arrives is announced and the form does not move in between. *@
+        <div role="alert">
+            @if (_message is not null)
+            {
+                <p class="callout callout--danger" data-testid="login-error">@_message</p>
+            }
+        </div>
+
+        <EditForm Model="Model!" FormName="login" OnSubmit="SubmitAsync" class="form" novalidate>
+            <div class="field @(_problems.For(LoginModel.EmailId) is null ? "" : "field--invalid")">
+                <label class="field__label" for="@LoginModel.EmailId">@Pl.Login.Email</label>
+                <input id="@LoginModel.EmailId" name="Model.Email" value="@Model!.Email" class="field__control" type="email" autocomplete="username" inputmode="email" maxlength="254"
+                       aria-invalid="@(_problems.For(LoginModel.EmailId) is null ? null : "true")" aria-describedby="@(_problems.For(LoginModel.EmailId) is null ? null : LoginModel.EmailId + "-error")" />
+                <FieldError FieldId="@LoginModel.EmailId" Problem="_problems.For(LoginModel.EmailId)" />
+            </div>
+            <div class="field @(_problems.For(LoginModel.PasswordId) is null ? "" : "field--invalid")">
+                <label class="field__label" for="@LoginModel.PasswordId">@Pl.Login.Password</label>
+                <div class="auth-password">
+                    <input id="@LoginModel.PasswordId" name="Model.Password" class="field__control" type="password" autocomplete="current-password"
+                           aria-invalid="@(_problems.For(LoginModel.PasswordId) is null ? null : "true")" aria-describedby="@(_problems.For(LoginModel.PasswordId) is null ? null : LoginModel.PasswordId + "-error")" />
+                    @* Progressive enhancement: hidden here, shown by the script that adds the reveal. Without script the password is simply typed as it is. *@
+                    <button type="button" class="btn btn--ghost" data-enhance="reveal" data-target="#@(LoginModel.PasswordId)" hidden>@Pl.Login.ShowPassword</button>
+                </div>
+                <FieldError FieldId="@LoginModel.PasswordId" Problem="_problems.For(LoginModel.PasswordId)" />
+            </div>
+            <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.Login.Submit</button></div>
+        </EditForm>
+
+        <p><a href="/zapomniane-haslo">@Pl.Login.ForgotLink</a></p>
+        <div class="divider"><span>@Pl.Login.Or</span></div>
+        <p><a class="btn btn--secondary auth-github" href="@GithubHref"><svg class="auth-github__mark" aria-hidden="true" focusable="false" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>@Pl.Login.Github</a></p>
+        <p>@Pl.Login.NoAccount <a href="@ReturnTarget.RegisterUrl(Back)">@Pl.Register.Title</a></p>
     </div>
-    <div class="field @(_problems.For(LoginModel.PasswordId) is null ? "" : "field--invalid")">
-        <label class="field__label" for="@LoginModel.PasswordId">@Pl.Login.Password</label>
-        <input id="@LoginModel.PasswordId" name="Model.Password" class="field__control" type="password" autocomplete="current-password"
-                   aria-invalid="@(_problems.For(LoginModel.PasswordId) is null ? null : "true")" aria-describedby="@(_problems.For(LoginModel.PasswordId) is null ? null : LoginModel.PasswordId + "-error")" />
-        <FieldError FieldId="@LoginModel.PasswordId" Problem="_problems.For(LoginModel.PasswordId)" />
-    </div>
-    <div class="form-actions"><button class="btn btn--primary" type="submit">@Pl.Login.Submit</button></div>
-</EditForm>
-<div class="divider"><span>@Pl.Login.Or</span></div>
-<p><a class="btn btn--secondary" href="@GithubHref">@Pl.Login.Github</a></p>
-<p>@Pl.Login.NoAccount <a href="@ReturnTarget.RegisterUrl(Back)">@Pl.Register.Title</a></p>
+</div>
 
 @code {
     [CascadingParameter] HttpContext HttpContext { get; set; } = default!;
@@ -49,6 +68,8 @@
     string? _message;
 
     string Back => ReturnTarget.Safe(Redirect);
+    /// <summary>A sign-in that continues a booking: the context line says so. Only the sanitised target is read; the query itself is never printed.</summary>
+    bool ForBooking => Back.StartsWith("/rezerwacja/", StringComparison.Ordinal);
     string GithubHref => OAuthEndpoints.StartPath + (Back == "/" ? "" : $"?{ReturnTarget.Parameter}={Uri.EscapeDataString(Back)}");
 
     protected override void OnInitialized()

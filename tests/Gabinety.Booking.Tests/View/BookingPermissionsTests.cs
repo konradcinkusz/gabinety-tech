@@ -4,7 +4,7 @@ using BookingStatus = Gabinety.Billing.BookingStatus;
 
 namespace Gabinety.Booking.Tests;
 
-/// <summary>BookingPermissions (T-04.07d): the four flags for the caller at <c>now</c>, same windows as the endpoints, at their exact edges.</summary>
+/// <summary>BookingPermissions (T-04.07d, T-11.10): the flags for the caller at <c>now</c>, same windows as the endpoints, at their exact edges.</summary>
 public class BookingPermissionsTests
 {
     const string Client = "demo-client", Practitioner = "demo-practitioner", Stranger = "demo-stranger";
@@ -102,6 +102,36 @@ public class BookingPermissionsTests
         foreach (var s in All.Where(s => s != BookingStatus.Confirmed))
             foreach (var who in new[] { Client, Practitioner, Stranger })
                 Assert.False(Flags(Row(s), who, Start + 2 * H).CanReportNoShow, $"{s}/{who}");
+    }
+
+    [Theory]
+    [InlineData(-24 * 3600 - 1, true)]  // 24 h and 1 s before the start
+    [InlineData(-24 * 3600, true)]      // exactly 24 h: the full-refund window is inclusive
+    [InlineData(-24 * 3600 + 1, false)] // 1 s inside it
+    [InlineData(0, false)]
+    public void Reschedule_is_for_the_client_of_a_Confirmed_booking_with_24h_or_more_to_go(int offsetFromStartSeconds, bool expected)
+    {
+        var b = Row(BookingStatus.Confirmed);
+        var now = Start + TimeSpan.FromSeconds(offsetFromStartSeconds);
+        Assert.Equal(expected, Flags(b, Client, now).CanReschedule);
+        Assert.False(Flags(b, Practitioner, now).CanReschedule);
+        Assert.False(Flags(b, Stranger, now).CanReschedule);
+    }
+
+    [Fact]
+    public void Reschedule_is_false_once_the_booking_was_moved()
+    {
+        var b = Row(BookingStatus.Confirmed);
+        b.RescheduleCount = 1;
+        Assert.False(Flags(b, Client, Start - 48 * H).CanReschedule);
+    }
+
+    [Fact]
+    public void Reschedule_is_false_from_every_status_but_Confirmed()
+    {
+        foreach (var s in All.Where(s => s != BookingStatus.Confirmed))
+            foreach (var who in new[] { Client, Practitioner, Stranger })
+                Assert.False(Flags(Row(s), who, Start - 48 * H).CanReschedule, $"{s}/{who}");
     }
 
     [Theory]

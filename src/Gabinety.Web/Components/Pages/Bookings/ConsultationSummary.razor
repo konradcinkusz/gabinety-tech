@@ -10,6 +10,7 @@
     </dl>
     <p class="muted">@BookFlowText.Summary.Zone</p>
     @ChildContent
+    @if (ChangeTimeHref is not null) {<a class="booking-summary__change btn btn--ghost" href="@ChangeTimeHref">@BookFlowText.Summary.ChangeTime</a>}
 </section>
 
 @code {
@@ -22,5 +23,7 @@
     [Parameter, EditorRequired] public string When { get; set; } = "";
     [Parameter] public int? Minutes { get; set; }
     [Parameter] public long PriceMinor { get; set; }
+    /// <summary>Where "Zmień termin" leads (the profile's picker); null leaves the link out, as the checkout and the confirmation do.</summary>
+    [Parameter] public string? ChangeTimeHref { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
 }

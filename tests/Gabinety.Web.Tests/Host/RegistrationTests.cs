@@ -27,8 +27,8 @@ public class RegistrationTests
         Assert.Equal("Hasło", form.QuerySelector("label[for=register-password]")!.TextContent);
         Assert.Equal("password", form.QuerySelector("#register-password")!.GetAttribute("type"));
         Assert.Equal("new-password", form.QuerySelector("#register-password")!.GetAttribute("autocomplete"));
-        Assert.Equal("Co najmniej 8 znaków, w tym mała i wielka litera, cyfra i znak specjalny.", page.TextOf("#register-password-hint"));
-        Assert.Equal("register-password-hint", form.QuerySelector("#register-password")!.GetAttribute("aria-describedby"));
+        Assert.Equal(["co najmniej 8 znaków", "mała i wielka litera", "cyfra", "znak specjalny"], page.All("#register-password-rules li").Select(li => li.TextContent));
+        Assert.Equal("register-password-rules", form.QuerySelector("#register-password")!.GetAttribute("aria-describedby")); // the rules, a visible list, describe the password
         Assert.NotNull(form.QuerySelector("input[name=__RequestVerificationToken]"));
         Assert.Equal("register", form.QuerySelector("input[name=_handler]")!.GetAttribute("value"));
         Assert.Equal("Załóż konto", form.QuerySelector("button[type=submit]")!.TextContent);

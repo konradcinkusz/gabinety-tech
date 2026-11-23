@@ -24,10 +24,35 @@ public sealed record OfferingFilter(string? Problem, string? Tech, int? Duration
         && (Duration is null || o.DurationMinutes == Duration) && (MaxPriceMinor is null || o.PriceMinor <= MaxPriceMinor);
 }
 
-public sealed record Cursor(decimal Score, DateTimeOffset ApprovedAt, Guid Id)
+/// <summary>The orders of the list (CONTRACTS 3.2). Every one ends with the ranking order, which ends with the id, so each is total.</summary>
+public enum SearchSort { Rank, PriceAsc, PriceDesc, NextSlot }
+
+public static class SearchSorts
 {
-    public string Encode() => Base64Url.EncodeToString(Encoding.ASCII.GetBytes(
-        $"{Score.ToString(CultureInfo.InvariantCulture)}|{ApprovedAt.UtcTicks.ToString(CultureInfo.InvariantCulture)}|{Id:N}"));
+    public static bool TryParse(string value, out SearchSort sort)
+    {
+        (var ok, sort) = value switch { "rank" => (true, SearchSort.Rank), "price_asc" => (true, SearchSort.PriceAsc), "price_desc" => (true, SearchSort.PriceDesc), "next_slot" => (true, SearchSort.NextSlot), _ => (false, SearchSort.Rank) };
+        return ok;
+    }
+
+    public static string Wire(this SearchSort sort) => sort switch { SearchSort.PriceAsc => "price_asc", SearchSort.PriceDesc => "price_desc", SearchSort.NextSlot => "next_slot", _ => "rank" };
+}
+
+/// <summary>
+/// The keyset position after the last row of a page. It encodes the sort: a rank cursor keeps the original three-part form (so a cursor handed out before
+/// this field existed still works), a price cursor is `sort|price|score|ticks|id`. <see cref="Price"/> is 0 for rank. A next-slot cursor is `next_slot|slotTicks|score|ticks|id`,
+/// where the second part is `none` for a practitioner without a next free slot (those come last); <see cref="Slot"/> is null for every other sort.
+/// </summary>
+public sealed record Cursor(SearchSort Sort, long Price, decimal Score, DateTimeOffset ApprovedAt, Guid Id, DateTimeOffset? Slot = null)
+{
+    public Cursor(decimal score, DateTimeOffset approvedAt, Guid id) : this(SearchSort.Rank, 0, score, approvedAt, id) { }
+
+    public string Encode()
+    {
+        var rank = $"{Score.ToString(CultureInfo.InvariantCulture)}|{ApprovedAt.UtcTicks.ToString(CultureInfo.InvariantCulture)}|{Id:N}";
+        var lead = Sort == SearchSort.NextSlot ? (Slot is { } slot ? slot.UtcTicks.ToString(CultureInfo.InvariantCulture) : "none") : Price.ToString(CultureInfo.InvariantCulture);
+        return Base64Url.EncodeToString(Encoding.ASCII.GetBytes(Sort == SearchSort.Rank ? rank : $"{Sort.Wire()}|{lead}|{rank}"));
+    }
 
     public static bool TryDecode(string text, out Cursor? cursor)
     {
@@ -35,10 +60,25 @@ public sealed record Cursor(decimal Score, DateTimeOffset ApprovedAt, Guid Id)
         try
         {
             var parts = Encoding.ASCII.GetString(Base64Url.DecodeFromChars(text)).Split('|');
+            var sort = SearchSort.Rank; long price = 0; DateTimeOffset? slot = null;
+            if (parts.Length == 5)
+            {
+                if (!SearchSorts.TryParse(parts[0], out sort) || sort == SearchSort.Rank) return false;
+                if (sort == SearchSort.NextSlot)
+                {
+                    if (parts[1] != "none")
+                    {
+                        if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var slotTicks) || slotTicks > 3155378975999999999) return false;
+                        slot = new DateTimeOffset(slotTicks, TimeSpan.Zero);
+                    }
+                }
+                else if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out price)) return false;
+                parts = parts[2..];
+            }
             if (parts.Length != 3 || !decimal.TryParse(parts[0], NumberStyles.Number, CultureInfo.InvariantCulture, out var score)
                 || !long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var ticks)
                 || ticks is < 0 or > 3155378975999999999 || !Guid.TryParseExact(parts[2], "N", out var id)) return false;
-            cursor = new Cursor(score, new DateTimeOffset(ticks, TimeSpan.Zero), id);
+            cursor = new Cursor(sort, price, score, new DateTimeOffset(ticks, TimeSpan.Zero), id, slot);
             return true;
         }
         catch (Exception e) when (e is FormatException or ArgumentException) { return false; }
@@ -56,6 +96,7 @@ public sealed class SearchQuery
     /// <summary><c>contract=1</c>: only practitioners who advertise contract availability.</summary>
     public bool Contract { get; private set; }
     public Cursor? After { get; private set; }
+    public SearchSort Sort { get; private set; } = SearchSort.Rank;
     public int Limit { get; private set; } = DefaultLimit;
     public (string Field, string Message)? Error { get; private set; }
 
@@ -75,7 +116,7 @@ public sealed class SearchQuery
         }
 
         if (!Single("problem", out problem) || !Single("tech", out tech) || !Single("q", out q) || !Single("cursor", out cursor)
-            || !Single("contract", out var contract) || !Single("duration", out var d) || !Single("maxPriceMinor", out var m) || !Single("limit", out var l)) return s;
+            || !Single("contract", out var contract) || !Single("sort", out var sort) || !Single("duration", out var d) || !Single("maxPriceMinor", out var m) || !Single("limit", out var l)) return s;
 
         if (problem is not null && !ValidSlug(problem)) { s.Fail("problem", "a slug of a-z, 0-9 and single hyphens"); return s; }
         if (tech is not null && !ValidSlug(tech)) { s.Fail("tech", "a slug of a-z, 0-9 and single hyphens"); return s; }
@@ -105,9 +146,14 @@ public sealed class SearchQuery
             if (t.Length > MaxQ) { s.Fail("q", "at most 60 characters"); return s; }
             s.Q = t.Length == 0 ? null : t;
         }
+        if (sort is not null)
+        {
+            if (!SearchSorts.TryParse(sort, out var so)) { s.Fail("sort", "rank, price_asc, price_desc or next_slot"); return s; }
+            s.Sort = so;
+        }
         if (cursor is not null)
         {
-            if (!Cursor.TryDecode(cursor, out var c)) { s.Fail("cursor", "not a cursor of this list"); return s; }
+            if (!Cursor.TryDecode(cursor, out var c) || c!.Sort != s.Sort) { s.Fail("cursor", "not a cursor of this list and sort"); return s; }
             s.After = c;
         }
         s.Filter = new OfferingFilter(problem, tech, duration, max);

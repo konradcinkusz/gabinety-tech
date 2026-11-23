@@ -18,6 +18,7 @@ namespace Gabinety.Booking.Features.Internal.Erasure;
 /// <c>(client_user_id, idempotency_key)</c> stays valid. The same token replaces <c>idempotency_records.client_user_id</c> and the client id inside the
 /// <c>pair_key</c> of the client's ledger rows (the only ledger column that carries a user id). It KEEPS ledger amounts and kinds, payments, payouts (none
 /// carries a user id), and the booking's amounts, statuses and times: accounting. The counterparty still sees the booking, with the placeholder brief.
+/// The user's <c>notification_preferences</c> rows are deleted in the same transaction (T-11.12).
 /// Idempotent: a second call finds no row of the old id. An unknown user is 204, as Directory's and Reputation's erasure answer. One transaction, rows
 /// updated in batches of <see cref="BatchSize"/>.
 /// <para>Collaboration proposals (ADR proposal 0013, T-13.02) follow the same rules: the erased user's id becomes the token; as the client their e-mail, name snapshot and company name are cleared; the text of every round
@@ -114,6 +115,11 @@ public sealed class ErasureFeature : IServiceFeature
             db.ChangeTracker.Clear();
             proposals += batch.Count;
         }
+
+        // Notification preferences are keyed by the raw user id and are no accounting: they are deleted, not anonymised (T-11.12).
+        db.NotificationPreferences.RemoveRange(await db.NotificationPreferences.Where(p => p.UserId == userId).ToListAsync(ct));
+        await db.SaveChangesAsync(ct);
+        db.ChangeTracker.Clear();
         return (bookings, records, proposals);
     }
 

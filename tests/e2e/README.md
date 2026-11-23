@@ -1,6 +1,6 @@
 # tests/e2e: Playwright harness and journeys
 
-The harness (T-08.03a) runs Playwright against a **running fake profile**. It starts nothing itself. Journeys J1-J8 (T-08.03 to T-08.05; J8 is ADR proposal 0013) only add spec files under `journeys/`; `playwright.config.ts`, `harness/**` and `package.json` belong to the harness task.
+The harness (T-08.03a) runs Playwright against a **running fake profile**. It starts nothing itself. Journeys J1-J10 (T-08.03 to T-08.05, T-11.20; J10 is ADR proposal 0013) only add spec files under `journeys/`; `playwright.config.ts`, `harness/**` and `package.json` belong to the harness task.
 
 ## Run it
 
@@ -19,6 +19,7 @@ The journeys run against the Blazor Web App (`src/Gabinety.Web`), the only web h
 - **Interactive pages.** The page is HTML first and interactive only after the websocket answers `StartCircuit`; input before that is discarded without an error. Use `gotoInteractive(page, url)` (in `harness/circuit.ts`) instead of `page.goto` for a page that may be interactive (it waits only when the prerendered HTML carries a server component marker), and `watchCircuit(page)` taken **before** a click that navigates to one (`await circuit.ready()` after). Never sleep for a circuit.
 - **No browser-facing API.** The browser never calls a backend, so `signInAs`/`signInViaBff` sign the browser context in through the real form and keep the user's token for the context; `bff(ctx, ..., "/api/proxy/<service>/...")` and the booking helpers call the service directly with it (the path keeps the old `/api/proxy/<service>/` prefix, which `harness/booking-support.ts` strips). What a journey is about still goes through the UI.
 - **Sign-in** is the form post of `signInViaFormPost` (the session cookie `gt_session`); `signInViaBff` also fetches the user's token from the identity service for API set-up (`accessTokenOf`).
+- J8 (`j8-reschedule.spec.ts`): a fresh client's paid booking is moved once from `/moje/rezerwacje/{id}/zmien-termin`; flash, new time, unchanged payment, old slot free, no second entry. J9 (`j9-password-reset.spec.ts`): forgot password, the token read from DevIdentity's `GET /dev/last-reset-token?email=` (only with `GABINETY_FAKE=1`; the fake profile sends no e-mail), set the new password, sign in; the link works once; the answer never tells whether the address exists. Both use their own `demo-` users, so they need no reseed.
 - J7 (`j7-foreign-origin.spec.ts`) posts the sign-in form with a foreign `Origin` and a cross-site fetch: 403 `cross_site_request`, no session cookie; the same-origin control passes.
 
 

@@ -42,6 +42,8 @@ export class BookingDetailPage {
       }
     }
   }
+  /** The reschedule entry (T-11.11): a link on the detail while the service allows a move; absent once the one allowed move is used. */
+  rescheduleLink(): Locator { return this.page.getByRole("link", { name: "Zmień termin" }); }
   disputeButton(): Locator { return this.page.getByRole("button", { name: "Zgłoś spór" }); }
   async openDispute(text: string) {
     await this.disputeButton().click();
@@ -82,5 +84,24 @@ export class AdminDisputesPage {
         await this.page.waitForTimeout(5_000);
       }
     }
+  }
+}
+
+/** /moje/rezerwacje/{id}/zmien-termin: the booking's summary and the slot picker of its offer, each free time a submit button. */
+export class ReschedulePage {
+  constructor(readonly page: Page) {}
+  heading(): Locator { return this.page.getByRole("heading", { level: 1, name: "Zmień termin" }); }
+  /** The free times shown (buttons named like `14:30`). */
+  times(): Locator { return this.page.getByRole("button", { name: /^\d{2}:\d{2}$/ }); }
+  /** The refusal callout of a booking that cannot be moved (again). */
+  refused(): Locator { return this.page.getByText("Tej rezerwacji nie można już przełożyć", { exact: false }); }
+  /** The picker reads the slots from Booking, which may answer 429 for a moment under the shared rate limit: reload until a time is shown (bounded). */
+  async firstTime(): Promise<Locator> {
+    const first = this.times().first();
+    await expect(async () => {
+      if (!(await first.isVisible())) await this.page.reload();
+      await expect(first).toBeVisible({ timeout: 8_000 });
+    }).toPass({ timeout: 90_000, intervals: [2_000, 5_000, 10_000] });
+    return first;
   }
 }

@@ -1,0 +1,10 @@
+/* The ledger's own rules (UX-051). Tokens only: the colour test of StyleContractTests reads this file. */
+
+/* The rows of a long ledger scroll inside the table wrapper while the head stays in view. Desktop only: under 40rem the rows are cards. */
+@media (min-width: 40rem) {
+    .ledger-table { max-height: 70vh; overflow: auto; }
+    .ledger-table thead th { position: sticky; top: 0; z-index: 1; }
+}
+
+/* A booking reference: the last characters of the id, set like code. The whole id is in the title. */
+.ledger-ref { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary); }

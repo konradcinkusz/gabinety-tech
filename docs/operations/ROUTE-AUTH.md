@@ -78,7 +78,11 @@ Columns: **Policy** = what the code declares (checked by the test): `Anonymous`,
 | Booking | POST | `/api/v1/bookings` | Authenticated | all | |
 | Booking | GET | `/api/v1/bookings/{id}` | Authenticated | all | |
 | Booking | GET | `/api/v1/me/bookings` | Authenticated | all | |
+| Booking | GET | `/api/v1/me/earnings` | Authenticated | all | practitioner only (403 otherwise), own rows only; T-11.15 |
 | Booking | POST | `/api/v1/bookings/{id}/cancel` | Authenticated | all | |
+| Booking | GET | `/api/v1/me/notification-preferences` | Authenticated | all | the caller's own rows only; T-11.12 |
+| Booking | PUT | `/api/v1/me/notification-preferences` | Authenticated | all | the caller's own rows only; a transactional kind is 400; T-11.12 |
+| Booking | POST | `/api/v1/bookings/{id}/reschedule` | Authenticated | all | client of the booking only (practitioner 403, stranger 404) |
 | Booking | POST | `/api/v1/bookings/{id}/dispute` | Authenticated | all | |
 | Booking | POST | `/api/v1/bookings/{id}/report-client-no-show` | Authenticated | all | |
 | Booking | GET | `/api/v1/admin/disputes` | Admin | all | |
@@ -152,12 +156,16 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/zasady-rankingu` | Anonymous | all | ranking rules from the Directory; 503 when it does not answer |
 | Web | PAGE | `/regulamin` | Anonymous | all | legal text (embedded markdown) |
 | Web | PAGE | `/polityka-prywatnosci` | Anonymous | all | legal text (embedded markdown) |
+| Web | PAGE | `/pomoc` | Anonymous | all | static help; the contact sentence and mailto only when `Support:Email` is set |
 | Web | GET | `/sitemap.xml` | Anonymous | all | approved practitioners and indexable categories; 503 when the Directory does not answer |
 | Web | GET | `/robots.txt` | Anonymous | all | the rules of the retired Next.js app (the sitemap and robots of ADR-0010) |
+| Web | GET | `/avatar/{slug}` | Anonymous | all | the verified GitHub avatar of an approved practitioner (ADR-0013): slug validated, login read from the Directory profile, only `github.com` then `avatars.githubusercontent.com`, `image/png` or `image/jpeg` up to 200 KB, cached 24 h (failures 10 min); 404 for anything else |
 | Web | PAGE | `/logowanie` | Anonymous | all | sign-in form (the POST is handled by the page, antiforgery) |
 | Web | PAGE | `/logowanie/kod` | Anonymous | all | second step of a two-factor sign-in; needs the sealed `gt_2fa` challenge cookie, else back to `/logowanie` |
 | Web | PAGE | `/rejestracja` | Anonymous | all | registration form (the POST is handled by the page, antiforgery) |
 | Web | PAGE | `/rejestracja/sprawdz-skrzynke` | Anonymous | all | "confirm your e-mail" state after a `202` registration |
+| Web | PAGE | `/zapomniane-haslo` | Anonymous | all | request a reset e-mail (T-11.07): one address, the same answer for a known and an unknown one; `noindex` |
+| Web | PAGE | `/reset-password` | Anonymous | all | the new password after the mailed link `?token=&email=` (T-11.07): token and address kept in hidden fields, never logged; signs nobody in; `noindex`, `referrer: strict-origin` |
 | Web | PAGE | `/wyloguj` | Anonymous | all | sign-out form |
 | Web | GET | `/oauth/github/start` | Anonymous | all | GitHub sign-in start: state cookie `gt_oauth_state` + returnUrl from `Site:BaseUrl` (PR #118) |
 | Web | GET | `/oauth/callback` | Anonymous | all | GitHub callback carve-out (PR #118): no sign-in redirect, state checked against the cookie, code exchanged |
@@ -171,6 +179,8 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/admin/podejrzane` | Admin | all | suspicious client-practitioner pairs (T-10.03) |
 | Web | PAGE | `/moje/rezerwacje` | Authenticated | all | my bookings (client and practitioner tabs), static server rendering |
 | Web | PAGE | `/moje/rezerwacje/{BookingId}` | Authenticated | all | booking detail with cancel, dispute and no-show (form posts, antiforgery) |
+| Web | GET | `/moje/rezerwacje/{BookingId}/kalendarz.ics` | Authenticated | all | the booking as an iCalendar attachment (`text/calendar`, no-store), read with the user's own bearer; only for Confirmed or Completed bookings, 404 otherwise and for another user's booking |
+| Web | PAGE | `/moje/rezerwacje/{BookingId}/zmien-termin` | Authenticated | all | the client moves a confirmed booking once, 24 h or more before its start (form posts, antiforgery); a booking that is not the caller's is the forbidden page; T-11.11 |
 | Web | PAGE | `/moje/opinie` | Authenticated | all | the practitioner's own reviews and replies |
 | Web | PAGE | `/moje/opinie/{BookingId}` | Authenticated | all | write a review (form post, antiforgery) |
 | Web | PAGE | `/propozycja/{Slug}` | Authenticated | all | ADR proposal 0013: a client's collaboration proposal to one programmer (form post, antiforgery, `Idempotency-Key`); `?kind=short` for a short one |
@@ -182,12 +192,13 @@ The middleware is UX, the services are the boundary: a signed-in page still call
 | Web | PAGE | `/rezerwacja/potwierdzenie/{BookingId}` | Authenticated | all | confirmation |
 | Web | PAGE | `/checkout/mock/{BookingId}` | Authenticated | all | mock checkout: answers 404 unless the fake profile runs the mock provider (`WebOptions.MockPayments`); the clock alone is interactive |
 | Web | PAGE | `/bookings/{BookingId}` | Authenticated | all | where the payment provider returns the browser (Stripe Checkout success URL): redirects to the confirmation |
-| Web | PAGE | `/konto` | Authenticated | all | account: e-mail, consents, data export link, account deletion (static rendering, forms with antiforgery) |
+| Web | PAGE | `/konto` | Authenticated | all | account: e-mail, consents, data export link, notification preferences (T-11.13: a form of this page posting the three switchable kinds to Booking, the transactional kinds are always sent, a failing Booking is a callout of its own section), password change (T-11.08: a form of this page, the session is reissued in the same response; no section for an account without a password), account deletion (static rendering, forms with antiforgery) |
 | Web | GET | `/konto/export` | Authenticated | all | the user's data as a no-store JSON attachment (the identity service's export, passed through) |
 | Web | PAGE | `/gabinet-programisty` | Authenticated | all | practitioner dashboard and onboarding, static server rendering; any signed-in account may become a practitioner (ADR-0012, "Practitioner area") |
 | Web | PAGE | `/gabinet-programisty/profil` | Authenticated | all | practitioner profile form |
 | Web | PAGE | `/gabinet-programisty/oferty` | Authenticated | all | offers: list, confirmation before disabling, re-enable, form |
 | Web | PAGE | `/gabinet-programisty/dostepnosc` | Authenticated | all | weekly availability and blocked days |
+| Web | PAGE | `/gabinet-programisty/kalendarz` | Authenticated | all | week view of the practitioner's consultations (`?tydzien=`), read with the user's own bearer; 403 for an account without a practitioner profile; static, no script |
 | Web | PAGE | `/gabinet-programisty/platnosci` | Authenticated | all | payments account status and onboarding link (PAYMENTS-GO-LIVE) |
 | Web | PAGE | `/practitioner/payments` | Authenticated | all | the return and refresh address Booking gives Stripe; forwards to `/gabinet-programisty/platnosci` |
 | Web | PAGE | `/not-found` | Anonymous | all | status code re-execution target |

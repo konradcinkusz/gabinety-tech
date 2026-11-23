@@ -13,8 +13,13 @@ public sealed record TaxonomyDto(string Version, IReadOnlyList<CategoryDto> Prob
 
 public sealed record RatingDto(double Average, int Count);
 
+/// <summary>
+/// A list card (CONTRACTS 3.2). <c>TechSlugs</c> (the union over the active offerings, at most 6) and <c>NextFreeSlotUtc</c> (start of the earliest bookable slot in the next 14 days) are
+/// wave 3 additions: absent from an older Directory, so they default to none.
+/// </summary>
 public sealed record PractitionerCardDto(Guid Id, string Slug, string DisplayName, string Headline, string? GithubLogin, IReadOnlyList<string> Badges,
-    RatingDto? Rating, bool IsNew, MoneyDto FromPrice, IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations, ContractAvailabilityDto? Contract = null);
+    RatingDto? Rating, bool IsNew, MoneyDto FromPrice, IReadOnlyList<string> ProblemSlugs, IReadOnlyList<int> Durations,
+    IReadOnlyList<string>? TechSlugs = null, DateTimeOffset? NextFreeSlotUtc = null, ContractAvailabilityDto? Contract = null);
 
 /// <summary>What a practitioner advertises for contract work (ADR proposal 0013). Absent means "not available"; <c>AvailableFrom</c> absent means available now.</summary>
 public sealed record ContractAvailabilityDto(DateOnly? AvailableFrom, int HoursPerWeek, MoneyDto? Rate);
@@ -66,6 +71,9 @@ public sealed record BriefDto(string Text, string? ProblemSlug, bool AiAssisted)
 
 public sealed record CreateBookingRequestDto(Guid OfferingId, [property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantWriter))] DateTimeOffset StartUtc, BriefDto Brief);
 
+/// <summary>Body of <c>POST /api/v1/bookings/{id}/reschedule</c> (CONTRACTS 4.2): the new start, a UTC instant written with <c>Z</c>.</summary>
+public sealed record RescheduleRequestDto([property: System.Text.Json.Serialization.JsonConverter(typeof(UtcInstantWriter))] DateTimeOffset StartUtc);
+
 /// <summary>The service insists on a UTC instant written with <c>Z</c> (CONTRACTS 0): <c>2026-12-08T11:00:00Z</c>, never <c>+00:00</c> or a local offset.</summary>
 public sealed class UtcInstantWriter : System.Text.Json.Serialization.JsonConverter<DateTimeOffset>
 {
@@ -85,7 +93,7 @@ public sealed record PaymentViewDto(string Status, MoneyDto Refunded);
 /// </summary>
 public sealed record BookingDetailDto(Guid Id, string Status, string? StatusReason, DateTimeOffset StartUtc, DateTimeOffset EndUtc, int DurationMinutes, string OfferingTitle, MoneyDto Price,
     PractitionerRefDto Practitioner, ClientRefDto? Client, BriefDto? Brief, string? MeetingUrl, DateTimeOffset? HoldExpiresAt, PaymentViewDto Payment, MoneyDto? Fee, MoneyDto? Payout,
-    bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview, CancelOutcomeDto? CancelOutcome = null);
+    bool CanCancel, bool CanDispute, bool CanReportNoShow, bool CanReview, CancelOutcomeDto? CancelOutcome = null, bool CanReschedule = false);
 
 /// <summary><c>cancelOutcome</c> (CONTRACTS 4.4, 9.2): what cancelling would do for the viewer right now, computed by the service on its clock. Present only when <c>canCancel</c>. <c>Outcome</c> is <c>full_refund</c>, <c>partial</c> or <c>no_refund</c>; <c>Refund</c> is what the client gets back.</summary>
 public sealed record CancelOutcomeDto(string Outcome, MoneyDto Refund);
@@ -96,6 +104,10 @@ public sealed record BriefSuggestionDto(string ProblemSlug, IReadOnlyList<string
 public sealed record CreateReviewResponseDto(Guid ReviewId, string Status);
 
 public sealed record MeDto(string UserId, Guid? PractitionerId, string? PractitionerStatus, bool IsAdmin, bool IsModerator);
+
+/// <summary>One switch of <c>/api/v1/me/notification-preferences</c> (CONTRACTS 4.2): <c>Kind</c> is <c>Reminder24h</c>, <c>Reminder1h</c> or <c>ReviewRequest</c>. The transactional kinds are never listed.</summary>
+public sealed record NotificationPreferenceDto(string Kind, bool Enabled);
+public sealed record NotificationPreferencesDto(IReadOnlyList<NotificationPreferenceDto> Items);
 
 // ---- the practitioner's own area (CONTRACTS 3.3, 3.5, 4.2; docs/operations/PAYMENTS-GO-LIVE.md)
 
@@ -133,6 +145,12 @@ public sealed record PaymentAccountDto(string Provider, string State);
 
 /// <summary><c>POST /api/v1/me/payments/account/onboarding</c>: <c>OnboardingUrl</c> is single use and short lived; it is never stored or logged.</summary>
 public sealed record PaymentOnboardingDto(string Provider, string State, string? OnboardingUrl);
+
+/// <summary>
+/// <c>GET /api/v1/me/earnings</c> (CONTRACTS 4.2, T-11.15): the Warsaw-day range answered (both days inclusive) and its four sums in grosz, plus the number of bookings behind the first three.
+/// The default range is the current Warsaw month, which the service decides; the page passes dates only for a month it was asked for.
+/// </summary>
+public sealed record EarningsDto(DateOnly From, DateOnly To, MoneyDto PaidOut, MoneyDto Pending, MoneyDto Disputed, MoneyDto Fees, int Count);
 
 // ---- contract availability and collaboration proposals (ADR proposal 0013)
 

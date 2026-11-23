@@ -40,12 +40,18 @@ else
                     var value = n;
                     <label class="rating-scale__option">
                         <input type="radio" id="@("rating-" + value)" name="Model.Rating" value="@value" checked="@(Model!.Rating == value)" />
-                        <span aria-hidden="true">@value</span>
+                        <span class="rating-scale__star" aria-hidden="true">&#9733;</span>
                         <span class="sr-only">@string.Format(ReviewsText.Form.RatingOption, value)</span>
                     </label>
                 }
             </div>
-            @if (Model!.Rating is >= ReviewRules.RatingMin and <= ReviewRules.RatingMax) {<p class="field__hint">@string.Format(ReviewsText.Form.RatingPreview, ReviewRules.Word(Model.Rating.Value))</p>}
+            @* All five words are rendered; the CSS shows only the word of the checked radio (no script). *@
+            <p class="rating-words">
+                @for (var n = ReviewRules.RatingMin; n <= ReviewRules.RatingMax; n++)
+                {
+                    <span class="rating-word rating-word--@n">@ReviewsText.Scale[n - 1]</span>
+                }
+            </p>
             @if (_ratingError is not null) {<p class="field__error" id="rating-error"><span class="sr-only">@(Pl.A11y.ErrorPrefix + " ")</span>@_ratingError</p>}
         </fieldset>
         <CounterTextArea Id="text" Name="Model.Text" Label="@ReviewsText.Form.TextLabel" Hint="@ReviewsText.Form.TextHint" Value="@Model!.Text" Rows="6" CounterFormat="@ReviewsText.Form.Counter"

@@ -73,7 +73,7 @@ public class SignInTests
         var page = await browser.GetAsync("/moje/rezerwacje");
         Assert.Equal(HttpStatusCode.OK, page.Status);
         Assert.Equal("Moje rezerwacje", page.TextOf("h1"));
-        Assert.Equal(["Konsultacja demo", "Druga konsultacja"], page.All("[data-testid=booking-row] h2").Select(h => h.TextContent));
+        Assert.Equal(["Konsultacja demo", "Druga konsultacja"], page.All("[data-testid=booking-row] .booking-row__title").Select(h => h.TextContent));
         Assert.Contains("wtorek, 1 grudnia, 13:00–14:00", page.TextOf("[data-testid=booking-row]"));
         Assert.Contains("250,00 zł", page.TextOf("[data-testid=booking-row]"));
         Assert.Equal("Potwierdzona", page.One("[data-testid=booking-row] .badge")!.TextContent);
@@ -83,8 +83,8 @@ public class SignInTests
         Assert.StartsWith("Bearer eyJ", seen.Authorization);
         Assert.DoesNotContain("eyJ", page.Html); // and no token anywhere in the page, prerendered state included
         Assert.DoesNotContain(web.Identity.Backend.Requests[0].Body ?? "", page.Html);
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/moje/propozycje", "/gabinet-programisty"], page.All("header .site-nav a").Select(a => a.GetAttribute("href")));
-        Assert.Equal(["/konto", "/wyloguj"], page.All("header .site-account a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], page.All("header .site-nav a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/moje/rezerwacje", "/moje/propozycje", "/konto", "/gabinet-programisty", "/wyloguj"], page.All("header .account-menu a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]

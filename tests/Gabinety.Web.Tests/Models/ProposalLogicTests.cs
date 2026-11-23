@@ -354,8 +354,8 @@ public class ListStateContractTests
     [Fact]
     public void The_contract_filter_is_on_only_for_the_value_one()
     {
-        Assert.True(ListState.Parse(null, null, null, null, null, null, "1").Contract);
-        foreach (var other in new[] { "0", "true", "yes", "", null }) Assert.False(ListState.Parse(null, null, null, null, null, null, other).Contract);
+        Assert.True(ListState.Parse(null, null, null, null, null, null, contract: "1").Contract);
+        foreach (var other in new[] { "0", "true", "yes", "", null }) Assert.False(ListState.Parse(null, null, null, null, null, null, contract: other).Contract);
         Assert.False(ListState.Parse(null, null, null, null, null, null).Contract); // the old six-argument call still works
     }
 

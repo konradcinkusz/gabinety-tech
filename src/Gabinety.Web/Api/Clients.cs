@@ -3,8 +3,8 @@ using Gabinety.Web.Auth;
 
 namespace Gabinety.Web.Api;
 
-/// <summary>The filters of <c>GET /api/v1/practitioners</c> (CONTRACTS 3.2).</summary>
-public sealed record PractitionerQuery(string? Problem = null, string? Tech = null, string? Q = null, int? Duration = null, long? MaxPriceMinor = null, string? Cursor = null, bool Contract = false);
+/// <summary>The filters of <c>GET /api/v1/practitioners</c> (CONTRACTS 3.2). <c>Sort</c> is the wire value (<c>price_asc</c>, <c>price_desc</c>, <c>next_slot</c>); none means the Directory's rank order.</summary>
+public sealed record PractitionerQuery(string? Problem = null, string? Tech = null, string? Q = null, int? Duration = null, long? MaxPriceMinor = null, string? Cursor = null, string? Sort = null, bool Contract = false);
 
 /// <summary>Directory, public reads only (SPEC 5.1: 5 s, once, GET only: see <see cref="ApiResilience"/>).</summary>
 public sealed partial class DirectoryClient(HttpClient http, VisitorAddressAccessor visitor) : ApiClient(http, visitor)
@@ -29,6 +29,7 @@ public sealed partial class DirectoryClient(HttpClient http, VisitorAddressAcces
         Add("maxPriceMinor", query.MaxPriceMinor?.ToString(CultureInfo.InvariantCulture));
         Add("cursor", query.Cursor);
         if (query.Contract) parts.Add("contract=1"); // ADR proposal 0013: only practitioners who take collaboration proposals
+        Add("sort", query.Sort);
         return GetAsync<PageDto<PractitionerCardDto>>("/api/v1/practitioners" + (parts.Count == 0 ? "" : "?" + string.Join('&', parts)), null, ct);
     }
 }
@@ -49,6 +50,14 @@ public sealed partial class BookingClient(HttpClient http, VisitorAddressAccesso
         if (!string.IsNullOrEmpty(cursor)) parts.Add($"cursor={Uri.EscapeDataString(cursor)}");
         return await GetAsync<PageDto<BookingViewDto>>("/api/v1/me/bookings?" + string.Join('&', parts), await tokens.AccessTokenAsync(ct), ct);
     }
+
+    /// <summary>The signed-in user's three switches (CONTRACTS 4.2): a kind without a row is on. Failure is state, never a cause, so the account page can fail soft.</summary>
+    public async Task<ApiResult<NotificationPreferencesDto>> NotificationPreferencesAsync(CancellationToken ct = default) =>
+        await GetAsync<NotificationPreferencesDto>("/api/v1/me/notification-preferences", await tokens.AccessTokenAsync(ct), ct);
+
+    /// <summary>Sets the kinds it names and answers with the full list. Only the switchable kinds are sent; the service refuses any other with <c>400 validation_failed</c>.</summary>
+    public async Task<ApiResult<NotificationPreferencesDto>> SetNotificationPreferencesAsync(IReadOnlyList<NotificationPreferenceDto> items, CancellationToken ct = default) =>
+        await WriteAsync<NotificationPreferencesDto>(HttpMethod.Put, "/api/v1/me/notification-preferences", await tokens.AccessTokenAsync(ct), new NotificationPreferencesDto(items), ct);
 }
 
 /// <summary>Reputation, public reads.</summary>

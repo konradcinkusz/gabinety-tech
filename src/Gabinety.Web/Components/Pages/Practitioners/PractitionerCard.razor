@@ -1,45 +1,91 @@
-@inject TimeProvider Time
-<article class="card practitioner-card" data-testid="practitioner-card">
-    <h2 class="practitioner-card__name"><a href="@($"/gabinet/{Practitioner.Slug}")">@Practitioner.DisplayName</a></h2>
-    <p class="practitioner-card__headline">@Practitioner.Headline</p>
-    <ul class="cluster">
-        @* One badge: the four checks are the same on every card and so carry no information; the full list is on the profile (P-LIST-2). *@
-        @if (Practitioner.Badges.Contains("approved"))
-        {
-            <li><span class="badge badge--success">@PlPages.ListExtra.Verified</span></li>
-        }
-        @if (Practitioner.Contract is { } contract)
-        {
-            <li><span class="badge badge--info" data-testid="card-contract">@ContractAvailabilityFormat.CardLine(contract, PlFormat.TodayWarsaw(Time.GetUtcNow()))</span></li>
-        }
-        <li>
+@using Gabinety.Web.Components.Pages.Bookings
+<article class="card card--link practitioner-card" data-testid="practitioner-card">
+    <div class="practitioner-card__avatar">
+        <Avatar Name="@Practitioner.DisplayName" Size="Avatar.AvatarSize.Medium" Slug="@(Practitioner.GithubLogin is { Length: > 0 } ? Practitioner.Slug : null)" />
+    </div>
+    <div class="practitioner-card__body">
+        <h2 class="practitioner-card__name"><a href="@($"/gabinet/{Practitioner.Slug}")">@Practitioner.DisplayName</a></h2>
+        <p class="practitioner-card__headline">@Practitioner.Headline</p>
+        <p class="cluster practitioner-card__meta">
+            @* One verification badge: the four checks are the same on every card and so carry no information; the full list is on the profile (P-LIST-2). *@
+            @if (Practitioner.Badges.Contains("approved"))
+            {
+                <span class="badge badge--success">@PlPages.ListExtra.Verified</span>
+            }
+            @if (Practitioner.Contract is { } contract)
+            {
+                <span class="badge badge--info" data-testid="card-contract">@ContractAvailabilityFormat.CardLine(contract, PlFormat.TodayWarsaw(Now))</span>
+            }
             @if (Practitioner.Rating is { } rating && !Practitioner.IsNew)
             {
-                <span class="badge" aria-label="@string.Format(Pl.Card.Rating, PlFormat.Rating(rating.Average), rating.Count)">★ @PlFormat.Rating(rating.Average) (@rating.Count)</span>
+                <span class="practitioner-card__rating num" role="img" aria-label="@string.Format(Pl.Card.Rating, PlFormat.Rating(rating.Average), rating.Count)">★ @PlFormat.Rating(rating.Average) (@rating.Count)</span>
             }
             else
             {
-                <span class="badge">@Pl.Card.IsNew</span>
+                <span class="badge badge--neutral">@Pl.Card.IsNew</span>
             }
-        </li>
-    </ul>
-    <p class="cluster">
-        <span>@Pl.Card.From <span class="num">@Money.Pln(Practitioner.FromPrice.AmountMinor)</span></span>
-        <span>@string.Join(", ", Practitioner.Durations.Select(d => string.Format(Pl.Filters.Minutes, d)))</span>
+        </p>
+        @if (Categories.Count > 0)
+        {
+            <p class="practitioner-card__categories">
+                @foreach (var category in Categories)
+                {
+                    <span>@category</span>
+                }
+            </p>
+        }
+        @if (Technologies.Count > 0)
+        {
+            <p class="practitioner-card__techs">
+                @foreach (var tech in Technologies)
+                {
+                    <span class="badge badge--neutral">@tech</span>
+                }
+            </p>
+        }
+        @if (Practitioner.NextFreeSlotUtc is { } next)
+        {
+            @* The Warsaw wall time, as the slot picker shows it. data-utc is the instant for a later local-time note (enhance.js reads it only on the slot picker). *@
+            <p class="practitioner-card__next">
+                @Pl.Card.NextSlot <time datetime="@next.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture)" data-utc="@next.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture)">@MyBookingsSchedule.Relative(Now, next)</time>
+            </p>
+        }
+    </div>
+    <p class="practitioner-card__price">
+        <span class="practitioner-card__from num">@Pl.Card.From @ListFormat.Price(Practitioner.FromPrice.AmountMinor)</span>
+        <span class="practitioner-card__durations muted">@string.Join(", ", Practitioner.Durations.Select(d => string.Format(Pl.Filters.Minutes, d)))</span>
     </p>
 </article>
 
 @code {
-    static readonly System.Globalization.CultureInfo Invariant = System.Globalization.CultureInfo.InvariantCulture;
+    /// <summary>The Polish names of the problem categories by slug, from the list page's taxonomy. A slug without a name is not shown.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? CategoryNames { get; set; }
+
+    /// <summary>The Polish names of the technologies by slug (T-11.05). A slug without a name is not shown.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? TechNames { get; set; }
+
+    /// <summary>The page's clock: the next free slot is read as a day relative to it (jutro, za 3 dni, …).</summary>
+    [Parameter, EditorRequired] public DateTimeOffset Now { get; set; }
 
     [Parameter, EditorRequired] public PractitionerCardDto Practitioner { get; set; } = default!;
 
-    static string BadgeLabel(string badge) => badge switch
+    /// <summary>At most three problems, in the order the Directory gives them.</summary>
+    IReadOnlyList<string> Categories
     {
-        "email" => Pl.Card.BadgeEmail,
-        "github" => Pl.Card.BadgeGithub,
-        "nip" => Pl.Card.BadgeNip,
-        "approved" => Pl.Card.BadgeApproved,
-        _ => badge,
-    };
+        get
+        {
+            if (CategoryNames is not { } names) return [];
+            return Practitioner.ProblemSlugs.Where(names.ContainsKey).Take(3).Select(slug => names[slug]).ToList();
+        }
+    }
+
+    /// <summary>At most three technologies, in the order the Directory gives them (T-11.05).</summary>
+    IReadOnlyList<string> Technologies
+    {
+        get
+        {
+            if (TechNames is not { } names || Practitioner.TechSlugs is not { } slugs) return [];
+            return slugs.Where(names.ContainsKey).Take(3).Select(slug => names[slug]).ToList();
+        }
+    }
 }

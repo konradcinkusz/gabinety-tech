@@ -240,6 +240,16 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("price_minor");
 
+                    b.Property<short>("RescheduleCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)0)
+                        .HasColumnName("reschedule_count");
+
+                    b.Property<DateTimeOffset?>("RescheduledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rescheduled_at");
+
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("resolved_at");
@@ -661,6 +671,27 @@ namespace Gabinety.Booking.Persistence.Migrations
                         .HasFilter("proposal_id IS NOT NULL");
 
                     b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("Gabinety.Booking.Notifications.Preferences.NotificationPreference", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.HasKey("UserId", "Kind");
+
+                    b.ToTable("notification_preferences", (string)null);
                 });
 
             modelBuilder.Entity("Gabinety.Booking.Persistence.AvailabilityException", b =>

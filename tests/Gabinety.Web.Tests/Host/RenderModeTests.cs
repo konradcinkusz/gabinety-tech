@@ -58,11 +58,13 @@ public partial class RenderModeTests
     }
 
     [Fact]
-    public void The_framework_script_is_loaded_once_from_the_app_not_a_cdn()
+    public void The_framework_script_and_the_one_enhancement_script_are_loaded_once_from_the_app_not_a_cdn()
     {
+        // UX-005 (owner decision D-1): exactly two scripts, both same-origin: the framework's and wwwroot/enhance.js (progressive enhancement, deferred)
         var app = Repo.Read("Components", "App.razor");
-        Assert.Single(Regex.Matches(app, @"<script\b"));
-        Assert.Contains("@Assets[\"_framework/blazor.web.js\"]", app);
+        Assert.Equal(2, Regex.Matches(app, @"<script\b").Count);
+        Assert.Single(Regex.Matches(app, Regex.Escape("@Assets[\"_framework/blazor.web.js\"]")));
+        Assert.Matches(@"<script src=""@Assets\[""enhance\.js""\]"" defer></script>", app);
         Assert.DoesNotMatch(@"https?://", app.Replace("<!DOCTYPE html>", ""));
     }
 
@@ -90,6 +92,6 @@ public partial class RenderModeTests
         // The client area is static too: no circuit for a list of bookings, and its HTML is complete.
         var mine = await browser.GetAsync("/moje/rezerwacje");
         Assert.DoesNotContain("<!--Blazor:", mine.Html);
-        Assert.Equal("Konsultacja z prerenderu", mine.TextOf("[data-testid=booking-row] h2"));
+        Assert.Equal("Konsultacja z prerenderu", mine.TextOf("[data-testid=booking-row] .booking-row__title"));
     }
 }

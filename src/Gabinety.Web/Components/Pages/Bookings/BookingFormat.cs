@@ -50,6 +50,13 @@ public static class BookingFormat
         _ => Pl.Bookings.ErrorGeneric,
     };
 
+    /// <summary>The states a booking ended in by a cancellation: the header says what happens to the money.</summary>
+    public static bool IsCancelled(string status) => status is "CancelledByClient" or "LateCancelledByClient" or "CancelledByPractitioner";
+
+    /// <summary>The link of "Zarezerwuj ponownie": the practitioner's public profile, only when the slug is known and only for a finished booking (completed or cancelled).</summary>
+    public static string? RebookHref(string status, string? slug) =>
+        (status == "Completed" || IsCancelled(status)) && !string.IsNullOrWhiteSpace(slug) ? "/gabinet/" + Uri.EscapeDataString(slug.Trim()) : null;
+
     public static string Role(string? raw) => raw == BookingClient.PractitionerRole ? BookingClient.PractitionerRole : BookingClient.ClientRole;
 
     public static string StatusFilter(string? raw) => raw is not null && Pl.Bookings.Statuses.ContainsKey(raw) ? raw : "";

@@ -60,7 +60,27 @@ public sealed class AvailabilityDraft
         return d;
     }
 
-    public void AddRule() { if (Rules.Count <= MaxRules) Rules.Add(new AvailabilityRuleDto(1, "09:00", "10:00")); }
+    public void AddRule(int isoWeekday = 1) { if (Rules.Count <= MaxRules) Rules.Add(new AvailabilityRuleDto(isoWeekday is >= 1 and <= 7 ? isoWeekday : 1, "09:00", "10:00")); }
+
+    /// <summary>
+    /// Makes the other working days (Monday to Friday) have exactly the intervals of <paramref name="isoWeekday"/>: their own intervals are replaced, weekends are not touched. Only Monday to Friday is a source;
+    /// a source without intervals does nothing (it would silently clear the week). Copies stop at the same row limit as <see cref="AddRule"/>, so validation still reports too many.
+    /// </summary>
+    public void CopyToWeekdays(int isoWeekday)
+    {
+        if (isoWeekday is < 1 or > 5) return;
+        var source = Rules.Where(r => r.IsoWeekday == isoWeekday).ToList();
+        if (source.Count == 0) return;
+        Rules.RemoveAll(r => r.IsoWeekday is >= 1 and <= 5 && r.IsoWeekday != isoWeekday);
+        for (var day = 1; day <= 5; day++)
+        {
+            if (day == isoWeekday) continue;
+            foreach (var r in source) { if (Rules.Count <= MaxRules) Rules.Add(r with { IsoWeekday = day }); }
+        }
+    }
+
+    /// <summary><c>środa, 24 grudnia 2026</c> for a stored <c>yyyy-MM-dd</c>; anything that is not a real date is returned as it is (validation reports it).</summary>
+    public static string LongDate(string iso) => RealDate(iso) ? $"{Gabinety.Web.Components.Pages.Shared.PlFormat.DayHeading(DateOnly.ParseExact(iso, "yyyy-MM-dd", CultureInfo.InvariantCulture))} {iso[..4]}" : iso;
 
     public void RemoveRule(int index) { if (index >= 0 && index < Rules.Count) Rules.RemoveAt(index); }
 

@@ -13,8 +13,9 @@ public sealed class SlotCalculator(BookingDbContext db, IConfiguration config, T
     public static readonly TimeZoneInfo Warsaw = TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
 
     /// <param name="withBusy">False answers the bare grid (rules, exceptions, lead time, horizon) and ignores existing bookings: it tells "never offered" from "taken".</param>
+    /// <param name="ignoreBookingId">A booking that is being moved: its own interval is not busy for its new slot (T-11.10).</param>
     public async Task<IReadOnlyList<DateTimeOffset>> ComputeAsync(Guid practitionerId, TimeSpan duration, DateOnly fromDate, DateOnly toDate,
-        CancellationToken ct, bool withBusy = true)
+        CancellationToken ct, bool withBusy = true, Guid? ignoreBookingId = null)
     {
         var now = time.GetUtcNow();
         var windowStart = new DateTimeOffset(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).AddDays(-1);
@@ -27,7 +28,7 @@ public sealed class SlotCalculator(BookingDbContext db, IConfiguration config, T
 
         // An EXPIRED hold does not block here (the database constraint still counts it until it is moved to Expired: see BookingSlotGuard).
         var busy = !withBusy ? [] : (await db.Bookings.AsNoTracking()
-                .Where(b => b.PractitionerId == practitionerId && b.StartUtc < windowEnd && b.EndUtc > windowStart
+                .Where(b => b.PractitionerId == practitionerId && b.Id != ignoreBookingId && b.StartUtc < windowEnd && b.EndUtc > windowStart
                     && (b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.Disputed
                         || (b.Status == BookingStatus.PendingPayment && b.HoldExpiresAt > now)))
                 .Select(b => new { b.StartUtc, b.EndUtc }).ToListAsync(ct))

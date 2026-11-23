@@ -1,5 +1,6 @@
 using Gabinety.Web.Api;
 using Gabinety.Web.Components.Pages.Shared;
+using Gabinety.Web.Text;
 
 namespace Gabinety.Web.Components.Pages.Gabinet;
 
@@ -40,9 +41,21 @@ public static class SlotPickerModel
     public static DayGroup? Selected(IReadOnlyList<DayGroup> days, DateOnly? requested) =>
         days.FirstOrDefault(d => d.Date == requested) ?? days.FirstOrDefault();
 
+    /// <summary>A slot as the API's UTC instant with <c>Z</c> (the form the service and the picker's <c>data-utc</c> use).</summary>
+    public static string UtcText(DateTimeOffset startUtc) => startUtc.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
+
     /// <summary>Link of the booking flow for one slot (journey J3): the booking page resolves the offering through the public profile, so <c>gabinet</c> travels with <c>start</c>.</summary>
     public static string BookingHref(Guid offeringId, DateTimeOffset startUtc, string profileSlug) =>
-        $"/rezerwacja/{offeringId}?start={Uri.EscapeDataString(startUtc.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture))}&gabinet={Uri.EscapeDataString(profileSlug)}";
+        $"/rezerwacja/{offeringId}?start={Uri.EscapeDataString(UtcText(startUtc))}&gabinet={Uri.EscapeDataString(profileSlug)}";
+
+    /// <summary>The reschedule page (<c>/moje/rezerwacje/{id}/zmien-termin</c>) with the picker state in its URL: the windows loaded and the day chosen.</summary>
+    public static string ReschedulePickerHref(Guid bookingId, int windows, DateOnly? day)
+    {
+        var parts = new List<string>();
+        if (windows > 1) parts.Add($"okna={windows}");
+        if (day is { } d) parts.Add($"dzien={d:yyyy-MM-dd}");
+        return $"/moje/rezerwacje/{bookingId}/zmien-termin{(parts.Count == 0 ? "" : "?" + string.Join('&', parts))}";
+    }
 
     /// <summary>The profile with the picker state of one offer in the URL (windows loaded, offer and day chosen), anchored at the offer.</summary>
     public static string PickerHref(string profileSlug, int windows, Guid? offeringId, DateOnly? day)
@@ -54,4 +67,40 @@ public static class SlotPickerModel
     }
 
     public static int ClampWindows(string? raw) => int.TryParse(raw, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n) ? Math.Clamp(n, 1, MaxWindows) : 1;
+
+    public const int PageDays = 7;
+
+    /// <summary>The 7-day page (index into the days that have times) that contains the selected day.</summary>
+    public static IReadOnlyList<DayGroup> Page(IReadOnlyList<DayGroup> days, DateOnly selected, out int pageIndex)
+    {
+        var at = Math.Max(0, days.ToList().FindIndex(d => d.Date == selected));
+        pageIndex = at / PageDays;
+        return [.. days.Skip(pageIndex * PageDays).Take(PageDays)];
+    }
+
+    /// <summary>First day of the previous or next 7-day page, or null at either end.</summary>
+    public static DateOnly? NeighbourPageDay(IReadOnlyList<DayGroup> days, int pageIndex, int direction)
+    {
+        var target = (pageIndex + direction) * PageDays;
+        return target < 0 || target >= days.Count ? null : days[target].Date;
+    }
+
+    public enum TimeOfDay { Morning, Afternoon, Evening }
+
+    /// <summary>Rano before 12:00, Po południu 12:00-16:59, Wieczorem from 17:00 (Warsaw time).</summary>
+    public static TimeOfDay PartOfDay(DateTimeOffset startUtc) => PlFormat.ToWarsaw(startUtc).Hour switch { < 12 => TimeOfDay.Morning, < 17 => TimeOfDay.Afternoon, _ => TimeOfDay.Evening };
+
+    /// <summary>The slots of one day in the three groups, empty groups omitted, in day order.</summary>
+    public static IReadOnlyList<(TimeOfDay Part, IReadOnlyList<SlotDto> Slots)> GroupByPartOfDay(IEnumerable<SlotDto> slots) =>
+        [.. slots.OrderBy(s => s.StartUtc).GroupBy(s => PartOfDay(s.StartUtc)).OrderBy(g => g.Key).Select(g => (g.Key, (IReadOnlyList<SlotDto>)[.. g]))];
+
+    /// <summary>"jutro, 09:30" for the first free time (relative day for today and tomorrow, else "wtorek, 24 listopada, 09:30"); null when there is none.</summary>
+    public static string? NearestLabel(IReadOnlyList<DayGroup> days, DateOnly today)
+    {
+        var first = days.OrderBy(d => d.Date).FirstOrDefault(d => d.Slots.Count > 0);
+        if (first is null) return null;
+        var slot = first.Slots.OrderBy(s => s.StartUtc).First();
+        var day = first.Date == today ? PlPages.Slots.Today : first.Date == today.AddDays(1) ? PlPages.Slots.Tomorrow : PlFormat.DayHeading(first.Date);
+        return $"{day}, {PlFormat.Time(slot.StartUtc)}";
+    }
 }

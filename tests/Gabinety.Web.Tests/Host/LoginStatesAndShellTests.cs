@@ -18,7 +18,7 @@ public class LoginStatesTests
         var throttled = await web.NewBrowser().PostFormAsync("/logowanie", Form());
         Assert.Equal("Zbyt wiele prób logowania. Spróbuj ponownie za minutę.", throttled.TextOf("[data-testid=login-error]"));
         Assert.DoesNotContain(throttled.SetCookies, c => c.StartsWith("gt_session="));
-        Assert.Equal("alert", throttled.One("[data-testid=login-error]")!.GetAttribute("role"));
+        Assert.Equal("alert", throttled.One("[data-testid=login-error]")!.ParentElement!.GetAttribute("role")); // the message sits in the live region that exists before any message
         Assert.Single(web.Identity.Backend.Requests, r => r.PathAndQuery.Contains("/auth/login") && r.Body!.Contains(FakeIdentity.Password)); // a login is never retried
     }
 
@@ -194,7 +194,7 @@ public class ShellTests
     static WebFactory Web()
     {
         var web = new WebFactory();
-        web.Directory.Respond = r => r.RequestUri!.AbsolutePath switch { "/api/v1/taxonomy" => FakeBackend.Json(Sample.Taxonomy), "/api/v1/sitemap" => FakeBackend.Json(Sample.Sitemap()), _ => FakeBackend.Json(Sample.Cards(2)) };
+        web.Directory.Respond = r => r.RequestUri!.AbsolutePath switch { "/api/v1/taxonomy" => FakeBackend.Json(Sample.Taxonomy), "/api/v1/sitemap" => FakeBackend.Json(Sample.Sitemap()), "/api/v1/me" => FakeBackend.Json(new Gabinety.Web.Api.MeDto("user-1", null, null, false, false)), _ => FakeBackend.Json(Sample.Cards(2)) };
         web.Booking.Respond = _ => FakeBackend.Json(new Gabinety.Web.Api.PageDto<Gabinety.Web.Api.BookingViewDto>([], null));
         return web;
     }
@@ -223,19 +223,35 @@ public class ShellTests
     }
 
     [Fact]
-    public async Task A_client_sees_bookings_the_practitioner_panel_the_account_menu_and_sign_out_but_no_administration()
+    public async Task A_client_sees_the_primary_links_the_account_menu_with_the_way_to_become_a_programmer_and_sign_out_but_no_administration()
     {
         await using var web = Web();
         var browser = web.NewBrowser();
         await SignIn.As(web, browser);
         var page = await browser.GetAsync("/programisci");
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/moje/propozycje", "/gabinet-programisty"], Hrefs(page, ".site-nav a"));
-        Assert.Equal(["/konto", "/wyloguj"], Hrefs(page, ".account-menu a"));
-        Assert.Equal("Twoje konto", page.TextOf(".account-menu summary"));
-        Assert.Equal("Wyloguj się", page.All(".account-menu a")[1].TextContent);
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik"], Hrefs(page, ".site-nav a"));
+        Assert.Equal(["/moje/rezerwacje", "/moje/propozycje", "/konto", "/gabinet-programisty", "/wyloguj"], Hrefs(page, ".account-menu a"));
+        Assert.Equal(["Moje rezerwacje", "Moje propozycje", "Konto", "Zostań programistą", "Wyloguj się"], page.All(".account-menu a").Select(a => a.TextContent));
+        Assert.DoesNotContain("Panel programisty", page.One("header")!.TextContent);
         Assert.Null(page.One(".site-account .btn--primary"));
         Assert.DoesNotContain(Hrefs(page, "header a"), h => h.StartsWith("/admin"));
         Assert.DoesNotContain("Zaloguj się", page.One("header")!.TextContent);
+    }
+
+    [Fact]
+    public async Task The_account_trigger_shows_the_initials_and_the_e_mail_with_the_full_address_in_its_title()
+    {
+        await using var web = Web();
+        var browser = web.NewBrowser();
+        await SignIn.As(web, browser);
+        var page = await browser.GetAsync("/programisci");
+        var trigger = page.One(".account-menu summary")!;
+        Assert.Equal("DC", trigger.QuerySelector(".account-menu__avatar")!.TextContent);
+        Assert.Equal("true", trigger.QuerySelector(".account-menu__avatar")!.GetAttribute("aria-hidden"));
+        var email = trigger.QuerySelector(".account-menu__email")!;
+        Assert.Equal("demo-client@demo.example", email.TextContent);
+        Assert.Equal("demo-client@demo.example", email.GetAttribute("title"));
+        Assert.Single(page.All("[data-testid=account-menu]"));
     }
 
     [Theory]
@@ -246,14 +262,14 @@ public class ShellTests
         web.Identity.Roles = [role];
         var single = web.NewBrowser();
         await SignIn.As(web, single);
-        Assert.Contains("/admin/weryfikacja", Hrefs(await single.GetAsync("/programisci"), ".site-nav a"));
+        Assert.Contains("/admin/weryfikacja", Hrefs(await single.GetAsync("/programisci"), ".account-menu a"));
 
         web.Identity.Roles = ["User", role]; // two roles: an array on the wire
         var many = web.NewBrowser();
         await SignIn.As(web, many);
         var page = await many.GetAsync("/programisci");
-        Assert.Contains("/admin/weryfikacja", Hrefs(page, ".site-nav a"));
-        Assert.Equal("Administracja", page.All(".site-nav a").Last().TextContent);
+        Assert.Contains("/admin/weryfikacja", Hrefs(page, ".account-menu a"));
+        Assert.Equal(["Administracja", "Wyloguj się"], page.All(".account-menu a").TakeLast(2).Select(a => a.TextContent));
     }
 
     [Fact]
@@ -269,6 +285,7 @@ public class ShellTests
     [Theory]
     [InlineData("/programisci", "Programiści")]
     [InlineData("/programisci/audyt-kodu", "Programiści")]
+    [InlineData("/jak-to-dziala", "Jak to działa")]
     [InlineData("/moje/rezerwacje", "Moje rezerwacje")]
     public async Task The_current_section_carries_aria_current_page_and_only_that_one(string path, string label)
     {
@@ -276,10 +293,58 @@ public class ShellTests
         var browser = web.NewBrowser();
         await SignIn.As(web, browser);
         var page = await browser.GetAsync(path);
-        var current = page.All(".site-nav a[aria-current=page]");
+        var current = page.All("header .site-nav a[aria-current=page], header .account-menu a[aria-current=page]"); // the desktop rendering; the phone menu is checked below
         Assert.Equal([label], current.Select(a => a.TextContent));
         Assert.Single(page.All(".site-menu a[aria-current=page]")); // the phone menu says the same
     }
+
+    [Fact]
+    public async Task A_practitioner_sees_the_panel_in_the_menu_and_the_footer_and_the_directory_is_asked_once_a_minute_per_session()
+    {
+        await using var web = Web();
+        Practitioner(web, "018f0000-0000-7000-8000-0000000000e1");
+        var browser = web.NewBrowser();
+        await SignIn.As(web, browser);
+        var before = MeCalls(web);
+        var page = await browser.GetAsync("/programisci");
+        Assert.Equal(1, MeCalls(web) - before); // the header asks, the footer reads the same answer
+        Assert.Contains("Panel programisty", Labels(page, ".account-menu a"));
+        Assert.DoesNotContain("Zostań programistą", page.One("header")!.TextContent);
+        Assert.Contains("Panel programisty", Labels(page, "footer a"));
+        Assert.DoesNotContain("Zostań programistą", Labels(page, "footer a"));
+
+        await browser.GetAsync("/konto");
+        await browser.GetAsync("/jak-to-dziala");
+        Assert.Equal(1, MeCalls(web) - before); // within the minute the session's answer is kept
+    }
+
+    [Fact]
+    public async Task When_the_directory_does_not_answer_the_account_is_offered_the_way_in_not_the_panel()
+    {
+        await using var web = Web();
+        var inner = web.Directory.Respond;
+        web.Directory.Respond = r => r.RequestUri!.AbsolutePath == "/api/v1/me" ? new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError) : inner(r);
+        var browser = web.NewBrowser();
+        await SignIn.As(web, browser);
+        var page = await browser.GetAsync("/programisci");
+        Assert.Contains("Zostań programistą", Labels(page, ".account-menu a"));
+        Assert.DoesNotContain("Panel programisty", page.One("header")!.TextContent);
+        Assert.DoesNotContain("Panel programisty", page.One("footer")!.TextContent);
+    }
+
+    /// <summary>Makes the Directory's <c>/api/v1/me</c> answer as a practitioner with that profile (or as a client when <paramref name="profileId"/> is null).</summary>
+    static void Practitioner(WebFactory web, string? profileId)
+    {
+        var inner = web.Directory.Respond;
+        var id = profileId is null ? (Guid?)null : Guid.Parse(profileId);
+        web.Directory.Respond = r => r.RequestUri!.AbsolutePath == "/api/v1/me"
+            ? FakeBackend.Json(new Gabinety.Web.Api.MeDto("user-1", id, id is null ? null : "Approved", false, false))
+            : inner(r);
+    }
+
+    static int MeCalls(WebFactory web) => web.Directory.Requests.Count(r => r.PathAndQuery == "/api/v1/me");
+
+    static string[] Labels(Page p, string css) => [.. p.All(css).Select(a => a.TextContent)];
 
     [Fact]
     public async Task The_account_page_marks_the_account_menu_entry_current()
@@ -301,16 +366,16 @@ public class ShellTests
         var menu = visitor.One("header details.site-menu")!;
         Assert.Equal("Menu", menu.QuerySelector("summary")!.TextContent);
         Assert.Null(menu.GetAttribute("open")); // closed until opened (and a new page is a new, closed menu)
-        Assert.Equal(["/programisci", "/logowanie?redirect=%2Fprogramisci", "/rejestracja?redirect=%2Fprogramisci"], menu.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik", "/logowanie?redirect=%2Fprogramisci", "/rejestracja?redirect=%2Fprogramisci"], menu.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
         Assert.Empty(visitor.All("header script"));
 
         await SignIn.As(web, browser);
         var member = await browser.GetAsync("/programisci");
-        Assert.Equal(["/programisci", "/moje/rezerwacje", "/moje/propozycje", "/gabinet-programisty", "/konto", "/wyloguj"], member.One("header details.site-menu")!.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik", "/moje/rezerwacje", "/moje/propozycje", "/konto", "/gabinet-programisty", "/wyloguj"], member.One("header details.site-menu")!.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
     }
 
     [Fact]
-    public async Task The_page_has_a_skip_link_to_main_one_main_landmark_two_named_navigations_and_a_legal_footer()
+    public async Task The_page_has_a_skip_link_to_main_one_main_landmark_named_navigations_and_a_footer_in_three_columns()
     {
         await using var web = Web();
         var page = await web.NewBrowser().GetAsync("/programisci");
@@ -318,11 +383,23 @@ public class ShellTests
         Assert.Equal("Przejdź do treści", page.One("a.skip-link")!.TextContent);
         Assert.Equal("main", page.One("#main")!.TagName.ToLowerInvariant());
         Assert.Single(page.All("main"));
-        Assert.Equal(["Menu główne", "Menu główne", "Informacje prawne"], page.All("header nav, footer nav").Select(n => n.GetAttribute("aria-label")));
+        Assert.Equal(["Menu główne", "Menu główne"], page.All("header nav").Select(n => n.GetAttribute("aria-label")));
         var footer = page.One("footer")!;
-        Assert.Equal(["/regulamin", "/polityka-prywatnosci"], footer.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
-        Assert.Equal(["Regulamin", "Polityka prywatności"], footer.QuerySelectorAll("a").Select(a => a.TextContent));
+        Assert.Equal(["Produkt", "Dla programistów", "Prawne"], footer.QuerySelectorAll(".site-footer__title").Select(t => t.TextContent));
+        Assert.Equal(3, footer.QuerySelectorAll("nav").Length);
+        Assert.Equal(["/programisci", "/jak-to-dziala", "/cennik", "/zasady-rankingu", "/pomoc", "/rejestracja", "/regulamin", "/polityka-prywatnosci"], footer.QuerySelectorAll("a").Select(a => a.GetAttribute("href")));
+        Assert.Equal(["Programiści", "Jak to działa", "Cennik", "Zasady rankingu", "Pomoc", "Zostań programistą", "Regulamin", "Polityka prywatności"], footer.QuerySelectorAll("a").Select(a => a.TextContent));
         Assert.Matches(@"© \d{4} Gabinety Tech", footer.TextContent);
+    }
+
+    [Fact]
+    public async Task The_brand_is_the_link_text_and_the_logo_mark_is_decorative()
+    {
+        await using var web = Web();
+        var brand = (await web.NewBrowser().GetAsync("/programisci")).One("header a.brand")!;
+        Assert.Equal("Gabinety Tech", brand.TextContent.Trim());
+        Assert.Equal("true", brand.QuerySelector("svg.brand__mark")!.GetAttribute("aria-hidden"));
+        Assert.Equal("currentColor", brand.QuerySelector("svg.brand__mark rect")!.GetAttribute("fill"));
     }
 
     [Fact]
@@ -344,7 +421,7 @@ public class ShellTests
         var browser = web.NewBrowser();
         await SignIn.As(web, browser);
         var menu = await browser.GetAsync("/programisci");
-        Assert.Equal("/wyloguj", menu.All(".account-menu a")[1].GetAttribute("href"));
+        Assert.Equal("/wyloguj", menu.All(".account-menu a").Last().GetAttribute("href"));
         var done = await browser.PostFormAsync("/wyloguj", new Dictionary<string, string>());
         var home = await browser.GetAsync(done.Location!);
         Assert.Equal("Wylogowano.", home.TextOf("[data-testid=flash]"));

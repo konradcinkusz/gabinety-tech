@@ -149,6 +149,56 @@ public class AvailabilityDraftTests
 
     static IReadOnlyList<AvailabilityIssueCode> Codes(AvailabilityDraft d) => [.. d.Validate().Select(i => i.Code)];
 
+    [Fact]
+    public void Copying_a_weekday_replaces_the_other_working_days_and_leaves_the_weekend_alone()
+    {
+        var d = Draft((1, "09:00", "12:00"), (1, "13:00", "15:00"), (3, "08:00", "09:00"), (6, "10:00", "11:00"));
+        d.CopyToWeekdays(1);
+        foreach (var day in new[] { 1, 2, 3, 4, 5 }) Assert.Equal([("09:00", "12:00"), ("13:00", "15:00")], d.Rules.Where(r => r.IsoWeekday == day).Select(r => (r.StartLocal, r.EndLocal)));
+        Assert.Equal([("10:00", "11:00")], d.Rules.Where(r => r.IsoWeekday == 6).Select(r => (r.StartLocal, r.EndLocal)));
+        Assert.Equal(11, d.Rules.Count);
+        Assert.Empty(d.Validate());
+    }
+
+    [Theory]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(0)]
+    public void Only_a_working_day_with_intervals_is_a_source_for_copying(int source)
+    {
+        var d = Draft((1, "09:00", "12:00"), (6, "10:00", "11:00"));
+        d.CopyToWeekdays(source);
+        Assert.Equal(2, d.Rules.Count);
+        d.CopyToWeekdays(2); // Tuesday has nothing: the week is not cleared
+        Assert.Equal(2, d.Rules.Count);
+    }
+
+    [Fact]
+    public void Copying_stops_at_the_row_limit_and_validation_still_reports_it()
+    {
+        var d = Draft();
+        for (var i = 0; i < 8; i++) d.Rules.Add(new AvailabilityRuleDto(1, $"{8 + i:00}:00", $"{8 + i:00}:30"));
+        d.CopyToWeekdays(1);
+        Assert.Equal(AvailabilityDraft.MaxRules + 1, d.Rules.Count);
+        Assert.Contains(AvailabilityIssueCode.TooManyRules, Codes(d));
+    }
+
+    [Fact]
+    public void Adding_for_a_day_uses_that_day_and_an_unknown_day_falls_back_to_monday()
+    {
+        var d = Draft();
+        d.AddRule(4);
+        d.AddRule(99);
+        Assert.Equal([4, 1], d.Rules.Select(r => r.IsoWeekday));
+    }
+
+    [Theory]
+    [InlineData("2026-12-24", "czwartek, 24 grudnia 2026")]
+    [InlineData("2027-02-03", "środa, 3 lutego 2027")]
+    [InlineData("2027-02-30", "2027-02-30")]
+    [InlineData("", "")]
+    public void An_exception_date_reads_in_polish_and_an_invalid_one_is_left_as_typed(string iso, string expected) => Assert.Equal(expected, AvailabilityDraft.LongDate(iso));
+
     [Fact] public void A_sound_draft_has_no_issue() => Assert.Empty(Draft((1, "09:00", "12:00"), (1, "13:00", "17:30"), (3, "10:00", "11:00")).Validate());
 
     [Theory]
@@ -318,6 +368,11 @@ public class PaymentsViewTests
     }
 
     [Theory]
+    [InlineData(PaymentsState.Ready, "success")] [InlineData(PaymentsState.Pending, "warning")] [InlineData(PaymentsState.None, "neutral")]
+    [InlineData(PaymentsState.NotApplicable, "neutral")] [InlineData(PaymentsState.Unknown, "neutral")]
+    public void The_status_badge_kind_is_success_for_ready_warning_for_pending_and_neutral_otherwise(PaymentsState state, string kind) => Assert.Equal(kind, PaymentsView.Kind(state));
+
+    [Theory]
     [InlineData("https://connect.stripe.com/setup/e/acct_1/abc", true)] [InlineData("http://connect.stripe.com/x", false)] [InlineData("javascript:alert(1)", false)] [InlineData("data:text/html,x", false)]
     [InlineData("//evil.example/x", false)] [InlineData("/gabinet-programisty", false)] [InlineData("https://user:pw@connect.stripe.com/x", false)] [InlineData("", false)] [InlineData(null, false)]
     public void Only_an_absolute_https_link_without_credentials_is_followed(string? url, bool ok) => Assert.Equal(ok, PaymentsView.IsFollowable(url));
@@ -329,4 +384,31 @@ public class ProfileStatusTests
     [InlineData("Draft", "Szkic", "neutral")] [InlineData("Submitted", "Czeka na weryfikację", "warning")] [InlineData("Approved", "Zatwierdzony", "success")]
     [InlineData("Rejected", "Odrzucony", "danger")] [InlineData("Suspended", "Zawieszony", "danger")] [InlineData("Surprise", "Status nieznany", "neutral")]
     public void A_status_has_the_label_the_journeys_read_and_a_kind(string status, string label, string kind) => Assert.Equal((label, kind), (ProfileStatus.Label(status), ProfileStatus.Kind(status)));
+}
+
+public class EarningsMonthTests
+{
+    static readonly DateOnly Today = new(2026, 11, 22);
+
+    [Theory]
+    [InlineData(null)] [InlineData("")] [InlineData("2026-1")] [InlineData("2026-13")] [InlineData("2026-00")] [InlineData("nonsense")] [InlineData("2026-10-01")] [InlineData("2099-01")] [InlineData("2026-12")]
+    public void Only_a_month_the_card_can_show_is_parsed(string? text) => Assert.Null(EarningsMonth.Parse(text, Today));
+
+    [Fact]
+    public void The_current_month_and_the_past_ones_are_parsed_to_their_first_day() =>
+        Assert.Equal((new DateOnly(2026, 11, 1), new DateOnly(2026, 10, 1)), (EarningsMonth.Parse("2026-11", Today), EarningsMonth.Parse("2026-10", Today)));
+
+    [Theory]
+    [InlineData(2026, 10, 31)] [InlineData(2028, 2, 29)] [InlineData(2027, 2, 28)] [InlineData(2026, 4, 30)]
+    public void A_month_runs_from_its_first_day_to_its_last_inclusive(int year, int month, int last) =>
+        Assert.Equal((new DateOnly(year, month, 1), new DateOnly(year, month, last)), EarningsMonth.Range(new DateOnly(year, month, 1)));
+
+    [Fact]
+    public void The_key_and_the_period_wording() =>
+        Assert.Equal(("2026-10", "Okres: 1 października 2026 – 31 października 2026"), (EarningsMonth.Key(new DateOnly(2026, 10, 1)), EarningsMonth.Period(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31))));
+
+    [Theory]
+    [InlineData(123456, "1\u00A0234,56\u00A0zł")] [InlineData(0, "0,00\u00A0zł")] [InlineData(-2500, "−25,00\u00A0zł")]
+    public void Money_is_the_site_helper_with_the_sign_of_a_reversal_kept(long grosz, string text) =>
+        Assert.Equal(text, EarningsMonth.Amount(new MoneyDto(grosz, "PLN")));
 }

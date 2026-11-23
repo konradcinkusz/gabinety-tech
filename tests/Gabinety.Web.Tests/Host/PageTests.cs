@@ -61,7 +61,8 @@ public class PageTests
         Assert.Equal(HttpStatusCode.OK, page.Status);
 
         Assert.Equal("Programiści", page.TextOf("h1"));
-        Assert.Equal("Wyniki: 6", Page.Squash(page.TextOf("header p:last-of-type"))); // the page object reads /^Wyniki: \d+$/
+        Assert.Equal("Wyniki: 6", Page.Squash(page.TextOf("[data-testid=count]"))); // the page object reads /^Wyniki: \d+$/ (getByText, and visible)
+        Assert.Equal("6 programistów", page.TextOf(".result-summary__total")); // the plural line is its own element
         var region = page.One("section[aria-label='Lista programistów']")!; // getByRole("region", { name: "Lista programistów" })
         var cards = region.QuerySelectorAll("ul[data-testid=practitioner-list] > li"); // the cards hold lists of their own: only the direct children of the results list (the page object does the same)
         Assert.Equal(2, cards.Length);
@@ -72,9 +73,10 @@ public class PageTests
         var nav = page.One("nav[aria-label=Filtry]")!; // CategoryNav: getByRole("navigation", { name: "Filtry" }).getByRole("link", { name, exact: true })
         Assert.Equal("/programisci/audyt-kodu", nav.QuerySelectorAll("a").First(a => a.TextContent == "Audyt kodu").GetAttribute("href"));
         Assert.Equal("true", nav.QuerySelectorAll("a").First(a => a.TextContent == "Wszystkie").GetAttribute("aria-current"));
-        Assert.Contains("od 250,00 zł", page.Dom.QuerySelector("[data-testid=practitioner-card]")!.TextContent);
+        Assert.Contains("od 250\u00A0zł", page.Dom.QuerySelector("[data-testid=practitioner-card]")!.TextContent); // whole amounts have no grosz
         Assert.Contains("30 min, 60 min", page.Dom.QuerySelector("[data-testid=practitioner-card]")!.TextContent);
         Assert.Contains("Nowy", page.Dom.QuerySelector("[data-testid=practitioner-card]")!.TextContent);
+        Assert.Equal("Audyt kodu", page.TextOf("[data-testid=practitioner-card] .practitioner-card__categories")); // the list passes the taxonomy's names down
     }
 
     [Fact]
@@ -125,8 +127,45 @@ public class PageTests
             };
             var page = await web.NewBrowser().GetAsync("/programisci/migracja");
             Assert.Equal(robots, page.One("meta[name=robots]")!.GetAttribute("content"));
-            Assert.Equal($"Wyniki: {count}", Page.Squash(page.TextOf("header p:last-of-type")));
+            Assert.Equal($"Wyniki: {count}", Page.Squash(page.TextOf("[data-testid=count]")));
         }
+    }
+
+    [Fact]
+    public async Task An_empty_result_names_the_active_filters_as_removable_chips_and_states_no_list()
+    {
+        await using var web = new WebFactory();
+        web.Directory.Respond = r => r.RequestUri!.AbsolutePath switch
+        {
+            "/api/v1/taxonomy" => FakeBackend.Json(Sample.Taxonomy),
+            "/api/v1/sitemap" => FakeBackend.Json(Sample.Sitemap()),
+            _ => FakeBackend.Json(Sample.Cards(0)),
+        };
+        var page = await web.NewBrowser().GetAsync("/programisci/audyt-kodu?duration=30&q=kod");
+        Assert.Equal(HttpStatusCode.OK, page.Status);
+        Assert.Equal("Nie ma programistów dla tych filtrów", page.TextOf("[data-testid=empty] h2"));
+        Assert.Equal("Wyniki: 0", Page.Squash(page.TextOf("[data-testid=count]")));
+        Assert.Equal("0 programistów", page.TextOf(".result-summary__total"));
+        Assert.Null(page.One("[data-testid=practitioner-list]")); // an empty list is never rendered
+        var chips = page.All("[data-testid=empty] [role=group] a.chip").Select(a => (a.TextContent.Replace("(usuń filtr)", "").Trim(), a.GetAttribute("href"))).ToList();
+        Assert.Equal([("30 min ×", "/programisci/audyt-kodu?q=kod"), ("Szukaj: „kod” ×", "/programisci/audyt-kodu?duration=30")], chips.Select(c => (Page.Squash(c.Item1), c.Item2))); // the category is the page, not a chip
+        Assert.Equal("/programisci/audyt-kodu", page.One("[data-testid=empty] a.btn--ghost")!.GetAttribute("href")); // Wyczyść filtry keeps the category
+    }
+
+    [Fact]
+    public async Task An_empty_category_without_filters_has_no_chips_and_no_clear_link()
+    {
+        await using var web = new WebFactory();
+        web.Directory.Respond = r => r.RequestUri!.AbsolutePath switch
+        {
+            "/api/v1/taxonomy" => FakeBackend.Json(Sample.Taxonomy),
+            "/api/v1/sitemap" => FakeBackend.Json(Sample.Sitemap(0, false, "/programisci/migracja")),
+            _ => FakeBackend.Json(Sample.Cards(0)),
+        };
+        var page = await web.NewBrowser().GetAsync("/programisci/migracja");
+        Assert.Equal("Nie ma programistów dla tych filtrów", page.TextOf("[data-testid=empty] h2"));
+        Assert.Empty(page.All("[data-testid=empty] a.chip"));
+        Assert.Null(page.One("[data-testid=empty] a.btn--ghost"));
     }
 
     [Theory]

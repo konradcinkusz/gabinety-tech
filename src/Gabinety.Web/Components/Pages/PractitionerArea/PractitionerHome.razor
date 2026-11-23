@@ -1,8 +1,12 @@
 @page "/gabinet-programisty"
 @attribute [Authorize]
 @layout PractitionerLayout
+@using Gabinety.Web.Components.Pages.Bookings
+@using Gabinety.Web.Components.Pages.Shared
 @inherits PractitionerPage
 @inject PractitionerSchedulingClient Scheduling
+@inject BookingClient Bookings
+@inject TimeProvider Clock
 @* Static server rendering: forms are plain posts handled by the host (antiforgery, no JavaScript needed, no circuit). Everything shown is read back from the services after each action: the
    checklist is never ticked from local state. *@
 
@@ -39,7 +43,7 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
         <h2 id="status-title" class="visually-hidden">@PlPractitioner.Common.StatusOf</h2>
         <p class="cluster"><span>@PlPractitioner.Common.StatusOf:</span> <KindBadge Label="@ProfileStatus.Label(Profile!.Status)" Kind="@ProfileStatus.Kind(Profile!.Status)" TestId="profile-status" /></p>
         @if (!string.IsNullOrWhiteSpace(Profile!.StatusReason)) {<p>@string.Format(PlPractitioner.Status.Reason, Profile!.StatusReason)</p>}
-        @if (ProfileStatus.Help(Profile!.Status) is { } help) {<p class="muted">@help</p>}
+        @if (Profile!.Status != "Approved" && ProfileStatus.Help(Profile!.Status) is { } help) {<p class="muted">@help</p>}
     </section>
 
     @if (NextSteps.ShowPaymentsBanner(_payments))
@@ -51,50 +55,85 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
         </div>
     }
 
-    <section class="section" aria-labelledby="next-title">
-        <h2 id="next-title">@PlPractitioner.Dashboard.NextTitle</h2>
-        <ol class="steps-list" data-testid="next-steps">
-            @foreach (var step in _steps)
-            {
-                <li class="step" data-step="@step.Key" data-done="@(step.Done ? "true" : "false")">
-                    <div class="cluster">
-                        <strong>@step.Title</strong>
-                        <KindBadge Label="@(step.Done ? PlPractitioner.Dashboard.Ready : PlPractitioner.Dashboard.Pending)" Kind="@(step.Done ? "success" : "neutral")" />
-                        @if (step == _next) {<KindBadge Label="@PlPractitioner.Dashboard.NextLabel" Kind="info" />}
-                    </div>
-                    <p class="muted">@step.Text</p>
-                    @if (!step.Done && step.Key != "verification") {<a href="@step.Href">@PlPractitioner.Dashboard.GoTo: @step.Title</a>}
-                </li>
-            }
-        </ol>
-    </section>
+    @if (Profile!.Status == "Approved")
+    {
+        <section class="callout callout--success stack" aria-labelledby="public-title" data-testid="public-profile">
+            <h2 id="public-title" class="callout__title">@PlPractitioner.Dashboard.PublicTitle</h2>
+            <p>@PlPractitioner.Dashboard.PublicBody</p>
+            <div class="cluster">
+                <a class="btn btn--primary" href="@PublicPath">@PlPractitioner.Dashboard.ViewPublic</a>
+                <button class="btn btn--secondary" type="button" hidden data-enhance="copy" data-copy="@PublicPath" data-done="@PlPractitioner.Dashboard.Copied">@PlPractitioner.Dashboard.CopyLink</button>
+            </div>
+        </section>
+        @if (_next is { } next) {<p data-testid="next-step">@PlPractitioner.Dashboard.NextLabel: <a href="@next.Href">@next.Title</a>. <span class="muted">@next.Text</span></p>}
 
-    @if (OnboardingChecklist.CanBeSubmitted(Profile!.Status))
+        <EarningsCard Month="_month" Today="_today" Figures="_earnings" Failed="_earningsFailed" />
+
+        <section class="section stack" aria-labelledby="upcoming-title" data-testid="upcoming">
+            <h2 id="upcoming-title">@PlPractitioner.Dashboard.UpcomingTitle</h2>
+            @if (_upcomingFailed)
+            {
+                <div class="callout callout--warning" role="status" data-testid="upcoming-failed">
+                    <p>@PlPractitioner.Dashboard.UpcomingFailed <a href="@PractitionerPaths.Home">@PlPractitioner.Common.Retry</a></p>
+                </div>
+            }
+            else if (_upcoming.Count == 0)
+            {
+                <p class="muted" data-testid="upcoming-empty">@PlPractitioner.Dashboard.UpcomingEmpty</p>
+            }
+            else
+            {
+                <ul class="upcoming">
+                    @foreach (var b in _upcoming)
+                    {
+                        <li class="upcoming__row" data-booking="@b.Id">
+                            <div class="upcoming__main">
+                                <strong>@b.OfferingTitle</strong>
+                                <span class="muted">@BookingFormat.MetaLine(MyBookingsSchedule.Relative(Clock.GetUtcNow(), b.StartUtc), BookingFormat.Name(b.Client?.DisplayName))</span>
+                            </div>
+                            <a href="@($"/moje/rezerwacje/{b.Id}?role={BookingClient.PractitionerRole}")" aria-label="@($"{PlPractitioner.Dashboard.Details}: {b.OfferingTitle}")">@PlPractitioner.Dashboard.Details</a>
+                        </li>
+                    }
+                </ul>
+                <p><a href="@($"/moje/rezerwacje?role={BookingClient.PractitionerRole}")">@PlPractitioner.Dashboard.AllBookings</a></p>
+            }
+        </section>
+    }
+    else if (OnboardingChecklist.CanBeSubmitted(Profile!.Status) || Profile!.Status == "Submitted")
     {
         <section class="section stack" aria-labelledby="checklist-title" id="lista-krokow">
             <h2 id="checklist-title">@PlPractitioner.Dashboard.ChecklistTitle</h2>
-            <p class="muted" data-testid="progress">@string.Format(PlPractitioner.Dashboard.ProgressLabel, _checklist.Count - _remaining, _checklist.Count)</p>
+            <div class="progress-row">
+                <progress class="progress" value="@(_checklist.Count - _remaining)" max="@_checklist.Count" aria-label="@PlPractitioner.Dashboard.ProgressAria"></progress>
+                <p class="muted" data-testid="progress">@string.Format(PlPractitioner.Dashboard.ProgressLabel, _checklist.Count - _remaining, _checklist.Count)</p>
+            </div>
             <ol class="checklist">
                 @foreach (var item in _checklist)
                 {
+                    var isNext = Profile!.Status != "Submitted" && !item.Done && item == _checklist.First(i => !i.Done);
+                    var href = item.Key == ChecklistKey.Github ? "#github-title" : item.Href;
                     <li class="checklist__item" data-item="@item.Key" data-done="@(item.Done ? "true" : "false")">
                         <div class="cluster">
                             <strong>@item.Title</strong>
                             <KindBadge Label="@(item.Done ? PlPractitioner.Dashboard.Done : PlPractitioner.Dashboard.Todo)" Kind="@(item.Done ? "success" : "neutral")" />
+                            @if (isNext) {<KindBadge Label="@PlPractitioner.Dashboard.NextLabel" Kind="info" />}
                         </div>
                         @if (!item.Done)
                         {
-                            <p class="muted">@if (item.Href is { } href) {<a href="@href">@item.Help</a>} else {<span>@item.Help</span>}</p>
+                            <p class="muted">@item.Help @if (href is not null) {<a href="@href" aria-label="@($"{PlPractitioner.Dashboard.Fill}: {item.Title}")">@PlPractitioner.Dashboard.Fill</a>}</p>
                         }
                     </li>
                 }
             </ol>
             @if (_submitNote is { } note) {<Alert Variant="note.Variant" TestId="submit-note">@note.Text</Alert>}
-            <form method="post" @onsubmit="SubmitAsync" @formname="submit-profile" class="stack">
-                <AntiforgeryToken />
-                <p class="muted" id="submit-help">@(_remaining > 0 ? string.Format(PlPractitioner.Dashboard.SubmitBlocked, _remaining, StepNoun(_remaining)) : PlPractitioner.Dashboard.SubmitWhatHappens)</p>
-                <div><button class="btn btn--primary" type="submit" disabled="@(_remaining > 0)" aria-describedby="submit-help">@PlPractitioner.Dashboard.Submit</button></div>
-            </form>
+            @if (OnboardingChecklist.CanBeSubmitted(Profile!.Status))
+            {
+                <form method="post" @onsubmit="SubmitAsync" @formname="submit-profile" class="submit-row">
+                    <AntiforgeryToken />
+                    <button class="btn btn--primary" type="submit" disabled="@(_remaining > 0)" aria-disabled="@(_remaining > 0 ? "true" : null)" aria-describedby="submit-help">@PlPractitioner.Dashboard.Submit</button>
+                    <p class="muted" id="submit-help">@(_remaining > 0 ? string.Format(PlPractitioner.Dashboard.SubmitBlocked, _remaining, StepNoun(_remaining)) : PlPractitioner.Dashboard.SubmitWhatHappens)</p>
+                </form>
+            }
         </section>
     }
 
@@ -140,6 +179,16 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
     (AlertVariant Variant, string Text)? _submitNote;
     readonly Dictionary<string, string> _errors = [];
     IReadOnlyList<OfferingPrivateDto> _offers = [];
+    IReadOnlyList<BookingViewDto> _upcoming = [];
+    bool _upcomingFailed;
+    DateOnly _today, _month;
+    EarningsDto? _earnings;
+    bool _earningsFailed;
+
+    /// <summary>The month the earnings card shows: <c>?miesiac=yyyy-MM</c>; absent or unusable, the current Warsaw month (decided by the service).</summary>
+    [SupplyParameterFromQuery(Name = EarningsMonth.Parameter)] public string? MonthParam { get; set; }
+
+    string PublicPath => "/gabinet/" + Uri.EscapeDataString(Profile!.Slug);
 
     string? Error(string field) => _errors.GetValueOrDefault(field);
 
@@ -157,7 +206,24 @@ else if (Profile is not null) @* Blazor renders once before an async OnInitializ
         var offers = Practitioner.OfferingsAsync();
         var availability = Scheduling.AvailabilityAsync();
         var account = Scheduling.PaymentAccountAsync();
-        await Task.WhenAll(offers, availability, account);
+        Task<ApiResult<PageDto<BookingViewDto>>>? bookings = Profile!.Status == "Approved" ? Bookings.MyBookingsAsync(BookingClient.PractitionerRole, null, null) : null;
+        _today = PlFormat.TodayWarsaw(Clock.GetUtcNow());
+        var asked = EarningsMonth.Parse(MonthParam, _today);
+        _month = asked ?? EarningsMonth.FirstOf(_today);
+        DateOnly? from = null, to = null;
+        if (asked is { } first) (from, to) = EarningsMonth.Range(first);
+        Task<ApiResult<EarningsDto>>? earnings = Profile!.Status == "Approved" ? Scheduling.EarningsAsync(from, to) : null;
+        await Task.WhenAll(offers, availability, account, (Task?)bookings ?? Task.CompletedTask, (Task?)earnings ?? Task.CompletedTask);
+        if (bookings is not null) // the region fails soft: the rest of the dashboard is already known
+        {
+            _upcomingFailed = !bookings.Result.IsOk;
+            _upcoming = bookings.Result.IsOk ? [.. MyBookingsSchedule.Split(bookings.Result.Value!.Items, Clock.GetUtcNow()).Upcoming.Take(5)] : [];
+        }
+        if (earnings is not null) // soft as well: a failed card is a callout, and the page goes on
+        {
+            _earningsFailed = !earnings.Result.IsOk;
+            _earnings = earnings.Result.IsOk ? earnings.Result.Value : null;
+        }
         _offers = offers.Result.IsOk ? offers.Result.Value! : [];
         _payments = NextSteps.PaymentsOf(account.Result);
         _checklist = OnboardingChecklist.Build(Profile!, _offers);

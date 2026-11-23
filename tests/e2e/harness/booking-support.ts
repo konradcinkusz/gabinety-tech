@@ -10,7 +10,9 @@ import { fetchRetrying, json } from "./http";
  * share rows, and the "one fee per client and practitioner pair" rule (CONTRACTS 9.1) always starts fresh. Nothing here logs a body or a token.
  */
 
-export const uniqueDemoName = (tag: string): string => `demo-${tag}-${randomUUID().slice(0, 8)}`;
+// The random part starts with a letter: an offering title built from this name is checked by Directory's contact-detail detector, and eight hex digits that all happen to be
+// 0-9 (about 2.3 % of runs) read as a phone number (`contact_details_not_allowed`, seen in CI on J6). A letter in front of the digits makes the detector's look-behind refuse the run.
+export const uniqueDemoName = (tag: string): string => `demo-${tag}-r${randomUUID().slice(0, 8)}`;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

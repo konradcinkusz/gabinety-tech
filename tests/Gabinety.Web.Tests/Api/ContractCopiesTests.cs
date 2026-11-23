@@ -47,6 +47,21 @@ public class ContractCopiesTests
         }
     }
 
+    /// <summary>Removes a property at any depth (a list's items carry the card's fields one level down).</summary>
+    static void RemoveAll(System.Text.Json.Nodes.JsonNode? node, string name)
+    {
+        switch (node)
+        {
+            case System.Text.Json.Nodes.JsonObject obj:
+                obj.Remove(name);
+                foreach (var child in obj) RemoveAll(child.Value, name);
+                break;
+            case System.Text.Json.Nodes.JsonArray arr:
+                foreach (var child in arr) RemoveAll(child, name);
+                break;
+        }
+    }
+
     static void RoundTrip<TCopy>(object real, JsonSerializerOptions? wire = null, Action<TCopy>? check = null, params string[] notYetInContract)
     {
         var json = JsonSerializer.Serialize(real, real.GetType(), wire ?? Services);
@@ -56,7 +71,7 @@ public class ContractCopiesTests
         using var realDoc = JsonDocument.Parse(json);
         // a field the web copy reads before the service sends it (see the DTO's remarks) is left out of the comparison, and only that one
         var copyJson = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(copy, W.ApiClient.Json))!;
-        foreach (var name in notYetInContract) copyJson.AsObject().Remove(name);
+        foreach (var name in notYetInContract) RemoveAll(copyJson, name);
         using var copyDoc = JsonDocument.Parse(copyJson.ToJsonString());
         AssertSubset(copyDoc.RootElement, realDoc.RootElement);
     }
@@ -66,12 +81,28 @@ public class ContractCopiesTests
         RoundTrip<W.PageDto<W.PractitionerCardDto>>(
             new Page<PractitionerCard>([new PractitionerCard(Id, "demo-anna-demowska", "Anna Demowska", "Audyty", "demo-anna", [Badge.Email, Badge.Github, Badge.Nip, Badge.Approved],
                 new RatingDto(4.5, 12), false, new MoneyDto(25000), ["audyt-kodu"], [30, 60])], "NEXT"),
-            check: c => { Assert.Equal(["email", "github", "nip", "approved"], c.Items[0].Badges); Assert.Equal(25000, c.Items[0].FromPrice.AmountMinor); Assert.Equal("NEXT", c.NextCursor); Assert.Equal(4.5, c.Items[0].Rating!.Average); });
+            check: c => { Assert.Equal(["email", "github", "nip", "approved"], c.Items[0].Badges); Assert.Equal(25000, c.Items[0].FromPrice.AmountMinor); Assert.Equal("NEXT", c.NextCursor); Assert.Equal(4.5, c.Items[0].Rating!.Average); },
+            notYetInContract: ["techSlugs", "nextFreeSlotUtc"]); // wave 3 fields: the Directory's wire record carries them, the shared contract record does not yet
 
     [Fact]
     public void The_last_page_has_no_cursor_and_a_card_without_rating_has_none() =>
         RoundTrip<W.PageDto<W.PractitionerCardDto>>(
-            new Page<PractitionerCard>([new PractitionerCard(Id, "s", "N", "H", null, [], null, true, new MoneyDto(5000), [], [30])]), check: c => { Assert.Null(c.NextCursor); Assert.Null(c.Items[0].Rating); });
+            new Page<PractitionerCard>([new PractitionerCard(Id, "s", "N", "H", null, [], null, true, new MoneyDto(5000), [], [30])]), check: c => { Assert.Null(c.NextCursor); Assert.Null(c.Items[0].Rating); },
+            notYetInContract: ["techSlugs", "nextFreeSlotUtc"]);
+
+    [Fact]
+    public void A_card_reads_the_wave_3_techSlugs_and_nextFreeSlotUtc_as_the_Directory_writes_them()
+    {
+        // the Directory's wire shape (CONTRACTS 3.2): camelCase, the instant with Z; an older Directory omits both, and the copy then has none
+        const string wire = """{"id":"018f0000-0000-7000-8000-000000000001","slug":"s","displayName":"N","headline":"H","githubLogin":null,"badges":[],"rating":null,"isNew":true,"fromPrice":{"amountMinor":5000,"currency":"PLN"},"problemSlugs":[],"durations":[30],"techSlugs":["dotnet","react"],"nextFreeSlotUtc":"2026-11-24T08:30:00Z"}""";
+        var card = JsonSerializer.Deserialize<W.PractitionerCardDto>(wire, W.ApiClient.Json)!;
+        Assert.Equal(["dotnet", "react"], card.TechSlugs);
+        Assert.Equal(new DateTimeOffset(2026, 11, 24, 8, 30, 0, TimeSpan.Zero), card.NextFreeSlotUtc);
+        const string olderWire = """{"id":"018f0000-0000-7000-8000-000000000001","slug":"s","displayName":"N","headline":"H","githubLogin":null,"badges":[],"rating":null,"isNew":true,"fromPrice":{"amountMinor":5000,"currency":"PLN"},"problemSlugs":[],"durations":[30]}""";
+        var older = JsonSerializer.Deserialize<W.PractitionerCardDto>(olderWire, W.ApiClient.Json)!;
+        Assert.Null(older.TechSlugs);
+        Assert.Null(older.NextFreeSlotUtc);
+    }
 
     [Fact]
     public void The_taxonomy() =>
@@ -179,4 +210,14 @@ public class ContractCopiesTests
     [Fact]
     public void Who_am_I() =>
         RoundTrip<W.MeDto>(new MeDto("user-1", Id, PractitionerStatus.Approved, false, true), Plain, c => Assert.Equal((Id, "Approved", true), (c.PractitionerId, c.PractitionerStatus, c.IsModerator)));
+
+    [Fact]
+    public void The_earnings_of_the_month_with_its_four_sums_and_the_count() =>
+        RoundTrip<W.EarningsDto>(new EarningsDto(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30), new MoneyDto(123456), new MoneyDto(4950), new MoneyDto(18000), new MoneyDto(3750), 7), Plain,
+            c => Assert.Equal((new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30), 123456L, 4950L, 18000L, 3750L, 7), (c.From, c.To, c.PaidOut.AmountMinor, c.Pending.AmountMinor, c.Disputed.AmountMinor, c.Fees.AmountMinor, c.Count)));
+
+    [Fact]
+    public void The_notification_preferences_are_the_three_switches_by_kind() =>
+        RoundTrip<W.NotificationPreferencesDto>(new NotificationPreferencesDto([new NotificationPreferenceDto("Reminder24h", false), new NotificationPreferenceDto("Reminder1h", true), new NotificationPreferenceDto("ReviewRequest", true)]), Plain,
+            c => Assert.Equal([("Reminder24h", false), ("Reminder1h", true), ("ReviewRequest", true)], c.Items.Select(i => (i.Kind, i.Enabled))));
 }

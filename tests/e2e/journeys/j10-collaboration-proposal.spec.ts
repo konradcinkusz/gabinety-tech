@@ -6,11 +6,11 @@ import { expect, test } from "../harness/fixtures";
 import { actorContext, registerDemoUser, uniqueDemoName } from "../harness/booking-support";
 import { fetchRetrying } from "../harness/http";
 
-// J8 (ADR proposal 0013): a programmer advertises contract availability, a client sends a long-term proposal, the programmer answers with other terms, the client accepts, and each side
+// J10 (ADR proposal 0013): a programmer advertises contract availability, a client sends a long-term proposal, the programmer answers with other terms, the client accepts, and each side
 // then sees the other's e-mail. The journey is about the UI; the follow-up state (the proposal's status) is read from Booking's API with the client's own token.
 // Everything it creates is in the `demo-` namespace under a unique suffix (the client account, the company name), so it neither depends on nor disturbs another journey.
 // The programmer is the seeded demo-practitioner-6 (Filip Syntetyczny, Approved); the seeder gives him no contract availability, so the journey switches it on itself.
-test.describe("J8 collaboration proposal: advertise, propose, counter, accept", () => {
+test.describe("J10 collaboration proposal: advertise, propose, counter, accept", () => {
   const PROGRAMMER = "demo-practitioner-6";
   const SLUG = "demo-filip-syntetyczny";
   const isoDay = (daysAhead: number) => new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);

@@ -1,2 +1,33 @@
-.practitioner-card__name { margin-bottom: var(--space-1); font-size: var(--text-lg); }
-.practitioner-card__headline { color: var(--color-text-secondary); }
+.practitioner-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-2) var(--space-4);
+}
+
+.practitioner-card__avatar { grid-column: 1; grid-row: 1 / span 2; }
+.practitioner-card__body { grid-column: 2; grid-row: 1; display: grid; gap: var(--space-2); min-width: 0; }
+.practitioner-card__name { margin: 0; font-size: var(--text-lg); line-height: var(--leading-tight); }
+.practitioner-card__headline { margin: 0; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.practitioner-card__meta { margin: 0; }
+.practitioner-card__rating { color: var(--color-text-secondary); }
+
+.practitioner-card__categories {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}
+
+.practitioner-card__categories span + span::before { content: "·"; margin-right: var(--space-3); }
+
+.practitioner-card__techs { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.practitioner-card__next { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.practitioner-card__next time { font-weight: 600; color: var(--color-text); }
+
+/* Right-aligned, below the body on the phone as well: the price is read after the name and the checks. */
+.practitioner-card__price { grid-column: 2; grid-row: 2; justify-self: end; margin: 0; text-align: right; }
+.practitioner-card__from { display: block; font-size: var(--text-lg); font-weight: 600; color: var(--color-text); }
+.practitioner-card__durations { display: block; font-size: var(--text-sm); }

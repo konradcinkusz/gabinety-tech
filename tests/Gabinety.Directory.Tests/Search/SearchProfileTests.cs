@@ -33,7 +33,7 @@ public class SearchProfileTests(SearchFactory f)
         using var doc = JsonDocument.Parse(await f.Anon().GetStringAsync(Url(p.Slug)));
         var root = doc.RootElement;
         Assert.Equal(
-            ["id", "slug", "displayName", "headline", "githubLogin", "badges", "rating", "isNew", "fromPrice", "problemSlugs", "durations",
+            ["id", "slug", "displayName", "headline", "githubLogin", "badges", "rating", "isNew", "fromPrice", "problemSlugs", "durations", "techSlugs",
              "bio", "portfolioUrl", "offerings", "completedCount", "memberSince"],
             root.EnumerateObject().Select(o => o.Name).ToArray());
         Assert.Equal(p.Slug, root.GetProperty("slug").GetString());

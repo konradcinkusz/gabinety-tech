@@ -4,7 +4,7 @@
     {
         <li class="card" data-testid="proposal-round">
             <h3 class="proposal-thread__title">@ProposalFormat.RoundHeading(r)</h3>
-            @if (r.Terms is { } t) {<p class="num">@ProposalFormat.Summary(t)</p>}
+            @if (r.Terms is { } t) {<p>@ProposalFormat.Summary(t)</p>}
             @if (!string.IsNullOrWhiteSpace(r.Text)) {<p class="proposal-thread__text">@r.Text</p>}
         </li>
     }

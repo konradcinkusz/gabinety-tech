@@ -42,7 +42,7 @@ else if (Items is not null)
                     <BookingBadge Badge="ProposalFormat.StatusBadge(p.Status)" />
                 </div>
                 <p class="muted">@ProposalFormat.KindLabel(p.Kind)</p>
-                <p class="num">@ProposalFormat.Summary(p.Terms)</p>
+                <p>@ProposalFormat.Summary(p.Terms)</p>
                 @if (p.YourTurn && ProposalFormat.IsOpen(p.Status)) {<p><strong data-testid="your-turn">@ProposalsText.Status.YourTurn</strong></p>}
                 else if (ProposalFormat.IsOpen(p.Status)) {<p class="muted">@ProposalsText.Status.Waiting</p>}
                 <a class="proposal-row__link" href="@($"{BasePath}/{p.Id}")">@ProposalsText.List.Details<span class="sr-only">: @Counterpart(p)</span></a>
